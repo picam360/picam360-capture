@@ -266,7 +266,7 @@ static void init_model_proj(CUBE_STATE_T *state)
    
    sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
 
-   state->program_obj = GLProgram_new("simplevertshader.glsl", "simplefragshader.glsl");
+   state->program_obj = GLProgram_new("shader/shader.glsl", "shader/fragshader.glsl");
 
    reset_model(state);
 }
