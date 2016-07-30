@@ -53,7 +53,6 @@ void my_fill_buffer_done(void* data, COMPONENT_T* comp)
 // Modified function prototype to work with pthreads
 void *video_decode_test(void* arg)
 {
-   const char* filename = "/opt/vc/src/hello_pi/hello_video/test.h264";
    eglImage = arg;
 
    if (eglImage == 0)
