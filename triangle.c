@@ -218,7 +218,7 @@ static void init_model_proj(CUBE_STATE_T *state)
    glMatrixMode(GL_PROJECTION);
    glLoadIdentity();
 
-   hht = nearp * (float)tan(45.0 / 2.0 / 180.0 * M_PI);
+   hht = nearp * (float)tan(30.0 / 2.0 / 180.0 * M_PI);
    hwd = hht * (float)state->screen_width / (float)state->screen_height;
 
    glFrustumf(-hwd, hwd, -hht, hht, nearp, farp);
@@ -250,7 +250,7 @@ static void reset_model(CUBE_STATE_T *state)
    // reset model rotation
    state->rot_angle_x = 45.f; state->rot_angle_y = 30.f; state->rot_angle_z = 0.f;
    state->rot_angle_x_inc = 0.5f; state->rot_angle_y_inc = 0.5f; state->rot_angle_z_inc = 0.f;
-   state->distance = 40.f;
+   state->distance = 20.f;
 }
 
 /***********************************************************
@@ -350,26 +350,27 @@ static void redraw_scene(CUBE_STATE_T *state)
    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
    // Need to rotate textures - do this by rotating each cube face
-   glRotatef(270.f, 0.f, 0.f, 1.f ); // front face normal along z axis
+   //glRotatef(270.f, 0.f, 0.f, 1.f ); // front face normal along z axis
 
    // draw first 4 vertices
    glDrawArrays( GL_TRIANGLE_STRIP, 0, 4);
-
-   // same pattern for other 5 faces - rotation chosen to make image orientation 'nice'
-   glRotatef(90.f, 0.f, 0.f, 1.f ); // back face normal along z axis
    glDrawArrays( GL_TRIANGLE_STRIP, 4, 4);
 
-   glRotatef(90.f, 1.f, 0.f, 0.f ); // left face normal along x axis
-   glDrawArrays( GL_TRIANGLE_STRIP, 8, 4);
+   // same pattern for other 5 faces - rotation chosen to make image orientation 'nice'
+   //glRotatef(90.f, 0.f, 0.f, 1.f ); // back face normal along z axis
+   //glDrawArrays( GL_TRIANGLE_STRIP, 4, 4);
 
-   glRotatef(90.f, 1.f, 0.f, 0.f ); // right face normal along x axis
-   glDrawArrays( GL_TRIANGLE_STRIP, 12, 4);
+   //glRotatef(90.f, 1.f, 0.f, 0.f ); // left face normal along x axis
+   //glDrawArrays( GL_TRIANGLE_STRIP, 8, 4);
 
-   glRotatef(270.f, 0.f, 1.f, 0.f ); // top face normal along y axis
-   glDrawArrays( GL_TRIANGLE_STRIP, 16, 4);
+   //glRotatef(90.f, 1.f, 0.f, 0.f ); // right face normal along x axis
+   //glDrawArrays( GL_TRIANGLE_STRIP, 12, 4);
 
-   glRotatef(90.f, 0.f, 1.f, 0.f ); // bottom face normal along y axis
-   glDrawArrays( GL_TRIANGLE_STRIP, 20, 4);
+   //glRotatef(270.f, 0.f, 1.f, 0.f ); // top face normal along y axis
+   //glDrawArrays( GL_TRIANGLE_STRIP, 16, 4);
+
+   //glRotatef(90.f, 0.f, 1.f, 0.f ); // bottom face normal along y axis
+   //glDrawArrays( GL_TRIANGLE_STRIP, 20, 4);
 
    eglSwapBuffers(state->display, state->surface);
 }

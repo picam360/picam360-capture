@@ -28,16 +28,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Spatial coordinates for the cube
 
 static const GLbyte quadx[2*4*3] = {
-		   /* LEFT */
-		   -20, -10,  10,
-		   0, -10,  10,
-		   -20,  10,  10,
-		   0,  10,  10,
-		   /* RIGHT */
-		   0, -10,  10,
-		   20, -10,  10,
-		   0,  10,  10,
-		   20,  10,  10
+   /* FRONT */
+   -20, -10,  10,
+   0, -10,  10,
+   -20,  10,  10,
+   0,  10,  10,
+
+   0, -10,  10,
+   20, -10,  10,
+   0,  10,  10,
+   20,  10,  10
 };
 
 /** Texture coordinates for the quad. */
