@@ -92,11 +92,7 @@ typedef struct
 
 static void init_ogl(CUBE_STATE_T *state);
 static void init_model_proj(CUBE_STATE_T *state);
-static void reset_model(CUBE_STATE_T *state);
-static GLfloat inc_and_wrap_angle(GLfloat angle, GLfloat angle_inc);
-static GLfloat inc_and_clip_distance(GLfloat distance, GLfloat distance_inc);
 static void redraw_scene(CUBE_STATE_T *state);
-static void update_model(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state);
 static void exit_func(void);
 static volatile int terminate;

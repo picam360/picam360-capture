@@ -1,6 +1,9 @@
 
 #ifndef _GLPROGRAM_H
 #define _GLPROGRAM_H
+#include <GLES2/gl2.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 #ifdef __cplusplus
 

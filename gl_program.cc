@@ -3,9 +3,6 @@
 #include <assert.h>
 #include <error.h>
 
-#include <GLES2/gl2.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
