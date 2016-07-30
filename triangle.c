@@ -37,7 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "bcm_host.h"
 
-#include "GLES/gl.h"
+#include "GLES2/gl2.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 
@@ -200,8 +200,6 @@ static void init_ogl(CUBE_STATE_T *state)
 
    // Enable back face culling.
    glEnable(GL_CULL_FACE);
-
-   glMatrixMode(GL_MODELVIEW);
 }
 
 int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out) {
@@ -232,9 +230,9 @@ int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out)
   glBufferData(GL_ARRAY_BUFFER, sizeof points, points, GL_STATIC_DRAW);
 
   if(vbo_out != NULL)
-	  vbo_out = vbo;
+	  *vbo_out = vbo;
   if(n_out != NULL)
-	  n_out = n;
+	  *n_out = n;
 
   return 0;
 }
@@ -252,13 +250,6 @@ int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out)
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state)
 {
-   float nearp = 1.0f;
-   float farp = 500.0f;
-   float hht;
-   float hwd;
-
-   glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
-
    glViewport(0, 0, (GLsizei)state->screen_width, (GLsizei)state->screen_height);
    
    sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
