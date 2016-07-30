@@ -46,6 +46,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "triangle.h"
 #include <pthread.h>
 
+#include <mat4/type.h>
+#include <mat4/create.h>
+#include <mat4/identity.h>
+#include <mat4/rotateX.h>
+#include <mat4/rotateY.h>
+#include <mat4/rotateZ.h>
+#include <mat4/multiply.h>
+#include <mat4/transpose.h>
+
+#include "gl_program.h"
 
 #define PATH "./"
 
@@ -65,6 +75,9 @@ typedef struct
    EGLDisplay display;
    EGLSurface surface;
    EGLContext context;
+   void *program_obj;
+   GLuint vbo;
+   GLuint vbo_nop;
    GLuint tex;
 // model rotation vector and direction
    GLfloat rot_angle_x_inc;
@@ -193,6 +206,34 @@ static void init_ogl(CUBE_STATE_T *state)
    glMatrixMode(GL_MODELVIEW);
 }
 
+int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out) {
+  GLuint vbo;
+  int n = 2 * (slices + 1) * stacks;
+  int i = 0;
+  glm::vec3 points[n];
+  float stepsk = M_PI/stacks;
+  float stepsl = 2*M_PI/slices;
+
+  for (float theta = 0.0; theta < M_PI - 0.0001; theta += stepsk) {
+    for (float phi = 0.0; phi <= 2*M_PI + 0.0001; phi += stepsl) {
+      points[i++] = glm::vec3(sin(theta) * sin(phi), cos(theta), sin(theta) * cos(phi))*radius;
+      points[i++] = glm::vec3(sin(theta + stepsk) * sin(phi), cos(theta + stepsk), sin(theta + stepsk) * cos(phi))*radius;
+    }
+  }
+
+
+  glGenBuffers(1, &vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof points, points, GL_STATIC_DRAW);
+
+  if(vbo_out != NULL)
+	  vbo_out = vbo;
+  if(n_out != NULL)
+	  n_out = n;
+
+  return 0;
+}
+
 /***********************************************************
  * Name: init_model_proj
  *
@@ -223,8 +264,9 @@ static void init_model_proj(CUBE_STATE_T *state)
 
    glFrustumf(-hwd, hwd, -hht, hht, nearp, farp);
    
-   glEnableClientState( GL_VERTEX_ARRAY );
-   glVertexPointer( 3, GL_BYTE, 0, quadx );
+   sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
+
+   state->program_obj = GLProgram_new("simplevertshader.glsl", "simplefragshader.glsl");
 
    reset_model(state);
 }
@@ -346,33 +388,35 @@ static GLfloat inc_and_clip_distance(GLfloat distance, GLfloat distance_inc)
  ***********************************************************/
 static void redraw_scene(CUBE_STATE_T *state)
 {
-   // Start with a clear screen
-   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	float x_rad = state->rot_angle_x * M_PI / 180.0;
+	float y_rad = state->rot_angle_y * M_PI / 180.0;
+	float z_rad = state->rot_angle_z * M_PI / 180.0;
 
-   // Need to rotate textures - do this by rotating each cube face
-   //glRotatef(270.f, 0.f, 0.f, 1.f ); // front face normal along z axis
+	// Start with a clear screen
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-   // draw first 4 vertices
-   glDrawArrays( GL_TRIANGLE_STRIP, 0, 4);
-   glDrawArrays( GL_TRIANGLE_STRIP, 4, 4);
+	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
 
-   // same pattern for other 5 faces - rotation chosen to make image orientation 'nice'
-   //glRotatef(90.f, 0.f, 0.f, 1.f ); // back face normal along z axis
-   //glDrawArrays( GL_TRIANGLE_STRIP, 4, 4);
+	glUseProgram(state->program);
 
-   //glRotatef(90.f, 1.f, 0.f, 0.f ); // left face normal along x axis
-   //glDrawArrays( GL_TRIANGLE_STRIP, 8, 4);
+	mat4 unif_matrix = mat4_create();
+	mat4_identity(unif_matrix);
+	mat4_rotateX(unif_matrix, unif_matrix, x_rad);
+	mat4_rotateY(unif_matrix, unif_matrix, -y_rad);
+	mat4_rotateZ(unif_matrix, unif_matrix, -z_rad);
 
-   //glRotatef(90.f, 1.f, 0.f, 0.f ); // right face normal along x axis
-   //glDrawArrays( GL_TRIANGLE_STRIP, 12, 4);
+	//Load in the texture and thresholding parameters.
+	glUniform1i(glGetUniformLocation(GLProgram_GetId(state->program_obj), "tex"), 0);
+	glUniformMatrix4fv(glGetUniformLocation(GLProgram_GetId(state->program_obj), "unif_matrix"),
+			1, GL_FALSE, (GLfloat*) unif_matrix);
 
-   //glRotatef(270.f, 0.f, 1.f, 0.f ); // top face normal along y axis
-   //glDrawArrays( GL_TRIANGLE_STRIP, 16, 4);
+	GLuint loc = glGetAttribLocation(GLProgram_GetId(state->program_obj), "vPosition");
+	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(loc);
 
-   //glRotatef(90.f, 0.f, 1.f, 0.f ); // bottom face normal along y axis
-   //glDrawArrays( GL_TRIANGLE_STRIP, 20, 4);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
 
-   eglSwapBuffers(state->display, state->surface);
+	eglSwapBuffers(state->display, state->surface);
 }
 
 /***********************************************************
@@ -418,10 +462,6 @@ static void init_textures(CUBE_STATE_T *state)
 
    // Start rendering
    pthread_create(&thread1, NULL, video_decode_test, eglImage);
-
-   // setup overall texture environment
-   glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
-   glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
    glEnable(GL_TEXTURE_2D);
 
