@@ -32,3 +32,5 @@ void GLProgram_delete(const void *_this);
 #ifdef __cplusplus
 }
 #endif
+
+#endif

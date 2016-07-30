@@ -41,8 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 
-#include "cube_texture_and_coords.h"
-
 #include "triangle.h"
 #include <pthread.h>
 
@@ -210,14 +208,21 @@ int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out)
   GLuint vbo;
   int n = 2 * (slices + 1) * stacks;
   int i = 0;
-  glm::vec3 points[n];
+  float points[3*n];
   float stepsk = M_PI/stacks;
   float stepsl = 2*M_PI/slices;
+  float theta;
+  float phi;
 
-  for (float theta = 0.0; theta < M_PI - 0.0001; theta += stepsk) {
-    for (float phi = 0.0; phi <= 2*M_PI + 0.0001; phi += stepsl) {
-      points[i++] = glm::vec3(sin(theta) * sin(phi), cos(theta), sin(theta) * cos(phi))*radius;
-      points[i++] = glm::vec3(sin(theta + stepsk) * sin(phi), cos(theta + stepsk), sin(theta + stepsk) * cos(phi))*radius;
+  for (theta = 0.0; theta < M_PI - 0.0001; theta += stepsk) {
+    for (phi = 0.0; phi <= 2*M_PI + 0.0001; phi += stepsl) {
+        points[i++] = sin(theta) * sin(phi) * radius;
+        points[i++] = cos(theta) * radius;
+        points[i++] = sin(theta) * cos(phi) * radius;
+
+        points[i++] = sin(theta + stepsk) * sin(phi) * radius;
+        points[i++] = cos(theta + stepsk) * radius;
+        points[i++] = sin(theta + stepsk) * cos(phi) * radius;
     }
   }
 
@@ -397,7 +402,7 @@ static void redraw_scene(CUBE_STATE_T *state)
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
 
-	glUseProgram(state->program);
+	glUseProgram(GLProgram_GetId(state->program_obj));
 
 	mat4 unif_matrix = mat4_create();
 	mat4_identity(unif_matrix);
