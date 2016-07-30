@@ -138,6 +138,8 @@ static void init_ogl(CUBE_STATE_T *state)
       EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
       EGL_NONE
    };
+	static const EGLint context_attributes[] = { EGL_CONTEXT_CLIENT_VERSION, 2,
+			EGL_NONE };
    
    EGLConfig config;
 
@@ -154,8 +156,12 @@ static void init_ogl(CUBE_STATE_T *state)
    result = eglSaneChooseConfigBRCM(state->display, attribute_list, &config, 1, &num_config);
    assert(EGL_FALSE != result);
 
+	//Bind to the right EGL API.
+	result = eglBindAPI(EGL_OPENGL_ES_API);
+	assert(result != EGL_FALSE);
+
    // create an EGL rendering context
-   state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT, NULL);
+   state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT, context_attributes);
    assert(state->context!=EGL_NO_CONTEXT);
 
    // create an EGL window surface
@@ -200,6 +206,7 @@ static void init_ogl(CUBE_STATE_T *state)
 
 int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out) {
   GLuint vbo;
+  /*
   int n = 2 * (slices + 1) * stacks;
   int i = 0;
   float points[3*n];
@@ -229,6 +236,21 @@ int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out)
 	  *vbo_out = vbo;
   if(n_out != NULL)
 	  *n_out = n;
+*/
+
+	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f,
+			1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+			1.0f };
+
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex_positions),
+			quad_vertex_positions, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	  if(vbo_out != NULL)
+		  *vbo_out = vbo;
+	  if(n_out != NULL)
+		  *n_out = 4;
 
   return 0;
 }
@@ -250,7 +272,7 @@ static void init_model_proj(CUBE_STATE_T *state)
    
    sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
 
-   state->program_obj = GLProgram_new("shader/shader.glsl", "shader/fragshader.glsl");
+   state->program_obj = GLProgram_new("shader/vertshader.glsl", "shader/fragshader.glsl");
 }
 
 /***********************************************************
