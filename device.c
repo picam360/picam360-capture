@@ -17,6 +17,9 @@ void *threadFunc( void *data )
         // Try to sample the device for 1ms
         waitSampleDevice(localDev, 1000);
 
+        printf("\tQ:%+-10g %+-10g %+-10g %+-10g\n", localDev->Q[0], localDev->Q[1], localDev->Q[2], localDev->Q[3] );
+
+
         // Send a keepalive - this is too often.  Need to only send on keepalive interval
         sendSensorKeepAlive(localDev);
     }
