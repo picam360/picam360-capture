@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mat4/transpose.h>
 
 #include "gl_program.h"
+#include <libovr_nsb/OVR.h>
 
 #define PATH "./"
 
@@ -74,6 +75,7 @@ typedef struct
    EGLSurface surface;
    EGLContext context;
    void *program_obj;
+   Device *device;
    GLuint vbo;
    GLuint vbo_nop;
    GLuint tex;
@@ -289,6 +291,10 @@ static void init_model_proj(CUBE_STATE_T *state)
  ***********************************************************/
 static void redraw_scene(CUBE_STATE_T *state)
 {
+    waitSampleDevice(state->device, 1000);
+    sendSensorKeepAlive(state->device);
+    printf("\tQ:%+-10g %+-10g %+-10g %+-10g\n", dev->Q[0], dev->Q[1], dev->Q[2], dev->Q[3] );
+
 	float x_rad = state->rot_angle_x * M_PI / 180.0;
 	float y_rad = state->rot_angle_y * M_PI / 180.0;
 	float z_rad = state->rot_angle_z * M_PI / 180.0;
@@ -300,11 +306,12 @@ static void redraw_scene(CUBE_STATE_T *state)
 
 	glUseProgram(GLProgram_GetId(state->program_obj));
 
+	float quat[4] = {dev->Q[0], dev->Q[1], dev->Q[2], dev->Q[3]};
 	mat4 unif_matrix = mat4_create();
-	mat4_identity(unif_matrix);
-	mat4_rotateX(unif_matrix, unif_matrix, x_rad);
-	mat4_rotateY(unif_matrix, unif_matrix, -y_rad);
-	mat4_rotateZ(unif_matrix, unif_matrix, -z_rad);
+	mat4_fromQuat(unif_matrix, quat);
+	//mat4_rotateX(unif_matrix, unif_matrix, x_rad);
+	//mat4_rotateY(unif_matrix, unif_matrix, -y_rad);
+	//mat4_rotateZ(unif_matrix, unif_matrix, -z_rad);
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(GLProgram_GetId(state->program_obj), "tex"), 0);
@@ -395,6 +402,20 @@ static void exit_func(void)
 
 //==============================================================================
 
+static void init_device()
+{
+    Device *dev = openRift(0,0);
+
+    if( !dev )
+    {
+        printf("Could not locate Rift\n");
+        printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
+    }
+
+    sendSensorKeepAlive(dev);
+    state->device = dev;
+}
+
 int main ()
 {
    bcm_host_init();
@@ -402,6 +423,8 @@ int main ()
 
    // Clear application state
    memset( state, 0, sizeof( *state ) );
+
+   init_device();
       
    // Start OGLES
    init_ogl(state);
@@ -414,7 +437,7 @@ int main ()
 
    while (!terminate)
    {
-     redraw_scene(state);
+       redraw_scene(state);
    }
    exit_func();
    return 0;
