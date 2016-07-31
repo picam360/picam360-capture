@@ -4,6 +4,25 @@
 static Device *dev = NULL;
 static float quat[4];
 
+/////////////////////////////////////////////////////////////////////////////////////
+// Continuous sample/update thread code
+// select() chosen for portability
+/////////////////////////////////////////////////////////////////////////////////////
+void *threadFunc( void *data )
+{
+    Device *localDev = (Device *)data;
+
+    while( localDev->runSampleThread )
+    {
+        // Try to sample the device for 1ms
+        waitSampleDevice(localDev, 1000);
+
+        // Send a keepalive - this is too often.  Need to only send on keepalive interval
+        sendSensorKeepAlive(localDev);
+    }
+    return 0;
+}
+
 void init_device()
 {
     dev = openRift(0,0);
@@ -14,16 +33,16 @@ void init_device()
         printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
     }
 
-    sendSensorKeepAlive(dev);
+    setKeepAliveInterval(1000);
+
+    pthread_t f1_thread;
+    dev->runSampleThread = TRUE;
+    pthread_create(&f1_thread,NULL,threadFunc,dev);
 }
 
 float *get_quatanion()
 {
 	int i;
-    waitSampleDevice(dev, 1000);
-    sendSensorKeepAlive(dev);
-    printf("\tQ:%+-10g %+-10g %+-10g %+-10g\n", dev->Q[0], dev->Q[1], dev->Q[2], dev->Q[3] );
-
 	for(i=0;i<4;i++)
 	{
 		quat[i] = dev->Q[i];
