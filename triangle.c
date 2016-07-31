@@ -79,7 +79,6 @@ typedef struct
    EGLSurface surface;
    EGLContext context;
    void *program_obj;
-   Device *device;
    GLuint vbo;
    GLuint vbo_nop;
    GLuint tex;
