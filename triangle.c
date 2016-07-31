@@ -40,10 +40,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "GLES2/gl2.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
+#include <libovr_nsb/OVR.h>
 
 #include "triangle.h"
 #include <pthread.h>
 
+#define mat4_create _mat4_create
 #include <mat4/type.h>
 #include <mat4/create.h>
 #include <mat4/identity.h>
@@ -54,7 +56,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mat4/transpose.h>
 
 #include "gl_program.h"
-#include <libovr_nsb/OVR.h>
 
 #define PATH "./"
 
