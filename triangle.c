@@ -288,10 +288,6 @@ static void init_model_proj(CUBE_STATE_T *state)
  ***********************************************************/
 static void redraw_scene(CUBE_STATE_T *state)
 {
-	float x_rad = state->rot_angle_x * M_PI / 180.0;
-	float y_rad = state->rot_angle_y * M_PI / 180.0;
-	float z_rad = state->rot_angle_z * M_PI / 180.0;
-
 	// Start with a clear screen
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
@@ -307,9 +303,6 @@ static void redraw_scene(CUBE_STATE_T *state)
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
-	//mat4_rotateX(unif_matrix, unif_matrix, x_rad);
-	//mat4_rotateY(unif_matrix, unif_matrix, -y_rad);
-	//mat4_rotateZ(unif_matrix, unif_matrix, -z_rad);
 
 	mat4_multiply(unif_matrix, matrix_camera, unif_matrix);
 
