@@ -19,13 +19,13 @@ void main(void) {
         float z = 0.75;
         float len = length(vec2(tcoord_x, z));
         float roll_orig = atan(tcoord.y, len);
-        float yaw_orig = atan(tcoord_x, z);
+        float yaw_orig = -atan(tcoord_x, z);
         pos.x = cos(roll_orig) * sin(yaw_orig);//yaw starts from y
         pos.y = cos(roll_orig) * cos(yaw_orig);//yaw starts from y
         pos.z = sin(roll_orig);
         pos = unif_matrix * pos;
         float roll = asin(pos.z);
-        float yaw = atan(pos.x, pos.y);//yaw starts from y
+        float yaw = -atan(pos.x, pos.y);//yaw starts from y
         //float roll = roll_orig;
         //float yaw = yaw_orig;
         //if(roll > -0.1 && roll < 0.1) {

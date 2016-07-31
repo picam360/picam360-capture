@@ -299,11 +299,19 @@ static void redraw_scene(CUBE_STATE_T *state)
 
 	glUseProgram(GLProgram_GetId(state->program_obj));
 
+	mat4 matrix_camera = mat4_create();
+	mat4_identity(matrix_camera);
+	mat4_rotateZ(matrix_camera, matrix_camera, 0);
+	mat4_rotateY(matrix_camera, matrix_camera, 0);
+	mat4_rotateX(matrix_camera, matrix_camera, M_PI/2);
+
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
 	//mat4_rotateX(unif_matrix, unif_matrix, x_rad);
 	//mat4_rotateY(unif_matrix, unif_matrix, -y_rad);
 	//mat4_rotateZ(unif_matrix, unif_matrix, -z_rad);
+
+	mat4_multiply(unif_matrix, matrix_camera, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(GLProgram_GetId(state->program_obj), "tex"), 0);
