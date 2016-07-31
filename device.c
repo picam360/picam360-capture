@@ -33,7 +33,7 @@ void init_device()
         printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
     }
 
-    setKeepAliveInterval(1000);
+    setKeepAliveInterval(dev, 1000);
 
     pthread_t f1_thread;
     dev->runSampleThread = TRUE;

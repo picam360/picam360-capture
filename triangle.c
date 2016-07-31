@@ -44,10 +44,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "triangle.h"
 #include <pthread.h>
 
-#define mat4_create _mat4_create
-#define mat4_identity _mat4_identity
-#define mat4_rotateX _mat4_rotateX
-#define mat4_create _mat4_create
 #include <mat4/type.h>
 #include <mat4/create.h>
 #include <mat4/identity.h>
@@ -62,9 +58,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "device.h"
 
 #define PATH "./"
-
-#define IMAGE_SIZE_WIDTH 1440
-#define IMAGE_SIZE_HEIGHT 1440
 
 #ifndef M_PI
    #define M_PI 3.141592654
@@ -99,7 +92,7 @@ typedef struct
 static void init_ogl(CUBE_STATE_T *state);
 static void init_model_proj(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
-static void init_textures(CUBE_STATE_T *state);
+static void init_textures(CUBE_STATE_T *state, int image_size_with, int image_size_height);
 static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state=&_state;
@@ -338,13 +331,13 @@ static void redraw_scene(CUBE_STATE_T *state)
  * Returns: void
  *
  ***********************************************************/
-static void init_textures(CUBE_STATE_T *state)
+static void init_textures(CUBE_STATE_T *state, int image_size_with, int image_size_height)
 {
    //// load three texture buffers but use them on six OGL|ES texture surfaces
    glGenTextures(1, &state->tex);
 
    glBindTexture(GL_TEXTURE_2D, state->tex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, IMAGE_SIZE_WIDTH, IMAGE_SIZE_HEIGHT, 0,
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with, image_size_height, 0,
                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -401,8 +394,11 @@ static void exit_func(void)
 
 //==============================================================================
 
-int main ()
+int main (int argc, char *argv[])
 {
+	int image_size_with = 1024;
+	int image_size_height = 1024;
+
    bcm_host_init();
    printf("Note: ensure you have sufficient gpu_mem configured\n");
 
@@ -418,7 +414,7 @@ int main ()
    init_model_proj(state);
 
    // initialise the OGLES texture(s)
-   init_textures(state);
+   init_textures(state, image_size_with, image_size_height);
 
    while (!terminate)
    {
