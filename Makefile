@@ -1,4 +1,4 @@
-OBJS=triangle.o video.o gl_program.o
+OBJS=triangle.o video.o gl_program.o device.o
 BIN=hello_videocube.bin
 LDFLAGS+=-lilclient
 

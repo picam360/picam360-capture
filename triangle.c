@@ -56,6 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mat4/rotateZ.h>
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
+#include <mat4/fromQuat.h>
 
 #include "gl_program.h"
 #include "device.h"
