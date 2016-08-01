@@ -1,4 +1,5 @@
 
+#include <pthread.h>
 #include <libovr_nsb/OVR.h>
 
 static Device *dev = NULL;
@@ -29,10 +30,11 @@ void init_device()
 {
     dev = openRift(0,0);
 
-    if( !dev )
+    if(dev == NULL)
     {
         printf("Could not locate Rift\n");
         printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
+        return;
     }
 
     setKeepAliveInterval(dev, 1000);
@@ -47,7 +49,14 @@ float *get_quatanion()
 	int i;
 	for(i=0;i<4;i++)
 	{
-		quat[i] = dev->Q[i];
+	    if(dev == NULL)
+	    {
+	    	quat[i] = 0;
+	    }
+	    else
+	    {
+	    	quat[i] = dev->Q[i];
+	    }
 	}
 	return quat;
 }
