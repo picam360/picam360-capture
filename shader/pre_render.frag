@@ -6,7 +6,7 @@ const float M_PI = 3.1415926535;
 const float image_r = 0.85;
 const vec2 center1 = vec2(0.50, 0.50);
 float k = 1.0;
-float step = 1.0 / 1024;
+float step = 1.0 / 1024.0;
 
 void main(void) {
         float fov = 45.0;
