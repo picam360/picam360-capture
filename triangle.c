@@ -76,6 +76,8 @@ typedef struct
    GLuint vbo;
    GLuint vbo_nop;
    GLuint tex;
+   GLuint pre_render_texture;
+   GLuint framebuffer;
 // model rotation vector and direction
    GLfloat rot_angle_x_inc;
    GLfloat rot_angle_y_inc;
@@ -91,6 +93,7 @@ typedef struct
 
 static void init_ogl(CUBE_STATE_T *state);
 static void init_model_proj(CUBE_STATE_T *state);
+static void redraw_pre_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state, int image_size_with, int image_size_height);
 static void exit_func(void);
@@ -196,6 +199,26 @@ static void init_ogl(CUBE_STATE_T *state)
    result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
    assert(EGL_FALSE != result);
 
+   //texture rendering
+	glGenFramebuffers(1, &state->framebuffer);
+
+    glGenTexture(GL_TEXTURE_2D, &state->pre_render_texture);
+    glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 320, 480, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_MAG_FLITER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_MIN_FLITER, GL_LINEAR);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+			state->pre_render_texture, 0);
+	if (glGetError() != GL_NO_ERROR) {
+		printf("glFramebufferTexture2D failed. Could not allocate framebuffer.");
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
    // Set background color and clear buffers
    glClearColor(0.15f, 0.25f, 0.35f, 1.0f);
 
@@ -267,8 +290,6 @@ int sphere(float radius, int slices, int stacks, GLuint *vbo_out, GLuint *n_out)
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state)
 {
-   glViewport(0, 0, (GLsizei)state->screen_width, (GLsizei)state->screen_height);
-   
    sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
 
    state->program_obj = GLProgram_new("shader/vertshader.glsl", "shader/fragshader.glsl");
@@ -286,12 +307,13 @@ static void init_model_proj(CUBE_STATE_T *state)
  * Returns: void
  *
  ***********************************************************/
-static void redraw_scene(CUBE_STATE_T *state)
+static void redraw_pre_render_texture(CUBE_STATE_T *state)
 {
-	// Start with a clear screen
-	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
+	glViewport(0, 0, 320, 480);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
+	glBindTexture(GL_TEXTURE_2D, state->tex);
 
 	glUseProgram(GLProgram_GetId(state->program_obj));
 
@@ -318,6 +340,24 @@ static void redraw_scene(CUBE_STATE_T *state)
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
 
 	eglSwapBuffers(state->display, state->surface);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+static void redraw_scene(CUBE_STATE_T *state)
+{
+	glViewport(0, 0, (GLsizei)state->screen_width, (GLsizei)state->screen_height);
+
+	// Start with a clear screen
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
+
+	eglSwapBuffers(state->display, state->surface);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 }
 
 /***********************************************************
@@ -419,6 +459,7 @@ int main (int argc, char *argv[])
 
    while (!terminate)
    {
+	   redraw_pre_render_texture(state);
        redraw_scene(state);
    }
    exit_func();
