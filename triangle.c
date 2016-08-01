@@ -72,7 +72,10 @@ typedef struct
    EGLDisplay display;
    EGLSurface surface;
    EGLContext context;
-   void *program_obj;
+   struct {
+	   void *pre_render;
+	   void *stereo;
+   } program;
    GLuint vbo;
    GLuint vbo_nop;
    GLuint tex;
@@ -293,7 +296,8 @@ static void init_model_proj(CUBE_STATE_T *state)
 {
    sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
 
-   state->program_obj = GLProgram_new("shader/vertshader.glsl", "shader/fragshader.glsl");
+   state->program->pre_render = GLProgram_new("shader/pre_render.vert", "shader/pre_render.frag");
+   state->program->stereo = GLProgram_new("shader/stereo.vert", "shader/stereo.frag");
 }
 
 /***********************************************************
@@ -310,13 +314,15 @@ static void init_model_proj(CUBE_STATE_T *state)
  ***********************************************************/
 static void redraw_pre_render_texture(CUBE_STATE_T *state)
 {
+	int program = GLProgram_GetId(state->program->pre_render);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 	glViewport(0, 0, 320, 480);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
 
-	glUseProgram(GLProgram_GetId(state->program_obj));
+	glUseProgram(program);
 
 	mat4 matrix_camera = mat4_create();
 	mat4_identity(matrix_camera);
@@ -330,11 +336,11 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state)
 	mat4_multiply(unif_matrix, matrix_camera, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
-	glUniform1i(glGetUniformLocation(GLProgram_GetId(state->program_obj), "tex"), 0);
-	glUniformMatrix4fv(glGetUniformLocation(GLProgram_GetId(state->program_obj), "unif_matrix"),
+	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"),
 			1, GL_FALSE, (GLfloat*) unif_matrix);
 
-	GLuint loc = glGetAttribLocation(GLProgram_GetId(state->program_obj), "vPosition");
+	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
@@ -348,17 +354,37 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state)
 }
 static void redraw_scene(CUBE_STATE_T *state)
 {
-	glViewport(0, 0, (GLsizei)state->screen_width, (GLsizei)state->screen_height);
+	int program = GLProgram_GetId(state->program->stereo_program_obj);
+
+
+	glUseProgram(program);
 
 	// Start with a clear screen
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 
+	//Load in the texture and thresholding parameters.
+	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"),
+			1, GL_FALSE, (GLfloat*) unif_matrix);
+
+	GLuint loc = glGetAttribLocation(program, "vPosition");
+	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(loc);
+
+	//left eye
+	glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
+
+	//right eye
+	glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width, (GLsizei)state->screen_height);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
+
 	eglSwapBuffers(state->display, state->surface);
 
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
 }
 
 /***********************************************************
