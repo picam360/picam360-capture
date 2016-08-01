@@ -296,8 +296,8 @@ static void init_model_proj(CUBE_STATE_T *state)
 {
    sphere(10, 10, 10, &state->vbo, &state->vbo_nop);
 
-   state->program->pre_render = GLProgram_new("shader/pre_render.vert", "shader/pre_render.frag");
-   state->program->stereo = GLProgram_new("shader/stereo.vert", "shader/stereo.frag");
+   state->program.pre_render = GLProgram_new("shader/pre_render.vert", "shader/pre_render.frag");
+   state->program.stereo = GLProgram_new("shader/stereo.vert", "shader/stereo.frag");
 }
 
 /***********************************************************
@@ -314,7 +314,7 @@ static void init_model_proj(CUBE_STATE_T *state)
  ***********************************************************/
 static void redraw_pre_render_texture(CUBE_STATE_T *state)
 {
-	int program = GLProgram_GetId(state->program->pre_render);
+	int program = GLProgram_GetId(state->program.pre_render);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 	glViewport(0, 0, 320, 480);
@@ -354,7 +354,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state)
 }
 static void redraw_scene(CUBE_STATE_T *state)
 {
-	int program = GLProgram_GetId(state->program->stereo_program_obj);
+	int program = GLProgram_GetId(state->program.stereo_program_obj);
 
 
 	glUseProgram(program);
