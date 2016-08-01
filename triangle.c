@@ -315,14 +315,13 @@ static void init_model_proj(CUBE_STATE_T *state)
 static void redraw_pre_render_texture(CUBE_STATE_T *state)
 {
 	int program = GLProgram_GetId(state->program.pre_render);
+	glUseProgram(program);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 	glViewport(0, 0, 320, 480);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
-
-	glUseProgram(program);
 
 	mat4 matrix_camera = mat4_create();
 	mat4_identity(matrix_camera);
@@ -355,13 +354,12 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state)
 static void redraw_scene(CUBE_STATE_T *state)
 {
 	int program = GLProgram_GetId(state->program.stereo);
-
-
 	glUseProgram(program);
 
 	// Start with a clear screen
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
+	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 
 	//Load in the texture and thresholding parameters.
@@ -376,7 +374,7 @@ static void redraw_scene(CUBE_STATE_T *state)
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
 
 	//right eye
-	glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width, (GLsizei)state->screen_height);
+	glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
 
 	eglSwapBuffers(state->display, state->surface);

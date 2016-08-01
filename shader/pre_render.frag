@@ -3,13 +3,12 @@ uniform mat4 unif_matrix;
 uniform sampler2D tex;
 
 const float M_PI = 3.1415926535;
-const float aspect = 480.0 / 640.0;
 const float image_r = 0.85;
 const vec2 center1 = vec2(0.50, 0.50);
 
 void main(void) {
         float fov = 45.0;
-        float u_factor = aspect*image_r;
+        float u_factor = image_r;
         float v_factor = image_r;
         float u = 0.0;
         float v = 0.0;
@@ -29,8 +28,8 @@ void main(void) {
         //if(roll > -0.1 && roll < 0.1) {
         //} else
         //if (roll > 0.0) {
-                float r = (M_PI / 2.0 - roll) / M_PI;
-                float yaw2 = -yaw + M_PI;
+                float r = (roll + M_PI / 2.0) / M_PI;
+                float yaw2 = yaw + M_PI;
                 u = u_factor * r * cos(yaw2) + center1.x;
                 v = v_factor * r * sin(yaw2) + center1.y;
                 if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
