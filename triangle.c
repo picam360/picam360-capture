@@ -354,7 +354,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state)
 }
 static void redraw_scene(CUBE_STATE_T *state)
 {
-	int program = GLProgram_GetId(state->program.stereo_program_obj);
+	int program = GLProgram_GetId(state->program.stereo);
 
 
 	glUseProgram(program);
@@ -366,8 +366,6 @@ static void redraw_scene(CUBE_STATE_T *state)
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
-	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"),
-			1, GL_FALSE, (GLfloat*) unif_matrix);
 
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
