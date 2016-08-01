@@ -345,8 +345,6 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state)
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
 
-	eglSwapBuffers(state->display, state->surface);
-
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
