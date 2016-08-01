@@ -202,14 +202,15 @@ static void init_ogl(CUBE_STATE_T *state)
    //texture rendering
 	glGenFramebuffers(1, &state->framebuffer);
 
-    glGenTexture(GL_TEXTURE_2D, &state->pre_render_texture);
-    glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 320, 480, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_MAG_FLITER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_2D_MIN_FLITER, GL_LINEAR);
+	glGenTextures(1, &state->pre_render_texture);
+	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 320, 480, 0, GL_RGB,	GL_UNSIGNED_BYTE, NULL);
+	if (glGetError() != GL_NO_ERROR) {
+		printf("glTexImage2D failed. Could not allocate texture buffer.");
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
