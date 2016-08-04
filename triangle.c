@@ -79,6 +79,7 @@ typedef struct {
 	} program;
 	GLuint pre_render_vbo;
 	GLuint pre_render_vbo_nop;
+	GLfloat pre_render_vbo_scale;
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	GLuint tex;
@@ -258,7 +259,7 @@ int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 }
 
 int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
-		GLuint *vbo_out, GLuint *n_out) {
+		GLuint *vbo_out, GLuint *n_out, GLuint *scale_out) {
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
@@ -276,6 +277,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 	float step_x = (end_x - start_x) / num_of_steps;
 	float step_y = (end_y - start_y) / num_of_steps;
 
+	float scale = 0;
 	int idx = 0;
 	int i, j;
 	for (i = 0; i < num_of_steps; i++) {	//x
@@ -289,6 +291,10 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = y / len;
 				points[idx++] = z / len;
 				points[idx++] = 1.0;
+				if(scale == 0)
+				{
+					scale = len / x;
+				}
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
@@ -316,6 +322,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 		*vbo_out = vbo;
 	if (n_out != NULL)
 		*n_out = n;
+	if (scale_out != NULL)
+		*scale_out = scale;
 
 	return 0;
 }
@@ -335,7 +343,7 @@ static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 120.0;
 	float aspect = state->pre_render_height / state->pre_render_width;
 	fovmesh(fov, fov * aspect, 20, &state->pre_render_vbo,
-			&state->pre_render_vbo_nop);
+			&state->pre_render_vbo_nop, &state->pre_render_vbo_scale);
 	stereomesh(&state->stereo_vbo, &state->stereo_vbo_nop);
 
 	state->program.pre_render = GLProgram_new("shader/pre_render.vert",
