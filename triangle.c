@@ -231,7 +231,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
-	float points[3 * n];
+	float points[4 * n];
 
 	float theta = theta_degree * M_PI / 180.0;
 	float phi = phi_degree * M_PI / 180.0;
@@ -247,29 +247,29 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 
 	int idx = 0;
 	int i, j;
-	for (i = 0; i < num_of_steps; i++) {
-		for (j = 0; j <= num_of_steps; j++) {
+	for (i = 0; i < num_of_steps; i++) {//x
+		for (j = 0; j <= num_of_steps; j++) {//y
 			{
-				float x = start_x + step_x * j;
-				float y = start_y + step_y * i;
+				float x = start_x + step_x * i;
+				float y = start_y + step_y * j;
 				float z = 1.0;
-				float len = sqrt(x * x + z * z);
-				float roll = atan2(y, len);
+				float roll = atan2(y, z);
 				float yaw = atan2(x, z);
 				points[idx++] = cos(roll) * sin(yaw);
+				points[idx++] = sin(roll);
 				points[idx++] = cos(roll) * cos(yaw);
 				points[idx++] = sin(roll);
 			}
 			{
-				float x = start_x + step_x * j;
-				float y = start_y + step_y * (i + 1);
+				float x = start_x + step_x * (i+1);
+				float y = start_y + step_y * j;
 				float z = 1.0;
 				float len = sqrt(x * x + z * z);
-				float roll = atan2(y, len);
+				float roll = atan2(y, z);
 				float yaw = atan2(x, z);
 				points[idx++] = cos(roll) * sin(yaw);
-				points[idx++] = cos(roll) * cos(yaw);
 				points[idx++] = sin(roll);
+				points[idx++] = cos(roll) * cos(yaw);
 			}
 		}
 	}
@@ -300,8 +300,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 90.0;
-	fovmesh(fov, fov * state->screen_height / state->screen_width, 20,
-			&state->vbo, &state->vbo_nop);
+	float aspect = state->screen_height / (state->screen_width / 2);
+	fovmesh(fov, fov * aspect, 20, &state->vbo, &state->vbo_nop);
 
 	state->program.pre_render = GLProgram_new("shader/pre_render.vert",
 			"shader/pre_render.frag");
