@@ -368,15 +368,15 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
 	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, M_PI / 2);
+	mat4_rotateX(camera_matrix, camera_matrix, -M_PI / 5);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
-	float scale_factor[3] = {1.0,1.0,-1.0};
-	mat4_scale(unif_matrix, unif_matrix, M_PI / 2);
-	mat4_rotateX(unif_matrix, unif_matrix, M_PI / 2);
+	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2);
+	float scale_factor[3] = {1.0,-1.0,-1.0};
+	mat4_scale(unif_matrix, unif_matrix, scale_factor);
 
-	//mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
+	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
