@@ -49,6 +49,7 @@
 #include <mat4/rotateX.h>
 #include <mat4/rotateY.h>
 #include <mat4/rotateZ.h>
+#include <mat4/scale.h>
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
 #include <mat4/fromQuat.h>
@@ -371,6 +372,8 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
+	float scale_factor[3] = {1.0,1.0,-1.0};
+	mat4_scale(unif_matrix, unif_matrix, M_PI / 2);
 	mat4_rotateX(unif_matrix, unif_matrix, M_PI / 2);
 
 	//mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
