@@ -277,30 +277,30 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 	int idx = 0;
 	int i, j;
 	for (i = 0; i < num_of_steps; i++) {	//x
-		for (j = 0; j <= num_of_steps; j++) {	//z
+		for (j = 0; j <= num_of_steps; j++) {	//y
 			{
 				float x = start_x + step_x * i;
-				float z = start_y + step_y * j;
-				float y = 1.0;
+				float y = start_y + step_y * j;
+				float z = 1.0;
 				float len = sqrt(x*x+y*y+z*z);
 				points[idx++] = x/len;
 				points[idx++] = y/len;
 				points[idx++] = z/len;
 				points[idx++] = 1.0;
-				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-				//		points[idx - 3], points[idx - 2], points[idx - 1]);
+				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+						points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 			{
 				float x = start_x + step_x * (i + 1);
-				float y = 1.0;
-				float z = start_y + step_y * j;
+				float y = start_y + step_y * j;
+				float z = 1.0;
 				float len = sqrt(x*x+y*y+z*z);
 				points[idx++] = x/len;
 				points[idx++] = y/len;
 				points[idx++] = z/len;
 				points[idx++] = 1.0;
-				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-				//		points[idx - 3], points[idx - 2], points[idx - 1]);
+				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+						points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 		}
 	}
@@ -371,6 +371,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
+	mat4_rotateX(unif_matrix, M_PI / 2);
 
 	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
