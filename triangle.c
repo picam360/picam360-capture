@@ -79,7 +79,7 @@ typedef struct {
 	} program;
 	GLuint pre_render_vbo;
 	GLuint pre_render_vbo_nop;
-	GLfloat pre_render_vbo_scale;
+	float pre_render_vbo_scale;
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	GLuint tex;
@@ -259,7 +259,7 @@ int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 }
 
 int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
-		GLuint *vbo_out, GLuint *n_out, GLfloat *scale_out) {
+		GLuint *vbo_out, GLuint *n_out, float *scale_out) {
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
