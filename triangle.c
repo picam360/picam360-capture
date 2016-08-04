@@ -287,8 +287,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = y/len;
 				points[idx++] = z/len;
 				points[idx++] = 1.0;
-				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-						points[idx - 3], points[idx - 2], points[idx - 1]);
+				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+				//		points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 			{
 				float x = start_x + step_x * (i + 1);
@@ -299,8 +299,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = y/len;
 				points[idx++] = z/len;
 				points[idx++] = 1.0;
-				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-						points[idx - 3], points[idx - 2], points[idx - 1]);
+				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+				//		points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 		}
 	}
@@ -373,7 +373,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_fromQuat(unif_matrix, get_quatanion());
 	mat4_rotateX(unif_matrix, unif_matrix, M_PI / 2);
 
-	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
+	//mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
