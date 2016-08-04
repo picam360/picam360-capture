@@ -203,8 +203,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 320, 480, 0, GL_RGB,
-			GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width / 4,
+			state->screen_height / 2, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
@@ -247,8 +247,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 
 	int idx = 0;
 	int i, j;
-	for (i = 0; i < num_of_steps; i++) {//x
-		for (j = 0; j <= num_of_steps; j++) {//y
+	for (i = 0; i < num_of_steps; i++) {	//x
+		for (j = 0; j <= num_of_steps; j++) {	//y
 			{
 				float x = start_x + step_x * i;
 				float y = start_y + step_y * j;
@@ -258,18 +258,22 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = cos(roll) * sin(yaw);
 				points[idx++] = sin(roll);
 				points[idx++] = cos(roll) * cos(yaw);
-				points[idx++] = sin(roll);
+				points[idx++] = 1.0;
+				printf("x=%f,y=%f,z=%f,w=%f¥n", points[idx - 4],
+						points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 			{
-				float x = start_x + step_x * (i+1);
+				float x = start_x + step_x * (i + 1);
 				float y = start_y + step_y * j;
 				float z = 1.0;
-				float len = sqrt(x * x + z * z);
 				float roll = atan2(y, z);
 				float yaw = atan2(x, z);
 				points[idx++] = cos(roll) * sin(yaw);
 				points[idx++] = sin(roll);
 				points[idx++] = cos(roll) * cos(yaw);
+				points[idx++] = 1.0;
+				printf("x=%f,y=%f,z=%f,w=%f¥n", points[idx - 4],
+						points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 		}
 	}
