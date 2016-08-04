@@ -293,7 +293,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = 1.0;
 				if(scale == 0)
 				{
-					scale = z / -x);
+					scale = z / -x;
 				}
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
@@ -378,7 +378,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
 	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, 30.0 * M_PI / 180.0);
+	mat4_rotateX(camera_matrix, camera_matrix, 20.0 * M_PI / 180.0);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
