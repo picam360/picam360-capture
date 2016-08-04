@@ -293,7 +293,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = 1.0;
 				if(scale == 0)
 				{
-					scale = abs(len / x);
+					scale = z / -x);
 				}
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
