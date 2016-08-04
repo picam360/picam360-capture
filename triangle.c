@@ -364,19 +364,27 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
 
-	mat4 matrix_camera = mat4_create();
-	mat4_identity(matrix_camera);
-	mat4_rotateZ(matrix_camera, matrix_camera, 0);
-	mat4_rotateY(matrix_camera, matrix_camera, 0);
-	mat4_rotateX(matrix_camera, matrix_camera, M_PI / 2);
+	float fov = 90.0;
+	float aspect = state->pre_render_height / state->pre_render_width;
+	mat4 projection_matrix = mat4_create();
+	mat4_perspective(projection_matrix, fov, aspect, 0.1, 100.0);
+
+
+	mat4 camera_matrix = mat4_create();
+	mat4_identity(camera_matrix);
+	mat4_rotateZ(camera_matrix, camera_matrix, 0);
+	mat4_rotateY(camera_matrix, camera_matrix, 0);
+	mat4_rotateX(camera_matrix, camera_matrix, M_PI / 2);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
 
-	mat4_multiply(unif_matrix, matrix_camera, unif_matrix);
+	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	glUniformMatrix4fv(glGetUniformLocation(program, "projection_matrix"), 1,
+			GL_FALSE, (GLfloat*) projection_matrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
 
@@ -419,7 +427,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glViewport(state->screen_width / 2 + state->screen_width / 8,
 			state->screen_height / 4, (GLsizei) state->screen_width / 4,
 			(GLsizei) state->screen_height / 2);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 	eglSwapBuffers(state->display, state->surface);
 

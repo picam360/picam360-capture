@@ -1,4 +1,5 @@
-varying vec2 tcoord;
+attribute vec4 vPosition;
+
 uniform mat4 unif_matrix;
 uniform sampler2D tex;
 
@@ -9,8 +10,7 @@ const vec2 center1 = vec2(0.50, 0.50);
 void main(void) {
         float u = 0.0;
         float v = 0.0;
-        vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
-        pos = unif_matrix * pos;
+        vec4 pos = unif_matrix * vPosition;
         float roll = asin(pos.y);
         float yaw = atan(pos.x, pos.z);
         float r = (roll + M_PI / 2.0) / M_PI;
