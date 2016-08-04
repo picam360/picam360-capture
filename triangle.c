@@ -259,7 +259,7 @@ int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 }
 
 int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
-		GLuint *vbo_out, GLuint *n_out, GLuint *scale_out) {
+		GLuint *vbo_out, GLuint *n_out, GLfloat *scale_out) {
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
@@ -293,7 +293,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = 1.0;
 				if(scale == 0)
 				{
-					scale = len / x;
+					scale = abs(len / x);
 				}
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
