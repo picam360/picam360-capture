@@ -65,6 +65,8 @@
 typedef struct {
 	uint32_t screen_width;
 	uint32_t screen_height;
+	uint32_t pre_render_width;
+	uint32_t pre_render_height;
 // OpenGL|ES objects
 	EGLDisplay display;
 	EGLSurface surface;
@@ -165,6 +167,9 @@ static void init_ogl(CUBE_STATE_T *state) {
 			&state->screen_height);
 	assert(success >= 0);
 
+	state->pre_render_width = state->screen_width / 4;
+	state->pre_render_height = state->screen_height / 2;
+
 	dst_rect.x = 0;
 	dst_rect.y = 0;
 	dst_rect.width = state->screen_width;
@@ -203,8 +208,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->screen_width / 4,
-			state->screen_height / 2, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->pre_render_width,
+			state->pre_render_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
@@ -304,7 +309,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 90.0;
-	float aspect = state->screen_height / (state->screen_width / 2);
+	float aspect = state->pre_render_width / state->pre_render_width;
 	fovmesh(fov, fov * aspect, 20, &state->vbo, &state->vbo_nop);
 
 	state->program.pre_render = GLProgram_new("shader/pre_render.vert",
@@ -330,7 +335,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glUseProgram(program);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-	glViewport(0, 0, state->screen_width / 4, state->screen_height / 2);
+	glViewport(0, 0, state->pre_render_width, state->pre_render_height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
