@@ -75,8 +75,10 @@ typedef struct {
 		void *pre_render;
 		void *stereo;
 	} program;
-	GLuint vbo;
-	GLuint vbo_nop;
+	GLuint pre_render_vbo;
+	GLuint pre_render_vbo_nop;
+	GLuint stereo_vbo;
+	GLuint stereo_vbo_nop;
 	GLuint tex;
 	GLuint pre_render_texture;
 	GLuint framebuffer;
@@ -170,6 +172,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 	state->pre_render_width = state->screen_width / 4;
 	state->pre_render_height = state->screen_height / 2;
 
+	printf("width=%d,height=%d\n", state->pre_render_width, state->pre_render_height);
+
 	dst_rect.x = 0;
 	dst_rect.y = 0;
 	dst_rect.width = state->screen_width;
@@ -231,6 +235,25 @@ static void init_ogl(CUBE_STATE_T *state) {
 	glEnable(GL_CULL_FACE);
 }
 
+int stereomesh(GLuint *vbo_out, GLuint *n_out) {
+  GLuint vbo;
+	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f,
+			1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+			1.0f };
+
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex_positions),
+			quad_vertex_positions, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	  if(vbo_out != NULL)
+		  *vbo_out = vbo;
+	  if(n_out != NULL)
+		  *n_out = 4;
+
+  return 0;
+}
+
 int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 		GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
@@ -264,7 +287,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = sin(roll);
 				points[idx++] = cos(roll) * cos(yaw);
 				points[idx++] = 1.0;
-				printf("x=%f,y=%f,z=%f,w=%f¥n", points[idx - 4],
+				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 						points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 			{
@@ -277,7 +300,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = sin(roll);
 				points[idx++] = cos(roll) * cos(yaw);
 				points[idx++] = 1.0;
-				printf("x=%f,y=%f,z=%f,w=%f¥n", points[idx - 4],
+				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 						points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 		}
@@ -285,7 +308,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * n, points,
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points,
 			GL_STATIC_DRAW);
 
 	if (vbo_out != NULL)
@@ -309,8 +332,9 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 90.0;
-	float aspect = state->pre_render_width / state->pre_render_width;
-	fovmesh(fov, fov * aspect, 20, &state->vbo, &state->vbo_nop);
+	float aspect = state->pre_render_height / state->pre_render_width;
+	fovmesh(fov, fov * aspect, 20, &state->pre_render_vbo, &state->pre_render_vbo_nop);
+	stereomesh(&state->stereo_vbo, &state->stereo_vbo_nop);
 
 	state->program.pre_render = GLProgram_new("shader/pre_render.vert",
 			"shader/pre_render.frag");
@@ -337,7 +361,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 	glViewport(0, 0, state->pre_render_width, state->pre_render_height);
 
-	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
 
 	mat4 matrix_camera = mat4_create();
@@ -360,7 +384,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -373,7 +397,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	// Start with a clear screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glBindBuffer(GL_ARRAY_BUFFER, state->vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, state->stereo_vbo);
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 
 	//Load in the texture and thresholding parameters.
@@ -388,7 +412,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glViewport(state->screen_width / 8, state->screen_height / 4,
 			(GLsizei) state->screen_width / 4,
 			(GLsizei) state->screen_height / 2);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->vbo_nop);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 	//right eye
 	//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
