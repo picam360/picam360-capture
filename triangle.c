@@ -245,16 +245,17 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 	float end_x = tan(theta / 2);
 	float end_y = tan(phi / 2);
 
-	float step_x = (end_x - sart_x) / num_of_steps;
-	float step_y = (end_y - sart_y) / num_of_steps;
+	float step_x = (end_x - start_x) / num_of_steps;
+	float step_y = (end_y - start_y) / num_of_steps;
 
+	int i = 0;
 	for (y = start_y; y < end_y; y += step_y) {
 		for (x = sart_x; x <= end_x; x += step_x) {
 			{
 				float z = 1.0;
 				float len = sqrt(x * x + z * z);
-				float roll = atan(y, len);
-				float yaw = atan(x, z);
+				float roll = atan2(y, len);
+				float yaw = atan2(x, z);
 				points[i++] = cos(roll) * sin(yaw);
 				points[i++] = cos(roll) * cos(yaw);
 				points[i++] = sin(roll);
@@ -262,8 +263,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 			{
 				float z = 1.0;
 				float len = sqrt(x * x + z * z);
-				float roll = atan(y + step_y, len);
-				float yaw = atan(x, z);
+				float roll = atan2(y + step_y, len);
+				float yaw = atan2(x, z);
 				points[i++] = cos(roll) * sin(yaw);
 				points[i++] = cos(roll) * cos(yaw);
 				points[i++] = sin(roll);
