@@ -52,6 +52,7 @@
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
 #include <mat4/fromQuat.h>
+#include <mat4/perspective.h>
 
 #include "gl_program.h"
 #include "device.h"
