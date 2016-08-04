@@ -277,30 +277,30 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 	int idx = 0;
 	int i, j;
 	for (i = 0; i < num_of_steps; i++) {	//x
-		for (j = 0; j <= num_of_steps; j++) {	//y
+		for (j = 0; j <= num_of_steps; j++) {	//z
 			{
 				float x = start_x + step_x * i;
-				float y = start_y + step_y * j;
-				float z = 1.0;
+				float z = start_y + step_y * j;
+				float y = 1.0;
 				float len = sqrt(x*x+y*y+z*z);
 				points[idx++] = x/len;
 				points[idx++] = y/len;
 				points[idx++] = z/len;
 				points[idx++] = 1.0;
-				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-						points[idx - 3], points[idx - 2], points[idx - 1]);
+				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+				//		points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 			{
 				float x = start_x + step_x * (i + 1);
-				float y = start_y + step_y * j;
-				float z = 1.0;
+				float y = 1.0;
+				float z = start_y + step_y * j;
 				float len = sqrt(x*x+y*y+z*z);
 				points[idx++] = x/len;
 				points[idx++] = y/len;
 				points[idx++] = z/len;
 				points[idx++] = 1.0;
-				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-						points[idx - 3], points[idx - 2], points[idx - 1]);
+				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+				//		points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
 		}
 	}
@@ -363,12 +363,6 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
 
-	float fov = 90.0;
-	float aspect = state->pre_render_height / state->pre_render_width;
-	mat4 projection_matrix = mat4_create();
-	mat4_perspective(projection_matrix, fov, aspect, 0.1, 100.0);
-
-
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
@@ -382,8 +376,6 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
-	glUniformMatrix4fv(glGetUniformLocation(program, "projection_matrix"), 1,
-			GL_FALSE, (GLfloat*) projection_matrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
 
