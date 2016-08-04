@@ -230,16 +230,13 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 		GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
 
-	int n = 2 * (num_of_steps - 1) * num_of_steps;
+	int n = 2 * (num_of_steps + 1) * num_of_steps;
 	float points[3 * n];
 
 	float theta = theta_degree * M_PI / 180.0;
 	float phi = phi_degree * M_PI / 180.0;
 
-	float x;
-	float y;
-
-	float sart_x = -tan(theta / 2);
+	float start_x = -tan(theta / 2);
 	float start_y = -tan(phi / 2);
 
 	float end_x = tan(theta / 2);
@@ -248,26 +245,31 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 	float step_x = (end_x - start_x) / num_of_steps;
 	float step_y = (end_y - start_y) / num_of_steps;
 
-	int i = 0;
-	for (y = start_y; y < end_y; y += step_y) {
-		for (x = sart_x; x <= end_x; x += step_x) {
+	int idx = 0;
+	int i, j;
+	for (i = 0; i < num_of_steps; i++) {
+		for (j = 0; j <= num_of_steps; j++) {
 			{
+				float x = start_x + step_x * j;
+				float y = start_y + step_y * i;
 				float z = 1.0;
 				float len = sqrt(x * x + z * z);
 				float roll = atan2(y, len);
 				float yaw = atan2(x, z);
-				points[i++] = cos(roll) * sin(yaw);
-				points[i++] = cos(roll) * cos(yaw);
-				points[i++] = sin(roll);
+				points[idx++] = cos(roll) * sin(yaw);
+				points[idx++] = cos(roll) * cos(yaw);
+				points[idx++] = sin(roll);
 			}
 			{
+				float x = start_x + step_x * j;
+				float y = start_y + step_y * (i + 1);
 				float z = 1.0;
 				float len = sqrt(x * x + z * z);
-				float roll = atan2(y + step_y, len);
+				float roll = atan2(y, len);
 				float yaw = atan2(x, z);
-				points[i++] = cos(roll) * sin(yaw);
-				points[i++] = cos(roll) * cos(yaw);
-				points[i++] = sin(roll);
+				points[idx++] = cos(roll) * sin(yaw);
+				points[idx++] = cos(roll) * cos(yaw);
+				points[idx++] = sin(roll);
 			}
 		}
 	}
