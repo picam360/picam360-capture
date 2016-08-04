@@ -174,7 +174,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 	state->pre_render_width = state->screen_width / 4;
 	state->pre_render_height = state->screen_height / 2;
 
-	printf("width=%d,height=%d\n", state->pre_render_width, state->pre_render_height);
+	printf("width=%d,height=%d\n", state->pre_render_width,
+			state->pre_render_height);
 
 	dst_rect.x = 0;
 	dst_rect.y = 0;
@@ -238,7 +239,7 @@ static void init_ogl(CUBE_STATE_T *state) {
 }
 
 int stereomesh(GLuint *vbo_out, GLuint *n_out) {
-  GLuint vbo;
+	GLuint vbo;
 	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f,
 			1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
 			1.0f };
@@ -248,12 +249,12 @@ int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex_positions),
 			quad_vertex_positions, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	  if(vbo_out != NULL)
-		  *vbo_out = vbo;
-	  if(n_out != NULL)
-		  *n_out = 4;
+	if (vbo_out != NULL)
+		*vbo_out = vbo;
+	if (n_out != NULL)
+		*n_out = 4;
 
-  return 0;
+	return 0;
 }
 
 int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
@@ -283,10 +284,10 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				float x = start_x + step_x * i;
 				float y = start_y + step_y * j;
 				float z = 1.0;
-				float len = sqrt(x*x+y*y+z*z);
-				points[idx++] = x/len;
-				points[idx++] = y/len;
-				points[idx++] = z/len;
+				float len = sqrt(x * x + y * y + z * z);
+				points[idx++] = x / len;
+				points[idx++] = y / len;
+				points[idx++] = z / len;
 				points[idx++] = 1.0;
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
@@ -295,10 +296,10 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				float x = start_x + step_x * (i + 1);
 				float y = start_y + step_y * j;
 				float z = 1.0;
-				float len = sqrt(x*x+y*y+z*z);
-				points[idx++] = x/len;
-				points[idx++] = y/len;
-				points[idx++] = z/len;
+				float len = sqrt(x * x + y * y + z * z);
+				points[idx++] = x / len;
+				points[idx++] = y / len;
+				points[idx++] = z / len;
 				points[idx++] = 1.0;
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
@@ -333,7 +334,8 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 90.0;
 	float aspect = state->pre_render_height / state->pre_render_width;
-	fovmesh(fov, fov * aspect, 20, &state->pre_render_vbo, &state->pre_render_vbo_nop);
+	fovmesh(fov, fov * aspect, 20, &state->pre_render_vbo,
+			&state->pre_render_vbo_nop);
 	stereomesh(&state->stereo_vbo, &state->stereo_vbo_nop);
 
 	state->program.pre_render = GLProgram_new("shader/pre_render.vert",
@@ -368,12 +370,12 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
 	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, -M_PI / 5);
+	mat4_rotateX(camera_matrix, camera_matrix, 0);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
-	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2);
-	float scale_factor[3] = {1.0,-1.0,-1.0};
+	mat4_rotateX(unif_matrix, unif_matrix, M_PI / 2);
+	float scale_factor[3] = { -1.0, 1.0, -1.0 };
 	mat4_scale(unif_matrix, unif_matrix, scale_factor);
 
 	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
