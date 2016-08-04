@@ -389,7 +389,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
-	glUniform1f(glGetUniformLocation(program, "scale"), 1.0);
+	glUniform1f(glGetUniformLocation(program, "scale"), state->pre_render_vbo_scale);
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
