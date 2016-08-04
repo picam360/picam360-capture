@@ -282,11 +282,10 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				float x = start_x + step_x * i;
 				float y = start_y + step_y * j;
 				float z = 1.0;
-				float roll = atan2(y, z);
-				float yaw = atan2(x, z);
-				points[idx++] = cos(roll) * sin(yaw);
-				points[idx++] = sin(roll);
-				points[idx++] = cos(roll) * cos(yaw);
+				float len = sqrt(x*x+y*y+z*z);
+				points[idx++] = x/len;
+				points[idx++] = y/len;
+				points[idx++] = z/len;
 				points[idx++] = 1.0;
 				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 						points[idx - 3], points[idx - 2], points[idx - 1]);
@@ -295,11 +294,10 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				float x = start_x + step_x * (i + 1);
 				float y = start_y + step_y * j;
 				float z = 1.0;
-				float roll = atan2(y, z);
-				float yaw = atan2(x, z);
-				points[idx++] = cos(roll) * sin(yaw);
-				points[idx++] = sin(roll);
-				points[idx++] = cos(roll) * cos(yaw);
+				float len = sqrt(x*x+y*y+z*z);
+				points[idx++] = x/len;
+				points[idx++] = y/len;
+				points[idx++] = z/len;
 				points[idx++] = 1.0;
 				printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 						points[idx - 3], points[idx - 2], points[idx - 1]);
