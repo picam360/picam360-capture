@@ -374,8 +374,8 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
-	mat4_rotateX(unif_matrix, unif_matrix, M_PI / 2);
-	float scale_factor[3] = { -1.0, 1.0, -1.0 };
+	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2);
+	float scale_factor[3] = { 1.0, 1.0, -1.0 };
 	mat4_scale(unif_matrix, unif_matrix, scale_factor);
 
 	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
