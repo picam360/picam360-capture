@@ -232,7 +232,7 @@ static void init_ogl(CUBE_STATE_T *state) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// Set background color and clear buffers
-	glClearColor(0.15f, 0.25f, 0.35f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Enable back face culling.
 	glEnable(GL_CULL_FACE);
@@ -332,7 +332,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
  *
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
-	float fov = 90.0;
+	float fov = 120.0;
 	float aspect = state->pre_render_height / state->pre_render_width;
 	fovmesh(fov, fov * aspect, 20, &state->pre_render_vbo,
 			&state->pre_render_vbo_nop);
@@ -370,7 +370,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
 	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, 0);
+	mat4_rotateX(camera_matrix, camera_matrix, 30.0 * M_PI / 180.0);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
