@@ -58,6 +58,8 @@
 #include "gl_program.h"
 #include "device.h"
 
+#include <opencv2/opencv.hpp>
+
 #define PATH "./"
 
 #ifndef M_PI
@@ -83,6 +85,7 @@ typedef struct {
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	GLuint tex;
+	GLuint log_texture;
 	GLuint pre_render_texture;
 	GLuint framebuffer;
 // model rotation vector and direction
@@ -239,6 +242,22 @@ static void init_ogl(CUBE_STATE_T *state) {
 	glEnable(GL_CULL_FACE);
 }
 
+int load_texture(const char *filename, GLuint *tex_out) {
+	GLuint tex;
+	IplImage *iplImage = cvLoadImage(filename);
+
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width,
+			iplImage->height, 0, GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
+	if (glGetError() != GL_NO_ERROR) {
+		printf("glTexImage2D failed. Could not allocate texture buffer.");
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
 	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f,
@@ -372,7 +391,10 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glViewport(0, 0, state->pre_render_width, state->pre_render_height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
+    glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
+    glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, state->log_texture);
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
@@ -391,6 +413,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "scale"), state->pre_render_vbo_scale);
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	glUniform1i(glGetUniformLocation(program, "logo_texture"), 1);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
 
@@ -455,6 +478,9 @@ static void redraw_scene(CUBE_STATE_T *state) {
  ***********************************************************/
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
 		int image_size_height) {
+
+	load_texture("img/logo_img.png", &state->logo_texture)
+
 	//// load three texture buffers but use them on six OGL|ES texture surfaces
 	glGenTextures(1, &state->tex);
 
