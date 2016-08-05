@@ -58,7 +58,7 @@
 #include "gl_program.h"
 #include "device.h"
 
-#include <opencv2/opencv.hpp>
+#include <opencv/highgui.h>
 
 #define PATH "./"
 
@@ -85,7 +85,7 @@ typedef struct {
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	GLuint tex;
-	GLuint log_texture;
+	GLuint logo_texture;
 	GLuint pre_render_texture;
 	GLuint framebuffer;
 // model rotation vector and direction
@@ -244,7 +244,7 @@ static void init_ogl(CUBE_STATE_T *state) {
 
 int load_texture(const char *filename, GLuint *tex_out) {
 	GLuint tex;
-	IplImage *iplImage = cvLoadImage(filename);
+	IplImage *iplImage = cvLoadImage(filename, CV_LOAD_IMAGE_COLOR);
 
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -256,6 +256,10 @@ int load_texture(const char *filename, GLuint *tex_out) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
+	if (tex_out != NULL)
+		*tex_out = tex;
+
+	return 0;
 }
 
 int stereomesh(GLuint *vbo_out, GLuint *n_out) {
@@ -394,7 +398,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
     glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
     glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, state->log_texture);
+	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
@@ -479,7 +483,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
 		int image_size_height) {
 
-	load_texture("img/logo_img.png", &state->logo_texture)
+	load_texture("img/logo_img.png", &state->logo_texture);
 
 	//// load three texture buffers but use them on six OGL|ES texture surfaces
 	glGenTextures(1, &state->tex);

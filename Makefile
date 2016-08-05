@@ -1,5 +1,5 @@
 OBJS=triangle.o video.o gl_program.o device.o
-BIN=hello_videocube.bin
+BIN=picam360-oculus-viewer
 LDFLAGS+=-lilclient
 
 include Makefile.include
