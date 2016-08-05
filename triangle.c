@@ -439,6 +439,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->stereo_vbo);
+    glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 
 	//Load in the texture and thresholding parameters.
