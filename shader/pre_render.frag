@@ -22,10 +22,10 @@ void main(void) {
 	        //gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	        gl_FragColor = texture2D(tex, vec2(u, v));
 	    } else {
-	    	u = position.x / position.y * 0.2;
-	    	v = position.z / position.y * 0.2;
-	    	u = (u + 1.0) / 2.0;
-	    	v = (v + 1.0) / 2.0;
+	    	u = pos.x / pos.y * 0.2;
+	    	v = pos.z / pos.y * 0.2;
+	    	u = (-u + 1.0) / 2.0;
+	    	v = (-v + 1.0) / 2.0;
 	        gl_FragColor = texture2D(logo_texture, vec2(u, v));
 	    }
 }
