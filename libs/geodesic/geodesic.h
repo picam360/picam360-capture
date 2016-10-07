@@ -18,6 +18,7 @@ typedef struct geodesicSphere geodesicSphere;
 typedef struct geodesicDome geodesicDome;
 
 
+extern "C"{
 geodesicSphere icosahedronSphere(unsigned int v);
 geodesicSphere octahedronSphere(unsigned int v);
 geodesicSphere tetrahedronSphere(unsigned int v);
@@ -25,7 +26,7 @@ geodesicSphere tetrahedronSphere(unsigned int v);
 // geodesicDome tetrahedronDome(unsigned int v, float crop);
 geodesicDome octahedronDome(unsigned int v, float crop);
 geodesicDome icosahedronDome(unsigned int v, float crop);
-
+}
 
 void deleteGeodesicSphere(geodesicSphere *g);
 void deleteGeodesicDome(geodesicDome *d);
