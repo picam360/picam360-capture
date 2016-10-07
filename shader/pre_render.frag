@@ -15,17 +15,22 @@ void main(void) {
         float roll = asin(pos.y);
         float yaw = atan(pos.x, pos.z);
         float r = (M_PI / 2.0 - roll) / M_PI;
-        if(r < 0.6) {
+	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        if(r < 0.5) {
 	        float yaw2 = yaw;
-	        u = image_r * r * cos(yaw2) + center1.x;
-	        v = image_r * r * sin(yaw2) + center1.y;
-	        //gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+		u = image_r * r * cos(yaw2) + center1.x;
+		v = image_r * r * sin(yaw2) + center1.y;
 	        gl_FragColor = texture2D(tex, vec2(u, v));
-	    } else {
-	    	u = pos.x / pos.y * 0.2;
-	    	v = pos.z / pos.y * 0.2;
-	    	u = (-u + 1.0) / 2.0;
-	    	v = (-v + 1.0) / 2.0;
+	} else {
+	        float yaw2 = -yaw;
+		r = 1.0 - r;
+		u = image_r * r * cos(yaw2) + center1.x;
+		v = image_r * r * sin(yaw2) + center1.y;
+//	    } else {
+//	    	u = pos.x / pos.y * 0.2;
+//	    	v = pos.z / pos.y * 0.2;
+//	    	u = (-u + 1.0) / 2.0;
+//	    	v = (-v + 1.0) / 2.0;
 	        gl_FragColor = texture2D(logo_texture, vec2(u, v));
-	    }
+	}
 }
