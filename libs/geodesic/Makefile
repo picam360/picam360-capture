@@ -1,7 +1,7 @@
 CXX=g++
 AR=ar
 CXXCFLAGS=-Wall -g -O2
-CXX_OPTS=-c
+CXX_OPTS=-c -fpermissive
 LDFLAGS= -lm -lrt
 
 LIB=../libgeodesic.a

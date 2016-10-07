@@ -57,6 +57,7 @@
 
 #include "gl_program.h"
 #include "device.h"
+#include "libs/geodesic/geodesic.h"
 
 #include <opencv/highgui.h>
 
@@ -288,6 +289,8 @@ int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 
 int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 		GLuint *vbo_out, GLuint *n_out, float *scale_out) {
+	geodesicSphere icosa = icosahedronSphere(3);
+
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
