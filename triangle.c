@@ -456,17 +456,17 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glEnableVertexAttribArray(loc);
 
 	//left eye
-	glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-	//glViewport(state->screen_width / 8, state->screen_height / 4,
-	//		(GLsizei) state->screen_width / 4,
-	//		(GLsizei) state->screen_height / 2);
+	//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+	glViewport(state->screen_width / 8, state->screen_height / 4,
+			(GLsizei) state->screen_width / 4,
+			(GLsizei) state->screen_height / 2);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 	//right eye
-	glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-	//glViewport(state->screen_width / 2 + state->screen_width / 8,
-	//		state->screen_height / 4, (GLsizei) state->screen_width / 4,
-	//		(GLsizei) state->screen_height / 2);
+	//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+	glViewport(state->screen_width / 2 + state->screen_width / 8,
+			state->screen_height / 4, (GLsizei) state->screen_width / 4,
+			(GLsizei) state->screen_height / 2);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 	eglSwapBuffers(state->display, state->surface);
