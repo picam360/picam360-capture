@@ -18,7 +18,10 @@ typedef struct geodesicSphere geodesicSphere;
 typedef struct geodesicDome geodesicDome;
 
 
+#ifdef __cplusplus
 extern "C"{
+#endif
+
 geodesicSphere icosahedronSphere(unsigned int v);
 geodesicSphere octahedronSphere(unsigned int v);
 geodesicSphere tetrahedronSphere(unsigned int v);
@@ -26,7 +29,10 @@ geodesicSphere tetrahedronSphere(unsigned int v);
 // geodesicDome tetrahedronDome(unsigned int v, float crop);
 geodesicDome octahedronDome(unsigned int v, float crop);
 geodesicDome icosahedronDome(unsigned int v, float crop);
+
+#ifdef __cplusplus
 }
+#endif
 
 void deleteGeodesicSphere(geodesicSphere *g);
 void deleteGeodesicDome(geodesicDome *d);
