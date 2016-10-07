@@ -85,7 +85,6 @@ typedef struct {
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	GLuint tex;
-	GLuint tex2;
 	GLuint logo_texture;
 	GLuint pre_render_texture;
 	GLuint framebuffer;
@@ -113,9 +112,7 @@ static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
 
 static void* eglImage = 0;
-static void* eglImage2 = 0;
 static pthread_t thread1;
-static pthread_t thread2;
 
 /***********************************************************
  * Name: init_ogl
@@ -178,10 +175,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 			&state->screen_height);
 	assert(success >= 0);
 
-	state->pre_render_width = 800 / 2;
-	state->pre_render_height = 800 * state->screen_height / state->screen_width;
-	//state->pre_render_width = state->screen_width / 2;
-	//state->pre_render_height = state->screen_height / 1;
+	state->pre_render_width = state->screen_width / 4;
+	state->pre_render_height = state->screen_height / 2;
 
 	printf("width=%d,height=%d\n", state->pre_render_width,
 			state->pre_render_height);
@@ -403,8 +398,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
     glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
     glActiveTexture(GL_TEXTURE1);
-//	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
-	glBindTexture(GL_TEXTURE_2D, state->tex2);
+	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
@@ -456,17 +450,17 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glEnableVertexAttribArray(loc);
 
 	//left eye
-	glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-	//glViewport(state->screen_width / 8, state->screen_height / 4,
-	//		(GLsizei) state->screen_width / 4,
-	//		(GLsizei) state->screen_height / 2);
+	//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+	glViewport(state->screen_width / 8, state->screen_height / 4,
+			(GLsizei) state->screen_width / 4,
+			(GLsizei) state->screen_height / 2);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 	//right eye
-	glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-	//glViewport(state->screen_width / 2 + state->screen_width / 8,
-	//		state->screen_height / 4, (GLsizei) state->screen_width / 4,
-	//		(GLsizei) state->screen_height / 2);
+	//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+	glViewport(state->screen_width / 2 + state->screen_width / 8,
+			state->screen_height / 4, (GLsizei) state->screen_width / 4,
+			(GLsizei) state->screen_height / 2);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 	eglSwapBuffers(state->display, state->surface);
@@ -520,38 +514,6 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 
 	// Bind texture surface to current vertices
 	glBindTexture(GL_TEXTURE_2D, state->tex);
-//return;
-//cam2
-//sleep(10);
-
-	//// load three texture buffers but use them on six OGL|ES texture surfaces
-	glGenTextures(1, &state->tex2);
-
-	glBindTexture(GL_TEXTURE_2D, state->tex2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with, image_size_height,
-			0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	/* Create EGL Image */
-	eglImage2 = eglCreateImageKHR(state->display, state->context,
-			EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->tex2, 0);
-
-	if (eglImage2 == EGL_NO_IMAGE_KHR) {
-		printf("eglCreateImageKHR failed 2.\n");
-		exit(1);
-	}
-
-	// Start rendering
-	pthread_create(&thread2, NULL, video_decode_test, eglImage2);
-
-	glEnable(GL_TEXTURE_2D);
-
-	// Bind texture surface to current vertices
-	glBindTexture(GL_TEXTURE_2D, state->tex2);
 }
 //------------------------------------------------------------------------------
 
