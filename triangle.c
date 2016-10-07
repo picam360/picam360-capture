@@ -293,56 +293,70 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 
 	GLuint vbo;
 
-	int n = 2 * (num_of_steps + 1) * num_of_steps;
+	int n = 3 * icosa.numFaces;
 	float points[4 * n];
-
-	float theta = theta_degree * M_PI / 180.0;
-	float phi = phi_degree * M_PI / 180.0;
-
-	float start_x = -tan(theta / 2);
-	float start_y = -tan(phi / 2);
-
-	float end_x = tan(theta / 2);
-	float end_y = tan(phi / 2);
-
-	float step_x = (end_x - start_x) / num_of_steps;
-	float step_y = (end_y - start_y) / num_of_steps;
-
-	float scale = 0;
+	int i,  j;
 	int idx = 0;
-	int i, j;
-	for (i = 0; i < num_of_steps; i++) {	//x
-		for (j = 0; j <= num_of_steps; j++) {	//y
-			{
-				float x = start_x + step_x * i;
-				float y = start_y + step_y * j;
-				float z = 1.0;
-				float len = sqrt(x * x + y * y + z * z);
-				points[idx++] = x / len;
-				points[idx++] = y / len;
-				points[idx++] = z / len;
-				points[idx++] = 1.0;
-				if(scale == 0)
-				{
-					scale = z / -x;
-				}
-				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-				//		points[idx - 3], points[idx - 2], points[idx - 1]);
-			}
-			{
-				float x = start_x + step_x * (i + 1);
-				float y = start_y + step_y * j;
-				float z = 1.0;
-				float len = sqrt(x * x + y * y + z * z);
-				points[idx++] = x / len;
-				points[idx++] = y / len;
-				points[idx++] = z / len;
-				points[idx++] = 1.0;
-				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-				//		points[idx - 3], points[idx - 2], points[idx - 1]);
-			}
+	for (i = 0; i < icosa.numPoints; i++) {
+		for (j = 0; j < 3; j++) {
+			int pidx = icosa.faces[i * 3 + j];
+			points[idx++] = icosa.points[3 * pidx + 0];
+			points[idx++] = icosa.points[3 * pidx + 1];
+			points[idx++] = icosa.points[3 * pidx + 2];
+			points[idx++] = 1.0;
 		}
 	}
+
+//	int n = 2 * (num_of_steps + 1) * num_of_steps;
+//	float points[4 * n];
+//
+//	float theta = theta_degree * M_PI / 180.0;
+//	float phi = phi_degree * M_PI / 180.0;
+//
+//	float start_x = -tan(theta / 2);
+//	float start_y = -tan(phi / 2);
+//
+//	float end_x = tan(theta / 2);
+//	float end_y = tan(phi / 2);
+//
+//	float step_x = (end_x - start_x) / num_of_steps;
+//	float step_y = (end_y - start_y) / num_of_steps;
+//
+//	float scale = 0;
+//	int idx = 0;
+//	int i, j;
+//	for (i = 0; i < num_of_steps; i++) {	//x
+//		for (j = 0; j <= num_of_steps; j++) {	//y
+//			{
+//				float x = start_x + step_x * i;
+//				float y = start_y + step_y * j;
+//				float z = 1.0;
+//				float len = sqrt(x * x + y * y + z * z);
+//				points[idx++] = x / len;
+//				points[idx++] = y / len;
+//				points[idx++] = z / len;
+//				points[idx++] = 1.0;
+//				if(scale == 0)
+//				{
+//					scale = z / -x;
+//				}
+//				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+//				//		points[idx - 3], points[idx - 2], points[idx - 1]);
+//			}
+//			{
+//				float x = start_x + step_x * (i + 1);
+//				float y = start_y + step_y * j;
+//				float z = 1.0;
+//				float len = sqrt(x * x + y * y + z * z);
+//				points[idx++] = x / len;
+//				points[idx++] = y / len;
+//				points[idx++] = z / len;
+//				points[idx++] = 1.0;
+//				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+//				//		points[idx - 3], points[idx - 2], points[idx - 1]);
+//			}
+//		}
+//	}
 
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -434,7 +448,8 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
+	//glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
+	glDrawArrays(GL_TRIANGLES, 0, state->pre_render_vbo_nop);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
