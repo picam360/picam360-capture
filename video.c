@@ -31,31 +31,48 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "bcm_host.h"
 #include "ilclient.h"
 
-static OMX_BUFFERHEADERTYPE* eglBuffer = NULL;
-static COMPONENT_T* egl_render = NULL;
+static pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
+static OMX_BUFFERHEADERTYPE* eglBuffer[2] = {};
+static COMPONENT_T* egl_render[2] = {};
 
-static void* eglImage = 0;
+static void* eglImage[2] = {};
 
 void my_fill_buffer_done(void* data, COMPONENT_T* comp)
 {
-  if (OMX_FillThisBuffer(ilclient_get_handle(egl_render), eglBuffer) != OMX_ErrorNone)
+int index = (int)data;
+//      printf("enter fill buffer done %d\n", index);
+
+//return;
+//pthread_mutex_lock(&mlock);
+  if (OMX_FillThisBuffer(ilclient_get_handle(egl_render[index]), eglBuffer[index]) != OMX_ErrorNone)
    {
-      printf("OMX_FillThisBuffer failed in callback\n");
+      printf("test  OMX_FillThisBuffer failed in callback\n");
       exit(1);
    }
+//pthread_mutex_unlock(&mlock);
+
 }
 
+static int mIndex = 0;
 
 // Modified function prototype to work with pthreads
 void *video_decode_test(void* arg)
 {
-   eglImage = arg;
+int index;
+pthread_mutex_lock(&mlock);
 
-   if (eglImage == 0)
+index = mIndex++;
+
+pthread_mutex_unlock(&mlock);
+
+   eglImage[index] = arg;
+
+   if (eglImage[index] == 0)
    {
       printf("eglImage is null.\n");
       exit(1);
@@ -85,7 +102,7 @@ void *video_decode_test(void* arg)
    }
 
    // callback
-   ilclient_set_fill_buffer_done_callback(client, my_fill_buffer_done, 0);
+   ilclient_set_fill_buffer_done_callback(client, my_fill_buffer_done, (void*)index);
 
    // create video_decode
    if(ilclient_create_component(client, &video_decode, "video_decode", ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS) != 0)
@@ -93,9 +110,9 @@ void *video_decode_test(void* arg)
    list[0] = video_decode;
 
    // create egl_render
-   if(status == 0 && ilclient_create_component(client, &egl_render, "egl_render", ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_OUTPUT_BUFFERS) != 0)
+   if(status == 0 && ilclient_create_component(client, &egl_render[index], "egl_render", ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_OUTPUT_BUFFERS) != 0)
       status = -14;
-   list[1] = egl_render;
+   list[1] = egl_render[index];
 
    // create clock
    if(status == 0 && ilclient_create_component(client, &clock, "clock", ILCLIENT_DISABLE_ALL_PORTS) != 0)
@@ -116,7 +133,7 @@ void *video_decode_test(void* arg)
    list[3] = video_scheduler;
 
    set_tunnel(tunnel, video_decode, 131, video_scheduler, 10);
-   set_tunnel(tunnel+1, video_scheduler, 11, egl_render, 220);
+   set_tunnel(tunnel+1, video_scheduler, 11, egl_render[index], 220);
    set_tunnel(tunnel+2, clock, 80, video_scheduler, 12);
 
    // setup clock tunnel first
@@ -135,6 +152,21 @@ void *video_decode_test(void* arg)
    format.eCompressionFormat = OMX_VIDEO_CodingAVC;
    format.xFramerate = 30 << 16;
 
+//int descriptor = open("test_1024x1024.h264", O_RDONLY);
+int descriptor = open("cam0", O_RDONLY);
+if(index == 0)
+{
+descriptor = open("cam0", O_RDONLY);
+}
+else
+{
+descriptor = open("cam1", O_RDONLY);
+}
+if(descriptor == -1)
+{
+printf("open\n");
+	exit(-1);
+}
 
    if(status == 0 &&
       OMX_SetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamVideoPortFormat, &format) == OMX_ErrorNone &&
@@ -146,12 +178,19 @@ void *video_decode_test(void* arg)
 
       ilclient_change_component_state(video_decode, OMX_StateExecuting);
 
+//pthread_mutex_unlock(&mlock);
+
+      printf("milestone\n");
+
+
       while((buf = ilclient_get_input_buffer(video_decode, 130, 1)) != NULL)
       {
+//pthread_mutex_lock(&mlock);
+
          // feed data and wait until we get port settings changed
          unsigned char *dest = buf->pBuffer;
-
-         data_len += read(STDIN_FILENO, dest, buf->nAllocLen-data_len);
+//         data_len += read(STDIN_FILENO, dest, buf->nAllocLen-data_len);
+         data_len += read(descriptor, dest, buf->nAllocLen-data_len);
 
          if(port_settings_changed == 0 &&
             ((data_len > 0 && ilclient_remove_event(video_decode, OMX_EventPortSettingsChanged, 131, 0, 0, 1) == 0) ||
@@ -163,6 +202,7 @@ void *video_decode_test(void* arg)
             if(ilclient_setup_tunnel(tunnel, 0, 0) != 0)
             {
                status = -7;
+//pthread_mutex_unlock(&mlock);
                break;
             }
 
@@ -172,40 +212,44 @@ void *video_decode_test(void* arg)
             if(ilclient_setup_tunnel(tunnel+1, 0, 1000) != 0)
             {
                status = -12;
-               break;
+// pthread_mutex_unlock(&mlock);
+              break;
             }
 
             // Set egl_render to idle
-            ilclient_change_component_state(egl_render, OMX_StateIdle);
+            ilclient_change_component_state(egl_render[index], OMX_StateIdle);
 
             // Enable the output port and tell egl_render to use the texture as a buffer
             //ilclient_enable_port(egl_render, 221); THIS BLOCKS SO CAN'T BE USED
-            if (OMX_SendCommand(ILC_GET_HANDLE(egl_render), OMX_CommandPortEnable, 221, NULL) != OMX_ErrorNone)
+            if (OMX_SendCommand(ILC_GET_HANDLE(egl_render[index]), OMX_CommandPortEnable, 221, NULL) != OMX_ErrorNone)
             {
                printf("OMX_CommandPortEnable failed.\n");
                exit(1);
             }
 
-            if (OMX_UseEGLImage(ILC_GET_HANDLE(egl_render), &eglBuffer, 221, NULL, eglImage) != OMX_ErrorNone)
+            if (OMX_UseEGLImage(ILC_GET_HANDLE(egl_render[index]), &eglBuffer[index], 221, NULL, eglImage[index]) != OMX_ErrorNone)
             {
                printf("OMX_UseEGLImage failed.\n");
                exit(1);
             }
 
             // Set egl_render to executing
-            ilclient_change_component_state(egl_render, OMX_StateExecuting);
+            ilclient_change_component_state(egl_render[index], OMX_StateExecuting);
 
 
             // Request egl_render to write data to the texture buffer
-            if(OMX_FillThisBuffer(ILC_GET_HANDLE(egl_render), eglBuffer) != OMX_ErrorNone)
+            if(OMX_FillThisBuffer(ILC_GET_HANDLE(egl_render[index]), eglBuffer[index]) != OMX_ErrorNone)
             {
                printf("OMX_FillThisBuffer failed.\n");
                exit(1);
             }
          }
          if(!data_len)
+{
+//pthread_mutex_unlock(&mlock);
             break;
 
+}
          buf->nFilledLen = data_len;
          data_len = 0;
 
@@ -221,8 +265,12 @@ void *video_decode_test(void* arg)
          if(OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf) != OMX_ErrorNone)
          {
             status = -6;
+//pthread_mutex_unlock(&mlock);
+
             break;
          }
+//pthread_mutex_unlock(&mlock);
+
       }
 
       buf->nFilledLen = 0;

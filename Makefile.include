@@ -7,6 +7,13 @@ INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/v
 
 all: $(BIN) $(LIB)
 
+
+MotionSensor/libMotionSensor.a:
+	$(MAKE) -C MotionSensor/
+
+libs/libI2Cdev.a:
+	$(MAKE) -C libs/I2Cdev
+
 %.o: %.c
 	@rm -f $@ 
 	$(CC) $(CFLAGS) $(INCLUDES) -g -c $< -o $@ -Wno-deprecated-declarations
