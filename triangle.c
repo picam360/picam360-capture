@@ -57,7 +57,6 @@
 
 #include "gl_program.h"
 #include "device.h"
-#include "libs/geodesic/geodesic.h"
 
 #include <opencv/highgui.h>
 
