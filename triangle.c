@@ -676,8 +676,9 @@ int main(int argc, char *argv[]) {
 		redraw_pre_render_texture(state);
 		if(state->preview) {
 			redraw_scene(state);
+		} else {
+			glFinish();
 		}
-		glFlush();
 
 		if(state->snap && state->snap_save_path[0] != '\0') {
 			state->snap = false;
@@ -686,8 +687,6 @@ int main(int argc, char *argv[]) {
 
 			int size = state->pre_render_width * state->pre_render_height*3;
 			unsigned char *buff = (unsigned char*)malloc(size);
-
-			glFinish();
 
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buff);
