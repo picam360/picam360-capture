@@ -73,6 +73,7 @@
 
 typedef struct {
 	bool preview;
+	bool stereo = false;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t pre_render_width;
@@ -106,6 +107,9 @@ typedef struct {
 // current distance from camera
 	GLfloat distance;
 	GLfloat distance_inc;
+
+	bool snap;
+	char snap_save_path[256];
 } CUBE_STATE_T;
 
 static void init_ogl(CUBE_STATE_T *state);
@@ -453,6 +457,21 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
 	//glDrawArrays(GL_TRIANGLES, 0, state->pre_render_vbo_nop);
 
+	if(state->snap && state->snap_save_path[0] != '\0') {
+		state->snap = false;
+		FILE *fp = fopen(buff, "w");
+		if (fp != NULL) {
+			int size = state->pre_render_width * state->pre_render_height;
+			unsigned char *buff = (unsigned char*)malloc(size);
+			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+			fwrite(buff, 1, size, fp);
+			free(buff);
+			fclose(fp);
+
+			fprintf("snapped : saved to %s\n", state->snap_save_path);
+		}
+	}
+
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -586,8 +605,9 @@ int main(int argc, char *argv[]) {
 	int image_size_height = 1024;
 	int num_of_cam = 1;
 	bool preview = false;
+	bool stereo = false;
 
-	while ((opt = getopt(argc, argv, "w:h:n:p")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:ps")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &image_size_with);
@@ -601,8 +621,11 @@ int main(int argc, char *argv[]) {
 		case 'p':
 			preview = true;
 			break;
+		case 's':
+			stereo = true;
+			break;
 		default: /* '?' */
-			printf("Usage: %s [-w width] [-h height] [-n num_of_cam]\n",
+			printf("Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
 					argv[0]);
 			return -1;
 		}
@@ -615,6 +638,7 @@ int main(int argc, char *argv[]) {
 	memset(state, 0, sizeof(*state));
 	state->num_of_cam = num_of_cam;
 	state->preview = preview;
+	state->stereo = stereo;
 
 	init_device();
 
@@ -636,6 +660,10 @@ int main(int argc, char *argv[]) {
 			if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				printf("snap saved to %s\n", param);
+				if(param != NULL) {
+					strncpy(state->snap_save_path, param, sizeof(state->snap_save_path) - 1);
+					state->snap = true;
+				}
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				printf("start_record saved to %s\n", param);
