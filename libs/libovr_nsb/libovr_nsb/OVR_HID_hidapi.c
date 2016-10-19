@@ -22,7 +22,7 @@ Device * openRiftHID( int nthDevice, Device *myDev )
     Device *dev = myDev;
 	
     // Iterate over the devices matching our IDs
-	devs = hid_enumerate(0x2833, 0x0001);
+	devs = hid_enumerate(0x2833, 0x0021);
 	cur_dev = devs;	
 	while (cur_dev) {
         // Skip to the one we want

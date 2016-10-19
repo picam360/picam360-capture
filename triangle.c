@@ -431,8 +431,8 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	//glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
-	glDrawArrays(GL_TRIANGLES, 0, state->pre_render_vbo_nop);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
+	//glDrawArrays(GL_TRIANGLES, 0, state->pre_render_vbo_nop);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -580,9 +580,37 @@ static void exit_func(void)
 
 //==============================================================================
 
+bool inputAvailable()
+{
+  struct timeval tv;
+  fd_set fds;
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+  FD_ZERO(&fds);
+  FD_SET(STDIN_FILENO, &fds);
+  select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+  return (FD_ISSET(0, &fds));
+}
+
 int main(int argc, char *argv[]) {
 	int image_size_with = 1024;
 	int image_size_height = 1024;
+
+    while ((int opt = getopt(argc, argv, "w:h:")) != -1) {
+        switch (opt) {
+            case 'w':
+                sscanf(optarg, "%d", &image_size_with);
+                break;
+
+            case 'h':
+                sscanf(optarg, "%d", &image_size_height);
+                break;
+
+            default: /* '?' */
+                printf("Usage: %s [-w width] [-h height]\n", argv[0]);
+                break;
+        }
+    }
 
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
@@ -602,6 +630,12 @@ int main(int argc, char *argv[]) {
 	init_textures(state, image_size_with, image_size_height);
 
 	while (!terminate) {
+		if(inputAvailable()) {
+			char buff[256];
+			int size = read(STDIN_FILENO, buff, sizeof(buff)-1);
+			buff[size] = '\0';
+			printf("%s\n", buff);
+		}
 		redraw_pre_render_texture(state);
 		redraw_scene(state);
 	}

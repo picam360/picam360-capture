@@ -14,9 +14,6 @@ MotionSensor/libMotionSensor.a:
 libs/libI2Cdev.a:
 	$(MAKE) -C libs/I2Cdev
 
-libs/libgeodesic.a:
-	$(MAKE) -C libs/geodesic
-
 %.o: %.c
 	@rm -f $@ 
 	$(CC) $(CFLAGS) $(INCLUDES) -g -c $< -o $@ -Wno-deprecated-declarations
