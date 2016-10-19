@@ -568,6 +568,9 @@ int inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
+extern char *optarg;
+extern int optind, opterr, optopt;
+
 int main(int argc, char *argv[]) {
 	int opt;
 	int image_size_with = 1024;
@@ -607,7 +610,7 @@ int main(int argc, char *argv[]) {
 	init_model_proj(state);
 
 	// initialise the OGLES texture(s)
-	init_textures(state, image_size_with, image_size_height, num_of_cam);
+	init_textures(state, image_size_with, image_size_height);
 
 	while (!terminate) {
 		if (inputAvailable()) {
