@@ -109,6 +109,7 @@ typedef struct {
 	GLfloat distance;
 	GLfloat distance_inc;
 
+	bool recording;
 	bool snap;
 	char snap_save_path[256];
 } CUBE_STATE_T;
@@ -187,9 +188,10 @@ static void init_ogl(CUBE_STATE_T *state) {
 			&state->screen_height);
 	assert(success >= 0);
 
-	if(state->pre_render_width == 0) {
+	if (state->pre_render_width == 0) {
 		state->pre_render_width = 800 / 2;
-		state->pre_render_height = 800 * state->screen_height / state->screen_width;
+		state->pre_render_height = 800 * state->screen_height
+				/ state->screen_width;
 		//state->pre_render_width = state->screen_width / 2;
 		//state->pre_render_height = state->screen_height / 1;
 	}
@@ -225,9 +227,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 				&nativewindow, NULL);
 	} else {
 		//Create an offscreen rendering surface
-		EGLint rendering_attributes[] =
-				{ EGL_WIDTH, state->screen_width, EGL_HEIGHT,
-						state->screen_height, EGL_NONE };
+		EGLint rendering_attributes[] = { EGL_WIDTH, state->screen_width,
+				EGL_HEIGHT, state->screen_height, EGL_NONE };
 		state->surface = eglCreatePbufferSurface(state->display, config,
 				rendering_attributes);
 	}
@@ -482,7 +483,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	if(state->stereo) {
+	if (state->stereo) {
 		//left eye
 		//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
 		glViewport(state->screen_width / 8, state->screen_height / 4,
@@ -623,7 +624,8 @@ int main(int argc, char *argv[]) {
 			sscanf(optarg, "%d", &render_height);
 			break;
 		default: /* '?' */
-			printf("Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
+			printf(
+					"Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
 					argv[0]);
 			return -1;
 		}
@@ -651,6 +653,9 @@ int main(int argc, char *argv[]) {
 	// initialise the OGLES texture(s)
 	init_textures(state, image_size_with, image_size_height);
 
+	int size = state->pre_render_width * state->pre_render_height * 3;
+	unsigned char *image_buffer = (unsigned char*) malloc(size);
+
 	while (!terminate) {
 		if (inputAvailable()) {
 			char buff[256];
@@ -659,44 +664,57 @@ int main(int argc, char *argv[]) {
 			char *cmd = strtok(buff, " \n");
 			if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				printf("snap saved to %s\n", param);
-				if(param != NULL) {
-					strncpy(state->snap_save_path, param, sizeof(state->snap_save_path) - 1);
+				if (param != NULL) {
+					printf("snap saved to %s\n", param);
+					strncpy(state->snap_save_path, param,
+							sizeof(state->snap_save_path) - 1);
 					state->snap = true;
 				}
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				printf("start_record saved to %s\n", param);
+				if (param != NULL) {
+					printf("start_record saved to %s\n", param);
+
+					StartRecord(state->pre_render_width,
+							state->pre_render_height, param, 4000);
+					state->recording = true;
+
+					printf("snapped : saved to %s\n", param);
+				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
+				if(state->recording){
+					state->recording = false;
+					StopRecord();
+				}
 			} else {
 				printf("unknown command : %s\n", buff);
 			}
 		}
 		redraw_pre_render_texture(state);
-		if(state->preview) {
+		if (state->preview) {
 			redraw_scene(state);
 		} else {
 			glFinish();
 		}
-
-		if(state->snap && state->snap_save_path[0] != '\0') {
-			state->snap = false;
-
-			printf("start snap!\n");
-
-			int size = state->pre_render_width * state->pre_render_height*3;
-			unsigned char *buff = (unsigned char*)malloc(size);
+		if (state->recording || state->snap) {
+			printf("snap saved to %s\n", param);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buff);
+			glReadPixels(0, 0, state->pre_render_width,
+					state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE,
+					image_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-			SaveJpeg(buff, state->pre_render_width, state->pre_render_height, state->snap_save_path, 70);
-
-			free(buff);
-
-			printf("snapped : saved to %s\n", state->snap_save_path);
+			if (state->recording) {
+				AddFrame(image_buffer);
+			}
+			if (state->snap) {
+				state->snap = false;
+				SaveJpeg(buff, state->pre_render_width,
+						state->pre_render_height, state->snap_save_path, 70);
+				printf("snapped : saved to %s\n", state->snap_save_path);
+			}
 		}
 	}
 	exit_func();
