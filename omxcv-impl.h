@@ -31,7 +31,7 @@ extern "C" {
 #include <bcm_host.h>
 #include <ilclient.h>
 //For OMX_IndexParamNalStreamFormatSelect
-#include <OMX_Broadcom.h>
+#include <IL/OMX_Broadcom.h>
 #pragma pack()
 }
 

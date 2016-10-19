@@ -4,7 +4,6 @@
  */
 #include "picam360_tools.h"
 #include "omxcv.h"
-#include "gl_transform.h"
 #include <opencv2/opencv.hpp>
 #include <cstdio>
 #include <cstdlib>
@@ -41,42 +40,6 @@ static int JPEG_QUALITY = 90;
 static OmxCvJpeg *encoder = NULL;
 static GLTransform *transformer = NULL;
 static OmxCv *recorder = NULL;
-
-int TransformToEquirectangular(int texture_width, int texture_height,
-		int equirectangular_width, int equirectangular_height,
-		const unsigned char *in_data, unsigned char *out_data) {
-
-	if (texture_width != TEXURE_WIDTH || texture_height != TEXURE_HEIGHT
-			|| equirectangular_width != EQUIRECTANGULAR_WIDTH
-			|| equirectangular_height != EQUIRECTANGULAR_HEIGHT) {
-		TEXURE_WIDTH = texture_width;
-		TEXURE_HEIGHT = texture_height;
-		EQUIRECTANGULAR_WIDTH = equirectangular_width;
-		EQUIRECTANGULAR_HEIGHT = equirectangular_height;
-
-		if (encoder != NULL) {
-			delete encoder;
-			encoder = NULL;
-		}
-		if (transformer != NULL) {
-			delete transformer;
-			transformer = NULL;
-		}
-
-		transformer = new GLTransform(EQUIRECTANGULAR_WIDTH,
-				EQUIRECTANGULAR_HEIGHT, TEXURE_WIDTH, TEXURE_HEIGHT);
-	}
-	transformer->SetRotation(X_DEG, Y_DEG, Z_DEG);
-	transformer->Transform(in_data, out_data);
-
-	return 0;
-}
-
-int SetRotation(float x_deg, float y_deg, float z_deg) {
-	X_DEG = x_deg;
-	Y_DEG = y_deg;
-	Z_DEG = z_deg;
-}
 
 int StartRecord(const char *filename, int bitrate_kbps) {
 	recorder = new OmxCv(filename, EQUIRECTANGULAR_WIDTH,
