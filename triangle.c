@@ -496,19 +496,21 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	//left eye
-	//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-	glViewport(state->screen_width / 8, state->screen_height / 4,
-			(GLsizei) state->screen_width / 4,
-			(GLsizei) state->screen_height / 2);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
+	if(state->stereo) {
+		//left eye
+		//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+		glViewport(state->screen_width / 8, state->screen_height / 4,
+				(GLsizei) state->screen_width / 4,
+				(GLsizei) state->screen_height / 2);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
-	//right eye
-	//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-	glViewport(state->screen_width / 2 + state->screen_width / 8,
-			state->screen_height / 4, (GLsizei) state->screen_width / 4,
-			(GLsizei) state->screen_height / 2);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
+		//right eye
+		//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+		glViewport(state->screen_width / 2 + state->screen_width / 8,
+				state->screen_height / 4, (GLsizei) state->screen_width / 4,
+				(GLsizei) state->screen_height / 2);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
+	}
 
 	eglSwapBuffers(state->display, state->surface);
 
@@ -686,7 +688,9 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		redraw_pre_render_texture(state);
-		redraw_scene(state);
+		if(state->preview) {
+			redraw_scene(state);
+		}
 	}
 	exit_func();
 	return 0;
