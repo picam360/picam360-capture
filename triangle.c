@@ -33,6 +33,8 @@
 #include <math.h>
 #include <assert.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <sys/select.h>
 
 #include "bcm_host.h"
 
@@ -114,8 +116,8 @@ static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
 
-static void* eglImage[MAX_CAM_NUM] = 0;
-static pthread_t thread[MAX_CAM_NUM];
+static void* eglImage[MAX_CAM_NUM] = {};
+static pthread_t thread[MAX_CAM_NUM] = {};
 
 /***********************************************************
  * Name: init_ogl
