@@ -614,7 +614,11 @@ int main(int argc, char *argv[]) {
 			char buff[256];
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
 			buff[size] = '\0';
-			printf("stdin : %s\n", buff);
+			if(strncmp(buff, "snap", sizeof(buff)) == 0) {
+				printf("snap\n");
+			} else {
+				printf("unknown command : %s\n", buff);
+			}
 		}
 		redraw_pre_render_texture(state);
 		redraw_scene(state);
