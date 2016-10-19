@@ -116,8 +116,8 @@ static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
 
-static void* eglImage[MAX_CAM_NUM] = {};
-static pthread_t thread[MAX_CAM_NUM] = {};
+static void* eglImage[MAX_CAM_NUM] = { };
+static pthread_t thread[MAX_CAM_NUM] = { };
 
 /***********************************************************
  * Name: init_ogl
@@ -403,7 +403,7 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
-	for(int i=0;i<state->num_of_cam;i++) {
+	for (int i = 0; i < state->num_of_cam; i++) {
 		glActiveTexture(GL_TEXTURE1 + i);
 		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
 	}
@@ -426,10 +426,10 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glUniform1f(glGetUniformLocation(program, "scale"),
 			state->pre_render_vbo_scale);
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
-	for(int i=0;i<state->num_of_cam;i++) {
+	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "tex%d", i);
-		glUniform1i(glGetUniformLocation(program, buff), i+1);
+		glUniform1i(glGetUniformLocation(program, buff), i + 1);
 	}
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
@@ -500,13 +500,13 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 
 	load_texture("img/logo_img.png", &state->logo_texture);
 
-	for(int i=0;i<state->num_of_cam;i++) {
+	for (int i = 0; i < state->num_of_cam; i++) {
 		//// load three texture buffers but use them on six OGL|ES texture surfaces
 		glGenTextures(1, &state->tex[i]);
 
 		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with, image_size_height,
-				0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with,
+				image_size_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -586,7 +586,8 @@ int main(int argc, char *argv[]) {
 			sscanf(optarg, "%d", &num_of_cam);
 			break;
 		default: /* '?' */
-			printf("Usage: %s [-w width] [-h height] [-n num_of_cam]\n", argv[0]);
+			printf("Usage: %s [-w width] [-h height] [-n num_of_cam]\n",
+					argv[0]);
 			return -1;
 		}
 	}
@@ -614,8 +615,13 @@ int main(int argc, char *argv[]) {
 			char buff[256];
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
 			buff[size] = '\0';
-			if(strncmp(buff, "snap", sizeof(buff)) == 0) {
+			char cmd = strtok(buff, ' ');
+			if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				printf("snap\n");
+			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
+				printf("start_record\n");
+			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
+				printf("stop_record\n");
 			} else {
 				printf("unknown command : %s\n", buff);
 			}
