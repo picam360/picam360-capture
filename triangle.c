@@ -72,6 +72,7 @@
 #define MAX_CAM_NUM 4
 
 typedef struct {
+	bool preview;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t pre_render_width;
@@ -199,20 +200,30 @@ static void init_ogl(CUBE_STATE_T *state) {
 	src_rect.width = state->screen_width << 16;
 	src_rect.height = state->screen_height << 16;
 
-	dispman_display = vc_dispmanx_display_open(0 /* LCD */);
-	dispman_update = vc_dispmanx_update_start(0);
+	if (state->preview) {
+		dispman_display = vc_dispmanx_display_open(0 /* LCD */);
+		dispman_update = vc_dispmanx_update_start(0);
 
-	dispman_element = vc_dispmanx_element_add(dispman_update, dispman_display,
-			0/*layer*/, &dst_rect, 0/*src*/, &src_rect,
-			DISPMANX_PROTECTION_NONE, 0 /*alpha*/, 0/*clamp*/, 0/*transform*/);
+		dispman_element = vc_dispmanx_element_add(dispman_update,
+				dispman_display, 0/*layer*/, &dst_rect, 0/*src*/, &src_rect,
+				DISPMANX_PROTECTION_NONE, 0 /*alpha*/, 0/*clamp*/,
+				0/*transform*/);
 
-	nativewindow.element = dispman_element;
-	nativewindow.width = state->screen_width;
-	nativewindow.height = state->screen_height;
-	vc_dispmanx_update_submit_sync(dispman_update);
+		nativewindow.element = dispman_element;
+		nativewindow.width = state->screen_width;
+		nativewindow.height = state->screen_height;
+		vc_dispmanx_update_submit_sync(dispman_update);
 
-	state->surface = eglCreateWindowSurface(state->display, config,
-			&nativewindow, NULL);
+		state->surface = eglCreateWindowSurface(state->display, config,
+				&nativewindow, NULL);
+	} else {
+		//Create an offscreen rendering surface
+		static const EGLint rendering_attributes[] =
+				{ EGL_WIDTH, state->screen_width, EGL_HEIGHT,
+						state->screen_height, EGL_NONE };
+		state->surface = eglCreatePbufferSurface(m_display, config,
+				rendering_attributes);
+	}
 	assert(state->surface != EGL_NO_SURFACE);
 
 	// connect the context to the surface
@@ -574,7 +585,7 @@ int main(int argc, char *argv[]) {
 	int image_size_with = 1024;
 	int image_size_height = 1024;
 	int num_of_cam = 1;
-	bool preview = 0;
+	bool preview = false;
 
 	while ((opt = getopt(argc, argv, "w:h:n:p")) != -1) {
 		switch (opt) {
@@ -603,6 +614,7 @@ int main(int argc, char *argv[]) {
 	// Clear application state
 	memset(state, 0, sizeof(*state));
 	state->num_of_cam = num_of_cam;
+	state->preview = preview;
 
 	init_device();
 
