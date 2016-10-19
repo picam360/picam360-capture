@@ -187,10 +187,12 @@ static void init_ogl(CUBE_STATE_T *state) {
 			&state->screen_height);
 	assert(success >= 0);
 
-	state->pre_render_width = 800 / 2;
-	state->pre_render_height = 800 * state->screen_height / state->screen_width;
-	//state->pre_render_width = state->screen_width / 2;
-	//state->pre_render_height = state->screen_height / 1;
+	if(state->pre_render_width == 0) {
+		state->pre_render_width = 800 / 2;
+		state->pre_render_height = 800 * state->screen_height / state->screen_width;
+		//state->pre_render_width = state->screen_width / 2;
+		//state->pre_render_height = state->screen_height / 1;
+	}
 
 	printf("width=%d,height=%d\n", state->pre_render_width,
 			state->pre_render_height);
@@ -603,6 +605,8 @@ int main(int argc, char *argv[]) {
 	int opt;
 	int image_size_with = 1024;
 	int image_size_height = 1024;
+	int render_width = 0;
+	int render_height = 0;
 	int num_of_cam = 1;
 	bool preview = false;
 	bool stereo = false;
@@ -624,9 +628,11 @@ int main(int argc, char *argv[]) {
 		case 's':
 			stereo = true;
 			break;
-		case 'r':
-			printf("r: %s\n",
-					optarg);
+		case 'W':
+			sscanf(optarg, "%d", &render_width);
+			break;
+		case 'H':
+			sscanf(optarg, "%d", &render_height);
 			break;
 		default: /* '?' */
 			printf("Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
@@ -640,6 +646,8 @@ int main(int argc, char *argv[]) {
 
 	// Clear application state
 	memset(state, 0, sizeof(*state));
+	state->pre_render_width = render_width;
+	state->pre_render_height = render_height;
 	state->num_of_cam = num_of_cam;
 	state->preview = preview;
 	state->stereo = stereo;
