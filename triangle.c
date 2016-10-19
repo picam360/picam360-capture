@@ -73,7 +73,7 @@
 
 typedef struct {
 	bool preview;
-	bool stereo = false;
+	bool stereo;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t pre_render_width;
@@ -222,10 +222,10 @@ static void init_ogl(CUBE_STATE_T *state) {
 				&nativewindow, NULL);
 	} else {
 		//Create an offscreen rendering surface
-		static const EGLint rendering_attributes[] =
+		EGLint rendering_attributes[] =
 				{ EGL_WIDTH, state->screen_width, EGL_HEIGHT,
 						state->screen_height, EGL_NONE };
-		state->surface = eglCreatePbufferSurface(m_display, config,
+		state->surface = eglCreatePbufferSurface(state->display, config,
 				rendering_attributes);
 	}
 	assert(state->surface != EGL_NO_SURFACE);
@@ -459,16 +459,16 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	if(state->snap && state->snap_save_path[0] != '\0') {
 		state->snap = false;
-		FILE *fp = fopen(buff, "w");
+		FILE *fp = fopen(state->snap_save_path, "w");
 		if (fp != NULL) {
 			int size = state->pre_render_width * state->pre_render_height;
 			unsigned char *buff = (unsigned char*)malloc(size);
-			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buff);
 			fwrite(buff, 1, size, fp);
 			free(buff);
 			fclose(fp);
 
-			fprintf("snapped : saved to %s\n", state->snap_save_path);
+			printf("snapped : saved to %s\n", state->snap_save_path);
 		}
 	}
 
