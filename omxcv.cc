@@ -18,27 +18,27 @@ using std::chrono::duration_cast;
 
 #define TIMEDIFF(start) (duration_cast<milliseconds>(steady_clock::now() - start).count())
 
-#ifdef ENABLE_NEON
-extern "C" void omxcv_bgr2rgb_neon(const unsigned char *src, unsigned char *dst, int n);
-#endif
-
-/**
- * Perform the BGR2RGB conversion.
- * @param [in] src The source buffer.
- * @param [in] dst The destination buffer.
- * @param [in] stride The stride of the image.
- */
-void BGR2RGB(const cv::Mat &src, uint8_t *dst, int stride) {
-#ifdef ENABLE_NEON
-	for (int i = 0; i < src.rows; i++) {
-		const uint8_t *buffer = src.ptr<const uint8_t>(i);
-		omxcv_bgr2rgb_neon(buffer, dst+stride*i, src.cols);
-	}
-#else
-	cv::Mat omat(src.rows, src.cols, CV_8UC3, dst, stride);
-	cv::cvtColor(src, omat, CV_BGR2RGB);
-#endif
-}
+//#ifdef ENABLE_NEON
+//extern "C" void omxcv_bgr2rgb_neon(const unsigned char *src, unsigned char *dst, int n);
+//#endif
+//
+///**
+// * Perform the BGR2RGB conversion.
+// * @param [in] src The source buffer.
+// * @param [in] dst The destination buffer.
+// * @param [in] stride The stride of the image.
+// */
+//void BGR2RGB(const cv::Mat &src, uint8_t *dst, int stride) {
+//#ifdef ENABLE_NEON
+//	for (int i = 0; i < src.rows; i++) {
+//		const uint8_t *buffer = src.ptr<const uint8_t>(i);
+//		omxcv_bgr2rgb_neon(buffer, dst+stride*i, src.cols);
+//	}
+//#else
+//	cv::Mat omat(src.rows, src.cols, CV_8UC3, dst, stride);
+//	cv::cvtColor(src, omat, CV_BGR2RGB);
+//#endif
+//}
 
 /**
  * Constructor.
