@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <stdbool.h>
 
 #include "bcm_host.h"
 
@@ -557,7 +558,7 @@ static void exit_func(void)
 
 //==============================================================================
 
-int inputAvailable() {
+bool inputAvailable() {
 	struct timeval tv;
 	fd_set fds;
 	tv.tv_sec = 0;
@@ -573,8 +574,9 @@ int main(int argc, char *argv[]) {
 	int image_size_with = 1024;
 	int image_size_height = 1024;
 	int num_of_cam = 1;
+	bool preview = 0;
 
-	while ((opt = getopt(argc, argv, "w:h:n:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:p")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &image_size_with);
@@ -584,6 +586,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'n':
 			sscanf(optarg, "%d", &num_of_cam);
+			break;
+		case 'p':
+			preview = true;
 			break;
 		default: /* '?' */
 			printf("Usage: %s [-w width] [-h height] [-n num_of_cam]\n",
