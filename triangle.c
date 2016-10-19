@@ -36,6 +36,7 @@
 #include <sys/time.h>
 #include <sys/select.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #include "bcm_host.h"
 
@@ -44,7 +45,7 @@
 #include "EGL/eglext.h"
 
 #include "triangle.h"
-#include <pthread.h>
+#include "picam360_tools.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -459,17 +460,16 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	if(state->snap && state->snap_save_path[0] != '\0') {
 		state->snap = false;
-		FILE *fp = fopen(state->snap_save_path, "w");
-		if (fp != NULL) {
-			int size = state->pre_render_width * state->pre_render_height;
-			unsigned char *buff = (unsigned char*)malloc(size);
-			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buff);
-			fwrite(buff, 1, size, fp);
-			free(buff);
-			fclose(fp);
 
-			printf("snapped : saved to %s\n", state->snap_save_path);
-		}
+		int size = state->pre_render_width * state->pre_render_height*3;
+		unsigned char *buff = (unsigned char*)malloc(size);
+		glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buff);
+
+		SaveJpeg(buff, state->snap_save_path, 70);
+
+		free(buff);
+
+		printf("snapped : saved to %s\n", state->snap_save_path);
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -607,7 +607,7 @@ int main(int argc, char *argv[]) {
 	bool preview = false;
 	bool stereo = false;
 
-	while ((opt = getopt(argc, argv, "w:h:n:ps")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psr::")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &image_size_with);
@@ -623,6 +623,10 @@ int main(int argc, char *argv[]) {
 			break;
 		case 's':
 			stereo = true;
+			break;
+		case 'r':
+			printf("r: %s\n",
+					optarg);
 			break;
 		default: /* '?' */
 			printf("Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
