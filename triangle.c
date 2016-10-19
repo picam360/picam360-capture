@@ -615,11 +615,13 @@ int main(int argc, char *argv[]) {
 			char buff[256];
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
 			buff[size] = '\0';
-			char cmd = strtok(buff, ' ');
+			char *cmd = strtok(buff, " \n");
 			if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
-				printf("snap\n");
+				char *param = strtok(NULL, " \n");
+				printf("snap saved to %s\n", param);
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
-				printf("start_record\n");
+				char *param = strtok(NULL, " \n");
+				printf("start_record saved to %s\n", param);
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
 			} else {
