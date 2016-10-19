@@ -688,7 +688,7 @@ int main(int argc, char *argv[]) {
 
 			glFinish();
 			glFlush();
-			eglSwapBuffers(m_display, m_surface);
+			eglSwapBuffers(state->display, state->surface);
 			glFinish();
 
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
