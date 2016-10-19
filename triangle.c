@@ -568,9 +568,6 @@ int inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-extern char *optarg;
-extern int optind, opterr, optopt;
-
 int main(int argc, char *argv[]) {
 	int opt;
 	int image_size_with = 1024;
