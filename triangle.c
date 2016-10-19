@@ -66,6 +66,8 @@
 #define M_PI 3.141592654
 #endif
 
+#define MAX_CAM_NUM 4
+
 typedef struct {
 	uint32_t screen_width;
 	uint32_t screen_height;
@@ -84,8 +86,7 @@ typedef struct {
 	float pre_render_vbo_scale;
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
-	GLuint tex;
-	GLuint tex2;
+	GLuint tex[MAX_CAM_NUM];
 	GLuint logo_texture;
 	GLuint pre_render_texture;
 	GLuint framebuffer;
@@ -107,13 +108,12 @@ static void init_model_proj(CUBE_STATE_T *state);
 static void redraw_pre_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
-		int image_size_height);
+		int image_size_height, int num_of_cam);
 static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
 
-static void* eglImage = 0;
-static void* eglImage2 = 0;
+static void* eglImage[MAX_CAM_NUM] = 0;
 static pthread_t thread1;
 static pthread_t thread2;
 
@@ -255,8 +255,8 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width,
-			iplImage->height, 0, GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width, iplImage->height, 0,
+			GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
@@ -319,8 +319,7 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = y / len;
 				points[idx++] = z / len;
 				points[idx++] = 1.0;
-				if(scale == 0)
-				{
+				if (scale == 0) {
 					scale = z / -x;
 				}
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
@@ -400,9 +399,9 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glViewport(0, 0, state->pre_render_width, state->pre_render_height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
-    glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->tex);
-    glActiveTexture(GL_TEXTURE1);
+	glActiveTexture(GL_TEXTURE1);
 //	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 	glBindTexture(GL_TEXTURE_2D, state->tex2);
 
@@ -421,7 +420,8 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
-	glUniform1f(glGetUniformLocation(program, "scale"), state->pre_render_vbo_scale);
+	glUniform1f(glGetUniformLocation(program, "scale"),
+			state->pre_render_vbo_scale);
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 1);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
@@ -446,7 +446,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->stereo_vbo);
-    glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
 
 	//Load in the texture and thresholding parameters.
@@ -489,70 +489,40 @@ static void redraw_scene(CUBE_STATE_T *state) {
  *
  ***********************************************************/
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
-		int image_size_height) {
+		int image_size_height, int num_of_cam) {
 
 	load_texture("img/logo_img.png", &state->logo_texture);
 
-	//// load three texture buffers but use them on six OGL|ES texture surfaces
-	glGenTextures(1, &state->tex);
+	for(int i=0;i<num_of_cam;i++) {
+		//// load three texture buffers but use them on six OGL|ES texture surfaces
+		glGenTextures(1, &state->tex[i]);
 
-	glBindTexture(GL_TEXTURE_2D, state->tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with, image_size_height,
-			0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with, image_size_height,
+				0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	/* Create EGL Image */
-	eglImage = eglCreateImageKHR(state->display, state->context,
-			EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->tex, 0);
+		/* Create EGL Image */
+		eglImage[i] = eglCreateImageKHR(state->display, state->context,
+				EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->tex[i], 0);
 
-	if (eglImage == EGL_NO_IMAGE_KHR) {
-		printf("eglCreateImageKHR failed.\n");
-		exit(1);
+		if (eglImage == EGL_NO_IMAGE_KHR) {
+			printf("eglCreateImageKHR failed.\n");
+			exit(1);
+		}
+
+		// Start rendering
+		pthread_create(&thread1, NULL, video_decode_test, eglImage[i]);
+
+		glEnable(GL_TEXTURE_2D);
+
+		// Bind texture surface to current vertices
+		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
 	}
-
-	// Start rendering
-	pthread_create(&thread1, NULL, video_decode_test, eglImage);
-
-	glEnable(GL_TEXTURE_2D);
-
-	// Bind texture surface to current vertices
-	glBindTexture(GL_TEXTURE_2D, state->tex);
-//return;
-//cam2
-//sleep(10);
-
-	//// load three texture buffers but use them on six OGL|ES texture surfaces
-	glGenTextures(1, &state->tex2);
-
-	glBindTexture(GL_TEXTURE_2D, state->tex2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with, image_size_height,
-			0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	/* Create EGL Image */
-	eglImage2 = eglCreateImageKHR(state->display, state->context,
-			EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->tex2, 0);
-
-	if (eglImage2 == EGL_NO_IMAGE_KHR) {
-		printf("eglCreateImageKHR failed 2.\n");
-		exit(1);
-	}
-
-	// Start rendering
-	pthread_create(&thread2, NULL, video_decode_test, eglImage2);
-
-	glEnable(GL_TEXTURE_2D);
-
-	// Bind texture surface to current vertices
-	glBindTexture(GL_TEXTURE_2D, state->tex2);
 }
 //------------------------------------------------------------------------------
 
@@ -580,37 +550,39 @@ static void exit_func(void)
 
 //==============================================================================
 
-bool inputAvailable()
-{
-  struct timeval tv;
-  fd_set fds;
-  tv.tv_sec = 0;
-  tv.tv_usec = 0;
-  FD_ZERO(&fds);
-  FD_SET(STDIN_FILENO, &fds);
-  select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
-  return (FD_ISSET(0, &fds));
+int inputAvailable() {
+	struct timeval tv;
+	fd_set fds;
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	FD_ZERO(&fds);
+	FD_SET(STDIN_FILENO, &fds);
+	select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
+	return (FD_ISSET(0, &fds));
 }
 
 int main(int argc, char *argv[]) {
+	int opt;
 	int image_size_with = 1024;
 	int image_size_height = 1024;
+	int num_of_cam = 1;
 
-    while ((int opt = getopt(argc, argv, "w:h:")) != -1) {
-        switch (opt) {
-            case 'w':
-                sscanf(optarg, "%d", &image_size_with);
-                break;
-
-            case 'h':
-                sscanf(optarg, "%d", &image_size_height);
-                break;
-
-            default: /* '?' */
-                printf("Usage: %s [-w width] [-h height]\n", argv[0]);
-                break;
-        }
-    }
+	while ((opt = getopt(argc, argv, "w:h:n:")) != -1) {
+		switch (opt) {
+		case 'w':
+			sscanf(optarg, "%d", &image_size_with);
+			break;
+		case 'h':
+			sscanf(optarg, "%d", &image_size_height);
+			break;
+		case 'n':
+			sscanf(optarg, "%d", &num_of_cam);
+			break;
+		default: /* '?' */
+			printf("Usage: %s [-w width] [-h height] [-n num_of_cam]\n", argv[0]);
+			return -1;
+		}
+	}
 
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
@@ -627,12 +599,12 @@ int main(int argc, char *argv[]) {
 	init_model_proj(state);
 
 	// initialise the OGLES texture(s)
-	init_textures(state, image_size_with, image_size_height);
+	init_textures(state, image_size_with, image_size_height, num_of_cam);
 
 	while (!terminate) {
-		if(inputAvailable()) {
+		if (inputAvailable()) {
 			char buff[256];
-			int size = read(STDIN_FILENO, buff, sizeof(buff)-1);
+			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
 			buff[size] = '\0';
 			printf("%s\n", buff);
 		}
