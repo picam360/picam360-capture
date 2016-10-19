@@ -152,21 +152,14 @@ pthread_mutex_unlock(&mlock);
    format.eCompressionFormat = OMX_VIDEO_CodingAVC;
    format.xFramerate = 30 << 16;
 
-//int descriptor = open("test_1024x1024.h264", O_RDONLY);
-int descriptor = open("cam0", O_RDONLY);
-if(index == 0)
-{
-descriptor = open("cam0", O_RDONLY);
-}
-else
-{
-descriptor = open("cam1", O_RDONLY);
-}
-if(descriptor == -1)
-{
-printf("open\n");
-	exit(-1);
-}
+   char buff[256];
+   sprintf(buff, "cam%d", index);
+   int descriptor = open(buff, O_RDONLY);
+	if(descriptor == -1)
+	{
+		printf("failed to open %s\n", buff);
+		exit(-1);
+	}
 
    if(status == 0 &&
       OMX_SetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamVideoPortFormat, &format) == OMX_ErrorNone &&
