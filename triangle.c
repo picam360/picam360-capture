@@ -677,6 +677,7 @@ int main(int argc, char *argv[]) {
 		if(state->preview) {
 			redraw_scene(state);
 		}
+		glFlush();
 
 		if(state->snap && state->snap_save_path[0] != '\0') {
 			state->snap = false;
@@ -687,15 +688,10 @@ int main(int argc, char *argv[]) {
 			unsigned char *buff = (unsigned char*)malloc(size);
 
 			glFinish();
-			glFlush();
-			eglSwapBuffers(state->display, state->surface);
-			glFinish();
 
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 			glReadPixels(0, 0, state->pre_render_width, state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE, buff);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-			printf("read pixel done!\n");
 
 			SaveJpeg(buff, state->pre_render_width, state->pre_render_height, state->snap_save_path, 70);
 
