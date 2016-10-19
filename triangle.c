@@ -86,6 +86,7 @@ typedef struct {
 	float pre_render_vbo_scale;
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
+	int num_of_cam;
 	GLuint tex[MAX_CAM_NUM];
 	GLuint logo_texture;
 	GLuint pre_render_texture;
@@ -108,14 +109,13 @@ static void init_model_proj(CUBE_STATE_T *state);
 static void redraw_pre_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
-		int image_size_height, int num_of_cam);
+		int image_size_height);
 static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
 
 static void* eglImage[MAX_CAM_NUM] = 0;
-static pthread_t thread1;
-static pthread_t thread2;
+static pthread_t thread[MAX_CAM_NUM];
 
 /***********************************************************
  * Name: init_ogl
@@ -400,10 +400,11 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, state->tex);
-	glActiveTexture(GL_TEXTURE1);
-//	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
-	glBindTexture(GL_TEXTURE_2D, state->tex2);
+	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
+	for(int i=0;i<state->num_of_cam;i++) {
+		glActiveTexture(GL_TEXTURE1 + i);
+		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
+	}
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
@@ -422,8 +423,12 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "scale"),
 			state->pre_render_vbo_scale);
-	glUniform1i(glGetUniformLocation(program, "tex"), 0);
-	glUniform1i(glGetUniformLocation(program, "logo_texture"), 1);
+	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
+	for(int i=0;i<state->num_of_cam;i++) {
+		char buff[256];
+		sprintf(buff, "tex%d", i);
+		glUniform1i(glGetUniformLocation(program, buff), i+1);
+	}
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
 
@@ -489,11 +494,11 @@ static void redraw_scene(CUBE_STATE_T *state) {
  *
  ***********************************************************/
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
-		int image_size_height, int num_of_cam) {
+		int image_size_height) {
 
 	load_texture("img/logo_img.png", &state->logo_texture);
 
-	for(int i=0;i<num_of_cam;i++) {
+	for(int i=0;i<state->num_of_cam;i++) {
 		//// load three texture buffers but use them on six OGL|ES texture surfaces
 		glGenTextures(1, &state->tex[i]);
 
@@ -510,13 +515,13 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 		eglImage[i] = eglCreateImageKHR(state->display, state->context,
 				EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->tex[i], 0);
 
-		if (eglImage == EGL_NO_IMAGE_KHR) {
+		if (eglImage[i] == EGL_NO_IMAGE_KHR) {
 			printf("eglCreateImageKHR failed.\n");
 			exit(1);
 		}
 
 		// Start rendering
-		pthread_create(&thread1, NULL, video_decode_test, eglImage[i]);
+		pthread_create(&thread[i], NULL, video_decode_test, eglImage[i]);
 
 		glEnable(GL_TEXTURE_2D);
 
@@ -589,6 +594,7 @@ int main(int argc, char *argv[]) {
 
 	// Clear application state
 	memset(state, 0, sizeof(*state));
+	state->num_of_cam = num_of_cam;
 
 	init_device();
 
