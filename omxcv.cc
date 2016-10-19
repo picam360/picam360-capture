@@ -3,7 +3,6 @@
  * @brief Routines to perform hardware accelerated H.264 encoding on the RPi.
  */
 
-#include "omxcv-config.h"
 #include "omxcv.h"
 #include "omxcv-impl.h"
 using namespace omxcv;
