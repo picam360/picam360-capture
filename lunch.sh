@@ -10,7 +10,7 @@ CAM_HEIGHT=1024
 BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
-BACKGROUND="-p"
+BACKGROUND=false
 STEREO=
 MODE=
 FPS=30
@@ -26,7 +26,7 @@ do
             ;;
         H)  RENDER_HEIGHT=$OPTARG
             ;;
-        B)  BACKGROUND="< cmd &"
+        B)  BACKGROUND=true
             ;;
         s)  STEREO="-s"
             ;;
@@ -42,4 +42,8 @@ do
 done
 
 raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
-./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO $BACKGROUND
+if [$BACKGROUND]; then
+	./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
+else
+	./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
+fi
