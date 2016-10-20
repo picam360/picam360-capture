@@ -140,6 +140,7 @@ static void redraw_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state);
 static void init_options(CUBE_STATE_T *state);
+static void save_options(CUBE_STATE_T *state);
 static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
@@ -616,7 +617,7 @@ static void init_textures(CUBE_STATE_T *state) {
  * Name: init_options
  *
  * Arguments:
- *       char *path - config file path
+ *       CUBE_STATE_T *state - holds OGLES model info
  *
  * Description:   Initialise options
  *
@@ -644,6 +645,33 @@ static void init_options(CUBE_STATE_T *state) {
 	if (lg_options.cam_horizon_r[0] == 0) {
 		lg_options.cam_horizon_r[0] = 1.0;
 	}
+
+	json_decref(options);
+}
+//------------------------------------------------------------------------------
+
+/***********************************************************
+ * Name: save_options
+ *
+ * Arguments:
+ *       CUBE_STATE_T *state - holds OGLES model info
+ *
+ * Description:   Initialise options
+ *
+ * Returns: void
+ *
+ ***********************************************************/
+static void save_options(CUBE_STATE_T *state) {
+	json_error_t error;
+	json_t *options = json_object();
+
+	json_object_set_new(options, "sharpness_gain", json_real(lg_options.sharpness_gain));
+	json_object_set_new(options, "cam0_offset_yaw", json_real(lg_options.cam_offset_yaw[0]));
+	json_object_set_new(options, "cam0_offset_x", json_real(lg_options.cam_offset_x[0]));
+	json_object_set_new(options, "cam0_offset_y", json_real(lg_options.cam_offset_y[0]));
+	json_object_set_new(options, "cam0_horizon_r", json_real(lg_options.cam_horizon_r[0]));
+
+	json_dump_file(options, CONFIG_FILE, 0);
 
 	json_decref(options);
 }
@@ -766,16 +794,25 @@ int main(int argc, char *argv[]) {
 			char *cmd = strtok(buff, " \n");
 			if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[0] += 0.01;
-				}
-				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
 					lg_options.cam_offset_y[0] -= 0.01;
 				}
+				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
+					lg_options.cam_offset_y[0] += 0.01;
+				}
 				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[0] -= 0.01;
+					lg_options.cam_offset_x[0] += 0.01;
 				}
 				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[0] += 0.01;
+					lg_options.cam_offset_x[0] -= 0.01;
+				}
+				if (strncmp(cmd, "s", sizeof(buff)) == 0) {
+					lg_options.sharpness_gain += 0.01;
+				}
+				if (strncmp(cmd, "w", sizeof(buff)) == 0) {
+					lg_options.sharpness_gain -= 0.01;
+				}
+				if (strncmp(cmd, "save", sizeof(buff)) == 0) {
+					save_options(state);
 				}
 			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
