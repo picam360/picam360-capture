@@ -684,23 +684,25 @@ static void save_options(CUBE_STATE_T *state) {
 static void exit_func(void)
 // Function to be passed to atexit().
 {
-	if (eglImage != 0) {
-		if (!eglDestroyImageKHR(state->display, (EGLImageKHR) eglImage))
-			printf("eglDestroyImageKHR failed.");
+	for (int i = 0; i < state->num_of_cam; i++) {
+		if (eglImage[i] != 0) {
+			if (!eglDestroyImageKHR(state->display, (EGLImageKHR) eglImage[i]))
+				printf("eglDestroyImageKHR failed.");
+		}
 	}
 
-// clear screen
+	// clear screen
 	glClear(GL_COLOR_BUFFER_BIT);
 	eglSwapBuffers(state->display, state->surface);
 
-// Release OpenGL resources
+	// Release OpenGL resources
 	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE,
 			EGL_NO_CONTEXT);
 	eglDestroySurface(state->display, state->surface);
 	eglDestroyContext(state->display, state->context);
 	eglTerminate(state->display);
 
-	printf("\ncube closed\n");
+	printf("\npicam360-capture closed\n");
 } // exit_func()
 
 //==============================================================================
