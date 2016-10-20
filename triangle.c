@@ -37,6 +37,7 @@
 #include <sys/select.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <linux/input.h>
 
 #include "bcm_host.h"
 
@@ -478,14 +479,19 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 	glUniform1f(glGetUniformLocation(program, "scale"),
 			state->render_vbo_scale);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
-			1.0 / state->render_width);
+			1.0 / state->cam_width);
 
 	//options start
-	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), lg_options.sharpness_gain);
-	glUniform1f(glGetUniformLocation(program, "cam0_offset_yaw"), lg_options.cam_offset_yaw[0]);
-	glUniform1f(glGetUniformLocation(program, "cam0_offset_x"), lg_options.cam_offset_x[0]);
-	glUniform1f(glGetUniformLocation(program, "cam0_offset_y"), lg_options.cam_offset_y[0]);
-	glUniform1f(glGetUniformLocation(program, "cam0_horizon_r"), lg_options.cam_horizon_r[0]);
+	glUniform1f(glGetUniformLocation(program, "sharpness_gain"),
+			lg_options.sharpness_gain);
+	glUniform1f(glGetUniformLocation(program, "cam0_offset_yaw"),
+			lg_options.cam_offset_yaw[0]);
+	glUniform1f(glGetUniformLocation(program, "cam0_offset_x"),
+			lg_options.cam_offset_x[0]);
+	glUniform1f(glGetUniformLocation(program, "cam0_offset_y"),
+			lg_options.cam_offset_y[0]);
+	glUniform1f(glGetUniformLocation(program, "cam0_horizon_r"),
+			lg_options.cam_horizon_r[0]);
 	//options end
 
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
@@ -758,7 +764,20 @@ int main(int argc, char *argv[]) {
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
 			buff[size] = '\0';
 			char *cmd = strtok(buff, " \n");
-			if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
+			if (state->operation_mode == CALIBRATION) {
+				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
+					lg_options.cam_offset_y += 0.01;
+				}
+				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
+					lg_options.cam_offset_y -= 0.01;
+				}
+				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
+					lg_options.cam_offset_x -= 0.01;
+				}
+				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
+					lg_options.cam_offset_x += 0.01;
+				}
+			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
 					strncpy(state->snap_save_path, param,

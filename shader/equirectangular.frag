@@ -71,7 +71,7 @@ void main(void) {
 		if (r >= 0.45) {
 			float r_r = pow(r - 0.45, 1.006) + 0.45;
 			u = u_factor * r_r * cos(yaw2) + 0.5 + cam0_offset_x;
-			v = v_factor * r_r * sin(yaw2) + 0.5 + cam0_offset_y;
+			v = v_factor * r_r * sin(yaw2) + 0.5 - cam0_offset_y;//cordinate is different
 			vec4 fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
@@ -79,7 +79,7 @@ void main(void) {
 
 			r_r = pow(r - 0.45, 1.003) + 0.45;
 			u = u_factor * r_r * cos(yaw2) + 0.5 + cam0_offset_x;
-			v = v_factor * r_r * sin(yaw2) + 0.5 + cam0_offset_y;
+			v = v_factor * r_r * sin(yaw2) + 0.5 - cam0_offset_y;//cordinate is different
 			fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
