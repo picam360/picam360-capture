@@ -59,6 +59,9 @@
 #include <mat4/fromQuat.h>
 #include <mat4/perspective.h>
 
+//json parser
+#include <jansson.h>
+
 #include "gl_program.h"
 #include "device.h"
 
@@ -71,6 +74,17 @@
 #endif
 
 #define MAX_CAM_NUM 4
+
+#define CONFIG_FILE "config.json"
+
+typedef struct {
+	float sharpness_gain;
+	float cam_offset_yaw[MAX_CAM_NUM];
+	float cam_offset_x[MAX_CAM_NUM];
+	float cam_offset_y[MAX_CAM_NUM];
+	float cam_horizon_r[MAX_CAM_NUM];
+} OPTIONS_T;
+OPTIONS_T lg_options = { };
 
 typedef struct {
 	bool preview;
@@ -124,6 +138,7 @@ static void init_model_proj(CUBE_STATE_T *state);
 static void redraw_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state);
+static void init_options(CUBE_STATE_T *state);
 static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
@@ -583,6 +598,35 @@ static void init_textures(CUBE_STATE_T *state) {
 }
 //------------------------------------------------------------------------------
 
+/***********************************************************
+ * Name: init_options
+ *
+ * Arguments:
+ *       char *path - config file path
+ *
+ * Description:   Initialise options
+ *
+ * Returns: void
+ *
+ ***********************************************************/
+static void init_options(CUBE_STATE_T *state) {
+	json_error_t error;
+	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
+	if (result == NULL) {
+		fputs(error.text, stderr);
+		return;
+	}
+	json_t *node;
+	json_array_foreach(options, i, node)
+	{
+		printf("json %s\n", json_string_value(node));
+	}
+
+	json_decref(result);
+
+}
+//------------------------------------------------------------------------------
+
 static void exit_func(void)
 // Function to be passed to atexit().
 {
@@ -630,6 +674,9 @@ int main(int argc, char *argv[]) {
 	state->preview = false;
 	state->stereo = false;
 	state->operation_mode = WINDOW;
+
+	//init options
+	init_options(state);
 
 	while ((opt = getopt(argc, argv, "w:h:n:psW:H:EC")) != -1) {
 		switch (opt) {
