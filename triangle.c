@@ -789,6 +789,7 @@ int main(int argc, char *argv[]) {
 // initialise the OGLES texture(s)
 	init_textures(state);
 
+	double calib_step = 0.01;
 	int frame_num;
 	double frame_elapsed;
 	struct timeval s, f;
@@ -805,23 +806,29 @@ int main(int argc, char *argv[]) {
 			if (cmd == NULL) {
 				//do nothing
 			} else if (state->operation_mode == CALIBRATION) {
+				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
+					char *param = strtok(NULL, " \n");
+					if (param != NULL) {
+						sscanf(param, "%lf", &calib_step);
+					}
+				}
 				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[0] -= 0.01;
+					lg_options.cam_offset_y[0] -= calib_step;
 				}
 				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[0] += 0.01;
+					lg_options.cam_offset_y[0] += calib_step;
 				}
 				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[0] += 0.01;
+					lg_options.cam_offset_x[0] += calib_step;
 				}
 				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[0] -= 0.01;
+					lg_options.cam_offset_x[0] -= calib_step;
 				}
 				if (strncmp(cmd, "s", sizeof(buff)) == 0) {
-					lg_options.sharpness_gain += 0.05;
+					lg_options.sharpness_gain += calib_step;
 				}
 				if (strncmp(cmd, "w", sizeof(buff)) == 0) {
-					lg_options.sharpness_gain -= 0.05;
+					lg_options.sharpness_gain -= calib_step;
 				}
 				if (strncmp(cmd, "save", sizeof(buff)) == 0) {
 					save_options(state);
