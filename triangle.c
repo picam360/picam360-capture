@@ -75,27 +75,28 @@
 typedef struct {
 	bool preview;
 	bool stereo;
+	bool equirectangular;
 	uint32_t screen_width;
 	uint32_t screen_height;
-	uint32_t pre_render_width;
-	uint32_t pre_render_height;
+	uint32_t render_width;
+	uint32_t render_height;
 // OpenGL|ES objects
 	EGLDisplay display;
 	EGLSurface surface;
 	EGLContext context;
 	struct {
-		void *pre_render;
+		void *render;
 		void *stereo;
 	} program;
-	GLuint pre_render_vbo;
-	GLuint pre_render_vbo_nop;
-	float pre_render_vbo_scale;
+	GLuint render_vbo;
+	GLuint render_vbo_nop;
+	float render_vbo_scale;
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	int num_of_cam;
-	GLuint tex[MAX_CAM_NUM];
+	GLuint cam_texture[MAX_CAM_NUM];
 	GLuint logo_texture;
-	GLuint pre_render_texture;
+	GLuint render_texture;
 	GLuint framebuffer;
 // model rotation vector and direction
 	GLfloat rot_angle_x_inc;
@@ -116,7 +117,7 @@ typedef struct {
 
 static void init_ogl(CUBE_STATE_T *state);
 static void init_model_proj(CUBE_STATE_T *state);
-static void redraw_pre_render_texture(CUBE_STATE_T *state);
+static void redraw_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
 static void init_textures(CUBE_STATE_T *state, int image_size_with,
 		int image_size_height);
@@ -188,16 +189,14 @@ static void init_ogl(CUBE_STATE_T *state) {
 			&state->screen_height);
 	assert(success >= 0);
 
-	if (state->pre_render_width == 0) {
-		state->pre_render_width = 800 / 2;
-		state->pre_render_height = 800 * state->screen_height
-				/ state->screen_width;
-		//state->pre_render_width = state->screen_width / 2;
-		//state->pre_render_height = state->screen_height / 1;
+	if (state->render_width == 0) {
+		state->render_width = 800 / 2;
+		state->render_height = 800 * state->screen_height / state->screen_width;
+		//state->render_width = state->screen_width / 2;
+		//state->render_height = state->screen_height / 1;
 	}
 
-	printf("width=%d,height=%d\n", state->pre_render_width,
-			state->pre_render_height);
+	printf("width=%d,height=%d\n", state->render_width, state->render_height);
 
 	dst_rect.x = 0;
 	dst_rect.y = 0;
@@ -242,12 +241,12 @@ static void init_ogl(CUBE_STATE_T *state) {
 	//texture rendering
 	glGenFramebuffers(1, &state->framebuffer);
 
-	glGenTextures(1, &state->pre_render_texture);
-	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
+	glGenTextures(1, &state->render_texture);
+	glBindTexture(GL_TEXTURE_2D, state->render_texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->pre_render_width,
-			state->pre_render_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->render_width,
+			state->render_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
@@ -255,7 +254,7 @@ static void init_ogl(CUBE_STATE_T *state) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-			state->pre_render_texture, 0);
+			state->render_texture, 0);
 	if (glGetError() != GL_NO_ERROR) {
 		printf(
 				"glFramebufferTexture2D failed. Could not allocate framebuffer.");
@@ -289,7 +288,7 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	return 0;
 }
 
-int stereomesh(GLuint *vbo_out, GLuint *n_out) {
+int board_mesh(GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
 	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f,
 			1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
@@ -308,7 +307,7 @@ int stereomesh(GLuint *vbo_out, GLuint *n_out) {
 	return 0;
 }
 
-int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
+int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 		GLuint *vbo_out, GLuint *n_out, float *scale_out) {
 	GLuint vbo;
 
@@ -389,14 +388,20 @@ int fovmesh(float theta_degree, int phi_degree, int num_of_steps,
  *
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
-	float fov = 120.0;
-	float aspect = state->pre_render_height / state->pre_render_width;
-	fovmesh(fov, fov * aspect, 20, &state->pre_render_vbo,
-			&state->pre_render_vbo_nop, &state->pre_render_vbo_scale);
-	stereomesh(&state->stereo_vbo, &state->stereo_vbo_nop);
+	if (state->equirectangular) {
+		board_mesh(&state->render_vbo, &state->render_vbo_nop);
+		state->program.render = GLProgram_new("shader/equiectangular.vert",
+				"shader/equirectangular.frag");
+	} else {
+		float fov = 120.0;
+		float aspect = state->render_height / state->render_width;
+		spherewindow_mesh(fov, fov * aspect, 20, &state->render_vbo,
+				&state->render_vbo_nop, &state->render_vbo_scale);
+		state->program.render = GLProgram_new("shader/window.vert",
+				"shader/window.frag");
+	}
 
-	state->program.pre_render = GLProgram_new("shader/pre_render.vert",
-			"shader/pre_render.frag");
+	board_mesh(&state->stereo_vbo, &state->stereo_vbo_nop);
 	state->program.stereo = GLProgram_new("shader/stereo.vert",
 			"shader/stereo.frag");
 }
@@ -413,19 +418,19 @@ static void init_model_proj(CUBE_STATE_T *state) {
  * Returns: void
  *
  ***********************************************************/
-static void redraw_pre_render_texture(CUBE_STATE_T *state) {
-	int program = GLProgram_GetId(state->program.pre_render);
+static void redraw_render_texture(CUBE_STATE_T *state) {
+	int program = GLProgram_GetId(state->program.render);
 	glUseProgram(program);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-	glViewport(0, 0, state->pre_render_width, state->pre_render_height);
+	glViewport(0, 0, state->render_width, state->render_height);
 
-	glBindBuffer(GL_ARRAY_BUFFER, state->pre_render_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, state->render_vbo);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		glActiveTexture(GL_TEXTURE1 + i);
-		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
 
 	mat4 camera_matrix = mat4_create();
@@ -444,11 +449,11 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "scale"),
-			state->pre_render_vbo_scale);
+			state->render_vbo_scale);
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
-		sprintf(buff, "tex%d", i);
+		sprintf(buff, "cam%d_texture", i);
 		glUniform1i(glGetUniformLocation(program, buff), i + 1);
 	}
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
@@ -458,8 +463,8 @@ static void redraw_pre_render_texture(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->pre_render_vbo_nop);
-	//glDrawArrays(GL_TRIANGLES, 0, state->pre_render_vbo_nop);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, state->render_vbo_nop);
+	//glDrawArrays(GL_TRIANGLES, 0, state->render_vbo_nop);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -474,7 +479,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->stereo_vbo);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, state->pre_render_texture);
+	glBindTexture(GL_TEXTURE_2D, state->render_texture);
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
@@ -496,6 +501,10 @@ static void redraw_scene(CUBE_STATE_T *state) {
 		glViewport(state->screen_width / 2 + state->screen_width / 8,
 				state->screen_height / 4, (GLsizei) state->screen_width / 4,
 				(GLsizei) state->screen_height / 2);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
+	} else {
+		glViewport(0, 0, (GLsizei) state->screen_width,
+				(GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 	}
 
@@ -524,9 +533,9 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 
 	for (int i = 0; i < state->num_of_cam; i++) {
 		//// load three texture buffers but use them on six OGL|ES texture surfaces
-		glGenTextures(1, &state->tex[i]);
+		glGenTextures(1, &state->cam_texture[i]);
 
-		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with,
 				image_size_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
@@ -537,7 +546,8 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 
 		/* Create EGL Image */
 		eglImage[i] = eglCreateImageKHR(state->display, state->context,
-				EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->tex[i], 0);
+				EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i],
+				0);
 
 		if (eglImage[i] == EGL_NO_IMAGE_KHR) {
 			printf("eglCreateImageKHR failed.\n");
@@ -550,7 +560,7 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 		glEnable(GL_TEXTURE_2D);
 
 		// Bind texture surface to current vertices
-		glBindTexture(GL_TEXTURE_2D, state->tex[i]);
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
 }
 //------------------------------------------------------------------------------
@@ -594,13 +604,16 @@ int main(int argc, char *argv[]) {
 	int opt;
 	int image_size_with = 1024;
 	int image_size_height = 1024;
-	int render_width = 0;
-	int render_height = 0;
-	int num_of_cam = 1;
-	bool preview = false;
-	bool stereo = false;
+	// Clear application state
+	memset(state, 0, sizeof(*state));
+	state->render_width = 0;
+	state->render_height = 0;
+	state->num_of_cam = 1;
+	state->preview = false;
+	state->stereo = false;
+	state->equirectangular = false;
 
-	while ((opt = getopt(argc, argv, "w:h:n:psW:H:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psW:H:e")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &image_size_with);
@@ -609,19 +622,22 @@ int main(int argc, char *argv[]) {
 			sscanf(optarg, "%d", &image_size_height);
 			break;
 		case 'n':
-			sscanf(optarg, "%d", &num_of_cam);
+			sscanf(optarg, "%d", &state->num_of_cam);
 			break;
 		case 'p':
-			preview = true;
+			state->preview = true;
 			break;
 		case 's':
-			stereo = true;
+			state->stereo = true;
 			break;
 		case 'W':
-			sscanf(optarg, "%d", &render_width);
+			sscanf(optarg, "%d", &state->render_width);
 			break;
 		case 'H':
-			sscanf(optarg, "%d", &render_height);
+			sscanf(optarg, "%d", &state->render_height);
+			break;
+		case 'e':
+			state->equirectangular = true;
 			break;
 		default: /* '?' */
 			printf(
@@ -633,14 +649,6 @@ int main(int argc, char *argv[]) {
 
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
-
-	// Clear application state
-	memset(state, 0, sizeof(*state));
-	state->pre_render_width = render_width;
-	state->pre_render_height = render_height;
-	state->num_of_cam = num_of_cam;
-	state->preview = preview;
-	state->stereo = stereo;
 
 	init_device();
 
@@ -655,7 +663,7 @@ int main(int argc, char *argv[]) {
 
 	struct timeval s, f;
 	int elapsed_ms;
-	int size = state->pre_render_width * state->pre_render_height * 3;
+	int size = state->render_width * state->render_height * 3;
 	unsigned char *image_buffer = (unsigned char*) malloc(size);
 
 	while (!terminate) {
@@ -674,15 +682,15 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					StartRecord(state->pre_render_width,
-							state->pre_render_height, param, 4000);
+					StartRecord(state->render_width, state->render_height,
+							param, 4000);
 					state->recording = true;
 
 					printf("start_record saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
-				if(state->recording){
+				if (state->recording) {
 					state->recording = false;
 					StopRecord();
 
@@ -693,7 +701,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		gettimeofday(&s, NULL);
-		redraw_pre_render_texture(state);
+		redraw_render_texture(state);
 		if (state->preview) {
 			redraw_scene(state);
 		} else {
@@ -701,9 +709,8 @@ int main(int argc, char *argv[]) {
 		}
 		if (state->recording || state->snap) {
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-			glReadPixels(0, 0, state->pre_render_width,
-					state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE,
-					image_buffer);
+			glReadPixels(0, 0, state->render_width, state->render_height,
+					GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 			if (state->recording) {
@@ -712,12 +719,13 @@ int main(int argc, char *argv[]) {
 			}
 			if (state->snap) {
 				state->snap = false;
-				SaveJpeg(image_buffer, state->pre_render_width,
-						state->pre_render_height, state->snap_save_path, 70);
+				SaveJpeg(image_buffer, state->render_width,
+						state->render_height, state->snap_save_path, 70);
 				printf("snap saved to %s\n", state->snap_save_path);
 			}
 			gettimeofday(&f, NULL);
-			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000 + (f.tv_usec - s.tv_usec) / 1000;
+			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000
+					+ (f.tv_usec - s.tv_usec) / 1000;
 			printf("elapsed %d ms\n", elapsed_ms);
 		}
 		gettimeofday(&f, NULL);
