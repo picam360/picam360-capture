@@ -1,6 +1,8 @@
 varying vec2 tcoord;
 uniform mat4 unif_matrix;
 uniform sampler2D cam0_texture;
+uniform float pixel_size;
+uniform float sharpness_gain;
 
 const float M_PI = 3.1415926535;
 //const float aspect = 480.0 / 640.0;
@@ -10,8 +12,6 @@ const vec2 center1 = vec2(0.50, 0.50);
 const vec2 center2 = vec2(0.50, 0.50);
 const float color_offset = 0.15;
 const float color_factor = 1.0 / (1.0 - color_offset);
-float k = 1.0;
-float step = 1.0 / 2048.0;
 
 void main(void) {
 	float u_factor = aspect * image_r;
@@ -48,7 +48,22 @@ void main(void) {
 	if (u == 0.0 && v == 0.0) {
 		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 	} else {
-		vec4 fc = texture2D(cam0_texture, vec2(u, v));
+		vec4 fc;
+		if (sharpness_gain == 0) {
+			fc = texture2D(cam0_texture, vec2(u, v));
+		} else {
+			//sharpness
+			fc = texture2D(cam0_texture, vec2(u, v))
+					* (1.0 + 4.0 * sharpness_gain);
+			fc -= texture2D(cam0_texture, vec2(u - 1.0 * pixel_size, v))
+					* sharpness_gain;
+			fc -= texture2D(cam0_texture, vec2(u, v - 1.0 * pixel_size))
+					* sharpness_gain;
+			fc -= texture2D(cam0_texture, vec2(u, v + 1.0 * pixel_size))
+					* sharpness_gain;
+			fc -= texture2D(cam0_texture, vec2(u + 1.0 * pixel_size, v))
+					* sharpness_gain;
+		}
 
 		fc = (fc - color_offset) * color_factor;
 		if (r >= 0.45) {

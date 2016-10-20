@@ -450,6 +450,9 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "scale"),
 			state->render_vbo_scale);
+	glUniform1f(glGetUniformLocation(program, "pixel_size"),
+			1.0 / state->render_width);
+	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), 0.5);
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
