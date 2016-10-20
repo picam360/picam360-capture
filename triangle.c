@@ -847,6 +847,9 @@ int main(int argc, char *argv[]) {
 					printf("stop record : frame num : %d : fps %.3lf\n",
 							frame_num, 1000.0 / frame_elapsed);
 				}
+			} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
+				printf("exit\n");
+				break;
 			} else {
 				printf("unknown command : %s\n", buff);
 			}
