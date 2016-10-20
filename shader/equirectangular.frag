@@ -42,7 +42,7 @@ void main(void) {
 
 	float yaw2 = -yaw + M_PI;
 	u = u_factor * r * cos(yaw2) + 0.5 + cam0_offset_x;
-	v = v_factor * r * sin(yaw2) + 0.5 + cam0_offset_y;
+	v = v_factor * r * sin(yaw2) + 0.5 - cam0_offset_y;//cordinate is different
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 		u = 0.0;
 		v = 0.0;

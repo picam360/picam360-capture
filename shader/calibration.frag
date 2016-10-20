@@ -11,7 +11,7 @@ uniform float cam0_horizon_r;
 
 void main(void) {
 	float u = tcoord.x + cam0_offset_x;
-	float v = tcoord.y + cam0_offset_y;
+	float v = (1.0 - tcoord.y) - cam0_offset_y;//cordinate is different
 	vec4 fc;
 	if (sharpness_gain == 0.0) {
 		fc = texture2D(cam0_texture, vec2(u, v));
