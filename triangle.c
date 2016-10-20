@@ -667,7 +667,6 @@ int main(int argc, char *argv[]) {
 			if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					printf("snap saved to %s\n", param);
 					strncpy(state->snap_save_path, param,
 							sizeof(state->snap_save_path) - 1);
 					state->snap = true;
@@ -675,11 +674,11 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					printf("start_record saved to %s\n", param);
-
 					StartRecord(state->pre_render_width,
 							state->pre_render_height, param, 4000);
 					state->recording = true;
+
+					printf("start_record saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
@@ -701,8 +700,6 @@ int main(int argc, char *argv[]) {
 			glFinish();
 		}
 		if (state->recording || state->snap) {
-			printf("snap saved to %s\n", param);
-
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 			glReadPixels(0, 0, state->pre_render_width,
 					state->pre_render_height, GL_RGB, GL_UNSIGNED_BYTE,
@@ -711,17 +708,19 @@ int main(int argc, char *argv[]) {
 
 			if (state->recording) {
 				AddFrame(image_buffer);
+				printf("add frame\n");
 			}
 			if (state->snap) {
 				state->snap = false;
 				SaveJpeg(image_buffer, state->pre_render_width,
 						state->pre_render_height, state->snap_save_path, 70);
-				gettimeofday(&t, NULL);
-				elapsed_ms = (t.tv_sec - s.tv_sec) * 1000 + (t.tv_usec - s.tv_usec) / 1000;
-				printf("snapped : saved to %s : elapsed %d ms\n", state->snap_save_path, elapsed_ms);
+				printf("snap saved to %s\n", state->snap_save_path);
 			}
+			gettimeofday(&f, NULL);
+			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000 + (f.tv_usec - s.tv_usec) / 1000;
+			printf("elapsed %d ms\n", elapsed_ms);
 		}
-		gettimeofday(&t, NULL);
+		gettimeofday(&f, NULL);
 	}
 	exit_func();
 	return 0;
