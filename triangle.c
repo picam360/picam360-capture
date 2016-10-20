@@ -612,18 +612,19 @@ static void init_textures(CUBE_STATE_T *state) {
 static void init_options(CUBE_STATE_T *state) {
 	json_error_t error;
 	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
-	if (result == NULL) {
+	if (options == NULL) {
 		fputs(error.text, stderr);
 		return;
 	}
-	json_t *node;
-	json_array_foreach(options, i, node)
+
+	char *str;
 	{
-		printf("json %s\n", json_string_value(node));
+		str = json_string_value(json_object_get(options, "shapness_gain"));
+		if (str != NULL) {
+			sscanf(str, "%f", &options->shapness_gain);
+		}
 	}
-
-	json_decref(result);
-
+	json_decref(options);
 }
 //------------------------------------------------------------------------------
 
@@ -635,11 +636,11 @@ static void exit_func(void)
 			printf("eglDestroyImageKHR failed.");
 	}
 
-	// clear screen
+// clear screen
 	glClear(GL_COLOR_BUFFER_BIT);
 	eglSwapBuffers(state->display, state->surface);
 
-	// Release OpenGL resources
+// Release OpenGL resources
 	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE,
 			EGL_NO_CONTEXT);
 	eglDestroySurface(state->display, state->surface);
@@ -664,7 +665,7 @@ bool inputAvailable() {
 
 int main(int argc, char *argv[]) {
 	int opt;
-	// Clear application state
+// Clear application state
 	memset(state, 0, sizeof(*state));
 	state->cam_width = 1024;
 	state->cam_height = 1024;
@@ -675,7 +676,7 @@ int main(int argc, char *argv[]) {
 	state->stereo = false;
 	state->operation_mode = WINDOW;
 
-	//init options
+//init options
 	init_options(state);
 
 	while ((opt = getopt(argc, argv, "w:h:n:psW:H:EC")) != -1) {
@@ -720,13 +721,13 @@ int main(int argc, char *argv[]) {
 
 	init_device();
 
-	// Start OGLES
+// Start OGLES
 	init_ogl(state);
 
-	// Setup the model world
+// Setup the model world
 	init_model_proj(state);
 
-	// initialise the OGLES texture(s)
+// initialise the OGLES texture(s)
 	init_textures(state);
 
 	int frame_num;
