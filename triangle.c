@@ -653,6 +653,8 @@ int main(int argc, char *argv[]) {
 	// initialise the OGLES texture(s)
 	init_textures(state, image_size_with, image_size_height);
 
+	struct timeval s, f;
+	int elapsed_ms;
 	int size = state->pre_render_width * state->pre_render_height * 3;
 	unsigned char *image_buffer = (unsigned char*) malloc(size);
 
@@ -678,19 +680,20 @@ int main(int argc, char *argv[]) {
 					StartRecord(state->pre_render_width,
 							state->pre_render_height, param, 4000);
 					state->recording = true;
-
-					printf("snapped : saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
 				if(state->recording){
 					state->recording = false;
 					StopRecord();
+
+					printf("stop record\n");
 				}
 			} else {
 				printf("unknown command : %s\n", buff);
 			}
 		}
+		gettimeofday(&s, NULL);
 		redraw_pre_render_texture(state);
 		if (state->preview) {
 			redraw_scene(state);
@@ -711,11 +714,14 @@ int main(int argc, char *argv[]) {
 			}
 			if (state->snap) {
 				state->snap = false;
-				SaveJpeg(buff, state->pre_render_width,
+				SaveJpeg(image_buffer, state->pre_render_width,
 						state->pre_render_height, state->snap_save_path, 70);
-				printf("snapped : saved to %s\n", state->snap_save_path);
+				gettimeofday(&t, NULL);
+				elapsed_ms = (t.tv_sec - s.tv_sec) * 1000 + (t.tv_usec - s.tv_usec) / 1000;
+				printf("snapped : saved to %s : elapsed %d ms\n", state->snap_save_path, elapsed_ms);
 			}
 		}
+		gettimeofday(&t, NULL);
 	}
 	exit_func();
 	return 0;
