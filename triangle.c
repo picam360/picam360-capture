@@ -390,8 +390,11 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
  *
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
+	float fov = 120.0;
+	float aspect = state->render_height / state->render_width;
+
 	switch (state->operation_mode) {
-	case REQUIRECTANGULAR:
+	case EQUIRECTANGULAR:
 		board_mesh(&state->render_vbo, &state->render_vbo_nop);
 		state->program.render = GLProgram_new("shader/equirectangular.vert",
 				"shader/equirectangular.frag");
@@ -403,8 +406,6 @@ static void init_model_proj(CUBE_STATE_T *state) {
 		break;
 	case WINDOW:
 	default:
-		float fov = 120.0;
-		float aspect = state->render_height / state->render_width;
 		spherewindow_mesh(fov, fov * aspect, 20, &state->render_vbo,
 				&state->render_vbo_nop, &state->render_vbo_scale);
 		state->program.render = GLProgram_new("shader/window.vert",
@@ -624,7 +625,7 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
-	state->equirectangular = false;
+	state->operation_mode = WINDOW;
 
 	while ((opt = getopt(argc, argv, "w:h:n:psW:H:EC")) != -1) {
 		switch (opt) {
