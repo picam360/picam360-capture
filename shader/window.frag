@@ -4,11 +4,15 @@ uniform mat4 unif_matrix;
 uniform sampler2D cam0_texture;
 uniform sampler2D logo_texture;
 uniform float pixel_size;
+//options start
 uniform float sharpness_gain;
+uniform float cam0_offset_yaw;
+uniform float cam0_offset_x;
+uniform float cam0_offset_y;
+uniform float cam0_horizon_r;
+//options end
 
 const float M_PI = 3.1415926535;
-const float image_r = 0.85;
-const vec2 center1 = vec2(0.50, 0.50);
 
 void main(void) {
 	float u = 0.0;
@@ -18,10 +22,10 @@ void main(void) {
 	float yaw = atan(pos.x, pos.z);
 	float r = (M_PI / 2.0 - roll) / M_PI;
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-	if (r < 0.5) {
+	if (r < 0.6) {
 		float yaw2 = yaw;
-		u = image_r * r * cos(yaw2) + center1.x;
-		v = image_r * r * sin(yaw2) + center1.y;
+		u = cam0_horizon_r * r * cos(yaw2) + 0.5 + cam0_offset_x;
+		v = cam0_horizon_r * r * sin(yaw2) + 0.5 - cam0_offset_y;
 		vec4 fc;
 		if (sharpness_gain == 0.0) {
 			fc = texture2D(cam0_texture, vec2(u, v));
@@ -42,8 +46,8 @@ void main(void) {
 	} else {
 		float yaw2 = -yaw;
 		r = 1.0 - r;
-		u = image_r * r * cos(yaw2) + center1.x;
-		v = image_r * r * sin(yaw2) + center1.y;
+		u = cam0_horizon_r * r * cos(yaw2) + 0.5;
+		v = cam0_horizon_r * r * sin(yaw2) + 0.5;
 //	    } else {
 //	    	u = pos.x / pos.y * 0.2;
 //	    	v = pos.z / pos.y * 0.2;

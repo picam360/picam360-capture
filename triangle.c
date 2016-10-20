@@ -80,6 +80,8 @@
 
 typedef struct {
 	float sharpness_gain;
+	float cam_offset_roll[MAX_CAM_NUM];
+	float cam_offset_pitch[MAX_CAM_NUM];
 	float cam_offset_yaw[MAX_CAM_NUM];
 	float cam_offset_x[MAX_CAM_NUM];
 	float cam_offset_y[MAX_CAM_NUM];
@@ -466,7 +468,7 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
 	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, 90.0 * M_PI / 180.0);
+	mat4_rotateX(camera_matrix, camera_matrix, lg_options.cam_offset_roll[0]);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
@@ -638,6 +640,10 @@ static void init_options(CUBE_STATE_T *state) {
 
 	lg_options.sharpness_gain = json_number_value(
 			json_object_get(options, "sharpness_gain"));
+	lg_options.cam_offset_roll[0] = json_number_value(
+			json_object_get(options, "cam0_offset_roll"));
+	lg_options.cam_offset_pitch[0] = json_number_value(
+			json_object_get(options, "cam0_offset_pitch"));
 	lg_options.cam_offset_yaw[0] = json_number_value(
 			json_object_get(options, "cam0_offset_yaw"));
 	lg_options.cam_offset_x[0] = json_number_value(
@@ -670,6 +676,10 @@ static void save_options(CUBE_STATE_T *state) {
 
 	json_object_set_new(options, "sharpness_gain",
 			json_real(lg_options.sharpness_gain));
+	json_object_set_new(options, "cam0_offset_roll",
+			json_real(lg_options.cam_offset_roll[0]));
+	json_object_set_new(options, "cam0_offset_pitch",
+			json_real(lg_options.cam_offset_pitch[0]));
 	json_object_set_new(options, "cam0_offset_yaw",
 			json_real(lg_options.cam_offset_yaw[0]));
 	json_object_set_new(options, "cam0_offset_x",
@@ -868,13 +878,16 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		gettimeofday(&s, NULL);
-		redraw_render_texture(state);
 		if (state->preview) {
+			redraw_render_texture(state);
 			redraw_scene(state);
-		} else {
-			glFinish();
 		}
 		if (state->recording || state->snap) {
+			if (!state->preview) {
+				redraw_render_texture(state);
+				glFinish();
+			}
+
 			glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 			glReadPixels(0, 0, state->render_width, state->render_height,
 					GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
