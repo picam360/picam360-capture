@@ -2,20 +2,23 @@ varying vec2 tcoord;
 uniform mat4 unif_matrix;
 uniform sampler2D cam0_texture;
 uniform float pixel_size;
+//options start
 uniform float sharpness_gain;
+uniform float cam0_offset_yaw;
+uniform float cam0_offset_x;
+uniform float cam0_offset_y;
+uniform float cam0_horizon_r;
+//options end
 
 const float M_PI = 3.1415926535;
 //const float aspect = 480.0 / 640.0;
 const float aspect = 1.0;
-const float image_r = 0.85;
-const vec2 center1 = vec2(0.50, 0.50);
-const vec2 center2 = vec2(0.50, 0.50);
 const float color_offset = 0.15;
 const float color_factor = 1.0 / (1.0 - color_offset);
 
 void main(void) {
-	float u_factor = aspect * image_r;
-	float v_factor = image_r;
+	float u_factor = aspect * cam0_horizon_r;
+	float v_factor = cam0_horizon_r;
 	float u = 0.0;
 	float v = 0.0;
 	vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
@@ -37,10 +40,9 @@ void main(void) {
 		r = pow(r - 0.4, 1.09) + 0.4;
 	}
 
-//		r = pow(r/0.5, 0.8) * 0.5;
 	float yaw2 = -yaw + M_PI;
-	u = u_factor * r * cos(yaw2) + center1.x;
-	v = v_factor * r * sin(yaw2) + center1.y;
+	u = u_factor * r * cos(yaw2) + cam0_offset_x;
+	v = v_factor * r * sin(yaw2) + cam0_offset_y;
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 		u = 0.0;
 		v = 0.0;
@@ -68,16 +70,16 @@ void main(void) {
 		fc = (fc - color_offset) * color_factor;
 		if (r >= 0.45) {
 			float r_r = pow(r - 0.45, 1.006) + 0.45;
-			u = u_factor * r_r * cos(yaw2) + center1.x;
-			v = v_factor * r_r * sin(yaw2) + center1.y;
+			u = u_factor * r_r * cos(yaw2) + cam0_horizon_rcam0_offset_x;
+			v = v_factor * r_r * sin(yaw2) + cam0_horizon_rcam0_offset_y;
 			vec4 fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
 			fc.z = fc_b.z;
 
 			r_r = pow(r - 0.45, 1.003) + 0.45;
-			u = u_factor * r_r * cos(yaw2) + center1.x;
-			v = v_factor * r_r * sin(yaw2) + center1.y;
+			u = u_factor * r_r * cos(yaw2) + cam0_horizon_rcam0_offset_x;
+			v = v_factor * r_r * sin(yaw2) + cam0_horizon_rcam0_offset_y;
 			fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
