@@ -667,7 +667,7 @@ int main(int argc, char *argv[]) {
 	int frame_num;
 	double frame_elapsed;
 	struct timeval s, f;
-	int elapsed_ms;
+	double elapsed_ms;
 	int size = state->render_width * state->render_height * 3;
 	unsigned char *image_buffer = (unsigned char*) malloc(size);
 
@@ -701,8 +701,8 @@ int main(int argc, char *argv[]) {
 					StopRecord();
 
 					frame_elapsed /= frame_num;
-					printf("stop record : frame num : %d ms : fps %d\n",
-							frame_num, (int) (1000.0 / frame_elapsed));
+					printf("stop record : frame num : %d : fps %.3lf\n",
+							frame_num, 1000.0 / frame_elapsed);
 				}
 			} else {
 				printf("unknown command : %s\n", buff);
@@ -725,8 +725,8 @@ int main(int argc, char *argv[]) {
 				AddFrame(image_buffer);
 
 				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000
-						+ (f.tv_usec - s.tv_usec) / 1000;
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				frame_num++;
 				frame_elapsed += elapsed_ms;
 			}
@@ -737,9 +737,9 @@ int main(int argc, char *argv[]) {
 				printf("snap saved to %s\n", state->snap_save_path);
 
 				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000
-						+ (f.tv_usec - s.tv_usec) / 1000;
-				printf("elapsed %d ms\n", elapsed_ms);
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+						+ (f.tv_usec - s.tv_usec) / 1000.0;
+				printf("elapsed %.3lf ms\n", elapsed_ms);
 			}
 		}
 		gettimeofday(&f, NULL);
