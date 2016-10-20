@@ -617,8 +617,20 @@ static void init_options(CUBE_STATE_T *state) {
 		return;
 	}
 
-	lg_options->sharpness_gain = json_number_value(
+	lg_options.sharpness_gain = json_number_value(
 			json_object_get(options, "sharpness_gain"));
+	lg_options.cam_offset_yaw[0] = json_number_value(
+			json_object_get(options, "cam0_offset_yaw"));
+	lg_options.cam_offset_x[0] = json_number_value(
+			json_object_get(options, "cam0_offset_x"));
+	lg_options.cam_offset_y[0] = json_number_value(
+			json_object_get(options, "cam0_offset_y"));
+	lg_options.cam_horizon_r[0] = json_number_value(
+			json_object_get(options, "cam0_horizon_r"));
+	if (lg_options.cam_horizon_r[0] == 0) {
+		lg_options.cam_horizon_r[0] = 1.0;
+	}
+
 	json_decref(options);
 }
 //------------------------------------------------------------------------------
