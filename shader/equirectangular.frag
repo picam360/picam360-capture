@@ -49,7 +49,7 @@ void main(void) {
 		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 	} else {
 		vec4 fc;
-		if (sharpness_gain == 0) {
+		if (sharpness_gain == 0.0) {
 			fc = texture2D(cam0_texture, vec2(u, v));
 		} else {
 			//sharpness
