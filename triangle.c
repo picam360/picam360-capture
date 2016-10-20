@@ -424,7 +424,7 @@ static void init_model_proj(CUBE_STATE_T *state) {
 		break;
 	case WINDOW:
 	default:
-		spherewindow_mesh(fov, fov * aspect, 20, &state->render_vbo,
+		spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo,
 				&state->render_vbo_nop, &state->render_vbo_scale);
 		state->program.render = GLProgram_new("shader/window.vert",
 				"shader/window.frag");
@@ -664,11 +664,16 @@ static void init_options(CUBE_STATE_T *state) {
 static void save_options(CUBE_STATE_T *state) {
 	json_t *options = json_object();
 
-	json_object_set_new(options, "sharpness_gain", json_real(lg_options.sharpness_gain));
-	json_object_set_new(options, "cam0_offset_yaw", json_real(lg_options.cam_offset_yaw[0]));
-	json_object_set_new(options, "cam0_offset_x", json_real(lg_options.cam_offset_x[0]));
-	json_object_set_new(options, "cam0_offset_y", json_real(lg_options.cam_offset_y[0]));
-	json_object_set_new(options, "cam0_horizon_r", json_real(lg_options.cam_horizon_r[0]));
+	json_object_set_new(options, "sharpness_gain",
+			json_real(lg_options.sharpness_gain));
+	json_object_set_new(options, "cam0_offset_yaw",
+			json_real(lg_options.cam_offset_yaw[0]));
+	json_object_set_new(options, "cam0_offset_x",
+			json_real(lg_options.cam_offset_x[0]));
+	json_object_set_new(options, "cam0_offset_y",
+			json_real(lg_options.cam_offset_y[0]));
+	json_object_set_new(options, "cam0_horizon_r",
+			json_real(lg_options.cam_horizon_r[0]));
 
 	json_dump_file(options, CONFIG_FILE, 0);
 
@@ -791,7 +796,9 @@ int main(int argc, char *argv[]) {
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
 			buff[size] = '\0';
 			char *cmd = strtok(buff, " \n");
-			if (state->operation_mode == CALIBRATION) {
+			if (cmd == NULL) {
+				//do nothing
+			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
 					lg_options.cam_offset_y[0] -= 0.01;
 				}
