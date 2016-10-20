@@ -41,8 +41,8 @@ void main(void) {
 	}
 
 	float yaw2 = -yaw + M_PI;
-	u = u_factor * r * cos(yaw2) + cam0_offset_x;
-	v = v_factor * r * sin(yaw2) + cam0_offset_y;
+	u = u_factor * r * cos(yaw2) + 0.5 + cam0_offset_x;
+	v = v_factor * r * sin(yaw2) + 0.5 + cam0_offset_y;
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 		u = 0.0;
 		v = 0.0;
@@ -70,16 +70,16 @@ void main(void) {
 		fc = (fc - color_offset) * color_factor;
 		if (r >= 0.45) {
 			float r_r = pow(r - 0.45, 1.006) + 0.45;
-			u = u_factor * r_r * cos(yaw2) + cam0_horizon_rcam0_offset_x;
-			v = v_factor * r_r * sin(yaw2) + cam0_horizon_rcam0_offset_y;
+			u = u_factor * r_r * cos(yaw2) + 0.5 + cam0_offset_x;
+			v = v_factor * r_r * sin(yaw2) + 0.5 + cam0_offset_y;
 			vec4 fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
 			fc.z = fc_b.z;
 
 			r_r = pow(r - 0.45, 1.003) + 0.45;
-			u = u_factor * r_r * cos(yaw2) + cam0_horizon_rcam0_offset_x;
-			v = v_factor * r_r * sin(yaw2) + cam0_horizon_rcam0_offset_y;
+			u = u_factor * r_r * cos(yaw2) + 0.5 + cam0_offset_x;
+			v = v_factor * r_r * sin(yaw2) + 0.5 + cam0_offset_y;
 			fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
