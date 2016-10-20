@@ -75,7 +75,9 @@
 typedef struct {
 	bool preview;
 	bool stereo;
-	bool equirectangular;
+	enum OPERATION_MODE {
+		WINDOW, EQUIRECTANGULAR, CALIBRATION
+	} operation_mode;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t render_width;
@@ -388,11 +390,19 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
  *
  ***********************************************************/
 static void init_model_proj(CUBE_STATE_T *state) {
-	if (state->equirectangular) {
+	switch (state->operation_mode) {
+	case REQUIRECTANGULAR:
 		board_mesh(&state->render_vbo, &state->render_vbo_nop);
 		state->program.render = GLProgram_new("shader/equirectangular.vert",
 				"shader/equirectangular.frag");
-	} else {
+		break;
+	case CALIBRATION:
+		board_mesh(&state->render_vbo, &state->render_vbo_nop);
+		state->program.render = GLProgram_new("shader/calibration.vert",
+				"shader/calibration.frag");
+		break;
+	case WINDOW:
+	default:
 		float fov = 120.0;
 		float aspect = state->render_height / state->render_width;
 		spherewindow_mesh(fov, fov * aspect, 20, &state->render_vbo,
@@ -616,7 +626,7 @@ int main(int argc, char *argv[]) {
 	state->stereo = false;
 	state->equirectangular = false;
 
-	while ((opt = getopt(argc, argv, "w:h:n:psW:H:e")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psW:H:EC")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &image_size_with);
@@ -639,8 +649,11 @@ int main(int argc, char *argv[]) {
 		case 'H':
 			sscanf(optarg, "%d", &state->render_height);
 			break;
-		case 'e':
-			state->equirectangular = true;
+		case 'E':
+			state->operation_mode = EQUIRECTANGULAR;
+			break;
+		case 'C':
+			state->operation_mode = CALIBRATION;
 			break;
 		default: /* '?' */
 			printf(
