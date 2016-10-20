@@ -766,16 +766,16 @@ int main(int argc, char *argv[]) {
 			char *cmd = strtok(buff, " \n");
 			if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y += 0.01;
+					lg_options.cam_offset_y[0] += 0.01;
 				}
 				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y -= 0.01;
+					lg_options.cam_offset_y[0] -= 0.01;
 				}
 				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x -= 0.01;
+					lg_options.cam_offset_x[0] -= 0.01;
 				}
 				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x += 0.01;
+					lg_options.cam_offset_x[0] += 0.01;
 				}
 			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
