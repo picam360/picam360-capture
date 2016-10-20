@@ -437,7 +437,7 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 	mat4_identity(camera_matrix);
 	mat4_rotateZ(camera_matrix, camera_matrix, 0);
 	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, 20.0 * M_PI / 180.0);
+	mat4_rotateX(camera_matrix, camera_matrix, 90.0 * M_PI / 180.0);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
