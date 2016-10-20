@@ -82,6 +82,8 @@ typedef struct {
 	uint32_t screen_height;
 	uint32_t render_width;
 	uint32_t render_height;
+	uint32_t cam_width;
+	uint32_t cam_height;
 // OpenGL|ES objects
 	EGLDisplay display;
 	EGLSurface surface;
@@ -121,8 +123,7 @@ static void init_ogl(CUBE_STATE_T *state);
 static void init_model_proj(CUBE_STATE_T *state);
 static void redraw_render_texture(CUBE_STATE_T *state);
 static void redraw_scene(CUBE_STATE_T *state);
-static void init_textures(CUBE_STATE_T *state, int image_size_with,
-		int image_size_height);
+static void init_textures(CUBE_STATE_T *state);
 static void exit_func(void);
 static volatile int terminate;
 static CUBE_STATE_T _state, *state = &_state;
@@ -502,7 +503,11 @@ static void redraw_scene(CUBE_STATE_T *state) {
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	if (state->stereo) {
+	if (state->operation_mode == CALIBRATION) {
+		glViewport((state->screen_width - state->screen_height) / 2, 0,
+				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
+	} else if (state->stereo) {
 		//left eye
 		//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
 		glViewport(state->screen_width / 8, state->screen_height / 4,
@@ -540,8 +545,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
  * Returns: void
  *
  ***********************************************************/
-static void init_textures(CUBE_STATE_T *state, int image_size_with,
-		int image_size_height) {
+static void init_textures(CUBE_STATE_T *state) {
 
 	load_texture("img/logo_img.png", &state->logo_texture);
 
@@ -550,8 +554,8 @@ static void init_textures(CUBE_STATE_T *state, int image_size_with,
 		glGenTextures(1, &state->cam_texture[i]);
 
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_size_with,
-				image_size_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
+				state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -616,10 +620,10 @@ bool inputAvailable() {
 
 int main(int argc, char *argv[]) {
 	int opt;
-	int image_size_with = 1024;
-	int image_size_height = 1024;
 	// Clear application state
 	memset(state, 0, sizeof(*state));
+	state->cam_width = 1024;
+	state->cam_height = 1024;
 	state->render_width = 0;
 	state->render_height = 0;
 	state->num_of_cam = 1;
@@ -630,10 +634,10 @@ int main(int argc, char *argv[]) {
 	while ((opt = getopt(argc, argv, "w:h:n:psW:H:EC")) != -1) {
 		switch (opt) {
 		case 'w':
-			sscanf(optarg, "%d", &image_size_with);
+			sscanf(optarg, "%d", &state->cam_width);
 			break;
 		case 'h':
-			sscanf(optarg, "%d", &image_size_height);
+			sscanf(optarg, "%d", &state->cam_height);
 			break;
 		case 'n':
 			sscanf(optarg, "%d", &state->num_of_cam);
@@ -676,7 +680,7 @@ int main(int argc, char *argv[]) {
 	init_model_proj(state);
 
 	// initialise the OGLES texture(s)
-	init_textures(state, image_size_with, image_size_height);
+	init_textures(state);
 
 	int frame_num;
 	double frame_elapsed;
