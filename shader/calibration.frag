@@ -12,7 +12,7 @@ uniform float cam0_horizon_r;
 
 void main(void) {
 	vec4 fc = texture2D(logo_texture, vec2(tcoord.x, tcoord.y));
-	if (fc.g == 0) {
+	if (fc.g == 0.0) {
 		float u = tcoord.x + cam0_offset_x;
 		float v = (1.0 - tcoord.y) - cam0_offset_y; //cordinate is different
 		if (sharpness_gain == 0.0) {
