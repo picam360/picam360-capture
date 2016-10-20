@@ -617,13 +617,8 @@ static void init_options(CUBE_STATE_T *state) {
 		return;
 	}
 
-	char *str;
-	{
-		str = json_string_value(json_object_get(options, "shapness_gain"));
-		if (str != NULL) {
-			sscanf(str, "%f", &options->shapness_gain);
-		}
-	}
+	lg_options->sharpness_gain = json_number_value(
+			json_object_get(options, "sharpness_gain"));
 	json_decref(options);
 }
 //------------------------------------------------------------------------------
