@@ -662,7 +662,6 @@ static void init_options(CUBE_STATE_T *state) {
  *
  ***********************************************************/
 static void save_options(CUBE_STATE_T *state) {
-	json_error_t error;
 	json_t *options = json_object();
 
 	json_object_set_new(options, "sharpness_gain", json_real(lg_options.sharpness_gain));
@@ -806,10 +805,10 @@ int main(int argc, char *argv[]) {
 					lg_options.cam_offset_x[0] -= 0.01;
 				}
 				if (strncmp(cmd, "s", sizeof(buff)) == 0) {
-					lg_options.sharpness_gain += 0.01;
+					lg_options.sharpness_gain += 0.05;
 				}
 				if (strncmp(cmd, "w", sizeof(buff)) == 0) {
-					lg_options.sharpness_gain -= 0.01;
+					lg_options.sharpness_gain -= 0.05;
 				}
 				if (strncmp(cmd, "save", sizeof(buff)) == 0) {
 					save_options(state);
