@@ -13,8 +13,9 @@ RENDER_HEIGHT=720
 BACKGROUND="-p"
 STEREO=
 MODE=
+FPS=30
 
-while getopts w:h:W:H:bsCE OPT
+while getopts w:h:W:H:BsCEf: OPT
 do
     case $OPT in
         w)  CAM_WIDTH=$OPTARG
@@ -25,7 +26,7 @@ do
             ;;
         H)  RENDER_HEIGHT=$OPTARG
             ;;
-        b)  BACKGROUND="< cmd &"
+        B)  BACKGROUND="< cmd &"
             ;;
         s)  STEREO="-s"
             ;;
@@ -33,10 +34,12 @@ do
             ;;
         E)  MODE="-E"
             ;;
+        f)  FPS=$OPTARG
+            ;;
         \?) usage_exit
             ;;
     esac
 done
 
-raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps 5 -o - > cam0 &
+raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
 ./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO $BACKGROUND
