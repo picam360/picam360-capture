@@ -479,7 +479,15 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 			state->render_vbo_scale);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
 			1.0 / state->render_width);
-	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), 0.5);
+
+	//options start
+	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), lg_options.sharpness_gain);
+	glUniform1f(glGetUniformLocation(program, "cam0_offset_yaw"), lg_options.cam_offset_yaw[0]);
+	glUniform1f(glGetUniformLocation(program, "cam0_offset_x"), lg_options.cam_offset_x[0]);
+	glUniform1f(glGetUniformLocation(program, "cam0_offset_y"), lg_options.cam_offset_y[0]);
+	glUniform1f(glGetUniformLocation(program, "cam0_horrizon_r"), lg_options.cam_horrizon_r[0]);
+	//options end
+
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
