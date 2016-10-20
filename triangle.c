@@ -390,7 +390,7 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 static void init_model_proj(CUBE_STATE_T *state) {
 	if (state->equirectangular) {
 		board_mesh(&state->render_vbo, &state->render_vbo_nop);
-		state->program.render = GLProgram_new("shader/equiectangular.vert",
+		state->program.render = GLProgram_new("shader/equirectangular.vert",
 				"shader/equirectangular.frag");
 	} else {
 		float fov = 120.0;

@@ -1,6 +1,6 @@
 varying vec2 tcoord;
 uniform mat4 unif_matrix;
-uniform sampler2D cam_texture;
+uniform sampler2D cam0_texture;
 
 const float M_PI = 3.1415926535;
 //const float aspect = 480.0 / 640.0;
@@ -48,14 +48,14 @@ void main(void) {
 	if (u == 0.0 && v == 0.0) {
 		gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 	} else {
-		vec4 fc = texture2D(cam_texture, vec2(u, v));
+		vec4 fc = texture2D(cam0_texture, vec2(u, v));
 
 		fc = (fc - color_offset) * color_factor;
 		if (r >= 0.45) {
 			float r_r = pow(r - 0.45, 1.006) + 0.45;
 			u = u_factor * r_r * cos(yaw2) + center1.x;
 			v = v_factor * r_r * sin(yaw2) + center1.y;
-			vec4 fc_b = texture2D(cam_texture, vec2(u, v));
+			vec4 fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
 			fc.z = fc_b.z;
@@ -63,7 +63,7 @@ void main(void) {
 			r_r = pow(r - 0.45, 1.003) + 0.45;
 			u = u_factor * r_r * cos(yaw2) + center1.x;
 			v = v_factor * r_r * sin(yaw2) + center1.y;
-			fc_b = texture2D(cam_texture, vec2(u, v));
+			fc_b = texture2D(cam0_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
 			fc.y = fc_b.y;
