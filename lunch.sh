@@ -11,9 +11,10 @@ BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
 BACKGROUND="-p"
+STEREO=
 MODE=
 
-while getopts w:h:W:H:bCE OPT
+while getopts w:h:W:H:bsCE OPT
 do
     case $OPT in
         w)  CAM_WIDTH=$OPTARG
@@ -26,6 +27,8 @@ do
             ;;
         b)  BACKGROUND="< cmd &"
             ;;
+        s)  STEREO="-s"
+            ;;
         C)  MODE="-C"
             ;;
         E)  MODE="-E"
@@ -36,4 +39,4 @@ do
 done
 
 raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps 5 -o - > cam0 &
-./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $BACKGROUND
+./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO $BACKGROUND

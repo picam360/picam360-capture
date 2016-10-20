@@ -805,6 +805,9 @@ int main(int argc, char *argv[]) {
 			char *cmd = strtok(buff, " \n");
 			if (cmd == NULL) {
 				//do nothing
+			} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
+				printf("exit\n");
+				break;
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 					char *param = strtok(NULL, " \n");
@@ -860,9 +863,6 @@ int main(int argc, char *argv[]) {
 					printf("stop record : frame num : %d : fps %.3lf\n",
 							frame_num, 1000.0 / frame_elapsed);
 				}
-			} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
-				printf("exit\n");
-				break;
 			} else {
 				printf("unknown command : %s\n", buff);
 			}
