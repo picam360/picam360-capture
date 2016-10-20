@@ -11,19 +11,21 @@ BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
 
-while getopts w:h: OPT
+while getopts w:h:W:H: OPT
 do
     case $OPT in
         w)  CAM_WIDTH=$OPTARG
             ;;
         h)  CAM_HEIGHT=$OPTARG
             ;;
-        h)  usage_exit
+        W)  RENDER_WIDTH=$OPTARG
+            ;;
+        H)  RENDER_HEIGHT=$OPTARG
             ;;
         \?) usage_exit
             ;;
     esac
 done
 
-raspivid -n -t 0 -w CAM_WIDTH -h CAM_HEIGHT -ih -b BITRATE -fps 5 -o - > cam0 &
-./picam360-oculus-viewer.bin -w CAM_WIDTH -h CAM_HEIGHT -W RENDER_WIDTH -H RENDER_HEIGHT -E -p < cmd &
+raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps 5 -o - > cam0 &
+./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT -E -p < cmd &
