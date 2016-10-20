@@ -577,7 +577,11 @@ static void redraw_scene(CUBE_STATE_T *state) {
  ***********************************************************/
 static void init_textures(CUBE_STATE_T *state) {
 
-	load_texture("img/logo_img.png", &state->logo_texture);
+	if (state->operation_mode == CALIBRATION) {
+		load_texture("img/calibration_img.png", &state->logo_texture);
+	} else {
+		load_texture("img/logo_img.png", &state->logo_texture);
+	}
 
 	for (int i = 0; i < state->num_of_cam; i++) {
 		//// load three texture buffers but use them on six OGL|ES texture surfaces
