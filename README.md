@@ -1,4 +1,4 @@
-hello_videocube
+picam360-capture
 ===============
 
-Sample for Raspberry Pi that uses egl_render to display video on an animated cube.
+This is capture software of picam360 image.
