@@ -1,5 +1,7 @@
 #!/bin/bash
 
+CURRENT=$(cd $(dirname $0) && pwd)
+
 usage_exit() {
         echo "Usage: $0 [-w width] [-h height] item ..." 1>&2
         exit 1
@@ -53,7 +55,7 @@ fi
 
 raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
 if [ $BACKGROUND = true ]; then
-	sudo ./picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
+	sudo $CURRENT/picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
 else
-	sudo ./picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
+	sudo $CURRENT/picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
 fi
