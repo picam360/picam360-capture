@@ -44,8 +44,8 @@ do
 done
 
 raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
-if [$BACKGROUND = true]; then
-	./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
+if [ $BACKGROUND = true ]; then
+	sudo ./picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
 else
-	./picam360-oculus-viewer.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
+	sudo ./picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
 fi
