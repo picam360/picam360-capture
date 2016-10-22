@@ -75,6 +75,7 @@
 #endif
 
 #define MAX_CAM_NUM 4
+#define MAX_OPERATION_NUM 4
 
 #define CONFIG_FILE "config.json"
 
@@ -89,12 +90,13 @@ typedef struct {
 } OPTIONS_T;
 OPTIONS_T lg_options = { };
 
+enum OPERATION_MODE {
+		WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
+	};
 typedef struct {
 	bool preview;
 	bool stereo;
-	enum OPERATION_MODE {
-		WINDOW, EQUIRECTANGULAR, CALIBRATION
-	} operation_mode;
+	enum OPERATION_MODE operation_mode;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t render_width;
@@ -111,7 +113,9 @@ typedef struct {
 	} program;
 	GLuint render_vbo;
 	GLuint render_vbo_nop;
-	float render_vbo_scale;
+	GLuint render_vbo_ary;
+	GLuint render_vbo_nop_ary[MAX_OPERATION_NUM];
+	float render_vbo_scale[MAX_OPERATION_NUM];
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	int num_of_cam;
@@ -413,24 +417,25 @@ static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 120.0;
 	float aspect = state->render_height / state->render_width;
 
-	switch (state->operation_mode) {
-	case EQUIRECTANGULAR:
-		board_mesh(&state->render_vbo, &state->render_vbo_nop);
-		state->program.render = GLProgram_new("shader/equirectangular.vert",
-				"shader/equirectangular.frag");
-		break;
-	case CALIBRATION:
-		board_mesh(&state->render_vbo, &state->render_vbo_nop);
-		state->program.render = GLProgram_new("shader/calibration.vert",
-				"shader/calibration.frag");
-		break;
-	case WINDOW:
-	default:
-		spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo,
-				&state->render_vbo_nop, &state->render_vbo_scale);
-		state->program.render = GLProgram_new("shader/window.vert",
-				"shader/window.frag");
-	}
+	board_mesh(&state->render_vbo_ary[EQUIRECTANGULAR], &state->render_vbo_nop_ary[EQUIRECTANGULAR]);
+	state->program.render = GLProgram_new("shader/equirectangular.vert",
+			"shader/equirectangular.frag");
+
+	board_mesh(&state->render_vbo_ary[FISHEYE], &state->render_vbo_nop_ary[FISHEYE]);
+	state->program.render = GLProgram_new("shader/fisheye.vert",
+			"shader/fisheye.frag");
+
+	board_mesh(&state->render_vbo_ary[CALIBRATION], &state->render_vbo_nop_ary[CALIBRATION]);
+	state->program.render = GLProgram_new("shader/calibration.vert",
+			"shader/calibration.frag");
+
+	spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo_ary[WINDOW],
+			&state->render_vbo_nop_ary[WINDOW], &state->render_vbo_scale);
+	state->program.render = GLProgram_new("shader/window.vert",
+			"shader/window.frag");
+
+	state->render_vbo = state->render_vbo_ary[state->operation_mode];
+	state->render_vbo = state->render_vbo_ary[state->operation_mode];
 
 	board_mesh(&state->stereo_vbo, &state->stereo_vbo_nop);
 	state->program.stereo = GLProgram_new("shader/stereo.vert",
@@ -750,7 +755,7 @@ int main(int argc, char *argv[]) {
 //init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "w:h:n:psW:H:EC")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psW:H:ECF")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &state->cam_width);
@@ -778,6 +783,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'C':
 			state->operation_mode = CALIBRATION;
+			break;
+		case 'F':
+			state->operation_mode = FISHEYE;
 			break;
 		default: /* '?' */
 			printf(
