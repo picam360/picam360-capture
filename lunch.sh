@@ -43,13 +43,13 @@ do
     esac
 done
 
-if [ -e cam0 ]; then
+if [ ! -e cam0 ]; then
 	mkfifo cam0
-elif
+fi
 
-if [ -e cmd ]; then
+if [ ! -e cmd ]; then
 	mkfifo cmd
-elif
+fi
 
 raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
 if [ $BACKGROUND = true ]; then
