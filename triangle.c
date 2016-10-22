@@ -109,6 +109,7 @@ typedef struct {
 	EGLContext context;
 	struct {
 		void *render;
+		void *render_ary[MAX_OPERATION_NUM];
 		void *stereo;
 	} program;
 	GLuint render_vbo;
@@ -418,24 +419,25 @@ static void init_model_proj(CUBE_STATE_T *state) {
 	float aspect = state->render_height / state->render_width;
 
 	board_mesh(&state->render_vbo_ary[EQUIRECTANGULAR], &state->render_vbo_nop_ary[EQUIRECTANGULAR]);
-	state->program.render = GLProgram_new("shader/equirectangular.vert",
+	state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new("shader/equirectangular.vert",
 			"shader/equirectangular.frag");
 
 	board_mesh(&state->render_vbo_ary[FISHEYE], &state->render_vbo_nop_ary[FISHEYE]);
-	state->program.render = GLProgram_new("shader/fisheye.vert",
+	state->program.render_ary[FISHEYE] = GLProgram_new("shader/fisheye.vert",
 			"shader/fisheye.frag");
 
 	board_mesh(&state->render_vbo_ary[CALIBRATION], &state->render_vbo_nop_ary[CALIBRATION]);
-	state->program.render = GLProgram_new("shader/calibration.vert",
+	state->program.render_ary[CALIBRATION] = GLProgram_new("shader/calibration.vert",
 			"shader/calibration.frag");
 
 	spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo_ary[WINDOW],
 			&state->render_vbo_nop_ary[WINDOW], &state->render_vbo_scale);
-	state->program.render = GLProgram_new("shader/window.vert",
+	state->program.render_ary[WINDOW] = GLProgram_new("shader/window.vert",
 			"shader/window.frag");
 
 	state->render_vbo = state->render_vbo_ary[state->operation_mode];
-	state->render_vbo = state->render_vbo_ary[state->operation_mode];
+	state->render_vbo_nop = state->render_vbo_nop_ary[state->operation_mode];
+	state->program.render = state->program.render_ary[state->operation_mode];
 
 	board_mesh(&state->stereo_vbo, &state->stereo_vbo_nop);
 	state->program.stereo = GLProgram_new("shader/stereo.vert",
