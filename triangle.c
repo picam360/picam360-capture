@@ -540,22 +540,24 @@ static void redraw_scene(CUBE_STATE_T *state) {
 				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 	} else if (state->stereo) {
+		int offset_x = (state->screen_width - 2 * state->render_width) / 2;
+		int offset_y = (state->screen_height - state->render_height) / 2;
 		//left eye
 		//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-		glViewport(state->screen_width / 8, state->screen_height / 4,
-				(GLsizei) state->screen_width / 4,
-				(GLsizei) state->screen_height / 2);
+		glViewport(offset_x, offset_y, (GLsizei) state->render_width,
+				(GLsizei) state->render_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 
 		//right eye
 		//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-		glViewport(state->screen_width / 2 + state->screen_width / 8,
-				state->screen_height / 4, (GLsizei) state->screen_width / 4,
-				(GLsizei) state->screen_height / 2);
+		glViewport(soffset_x + state->render_width, offset_y,
+				(GLsizei) state->render_width, (GLsizei) state->render_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 	} else {
-		glViewport(0, 0, (GLsizei) state->screen_width,
-				(GLsizei) state->screen_height);
+		int offset_x = (state->screen_width - state->render_width) / 2;
+		int offset_y = (state->screen_height - state->render_height) / 2;
+		glViewport(offset_x, offset_y, (GLsizei) state->render_width,
+				(GLsizei) state->render_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->stereo_vbo_nop);
 	}
 
