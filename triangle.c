@@ -91,8 +91,8 @@ typedef struct {
 OPTIONS_T lg_options = { };
 
 enum OPERATION_MODE {
-		WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
-	};
+	WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
+};
 typedef struct {
 	bool preview;
 	bool stereo;
@@ -418,17 +418,20 @@ static void init_model_proj(CUBE_STATE_T *state) {
 	float fov = 120.0;
 	float aspect = state->render_height / state->render_width;
 
-	board_mesh(&state->render_vbo_ary[EQUIRECTANGULAR], &state->render_vbo_nop_ary[EQUIRECTANGULAR]);
-	state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new("shader/equirectangular.vert",
-			"shader/equirectangular.frag");
+	board_mesh(&state->render_vbo_ary[EQUIRECTANGULAR],
+			&state->render_vbo_nop_ary[EQUIRECTANGULAR]);
+	state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new(
+			"shader/equirectangular.vert", "shader/equirectangular.frag");
 
-	board_mesh(&state->render_vbo_ary[FISHEYE], &state->render_vbo_nop_ary[FISHEYE]);
+	board_mesh(&state->render_vbo_ary[FISHEYE],
+			&state->render_vbo_nop_ary[FISHEYE]);
 	state->program.render_ary[FISHEYE] = GLProgram_new("shader/fisheye.vert",
 			"shader/fisheye.frag");
 
-	board_mesh(&state->render_vbo_ary[CALIBRATION], &state->render_vbo_nop_ary[CALIBRATION]);
-	state->program.render_ary[CALIBRATION] = GLProgram_new("shader/calibration.vert",
-			"shader/calibration.frag");
+	board_mesh(&state->render_vbo_ary[CALIBRATION],
+			&state->render_vbo_nop_ary[CALIBRATION]);
+	state->program.render_ary[CALIBRATION] = GLProgram_new(
+			"shader/calibration.vert", "shader/calibration.frag");
 
 	spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo_ary[WINDOW],
 			&state->render_vbo_nop_ary[WINDOW], &state->render_vbo_scale);
@@ -642,30 +645,29 @@ static void init_textures(CUBE_STATE_T *state) {
 static void init_options(CUBE_STATE_T *state) {
 	json_error_t error;
 	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
-	if (options == NULL) {
+	if (options != NULL) {
 		fputs(error.text, stderr);
-		return;
-	}
+	} else {
+		lg_options.sharpness_gain = json_number_value(
+				json_object_get(options, "sharpness_gain"));
+		lg_options.cam_offset_roll[0] = json_number_value(
+				json_object_get(options, "cam0_offset_roll"));
+		lg_options.cam_offset_pitch[0] = json_number_value(
+				json_object_get(options, "cam0_offset_pitch"));
+		lg_options.cam_offset_yaw[0] = json_number_value(
+				json_object_get(options, "cam0_offset_yaw"));
+		lg_options.cam_offset_x[0] = json_number_value(
+				json_object_get(options, "cam0_offset_x"));
+		lg_options.cam_offset_y[0] = json_number_value(
+				json_object_get(options, "cam0_offset_y"));
+		lg_options.cam_horizon_r[0] = json_number_value(
+				json_object_get(options, "cam0_horizon_r"));
 
-	lg_options.sharpness_gain = json_number_value(
-			json_object_get(options, "sharpness_gain"));
-	lg_options.cam_offset_roll[0] = json_number_value(
-			json_object_get(options, "cam0_offset_roll"));
-	lg_options.cam_offset_pitch[0] = json_number_value(
-			json_object_get(options, "cam0_offset_pitch"));
-	lg_options.cam_offset_yaw[0] = json_number_value(
-			json_object_get(options, "cam0_offset_yaw"));
-	lg_options.cam_offset_x[0] = json_number_value(
-			json_object_get(options, "cam0_offset_x"));
-	lg_options.cam_offset_y[0] = json_number_value(
-			json_object_get(options, "cam0_offset_y"));
-	lg_options.cam_horizon_r[0] = json_number_value(
-			json_object_get(options, "cam0_horizon_r"));
+		json_decref(options);
+	}
 	if (lg_options.cam_horizon_r[0] == 0) {
-		lg_options.cam_horizon_r[0] = 1.0;
+		lg_options.cam_horizon_r[0] = 0.85;
 	}
-
-	json_decref(options);
 }
 //------------------------------------------------------------------------------
 
