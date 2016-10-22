@@ -713,6 +713,7 @@ static void exit_func(void)
 		if (eglImage[i] != 0) {
 			if (!eglDestroyImageKHR(state->display, (EGLImageKHR) eglImage[i]))
 				printf("eglDestroyImageKHR failed.");
+			eglImage[i] = NULL;
 		}
 	}
 
@@ -831,6 +832,7 @@ int main(int argc, char *argv[]) {
 				//do nothing
 			} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
 				printf("exit\n");
+				exit(0);//temporary
 				break;
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
