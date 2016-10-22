@@ -113,9 +113,9 @@ typedef struct {
 	} program;
 	GLuint render_vbo;
 	GLuint render_vbo_nop;
-	GLuint render_vbo_ary;
+	GLuint render_vbo_ary[MAX_OPERATION_NUM];
 	GLuint render_vbo_nop_ary[MAX_OPERATION_NUM];
-	float render_vbo_scale[MAX_OPERATION_NUM];
+	float render_vbo_scale;
 	GLuint stereo_vbo;
 	GLuint stereo_vbo_nop;
 	int num_of_cam;

@@ -15,7 +15,7 @@ STEREO=
 MODE=
 FPS=30
 
-while getopts w:h:W:H:BsCEf: OPT
+while getopts w:h:W:H:BsCEFf: OPT
 do
     case $OPT in
         w)  CAM_WIDTH=$OPTARG
@@ -33,6 +33,8 @@ do
         C)  MODE="-C"
             ;;
         E)  MODE="-E"
+            ;;
+        F)  MODE="-F"
             ;;
         f)  FPS=$OPTARG
             ;;
