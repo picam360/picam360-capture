@@ -645,7 +645,7 @@ static void init_textures(CUBE_STATE_T *state) {
 static void init_options(CUBE_STATE_T *state) {
 	json_error_t error;
 	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
-	if (options != NULL) {
+	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
 		lg_options.sharpness_gain = json_number_value(
