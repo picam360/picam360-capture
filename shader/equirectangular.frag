@@ -28,7 +28,7 @@ void main(void) {
 	pos.y = cos(roll_orig) * cos(yaw_orig); //yaw starts from y
 	pos.z = sin(roll_orig);
 	pos = unif_matrix * pos;
-	float roll = asin(pos.z);
+	float roll = -asin(pos.z);//this is for jpeg cordinate
 	float yaw = atan(pos.x, pos.y); //yaw starts from y
 
 	float r = (M_PI / 2.0 - roll) / M_PI;
