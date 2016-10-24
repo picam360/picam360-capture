@@ -33,7 +33,7 @@ void main(void) {
 	float yaw = atan(pos.x, pos.y); //yaw starts from y
 
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	if (r > 0.6) {
+	if (r > 0.65) {
 		float yaw2 = -yaw;
 		r = 1.0 - r;
 		u = cam0_horizon_r * r * cos(yaw2) + 0.5;
