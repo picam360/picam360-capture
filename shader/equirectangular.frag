@@ -1,6 +1,7 @@
 varying vec2 tcoord;
 uniform mat4 unif_matrix;
 uniform sampler2D cam0_texture;
+uniform sampler2D logo_texture;
 uniform float pixel_size;
 //options start
 uniform float sharpness_gain;
@@ -32,7 +33,14 @@ void main(void) {
 	float yaw = atan(pos.x, pos.y); //yaw starts from y
 
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	if (r >= 0.55) {
+	if (r > 0.6) {
+		float yaw2 = -yaw;
+		r = 1.0 - r;
+		u = cam0_horizon_r * r * cos(yaw2) + 0.5;
+		v = cam0_horizon_r * r * sin(yaw2) + 0.5;
+		gl_FragColor = texture2D(logo_texture, vec2(u, v));
+		return;
+	} else if (r >= 0.55) {
 		r = pow(r - 0.55, 1.2) + pow(0.05, 1.1) + pow(0.10, 1.09) + 0.4;
 	} else if (r >= 0.50) {
 		r = pow(r - 0.50, 1.1) + pow(0.10, 1.09) + 0.4;
