@@ -22,7 +22,7 @@ void main(void) {
 	float yaw = atan(pos.x, pos.z);
 	float r = (M_PI / 2.0 - roll) / M_PI;
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-	if (r < 0.6) {
+	if (r < 0.65) {
 		float yaw2 = yaw;
 		u = cam0_horizon_r * r * cos(yaw2) + 0.5 + cam0_offset_x;
 		v = cam0_horizon_r * r * sin(yaw2) + 0.5 - cam0_offset_y;
@@ -45,9 +45,9 @@ void main(void) {
 		gl_FragColor = fc;
 	} else {
 		float yaw2 = -yaw;
-		r = 1.0 - r;
-		u = cam0_horizon_r * r * cos(yaw2) + 0.5;
-		v = cam0_horizon_r * r * sin(yaw2) + 0.5;
+		r = (1.0 - r) / 0.35 * 0.5;
+		u = r * cos(yaw2) + 0.5;
+		v = r * sin(yaw2) + 0.5;
 //	    } else {
 //	    	u = pos.x / pos.y * 0.2;
 //	    	v = pos.z / pos.y * 0.2;

@@ -35,9 +35,9 @@ void main(void) {
 	float r = (M_PI / 2.0 - roll) / M_PI;
 	if (r > 0.65) {
 		float yaw2 = yaw;
-		r = 1.0 - r;
-		u = cam0_horizon_r * r * cos(yaw2) + 0.5;
-		v = cam0_horizon_r * r * sin(yaw2) + 0.5;
+		r = (1.0 - r) / 0.35 * 0.5;
+		u = r * cos(yaw2) + 0.5;
+		v = r * sin(yaw2) + 0.5;
 		gl_FragColor = texture2D(logo_texture, vec2(u, v));
 		return;
 	} else if (r >= 0.55) {
