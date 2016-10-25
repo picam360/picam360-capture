@@ -666,7 +666,7 @@ static void init_options(CUBE_STATE_T *state) {
 		json_decref(options);
 	}
 	if (lg_options.cam_horizon_r[0] == 0) {
-		lg_options.cam_horizon_r[0] = 0.85;
+		lg_options.cam_horizon_r[0] = 0.8;
 	}
 }
 //------------------------------------------------------------------------------
