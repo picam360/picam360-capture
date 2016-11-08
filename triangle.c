@@ -515,6 +515,14 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 		glUniform1f(glGetUniformLocation(program, buff),
 				lg_options.cam_horizon_r[i]);
 	}
+	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"),
+			lg_options.cam_offset_yaw[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam%d_offset_x"),
+			lg_options.cam_offset_x[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam%d_offset_y"),
+			lg_options.cam_offset_y[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam%d_horizon_r"),
+			lg_options.cam_horizon_r[state->active_cam]);
 	//options end
 
 	//texture start
@@ -524,6 +532,7 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 		sprintf(buff, "cam%d_texture", i);
 		glUniform1i(glGetUniformLocation(program, buff), i + 1);
 	}
+	glUniform1i(glGetUniformLocation(program, "cam_texture"), state->active_cam + 1);
 	//texture end
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
