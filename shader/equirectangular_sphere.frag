@@ -34,22 +34,25 @@ void main(void) {
 	float roll = -asin(pos.z); //this is for jpeg cordinate
 	float yaw = atan(pos.x, pos.y); //yaw starts from y
 
+	vec4 fc0;
+	vec4 fc1;
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	if (r < 0.5) {
-		if (r >= 0.40) {
-			r = pow(r - 0.4, 1.09) + 0.4;
+	if (r < 0.6) {
+		float r2 = r;
+		if (r2 >= 0.40) {
+			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = -yaw + M_PI + cam0_offset_yaw;
 		float u_factor = aspect * cam0_horizon_r;
 		float v_factor = cam0_horizon_r;
-		u = u_factor * r * cos(yaw2) + 0.5 + cam0_offset_x;
-		v = v_factor * r * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
+		u = u_factor * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
+		v = v_factor * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
 		}
 		if (u == 0.0 && v == 0.0) {
-			gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+			fc0 = vec4(0.0, 0.0, 0.0, 1.0);
 		} else {
 			vec4 fc;
 			if (sharpness_gain == 0.0) {
@@ -68,24 +71,25 @@ void main(void) {
 						* sharpness_gain;
 			}
 
-			gl_FragColor = fc;
+			fc0 = fc;
 		}
-	} else {
-		r = 1.0 - r;
-		if (r >= 0.40) {
-			r = pow(r - 0.4, 1.09) + 0.4;
+	}
+	if (r > 0.4) {
+		float r2 = 1.0 - r;
+		if (r2 >= 0.40) {
+			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
-		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
+		float yaw2 = yaw + M_PI + cam1_offset_yaw;
 		float u_factor = aspect * cam1_horizon_r;
 		float v_factor = cam1_horizon_r;
-		u = u_factor * r * cos(yaw2) + 0.5 + cam1_offset_x;
-		v = v_factor * r * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
+		u = u_factor * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
+		v = v_factor * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
 		}
 		if (u == 0.0 && v == 0.0) {
-			gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+			fc1 = vec4(0.0, 0.0, 0.0, 1.0);
 		} else {
 			vec4 fc;
 			if (sharpness_gain == 0.0) {
@@ -104,8 +108,15 @@ void main(void) {
 						* sharpness_gain;
 			}
 
-			gl_FragColor = fc;
+			fc1 = fc;
 		}
+	}
+	if (r < 0.4) {
+		gl_FragColor = fc0;
+	} else if (r < 0.6) {
+		gl_FragColor = (fc0 * (r - 0.4) + fc1 * (0.6 - r)) / 0.2;
+	} else {
+		gl_FragColor = fc1;
 	}
 
 }
