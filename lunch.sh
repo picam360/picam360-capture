@@ -8,19 +8,23 @@ usage_exit() {
         exit 1
 }
 
+CAM_NUM=1
 CAM_WIDTH=1024
 CAM_HEIGHT=1024
 BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
 BACKGROUND=false
+REMOTE=false
 STEREO=
 MODE=
 FPS=30
 
-while getopts w:h:W:H:BsCEFf: OPT
+while getopts n:w:h:W:H:BsCEFf:r OPT
 do
     case $OPT in
+        n)  CAM_NUM=$OPTARG
+            ;;
         w)  CAM_WIDTH=$OPTARG
             ;;
         h)  CAM_HEIGHT=$OPTARG
@@ -41,6 +45,8 @@ do
             ;;
         f)  FPS=$OPTARG
             ;;
+        r)  REMOTE=true
+            ;;
         \?) usage_exit
             ;;
     esac
@@ -51,14 +57,24 @@ if [ -e cam0 ]; then
 fi
 mkfifo cam0
 
+if [ -e cam1 ]; then
+	rm cam1
+fi
+mkfifo cam1
+
 if [ -e cmd ]; then
 	rm cmd
 fi
 mkfifo cmd
 
-raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
-if [ $BACKGROUND = true ]; then
-	./picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
+if [ $REMOTE = true ]; then
+	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - cam1 &
 else
-	./picam360-capture.bin -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
+	raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
+fi
+
+if [ $BACKGROUND = true ]; then
+	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
+else
+	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
 fi

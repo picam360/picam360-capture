@@ -74,7 +74,7 @@
 #define M_PI 3.141592654
 #endif
 
-#define MAX_CAM_NUM 4
+#define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 4
 
 #define CONFIG_FILE "config.json"
@@ -103,6 +103,7 @@ typedef struct {
 	uint32_t render_height;
 	uint32_t cam_width;
 	uint32_t cam_height;
+	uint32_t active_cam;
 // OpenGL|ES objects
 	EGLDisplay display;
 	EGLSurface surface;
@@ -494,25 +495,37 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
 			1.0 / state->cam_width);
 
+	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
+
 	//options start
 	glUniform1f(glGetUniformLocation(program, "sharpness_gain"),
 			lg_options.sharpness_gain);
-	glUniform1f(glGetUniformLocation(program, "cam0_offset_yaw"),
-			lg_options.cam_offset_yaw[0]);
-	glUniform1f(glGetUniformLocation(program, "cam0_offset_x"),
-			lg_options.cam_offset_x[0]);
-	glUniform1f(glGetUniformLocation(program, "cam0_offset_y"),
-			lg_options.cam_offset_y[0]);
-	glUniform1f(glGetUniformLocation(program, "cam0_horizon_r"),
-			lg_options.cam_horizon_r[0]);
+	for (int i = 0; i < state->num_of_cam; i++) {
+		char buff[256];
+		sprintf(buff, "cam%d_offset_yaw", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_offset_yaw[i]);
+		sprintf(buff, "cam%d_offset_x", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_offset_x[i]);
+		sprintf(buff, "cam%d_offset_y", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_offset_y[i]);
+		sprintf(buff, "cam%d_horizon_r", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_horizon_r[i]);
+	}
 	//options end
 
+	//texture start
 	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_texture", i);
 		glUniform1i(glGetUniformLocation(program, buff), i + 1);
 	}
+	//texture end
+
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
 
@@ -650,23 +663,33 @@ static void init_options(CUBE_STATE_T *state) {
 	} else {
 		lg_options.sharpness_gain = json_number_value(
 				json_object_get(options, "sharpness_gain"));
-		lg_options.cam_offset_roll[0] = json_number_value(
-				json_object_get(options, "cam0_offset_roll"));
-		lg_options.cam_offset_pitch[0] = json_number_value(
-				json_object_get(options, "cam0_offset_pitch"));
-		lg_options.cam_offset_yaw[0] = json_number_value(
-				json_object_get(options, "cam0_offset_yaw"));
-		lg_options.cam_offset_x[0] = json_number_value(
-				json_object_get(options, "cam0_offset_x"));
-		lg_options.cam_offset_y[0] = json_number_value(
-				json_object_get(options, "cam0_offset_y"));
-		lg_options.cam_horizon_r[0] = json_number_value(
-				json_object_get(options, "cam0_horizon_r"));
+		for (int i = 0; i < MAX_CAM_NUM; i++) {
+			char buff[256];
+			sprintf(buff, "cam%d_offset_roll", i);
+			lg_options.cam_offset_roll[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, "cam%d_offset_pitch", i);
+			lg_options.cam_offset_pitch[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, "cam%d_offset_yaw", i);
+			lg_options.cam_offset_yaw[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, "cam%d_offset_x", i);
+			lg_options.cam_offset_x[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, "cam%d_offset_y", i);
+			lg_options.cam_offset_y[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, "cam%d_horizon_r", i);
+			lg_options.cam_horizon_r[i] = json_number_value(
+					json_object_get(options, buff));
+
+			if (lg_options.cam_horizon_r[i] == 0) {
+				lg_options.cam_horizon_r[i] = 0.8;
+			}
+		}
 
 		json_decref(options);
-	}
-	if (lg_options.cam_horizon_r[0] == 0) {
-		lg_options.cam_horizon_r[0] = 0.8;
 	}
 }
 //------------------------------------------------------------------------------
@@ -687,18 +710,27 @@ static void save_options(CUBE_STATE_T *state) {
 
 	json_object_set_new(options, "sharpness_gain",
 			json_real(lg_options.sharpness_gain));
-	json_object_set_new(options, "cam0_offset_roll",
-			json_real(lg_options.cam_offset_roll[0]));
-	json_object_set_new(options, "cam0_offset_pitch",
-			json_real(lg_options.cam_offset_pitch[0]));
-	json_object_set_new(options, "cam0_offset_yaw",
-			json_real(lg_options.cam_offset_yaw[0]));
-	json_object_set_new(options, "cam0_offset_x",
-			json_real(lg_options.cam_offset_x[0]));
-	json_object_set_new(options, "cam0_offset_y",
-			json_real(lg_options.cam_offset_y[0]));
-	json_object_set_new(options, "cam0_horizon_r",
-			json_real(lg_options.cam_horizon_r[0]));
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
+		char buff[256];
+		sprintf(buff, "cam%d_offset_roll", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_offset_roll[i]));
+		sprintf(buff, "cam%d_offset_pitch", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_offset_pitch[i]));
+		sprintf(buff, "cam%d_offset_yaw", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_offset_yaw[i]));
+		sprintf(buff, "cam%d_offset_x", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_offset_x[i]));
+		sprintf(buff, "cam%d_offset_y", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_offset_y[i]));
+		sprintf(buff, "cam%d_horizon_r", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_horizon_r[i]));
+	}
 
 	json_dump_file(options, CONFIG_FILE, 0);
 
@@ -832,7 +864,7 @@ int main(int argc, char *argv[]) {
 				//do nothing
 			} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
 				printf("exit\n");
-				exit(0);//temporary
+				exit(0); //temporary
 				break;
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
@@ -841,17 +873,23 @@ int main(int argc, char *argv[]) {
 						sscanf(param, "%lf", &calib_step);
 					}
 				}
+				if (strncmp(cmd, "0", sizeof(buff)) == 0) {
+					state->active_cam = 0;
+				}
+				if (strncmp(cmd, "1", sizeof(buff)) == 0) {
+					state->active_cam = 1;
+				}
 				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[0] -= calib_step;
+					lg_options.cam_offset_y[state->active_cam] -= calib_step;
 				}
 				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[0] += calib_step;
+					lg_options.cam_offset_y[state->active_cam] += calib_step;
 				}
 				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[0] += calib_step;
+					lg_options.cam_offset_x[state->active_cam] += calib_step;
 				}
 				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[0] -= calib_step;
+					lg_options.cam_offset_x[state->active_cam] -= calib_step;
 				}
 				if (strncmp(cmd, "s", sizeof(buff)) == 0) {
 					lg_options.sharpness_gain += calib_step;
