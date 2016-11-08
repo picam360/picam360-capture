@@ -421,8 +421,14 @@ static void init_model_proj(CUBE_STATE_T *state) {
 
 	board_mesh(&state->render_vbo_ary[EQUIRECTANGULAR],
 			&state->render_vbo_nop_ary[EQUIRECTANGULAR]);
-	state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new(
-			"shader/equirectangular.vert", "shader/equirectangular.frag");
+	if (state->num_of_cam == 1) {
+		state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new(
+				"shader/equirectangular.vert", "shader/equirectangular.frag");
+	} else {
+		state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new(
+				"shader/equirectangular.vert",
+				"shader/equirectangular_sphere.frag");
+	}
 
 	board_mesh(&state->render_vbo_ary[FISHEYE],
 			&state->render_vbo_nop_ary[FISHEYE]);
@@ -436,8 +442,13 @@ static void init_model_proj(CUBE_STATE_T *state) {
 
 	spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo_ary[WINDOW],
 			&state->render_vbo_nop_ary[WINDOW], &state->render_vbo_scale);
-	state->program.render_ary[WINDOW] = GLProgram_new("shader/window.vert",
-			"shader/window.frag");
+	if (state->num_of_cam == 1) {
+		state->program.render_ary[WINDOW] = GLProgram_new("shader/window.vert",
+				"shader/window.frag");
+	} else {
+		state->program.render_ary[WINDOW] = GLProgram_new("shader/window.vert",
+				"shader/window_sphere.frag");
+	}
 
 	state->render_vbo = state->render_vbo_ary[state->operation_mode];
 	state->render_vbo_nop = state->render_vbo_nop_ary[state->operation_mode];
