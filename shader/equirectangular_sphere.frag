@@ -75,7 +75,7 @@ void main(void) {
 		if (r >= 0.40) {
 			r = pow(r - 0.4, 1.09) + 0.4;
 		}
-		float yaw2 = -yaw + M_PI;
+		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
 		float u_factor = aspect * cam1_horizon_r;
 		float v_factor = cam1_horizon_r;
 		u = u_factor * r * cos(yaw2) + 0.5 + cam1_offset_x;
