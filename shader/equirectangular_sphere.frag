@@ -35,8 +35,11 @@ void main(void) {
 	float yaw = atan(pos.x, pos.y); //yaw starts from y
 
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	if (r > 0.5) {
-		float yaw2 = -yaw + M_PI;
+	if (r < 0.5) {
+		if (r >= 0.40) {
+			r = pow(r - 0.4, 1.09) + 0.4;
+		}
+		float yaw2 = -yaw + M_PI + cam0_offset_yaw;
 		float u_factor = aspect * cam0_horizon_r;
 		float v_factor = cam0_horizon_r;
 		u = u_factor * r * cos(yaw2) + 0.5 + cam0_offset_x;
@@ -68,6 +71,10 @@ void main(void) {
 			gl_FragColor = fc;
 		}
 	} else {
+		r = 1.0 - r;
+		if (r >= 0.40) {
+			r = pow(r - 0.4, 1.09) + 0.4;
+		}
 		float yaw2 = -yaw + M_PI;
 		float u_factor = aspect * cam1_horizon_r;
 		float v_factor = cam1_horizon_r;

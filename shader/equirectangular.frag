@@ -48,7 +48,7 @@ void main(void) {
 		r = pow(r - 0.4, 1.09) + 0.4;
 	}
 
-	float yaw2 = -yaw + M_PI;
+	float yaw2 = -yaw + M_PI + cam_offset_yaw;
 	u = u_factor * r * cos(yaw2) + 0.5 + cam_offset_x;
 	v = v_factor * r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
