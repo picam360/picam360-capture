@@ -532,7 +532,8 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 		sprintf(buff, "cam%d_texture", i);
 		glUniform1i(glGetUniformLocation(program, buff), i + 1);
 	}
-	glUniform1i(glGetUniformLocation(program, "cam_texture"), state->active_cam + 1);
+	glUniform1i(glGetUniformLocation(program, "cam_texture"),
+			state->active_cam + 1);
 	//texture end
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
@@ -875,18 +876,16 @@ int main(int argc, char *argv[]) {
 				printf("exit\n");
 				exit(0); //temporary
 				break;
+			} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
+				state->active_cam = 0;
+			} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
+				state->active_cam = 1;
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 					char *param = strtok(NULL, " \n");
 					if (param != NULL) {
 						sscanf(param, "%lf", &calib_step);
 					}
-				}
-				if (strncmp(cmd, "0", sizeof(buff)) == 0) {
-					state->active_cam = 0;
-				}
-				if (strncmp(cmd, "1", sizeof(buff)) == 0) {
-					state->active_cam = 1;
 				}
 				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
 					lg_options.cam_offset_y[state->active_cam] -= calib_step;
