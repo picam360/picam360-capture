@@ -15,7 +15,7 @@ uniform float cam1_offset_y;
 uniform float cam1_horizon_r;
 //options end
 
-const float overlap = 0.3;
+const float overlap = 0.03;
 const float M_PI = 3.1415926535;
 //const float aspect = 480.0 / 640.0;
 const float color_offset = 0.15;
@@ -37,7 +37,7 @@ void main(void) {
 	vec4 fc0;
 	vec4 fc1;
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	if (r < 0.55) {
+	if (r < 0.5 + overlap) {
 		float r2 = r;
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
@@ -72,14 +72,14 @@ void main(void) {
 			fc0 = fc;
 		}
 	}
-	if (r > 0.45) {
+	if (r > 0.5 - overlap) {
 		float r2 = 1.0 - r;
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = yaw + M_PI + cam1_offset_yaw;
-		u = cam0_horizon_r * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
-		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
+		u = cam1_horizon_r * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
+		v = cam1_horizon_r * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
@@ -114,6 +114,5 @@ void main(void) {
 	} else {
 		gl_FragColor = fc1;
 	}
-
 }
 
