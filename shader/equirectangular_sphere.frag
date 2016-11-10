@@ -18,7 +18,6 @@ uniform float cam1_horizon_r;
 const float overlap = 0.3;
 const float M_PI = 3.1415926535;
 //const float aspect = 480.0 / 640.0;
-const float aspect = 1.0;
 const float color_offset = 0.15;
 const float color_factor = 1.0 / (1.0 - color_offset);
 
@@ -44,10 +43,8 @@ void main(void) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = -yaw + M_PI + cam0_offset_yaw;
-		float u_factor = aspect * cam0_horizon_r;
-		float v_factor = cam0_horizon_r;
-		u = u_factor * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
-		v = v_factor * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
+		u = cam0_horizon_r * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
+		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
@@ -81,10 +78,8 @@ void main(void) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = yaw + M_PI + cam1_offset_yaw;
-		float u_factor = aspect * cam1_horizon_r;
-		float v_factor = cam1_horizon_r;
-		u = u_factor * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
-		v = v_factor * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
+		u = cam0_horizon_r * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
+		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;

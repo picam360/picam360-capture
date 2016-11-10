@@ -69,10 +69,8 @@ void main(void) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = yaw + M_PI + cam1_offset_yaw;
-		float u_factor = aspect * cam1_horizon_r;
-		float v_factor = cam1_horizon_r;
-		u = u_factor * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
-		v = v_factor * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
+		u = cam1_horizon_r * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
+		v = cam1_horizon_r * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
