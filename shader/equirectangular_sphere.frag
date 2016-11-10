@@ -115,7 +115,7 @@ void main(void) {
 	if (r < 0.5 - overlap) {
 		gl_FragColor = fc0;
 	} else if (r < 0.5 + overlap) {
-		gl_FragColor = (fc0 * (0.55 - r) + fc1 * (r - 0.45)) / (overlap * 2);
+		gl_FragColor = (fc0 * (0.55 - r) + fc1 * (r - 0.45)) / (overlap * 2.0);
 	} else {
 		gl_FragColor = fc1;
 	}
