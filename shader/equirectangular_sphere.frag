@@ -37,7 +37,7 @@ void main(void) {
 	vec4 fc0;
 	vec4 fc1;
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	if (r < 0.6) {
+	if (r < 0.55) {
 		float r2 = r;
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
@@ -74,7 +74,7 @@ void main(void) {
 			fc0 = fc;
 		}
 	}
-	if (r > 0.4) {
+	if (r > 0.45) {
 		float r2 = 1.0 - r;
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
@@ -111,10 +111,10 @@ void main(void) {
 			fc1 = fc;
 		}
 	}
-	if (r < 0.4) {
+	if (r < 0.45) {
 		gl_FragColor = fc0;
-	} else if (r < 0.6) {
-		gl_FragColor = (fc0 * (r - 0.4) + fc1 * (0.6 - r)) / 0.2;
+	} else if (r < 0.55) {
+		gl_FragColor = (fc0 * (0.55 - r) + fc1 * (r - 0.45)) / 0.2;
 	} else {
 		gl_FragColor = fc1;
 	}

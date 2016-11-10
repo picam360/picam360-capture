@@ -1,0 +1,2 @@
+SUBSYSTEM=="usb", ACTION=="add", ATTRS{idVendor}=="2833", ATTRS{idProduct}=="0021", RUN+="/bin/sh /home/pi/picam360/picam360-capture/setup/set-oculus.sh"
+SUBSYSTEM=="usb", ACTION=="remove", ATTRS{idVendor}=="2833", ATTRS{idProduct}=="0021", RUN+="/bin/sh /home/pi/picam360/picam360-capture/setup/unset-oculus.sh"
