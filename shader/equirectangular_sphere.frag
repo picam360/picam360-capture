@@ -15,6 +15,7 @@ uniform float cam1_offset_y;
 uniform float cam1_horizon_r;
 //options end
 
+const float overlap = 0.3;
 const float M_PI = 3.1415926535;
 //const float aspect = 480.0 / 640.0;
 const float aspect = 1.0;
@@ -111,10 +112,10 @@ void main(void) {
 			fc1 = fc;
 		}
 	}
-	if (r < 0.45) {
+	if (r < 0.5 - overlap) {
 		gl_FragColor = fc0;
-	} else if (r < 0.55) {
-		gl_FragColor = (fc0 * (0.55 - r) + fc1 * (r - 0.45)) / 0.2;
+	} else if (r < 0.5 + overlap) {
+		gl_FragColor = (fc0 * (0.55 - r) + fc1 * (r - 0.45)) / (overlap * 2);
 	} else {
 		gl_FragColor = fc1;
 	}
