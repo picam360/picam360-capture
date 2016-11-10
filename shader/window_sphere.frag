@@ -22,10 +22,9 @@ void main(void) {
 	float u = 0.0;
 	float v = 0.0;
 	vec4 pos = unif_matrix * position;
-	float roll = -asin(pos.y);//this is for jpeg coordinate
+	float roll = -asin(pos.y); //this is for jpeg coordinate
 	float yaw = atan(pos.x, pos.z);
-	float r = (M_PI / 2.0 - roll) / M_PI;
-	
+
 	vec4 fc0;
 	vec4 fc1;
 	float r = (M_PI / 2.0 - roll) / M_PI;
@@ -35,10 +34,8 @@ void main(void) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = -yaw + M_PI + cam0_offset_yaw;
-		float u_factor = aspect * cam0_horizon_r;
-		float v_factor = cam0_horizon_r;
-		u = u_factor * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
-		v = v_factor * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
+		u = cam0_horizon_r * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
+		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
