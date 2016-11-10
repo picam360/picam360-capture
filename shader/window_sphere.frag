@@ -1,15 +1,19 @@
 varying vec4 position;
 
 uniform mat4 unif_matrix;
-uniform sampler2D cam_texture;
-uniform sampler2D logo_texture;
+uniform sampler2D cam0_texture;
+uniform sampler2D cam1_texture;
 uniform float pixel_size;
 //options start
 uniform float sharpness_gain;
-uniform float cam_offset_yaw;
-uniform float cam_offset_x;
-uniform float cam_offset_y;
-uniform float cam_horizon_r;
+uniform float cam0_offset_yaw;
+uniform float cam0_offset_x;
+uniform float cam0_offset_y;
+uniform float cam0_horizon_r;
+uniform float cam1_offset_yaw;
+uniform float cam1_offset_x;
+uniform float cam1_offset_y;
+uniform float cam1_horizon_r;
 //options end
 
 const float M_PI = 3.1415926535;
@@ -21,38 +25,89 @@ void main(void) {
 	float roll = -asin(pos.y);//this is for jpeg coordinate
 	float yaw = atan(pos.x, pos.z);
 	float r = (M_PI / 2.0 - roll) / M_PI;
-	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-	if (r < 0.65) {
-		float yaw2 = yaw + cam_offset_yaw;
-		u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;
-		v = cam_horizon_r * r * sin(yaw2) + 0.5 - cam_offset_y;
-		vec4 fc;
-		if (sharpness_gain == 0.0) {
-			fc = texture2D(cam_texture, vec2(u, v));
-		} else {
-			//sharpness
-			fc = texture2D(cam_texture, vec2(u, v))
-					* (1.0 + 4.0 * sharpness_gain);
-			fc -= texture2D(cam_texture, vec2(u - 1.0 * pixel_size, v))
-					* sharpness_gain;
-			fc -= texture2D(cam_texture, vec2(u, v - 1.0 * pixel_size))
-					* sharpness_gain;
-			fc -= texture2D(cam_texture, vec2(u, v + 1.0 * pixel_size))
-					* sharpness_gain;
-			fc -= texture2D(cam_texture, vec2(u + 1.0 * pixel_size, v))
-					* sharpness_gain;
+	
+	vec4 fc0;
+	vec4 fc1;
+	float r = (M_PI / 2.0 - roll) / M_PI;
+	if (r < 0.55) {
+		float r2 = r;
+		if (r2 >= 0.40) {
+			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
-		gl_FragColor = fc;
+		float yaw2 = -yaw + M_PI + cam0_offset_yaw;
+		float u_factor = aspect * cam0_horizon_r;
+		float v_factor = cam0_horizon_r;
+		u = u_factor * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
+		v = v_factor * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
+		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
+			u = 0.0;
+			v = 0.0;
+		}
+		if (u == 0.0 && v == 0.0) {
+			fc0 = vec4(0.0, 0.0, 0.0, 1.0);
+		} else {
+			vec4 fc;
+			if (sharpness_gain == 0.0) {
+				fc = texture2D(cam0_texture, vec2(u, v));
+			} else {
+				//sharpness
+				fc = texture2D(cam0_texture, vec2(u, v))
+						* (1.0 + 4.0 * sharpness_gain);
+				fc -= texture2D(cam0_texture, vec2(u - 1.0 * pixel_size, v))
+						* sharpness_gain;
+				fc -= texture2D(cam0_texture, vec2(u, v - 1.0 * pixel_size))
+						* sharpness_gain;
+				fc -= texture2D(cam0_texture, vec2(u, v + 1.0 * pixel_size))
+						* sharpness_gain;
+				fc -= texture2D(cam0_texture, vec2(u + 1.0 * pixel_size, v))
+						* sharpness_gain;
+			}
+
+			fc0 = fc;
+		}
+	}
+	if (r > 0.45) {
+		float r2 = 1.0 - r;
+		if (r2 >= 0.40) {
+			r2 = pow(r2 - 0.4, 1.09) + 0.4;
+		}
+		float yaw2 = yaw + M_PI + cam1_offset_yaw;
+		float u_factor = aspect * cam1_horizon_r;
+		float v_factor = cam1_horizon_r;
+		u = u_factor * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
+		v = v_factor * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
+		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
+			u = 0.0;
+			v = 0.0;
+		}
+		if (u == 0.0 && v == 0.0) {
+			fc1 = vec4(0.0, 0.0, 0.0, 1.0);
+		} else {
+			vec4 fc;
+			if (sharpness_gain == 0.0) {
+				fc = texture2D(cam1_texture, vec2(u, v));
+			} else {
+				//sharpness
+				fc = texture2D(cam1_texture, vec2(u, v))
+						* (1.0 + 4.0 * sharpness_gain);
+				fc -= texture2D(cam1_texture, vec2(u - 1.0 * pixel_size, v))
+						* sharpness_gain;
+				fc -= texture2D(cam1_texture, vec2(u, v - 1.0 * pixel_size))
+						* sharpness_gain;
+				fc -= texture2D(cam1_texture, vec2(u, v + 1.0 * pixel_size))
+						* sharpness_gain;
+				fc -= texture2D(cam1_texture, vec2(u + 1.0 * pixel_size, v))
+						* sharpness_gain;
+			}
+
+			fc1 = fc;
+		}
+	}
+	if (r < 0.5 - overlap) {
+		gl_FragColor = fc0;
+	} else if (r < 0.5 + overlap) {
+		gl_FragColor = (fc0 * (0.55 - r) + fc1 * (r - 0.45)) / (overlap * 2.0);
 	} else {
-		float yaw2 = -yaw;
-		r = (1.0 - r) / 0.35 * 0.5;
-		u = r * cos(yaw2) + 0.5;
-		v = r * sin(yaw2) + 0.5;
-//	    } else {
-//	    	u = pos.x / pos.y * 0.2;
-//	    	v = pos.z / pos.y * 0.2;
-//	    	u = (-u + 1.0) / 2.0;
-//	    	v = (-v + 1.0) / 2.0;
-		gl_FragColor = texture2D(logo_texture, vec2(u, v));
+		gl_FragColor = fc1;
 	}
 }
