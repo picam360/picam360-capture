@@ -16,6 +16,7 @@ uniform float cam1_offset_y;
 uniform float cam1_horizon_r;
 //options end
 
+const float overlap = 0.3;
 const float M_PI = 3.1415926535;
 
 void main(void) {
