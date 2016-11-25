@@ -72,7 +72,7 @@ mkfifo cmd
 
 if [ $REMOTE = true ]; then
 	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &
-else if [ $DIRECT = "" ]; then
+elif [ $DIRECT = "" ]; then
 	raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
 fi
 

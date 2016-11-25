@@ -518,8 +518,8 @@ static void signal_handler(int signal) {
 	want_quit = 1;
 }
 
-static OMX_ERRORTYPE my_fill_buffer_done(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
-		OMX_BUFFERHEADERTYPE* pBuffer) {
+static OMX_ERRORTYPE my_fill_buffer_done(OMX_HANDLETYPE hComponent,
+		OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer) {
 	appctx *ctx = (appctx *) pAppData;
 
 	if (OMX_FillThisBuffer(ctx->render, ctx->eglBuffer) != OMX_ErrorNone) {
@@ -570,6 +570,8 @@ void *video_direct(void* arg) {
 
 	OMX_ERRORTYPE r;
 
+	int camera_output_port = (state->cam_width <= 1440) ? 71 : 72;
+
 	if ((r = OMX_Init()) != OMX_ErrorNone) {
 		omx_die(r, "OMX initalization failed");
 	}
@@ -602,8 +604,9 @@ void *video_direct(void* arg) {
 	dump_port(ctx.camera, 73, OMX_TRUE);
 	say("Default port definition for camera preview output port 70");
 	dump_port(ctx.camera, 70, OMX_TRUE);
-	say("Default port definition for camera video output port 71");
-	dump_port(ctx.camera, 71, OMX_TRUE);
+	say(
+			"Default port definition for camera video output port camera_output_port");
+	dump_port(ctx.camera, camera_output_port, OMX_TRUE);
 
 	OMX_TIME_CONFIG_CLOCKSTATETYPE cstate;
 	OMX_INIT_STRUCTURE(cstate);
@@ -636,61 +639,136 @@ void *video_direct(void* arg) {
 			&device)) != OMX_ErrorNone) {
 		omx_die(r, "Failed to set camera parameter device number");
 	}
-	// Configure video format emitted by camera preview output port
-	OMX_PARAM_PORTDEFINITIONTYPE camera_portdef;
-	OMX_INIT_STRUCTURE(camera_portdef);
-	camera_portdef.nPortIndex = 70;
-	if ((r = OMX_GetParameter(ctx.camera, OMX_IndexParamPortDefinition,
-			&camera_portdef)) != OMX_ErrorNone) {
-		omx_die(r,
-				"Failed to get port definition for camera preview output port 70");
-	}
-	camera_portdef.format.video.nFrameWidth = state->cam_width;
-	camera_portdef.format.video.nFrameHeight = state->cam_height;
-	camera_portdef.format.video.xFramerate = VIDEO_FRAMERATE << 16;
-	// Stolen from gstomxvideodec.c of gst-omx
-	camera_portdef.format.video.nStride =
-			(camera_portdef.format.video.nFrameWidth
-					+ camera_portdef.nBufferAlignment - 1)
-					& (~(camera_portdef.nBufferAlignment - 1));
-	camera_portdef.format.video.eColorFormat =
-			OMX_COLOR_FormatYUV420PackedPlanar;
-	if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamPortDefinition,
-			&camera_portdef)) != OMX_ErrorNone) {
-		omx_die(r,
-				"Failed to set port definition for camera preview output port 70");
-	}
-	// Configure video format emitted by camera video output port
-	// Use configuration from camera preview output as basis for
-	// camera video output configuration
-	OMX_INIT_STRUCTURE(camera_portdef);
-	camera_portdef.nPortIndex = 70;
-	if ((r = OMX_GetParameter(ctx.camera, OMX_IndexParamPortDefinition,
-			&camera_portdef)) != OMX_ErrorNone) {
-		omx_die(r,
-				"Failed to get port definition for camera preview output port 70");
-	}
-	camera_portdef.nPortIndex = 71;
-	if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamPortDefinition,
-			&camera_portdef)) != OMX_ErrorNone) {
-		omx_die(r,
-				"Failed to set port definition for camera video output port 71");
-	}
-	// Configure frame rate
-	OMX_CONFIG_FRAMERATETYPE framerate;
-	OMX_INIT_STRUCTURE(framerate);
-	framerate.nPortIndex = 70;
-	framerate.xEncodeFramerate = camera_portdef.format.video.xFramerate;
-	if ((r = OMX_SetConfig(ctx.camera, OMX_IndexConfigVideoFramerate,
-			&framerate)) != OMX_ErrorNone) {
-		omx_die(r,
-				"Failed to set framerate configuration for camera preview output port 70");
-	}
-	framerate.nPortIndex = 71;
-	if ((r = OMX_SetConfig(ctx.camera, OMX_IndexConfigVideoFramerate,
-			&framerate)) != OMX_ErrorNone) {
-		omx_die(r,
-				"Failed to set framerate configuration for camera video output port 71");
+	if (camera_output_port == 72) {
+		//Configure camera sensor
+		printf("configuring '%s' sensor\n", camera.name);
+		OMX_PARAM_SENSORMODETYPE sensor;
+		OMX_INIT_STRUCTURE(sensor);
+		sensor.nPortIndex = OMX_ALL;
+		OMX_INIT_STRUCTURE(sensor.sFrameSize);
+		sensor.sFrameSize.nPortIndex = OMX_ALL;
+		if ((error = OMX_GetParameter(camera.handle,
+				OMX_IndexParamCommonSensorMode, &sensor))) {
+			fprintf(stderr, "error: OMX_GetParameter: %s\n",
+					dump_OMX_ERRORTYPE(error));
+			exit(1);
+		}
+		sensor.bOneShot = OMX_TRUE;
+		sensor.sFrameSize.nWidth = state->cam_width;
+		sensor.sFrameSize.nHeight = state->cam_height;
+		if ((error = OMX_SetParameter(camera.handle,
+				OMX_IndexParamCommonSensorMode, &sensor))) {
+			fprintf(stderr, "error: OMX_SetParameter: %s\n",
+					dump_OMX_ERRORTYPE(error));
+			exit(1);
+		}
+
+		//Configure camera port definition
+		printf("configuring '%s' port definition\n", camera.name);
+		OMX_PARAM_PORTDEFINITIONTYPE port_def;
+		OMX_INIT_STRUCTURE(port_def);
+		port_def.nPortIndex = 72;
+		if ((error = OMX_GetParameter(camera.handle,
+				OMX_IndexParamPortDefinition, &port_def))) {
+			fprintf(stderr, "error: OMX_GetParameter: %s\n",
+					dump_OMX_ERRORTYPE(error));
+			exit(1);
+		}
+		port_def.format.image.nFrameWidth = state->cam_width;
+		port_def.format.image.nFrameHeight = state->cam_height;
+		port_def.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
+		port_def.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
+		//Stride is byte-per-pixel*width, YUV has 1 byte per pixel, so the stride is
+		//the width (rounded up to the nearest multiple of 16).
+		//See mmal/util/mmal_util.c, mmal_encoding_width_to_stride()
+		port_def.format.image.nStride = round_up(state->cam_width, 16);
+		if ((error = OMX_SetParameter(camera.handle,
+				OMX_IndexParamPortDefinition, &port_def))) {
+			fprintf(stderr, "error: OMX_SetParameter: %s\n",
+					dump_OMX_ERRORTYPE(error));
+			exit(1);
+		}
+
+		//Configure preview port
+		//In theory the fastest resolution and framerate are 1920x1080 @30fps because
+		//these are the default settings for the preview port, so the frames don't
+		//need to be resized. In practice, this is not true. The fastest way to
+		//produce stills is setting the lowest resolution, that is, 640x480 @30fps.
+		//The difference between 1920x1080 @30fps and 640x480 @30fps is a speed boost
+		//of ~4%, from ~1083ms to ~1039ms
+		port_def.nPortIndex = 70;
+		port_def.format.video.nFrameWidth = 640;
+		port_def.format.video.nFrameHeight = 480;
+		port_def.format.video.eCompressionFormat = OMX_IMAGE_CodingUnused;
+		port_def.format.video.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
+		//Setting the framerate to 0 unblocks the shutter speed from 66ms to 772ms
+		//The higher the speed, the higher the capture time
+		port_def.format.video.xFramerate = 0;
+		port_def.format.video.nStride = 640;
+		if ((error = OMX_SetParameter(camera.handle,
+				OMX_IndexParamPortDefinition, &port_def))) {
+			fprintf(stderr, "error: OMX_SetParameter - "
+					"OMX_IndexParamPortDefinition: %s",
+					dump_OMX_ERRORTYPE(error));
+			exit(1);
+		}
+	} else {
+		// Configure video format emitted by camera preview output port
+		OMX_PARAM_PORTDEFINITIONTYPE camera_portdef;
+		OMX_INIT_STRUCTURE(camera_portdef);
+		camera_portdef.nPortIndex = 70;
+		if ((r = OMX_GetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&camera_portdef)) != OMX_ErrorNone) {
+			omx_die(r,
+					"Failed to get port definition for camera preview output port 70");
+		}
+		camera_portdef.format.video.nFrameWidth = state->cam_width;
+		camera_portdef.format.video.nFrameHeight = state->cam_height;
+		camera_portdef.format.video.xFramerate = VIDEO_FRAMERATE << 16;
+		// Stolen from gstomxvideodec.c of gst-omx
+		camera_portdef.format.video.nStride =
+				(camera_portdef.format.video.nFrameWidth
+						+ camera_portdef.nBufferAlignment - 1)
+						& (~(camera_portdef.nBufferAlignment - 1));
+		camera_portdef.format.video.eColorFormat =
+				OMX_COLOR_FormatYUV420PackedPlanar;
+		if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&camera_portdef)) != OMX_ErrorNone) {
+			omx_die(r,
+					"Failed to set port definition for camera preview output port 70");
+		}
+		// Configure video format emitted by camera video output port
+		// Use configuration from camera preview output as basis for
+		// camera video output configuration
+		OMX_INIT_STRUCTURE(camera_portdef);
+		camera_portdef.nPortIndex = 70;
+		if ((r = OMX_GetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&camera_portdef)) != OMX_ErrorNone) {
+			omx_die(r,
+					"Failed to get port definition for camera preview output port 70");
+		}
+		camera_portdef.nPortIndex = 71;
+		if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&camera_portdef)) != OMX_ErrorNone) {
+			omx_die(r,
+					"Failed to set port definition for camera video output port 71");
+		}
+		// Configure frame rate
+		OMX_CONFIG_FRAMERATETYPE framerate;
+		OMX_INIT_STRUCTURE(framerate);
+		framerate.nPortIndex = 70;
+		framerate.xEncodeFramerate = camera_portdef.format.video.xFramerate;
+		if ((r = OMX_SetConfig(ctx.camera, OMX_IndexConfigVideoFramerate,
+				&framerate)) != OMX_ErrorNone) {
+			omx_die(r,
+					"Failed to set framerate configuration for camera preview output port 70");
+		}
+		framerate.nPortIndex = 71;
+		if ((r = OMX_SetConfig(ctx.camera, OMX_IndexConfigVideoFramerate,
+				&framerate)) != OMX_ErrorNone) {
+			omx_die(r,
+					"Failed to set framerate configuration for camera video output port 71");
+		}
 	}
 	// Configure sharpness
 	OMX_CONFIG_SHARPNESSTYPE sharpness;
@@ -795,12 +873,12 @@ void *video_direct(void* arg) {
 	}
 	OMX_CONFIG_MIRRORTYPE mirror;
 	OMX_INIT_STRUCTURE(mirror);
-	mirror.nPortIndex = 71;
+	mirror.nPortIndex = camera_output_port;
 	mirror.eMirror = eMirror;
 	if ((r = OMX_SetConfig(ctx.camera, OMX_IndexConfigCommonMirror, &mirror))
 			!= OMX_ErrorNone) {
 		omx_die(r,
-				"Failed to set mirror configuration for camera video output port 71");
+				"Failed to set mirror configuration for camera video output port camera_output_port");
 	}
 
 	// Ensure camera is ready
@@ -840,11 +918,11 @@ void *video_direct(void* arg) {
 
 	// Tunnel camera video output port and render input port
 	say(
-			"Setting up tunnel from camera video output port 71 to render input port 220...");
-	if ((r = OMX_SetupTunnel(ctx.camera, 71, ctx.render, 220))
+			"Setting up tunnel from camera video output port camera_output_port to render input port 220...");
+	if ((r = OMX_SetupTunnel(ctx.camera, camera_output_port, ctx.render, 220))
 			!= OMX_ErrorNone) {
 		omx_die(r,
-				"Failed to setup tunnel between camera video output port 71 and render input port 90");
+				"Failed to setup tunnel between camera video output port camera_output_port and render input port 90");
 	}
 
 	// Switch components to idle state
@@ -890,11 +968,11 @@ void *video_direct(void* arg) {
 		omx_die(r, "Failed to enable camera preview output port 70");
 	}
 	block_until_port_changed(ctx.camera, 70, OMX_TRUE);
-	if ((r = OMX_SendCommand(ctx.camera, OMX_CommandPortEnable, 71, NULL))
-			!= OMX_ErrorNone) {
+	if ((r = OMX_SendCommand(ctx.camera, OMX_CommandPortEnable,
+			camera_output_port, NULL)) != OMX_ErrorNone) {
 		omx_die(r, "Failed to enable camera video output port 71");
 	}
-	block_until_port_changed(ctx.camera, 71, OMX_TRUE);
+	block_until_port_changed(ctx.camera, camera_output_port, OMX_TRUE);
 	if ((r = OMX_SendCommand(ctx.render, OMX_CommandPortEnable, 220, NULL))
 			!= OMX_ErrorNone) {
 		omx_die(r, "Failed to enable render input port 220");
@@ -950,23 +1028,25 @@ void *video_direct(void* arg) {
 	block_until_state_changed(ctx.null_sink, OMX_StateExecuting);
 
 	// Start capturing video with the camera
-	say("Switching on capture on camera video output port 71...");
+	say(
+			"Switching on capture on camera video output port camera_output_port...");
 	OMX_CONFIG_PORTBOOLEANTYPE capture;
 	OMX_INIT_STRUCTURE(capture);
-	capture.nPortIndex = 71;
+	capture.nPortIndex = camera_output_port;
 	capture.bEnabled = OMX_TRUE;
 	if ((r = OMX_SetParameter(ctx.camera, OMX_IndexConfigPortCapturing,
 			&capture)) != OMX_ErrorNone) {
 		omx_die(r,
-				"Failed to switch on capture on camera video output port 71");
+				"Failed to switch on capture on camera video output port camera_output_port");
 	}
 
 	say("Configured port definition for camera input port 73");
 	dump_port(ctx.camera, 73, OMX_FALSE);
 	say("Configured port definition for camera preview output port 70");
 	dump_port(ctx.camera, 70, OMX_FALSE);
-	say("Configured port definition for camera video output port 71");
-	dump_port(ctx.camera, 71, OMX_FALSE);
+	say(
+			"Configured port definition for camera video output port camera_output_port");
+	dump_port(ctx.camera, camera_output_port, OMX_FALSE);
 	say("Configured port definition for render input port 90");
 	dump_port(ctx.render, 220, OMX_FALSE);
 	say("Configured port definition for null sink input port 240");
@@ -995,12 +1075,12 @@ void *video_direct(void* arg) {
 
 	// Stop capturing video with the camera
 	OMX_INIT_STRUCTURE(capture);
-	capture.nPortIndex = 71;
+	capture.nPortIndex = camera_output_port;
 	capture.bEnabled = OMX_FALSE;
 	if ((r = OMX_SetParameter(ctx.camera, OMX_IndexConfigPortCapturing,
 			&capture)) != OMX_ErrorNone) {
 		omx_die(r,
-				"Failed to switch off capture on camera video output port 71");
+				"Failed to switch off capture on camera video output port camera_output_port");
 	}
 
 	// Flush the buffers on each component
@@ -1014,9 +1094,10 @@ void *video_direct(void* arg) {
 		omx_die(r, "Failed to flush buffers of camera preview output port 70");
 	}
 	block_until_flushed(&ctx);
-	if ((r = OMX_SendCommand(ctx.camera, OMX_CommandFlush, 71, NULL))
-			!= OMX_ErrorNone) {
-		omx_die(r, "Failed to flush buffers of camera video output port 71");
+	if ((r = OMX_SendCommand(ctx.camera, OMX_CommandFlush, camera_output_port,
+			NULL)) != OMX_ErrorNone) {
+		omx_die(r,
+				"Failed to flush buffers of camera video output port camera_output_port");
 	}
 	block_until_flushed(&ctx);
 	if ((r = OMX_SendCommand(ctx.render, OMX_CommandFlush, 220, NULL))
@@ -1041,11 +1122,12 @@ void *video_direct(void* arg) {
 		omx_die(r, "Failed to disable camera preview output port 70");
 	}
 	block_until_port_changed(ctx.camera, 70, OMX_FALSE);
-	if ((r = OMX_SendCommand(ctx.camera, OMX_CommandPortDisable, 71, NULL))
-			!= OMX_ErrorNone) {
-		omx_die(r, "Failed to disable camera video output port 71");
+	if ((r = OMX_SendCommand(ctx.camera, OMX_CommandPortDisable,
+			camera_output_port, NULL)) != OMX_ErrorNone) {
+		omx_die(r,
+				"Failed to disable camera video output port camera_output_port");
 	}
-	block_until_port_changed(ctx.camera, 71, OMX_FALSE);
+	block_until_port_changed(ctx.camera, camera_output_port, OMX_FALSE);
 	if ((r = OMX_SendCommand(ctx.render, OMX_CommandPortDisable, 220, NULL))
 			!= OMX_ErrorNone) {
 		omx_die(r, "Failed to disable render input port 90");
