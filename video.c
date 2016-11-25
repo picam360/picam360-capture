@@ -61,13 +61,9 @@ static int mIndex = 0;
 // Modified function prototype to work with pthreads
 void *video_decode_test(void* arg) {
 	int index;
-	pthread_mutex_lock(&mlock);
 
-	index = mIndex++;
-
-	pthread_mutex_unlock(&mlock);
-
-	eglImage[index] = arg;
+	eglImage[index] = ((void**) arg)[1];
+	index = (int)((void**) arg)[2];
 
 	if (eglImage[index] == 0) {
 		printf("eglImage is null.\n");

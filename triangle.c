@@ -46,7 +46,11 @@
 #include "EGL/eglext.h"
 
 #include "triangle.h"
+#include "video.h"
+#include "video_direct.h"
 #include "picam360_tools.h"
+#include "gl_program.h"
+#include "device.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -63,9 +67,6 @@
 //json parser
 #include <jansson.h>
 
-#include "gl_program.h"
-#include "device.h"
-
 #include <opencv/highgui.h>
 
 #define PATH "./"
@@ -73,9 +74,6 @@
 #ifndef M_PI
 #define M_PI 3.141592654
 #endif
-
-#define MAX_CAM_NUM 2
-#define MAX_OPERATION_NUM 4
 
 #define CONFIG_FILE "config.json"
 
@@ -89,58 +87,6 @@ typedef struct {
 	float cam_horizon_r[MAX_CAM_NUM];
 } OPTIONS_T;
 OPTIONS_T lg_options = { };
-
-enum OPERATION_MODE {
-	WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
-};
-typedef struct {
-	bool preview;
-	bool stereo;
-	enum OPERATION_MODE operation_mode;
-	uint32_t screen_width;
-	uint32_t screen_height;
-	uint32_t render_width;
-	uint32_t render_height;
-	uint32_t cam_width;
-	uint32_t cam_height;
-	uint32_t active_cam;
-// OpenGL|ES objects
-	EGLDisplay display;
-	EGLSurface surface;
-	EGLContext context;
-	struct {
-		void *render;
-		void *render_ary[MAX_OPERATION_NUM];
-		void *stereo;
-	} program;
-	GLuint render_vbo;
-	GLuint render_vbo_nop;
-	GLuint render_vbo_ary[MAX_OPERATION_NUM];
-	GLuint render_vbo_nop_ary[MAX_OPERATION_NUM];
-	float render_vbo_scale;
-	GLuint stereo_vbo;
-	GLuint stereo_vbo_nop;
-	int num_of_cam;
-	GLuint cam_texture[MAX_CAM_NUM];
-	GLuint logo_texture;
-	GLuint render_texture;
-	GLuint framebuffer;
-// model rotation vector and direction
-	GLfloat rot_angle_x_inc;
-	GLfloat rot_angle_y_inc;
-	GLfloat rot_angle_z_inc;
-// current model rotation angles
-	GLfloat rot_angle_x;
-	GLfloat rot_angle_y;
-	GLfloat rot_angle_z;
-// current distance from camera
-	GLfloat distance;
-	GLfloat distance_inc;
-
-	bool recording;
-	bool snap;
-	char snap_save_path[256];
-} CUBE_STATE_T;
 
 static void init_ogl(CUBE_STATE_T *state);
 static void init_model_proj(CUBE_STATE_T *state);
@@ -655,7 +601,12 @@ static void init_textures(CUBE_STATE_T *state) {
 		}
 
 		// Start rendering
-		pthread_create(&thread[i], NULL, video_decode_test, eglImage[i]);
+		void **args = malloc(sizeof(void*) * 3);
+		args[0] = (void*) state;
+		args[1] = (void*) eglImage[i];
+		args[2] = (void*) i;
+		pthread_create(&thread[i], NULL,
+				(state->video_direct) ? video_direct : video_decode_test, args);
 
 		glEnable(GL_TEXTURE_2D);
 
@@ -809,11 +760,12 @@ int main(int argc, char *argv[]) {
 	state->preview = false;
 	state->stereo = false;
 	state->operation_mode = WINDOW;
+	state->video_direct = false;
 
-//init options
+	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "w:h:n:psW:H:ECF")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psW:H:ECFD")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &state->cam_width);
@@ -844,6 +796,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'F':
 			state->operation_mode = FISHEYE;
+			break;
+		case 'D':
+			state->video_direct = true;
 			break;
 		default: /* '?' */
 			printf(
