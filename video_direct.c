@@ -641,13 +641,12 @@ void *video_direct(void* arg) {
 	}
 	if (camera_output_port == 72) {
 		//Configure camera sensor
-		printf("configuring '%s' sensor\n", camera.name);
 		OMX_PARAM_SENSORMODETYPE sensor;
 		OMX_INIT_STRUCTURE(sensor);
 		sensor.nPortIndex = OMX_ALL;
 		OMX_INIT_STRUCTURE(sensor.sFrameSize);
 		sensor.sFrameSize.nPortIndex = OMX_ALL;
-		if ((error = OMX_GetParameter(camera.handle,
+		if ((error = OMX_GetParameter(ctx.camera,
 				OMX_IndexParamCommonSensorMode, &sensor))) {
 			fprintf(stderr, "error: OMX_GetParameter: %s\n",
 					dump_OMX_ERRORTYPE(error));
@@ -656,7 +655,7 @@ void *video_direct(void* arg) {
 		sensor.bOneShot = OMX_TRUE;
 		sensor.sFrameSize.nWidth = state->cam_width;
 		sensor.sFrameSize.nHeight = state->cam_height;
-		if ((error = OMX_SetParameter(camera.handle,
+		if ((error = OMX_SetParameter(ctx.camera,
 				OMX_IndexParamCommonSensorMode, &sensor))) {
 			fprintf(stderr, "error: OMX_SetParameter: %s\n",
 					dump_OMX_ERRORTYPE(error));
@@ -668,7 +667,7 @@ void *video_direct(void* arg) {
 		OMX_PARAM_PORTDEFINITIONTYPE port_def;
 		OMX_INIT_STRUCTURE(port_def);
 		port_def.nPortIndex = 72;
-		if ((error = OMX_GetParameter(camera.handle,
+		if ((error = OMX_GetParameter(ctx.camera,
 				OMX_IndexParamPortDefinition, &port_def))) {
 			fprintf(stderr, "error: OMX_GetParameter: %s\n",
 					dump_OMX_ERRORTYPE(error));
@@ -682,7 +681,7 @@ void *video_direct(void* arg) {
 		//the width (rounded up to the nearest multiple of 16).
 		//See mmal/util/mmal_util.c, mmal_encoding_width_to_stride()
 		port_def.format.image.nStride = round_up(state->cam_width, 16);
-		if ((error = OMX_SetParameter(camera.handle,
+		if ((error = OMX_SetParameter(ctx.camera,
 				OMX_IndexParamPortDefinition, &port_def))) {
 			fprintf(stderr, "error: OMX_SetParameter: %s\n",
 					dump_OMX_ERRORTYPE(error));
@@ -705,7 +704,7 @@ void *video_direct(void* arg) {
 		//The higher the speed, the higher the capture time
 		port_def.format.video.xFramerate = 0;
 		port_def.format.video.nStride = 640;
-		if ((error = OMX_SetParameter(camera.handle,
+		if ((error = OMX_SetParameter(ctx.camera,
 				OMX_IndexParamPortDefinition, &port_def))) {
 			fprintf(stderr, "error: OMX_SetParameter - "
 					"OMX_IndexParamPortDefinition: %s",
