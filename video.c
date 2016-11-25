@@ -40,7 +40,7 @@ static COMPONENT_T* egl_render[2] = { };
 
 static void* eglImage[2] = { };
 
-void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
+static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int index = (int) data;
 
 	if (OMX_FillThisBuffer(ilclient_get_handle(egl_render[index]),

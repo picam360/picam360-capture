@@ -518,7 +518,7 @@ static void signal_handler(int signal) {
 	want_quit = 1;
 }
 
-OMX_ERRORTYPE my_fill_buffer_done(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
+static OMX_ERRORTYPE my_fill_buffer_done(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
 		OMX_BUFFERHEADERTYPE* pBuffer) {
 	appctx *ctx = (appctx *) pAppData;
 
