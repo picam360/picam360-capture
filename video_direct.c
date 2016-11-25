@@ -563,6 +563,10 @@ static OMX_ERRORTYPE event_handler(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
 	return OMX_ErrorNone;
 }
 
+static int round_up(int value, int divisor) {
+	return (divisor + value - 1) & ~(divisor - 1);
+}
+
 void *video_direct(void* arg) {
 	bcm_host_init();
 
