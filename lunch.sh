@@ -18,9 +18,10 @@ BACKGROUND=false
 REMOTE=false
 STEREO=
 MODE=
+DIRECT=
 FPS=30
 
-while getopts n:w:h:W:H:BsCEFf:r OPT
+while getopts n:w:h:W:H:BsCEFf:rD OPT
 do
     case $OPT in
         n)  CAM_NUM=$OPTARG
@@ -47,6 +48,8 @@ do
             ;;
         r)  REMOTE=true
             ;;
+        D)  DIRECT="-D"
+            ;;
         \?) usage_exit
             ;;
     esac
@@ -69,12 +72,12 @@ mkfifo cmd
 
 if [ $REMOTE = true ]; then
 	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &
-else
+else if [ $DIRECT = "" ]; then
 	raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
 fi
 
 if [ $BACKGROUND = true ]; then
-	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO < cmd &
+	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO < cmd &
 else
-	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STEREO -p
+	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO -p
 fi
