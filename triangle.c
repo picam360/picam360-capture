@@ -602,9 +602,9 @@ static void init_textures(CUBE_STATE_T *state) {
 
 		// Start rendering
 		void **args = malloc(sizeof(void*) * 3);
-		args[0] = (void*) state;
+		args[0] = (void*) i;
 		args[1] = (void*) eglImage[i];
-		args[2] = (void*) i;
+		args[2] = (void*) state;
 		pthread_create(&thread[i], NULL,
 				(state->video_direct) ? video_direct : video_decode_test, args);
 

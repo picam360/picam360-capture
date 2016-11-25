@@ -35,7 +35,6 @@
 #include "bcm_host.h"
 #include "ilclient.h"
 
-static pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
 static OMX_BUFFERHEADERTYPE* eglBuffer[2] = { };
 static COMPONENT_T* egl_render[2] = { };
 
@@ -43,27 +42,20 @@ static void* eglImage[2] = { };
 
 void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int index = (int) data;
-//      printf("enter fill buffer done %d\n", index);
 
-//return;
-//pthread_mutex_lock(&mlock);
 	if (OMX_FillThisBuffer(ilclient_get_handle(egl_render[index]),
 			eglBuffer[index]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
-//pthread_mutex_unlock(&mlock);
-
 }
-
-static int mIndex = 0;
 
 // Modified function prototype to work with pthreads
 void *video_decode_test(void* arg) {
 	int index;
 
+	index = (int)((void**) arg)[0];
 	eglImage[index] = ((void**) arg)[1];
-	index = (int)((void**) arg)[2];
 
 	if (eglImage[index] == 0) {
 		printf("eglImage is null.\n");
@@ -173,12 +165,10 @@ void *video_decode_test(void* arg) {
 
 		ilclient_change_component_state(video_decode, OMX_StateExecuting);
 
-//pthread_mutex_unlock(&mlock);
 
 		printf("milestone\n");
 
 		while ((buf = ilclient_get_input_buffer(video_decode, 130, 1)) != NULL) {
-//pthread_mutex_lock(&mlock);
 
 // feed data and wait until we get port settings changed
 			unsigned char *dest = buf->pBuffer;
@@ -201,7 +191,6 @@ void *video_decode_test(void* arg) {
 
 				if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
 					status = -7;
-//pthread_mutex_unlock(&mlock);
 					break;
 				}
 
@@ -211,7 +200,6 @@ void *video_decode_test(void* arg) {
 				// now setup tunnel to egl_render
 				if (ilclient_setup_tunnel(tunnel + 1, 0, 1000) != 0) {
 					status = -12;
-// pthread_mutex_unlock(&mlock);
 					break;
 				}
 
@@ -246,7 +234,6 @@ void *video_decode_test(void* arg) {
 				}
 			}
 			if (!data_len) {
-//pthread_mutex_unlock(&mlock);
 				break;
 
 			}
@@ -263,12 +250,8 @@ void *video_decode_test(void* arg) {
 			if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf)
 					!= OMX_ErrorNone) {
 				status = -6;
-//pthread_mutex_unlock(&mlock);
-
 				break;
 			}
-//pthread_mutex_unlock(&mlock);
-
 		}
 
 		buf->nFilledLen = 0;

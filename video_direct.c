@@ -566,7 +566,7 @@ static OMX_ERRORTYPE event_handler(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
 void *video_direct(void* arg) {
 	bcm_host_init();
 
-	CUBE_STATE_T *state = (CUBE_STATE_T *) ((void**) arg)[0];
+	CUBE_STATE_T *state = (CUBE_STATE_T *) ((void**) arg)[2];
 
 	OMX_ERRORTYPE r;
 
