@@ -646,31 +646,28 @@ void *video_direct(void* arg) {
 		sensor.nPortIndex = OMX_ALL;
 		OMX_INIT_STRUCTURE(sensor.sFrameSize);
 		sensor.sFrameSize.nPortIndex = OMX_ALL;
-		if ((r = OMX_GetParameter(ctx.camera,
-				OMX_IndexParamCommonSensorMode, &sensor))) {
-			fprintf(stderr, "error: OMX_GetParameter: %s\n",
-					dump_OMX_ERRORTYPE(r));
-			exit(1);
+		if ((r = OMX_GetParameter(ctx.camera, OMX_IndexParamCommonSensorMode,
+				&sensor))) {
+			omx_die(r,
+					"Failed to set port definition for camera video output port 72");
 		}
 		sensor.bOneShot = OMX_TRUE;
 		sensor.sFrameSize.nWidth = state->cam_width;
 		sensor.sFrameSize.nHeight = state->cam_height;
-		if ((r = OMX_SetParameter(ctx.camera,
-				OMX_IndexParamCommonSensorMode, &sensor))) {
-			fprintf(stderr, "error: OMX_SetParameter: %s\n",
-					dump_OMX_ERRORTYPE(r));
-			exit(1);
+		if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamCommonSensorMode,
+				&sensor))) {
+			omx_die(r,
+					"Failed to set port definition for camera video output port 72");
 		}
 
 		//Configure camera port definition
 		OMX_PARAM_PORTDEFINITIONTYPE port_def;
 		OMX_INIT_STRUCTURE(port_def);
 		port_def.nPortIndex = 72;
-		if ((r = OMX_GetParameter(ctx.camera,
-				OMX_IndexParamPortDefinition, &port_def))) {
-			fprintf(stderr, "error: OMX_GetParameter: %s\n",
-					dump_OMX_ERRORTYPE(r));
-			exit(1);
+		if ((r = OMX_GetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&port_def))) {
+			omx_die(r,
+					"Failed to set port definition for camera video output port 72");
 		}
 		port_def.format.image.nFrameWidth = state->cam_width;
 		port_def.format.image.nFrameHeight = state->cam_height;
@@ -680,11 +677,10 @@ void *video_direct(void* arg) {
 		//the width (rounded up to the nearest multiple of 16).
 		//See mmal/util/mmal_util.c, mmal_encoding_width_to_stride()
 		port_def.format.image.nStride = round_up(state->cam_width, 16);
-		if ((r = OMX_SetParameter(ctx.camera,
-				OMX_IndexParamPortDefinition, &port_def))) {
-			fprintf(stderr, "error: OMX_SetParameter: %s\n",
-					dump_OMX_ERRORTYPE(r));
-			exit(1);
+		if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&port_def))) {
+			omx_die(r,
+					"Failed to set port definition for camera video output port 72");
 		}
 
 		//Configure preview port
@@ -703,12 +699,10 @@ void *video_direct(void* arg) {
 		//The higher the speed, the higher the capture time
 		port_def.format.video.xFramerate = 0;
 		port_def.format.video.nStride = 640;
-		if ((r = OMX_SetParameter(ctx.camera,
-				OMX_IndexParamPortDefinition, &port_def))) {
-			fprintf(stderr, "error: OMX_SetParameter - "
-					"OMX_IndexParamPortDefinition: %s",
-					dump_OMX_ERRORTYPE(r));
-			exit(1);
+		if ((r = OMX_SetParameter(ctx.camera, OMX_IndexParamPortDefinition,
+				&port_def))) {
+			omx_die(r,
+					"Failed to set port definition for camera preview output port 70");
 		}
 	} else {
 		// Configure video format emitted by camera preview output port
