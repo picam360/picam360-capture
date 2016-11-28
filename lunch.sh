@@ -20,10 +20,13 @@ STEREO=
 MODE=
 DIRECT=
 FPS=30
+CODEC=H264
 
-while getopts n:w:h:W:H:BsCEFf:rD OPT
+while getopts c:n:w:h:W:H:BsCEFf:rD OPT
 do
     case $OPT in
+        c)  CODEC=$OPTARG
+            ;;
         n)  CAM_NUM=$OPTARG
             ;;
         w)  CAM_WIDTH=$OPTARG
@@ -77,7 +80,7 @@ elif [ $DIRECT = "" ]; then
 fi
 
 if [ $BACKGROUND = true ]; then
-	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO < cmd &
+	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO < cmd &
 else
-	./picam360-capture.bin -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO -p
+	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO -p
 fi

@@ -37,10 +37,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 enum OPERATION_MODE {
 	WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
 };
+enum CODEC_TYPE {
+	H264, MJPEG
+};
 typedef struct {
 	bool preview;
 	bool stereo;
 	bool video_direct;
+	enum CODEC_TYPE codec_type;
 	enum OPERATION_MODE operation_mode;
 	uint32_t screen_width;
 	uint32_t screen_height;

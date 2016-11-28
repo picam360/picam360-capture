@@ -47,6 +47,7 @@
 
 #include "triangle.h"
 #include "video.h"
+#include "video_mjpeg.h"
 #include "video_direct.h"
 #include "picam360_tools.h"
 #include "gl_program.h"
@@ -606,7 +607,9 @@ static void init_textures(CUBE_STATE_T *state) {
 		args[1] = (void*) eglImage[i];
 		args[2] = (void*) state;
 		pthread_create(&thread[i], NULL,
-				(state->video_direct) ? video_direct : video_decode_test, args);
+				(state->video_direct) ? video_direct :
+				(state->codec_type == H264) ?
+						video_decode_test : video_mjpeg_decode, args);
 
 		glEnable(GL_TEXTURE_2D);
 
@@ -759,14 +762,20 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
+	state->codec_type = H264;
 	state->operation_mode = WINDOW;
 	state->video_direct = false;
 
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "w:h:n:psW:H:ECFD")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFD")) != -1) {
 		switch (opt) {
+		case 'c':
+			if (strcmp(optarg, "MJPEG") == 0) {
+				state->codec_type = MJPEG;
+			}
+			break;
 		case 'w':
 			sscanf(optarg, "%d", &state->cam_width);
 			break;
@@ -800,7 +809,8 @@ int main(int argc, char *argv[]) {
 		case 'D':
 			state->video_direct = true;
 			break;
-		default: /* '?' */
+		default:
+			/* '?' */
 			printf(
 					"Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
 					argv[0]);
