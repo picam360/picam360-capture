@@ -109,6 +109,15 @@ void *video_mjpeg_decode(void* arg) {
 		status = -14;
 	list[2] = clock;
 
+	OMX_PORT_PARAM_TYPE decode_port;
+	decode_port.nSize = sizeof(OMX_PORT_PARAM_TYPE);
+	decode_port.nVersion.nVersion = OMX_VERSION;
+
+	OMX_GetParameter(image_decode, OMX_IndexParamImageInit, &decode_port);
+	if (decode_port.nPorts != 2) {
+		return OMXJPEG_ERROR_WRONG_NO_PORTS;
+	}
+
 	memset(&cstate, 0, sizeof(cstate));
 	cstate.nSize = sizeof(cstate);
 	cstate.nVersion.nVersion = OMX_VERSION;
@@ -139,15 +148,6 @@ void *video_mjpeg_decode(void* arg) {
 
 	if (status == 0)
 		ilclient_change_component_state(image_decode, OMX_StateIdle);
-
-	OMX_PORT_PARAM_TYPE decode_port;
-	decode_port.nSize = sizeof(OMX_PORT_PARAM_TYPE);
-	decode_port.nVersion.nVersion = OMX_VERSION;
-
-	OMX_GetParameter(image_decode, OMX_IndexParamImageInit, &decode_port);
-	if (decode_port.nPorts != 2) {
-		return OMXJPEG_ERROR_WRONG_NO_PORTS;
-	}
 
 	memset(&format, 0, sizeof(OMX_IMAGE_PARAM_PORTFORMATTYPE));
 	format.nSize = sizeof(OMX_IMAGE_PARAM_PORTFORMATTYPE);
