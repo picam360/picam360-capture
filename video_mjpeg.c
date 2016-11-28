@@ -109,16 +109,6 @@ void *video_mjpeg_decode(void* arg) {
 		status = -14;
 	list[2] = clock;
 
-	OMX_PORT_PARAM_TYPE decode_port;
-	decode_port.nSize = sizeof(OMX_PORT_PARAM_TYPE);
-	decode_port.nVersion.nVersion = OMX_VERSION;
-
-	OMX_GetParameter(image_decode, OMX_IndexParamImageInit, &decode_port);
-	if (decode_port.nPorts != 2) {
-		printf("wrong no ports\n");
-		exit(-1);
-	}
-
 	memset(&cstate, 0, sizeof(cstate));
 	cstate.nSize = sizeof(cstate);
 	cstate.nVersion.nVersion = OMX_VERSION;
@@ -135,6 +125,16 @@ void *video_mjpeg_decode(void* arg) {
 					"video_scheduler", ILCLIENT_DISABLE_ALL_PORTS) != 0)
 		status = -14;
 	list[3] = video_scheduler;
+
+	OMX_PORT_PARAM_TYPE decode_port;
+	decode_port.nSize = sizeof(OMX_PORT_PARAM_TYPE);
+	decode_port.nVersion.nVersion = OMX_VERSION;
+
+	OMX_GetParameter(ILC_GET_HANDLE(image_decode), OMX_IndexParamImageInit, &decode_port);
+	if (decode_port.nPorts != 2) {
+		printf("wrong no ports\n");
+		exit(-1);
+	}
 
 	set_tunnel(tunnel, image_decode, decode_port.nStartPortNumber + 1,
 			video_scheduler, 10);
