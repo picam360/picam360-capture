@@ -115,7 +115,8 @@ void *video_mjpeg_decode(void* arg) {
 
 	OMX_GetParameter(image_decode, OMX_IndexParamImageInit, &decode_port);
 	if (decode_port.nPorts != 2) {
-		return OMXJPEG_ERROR_WRONG_NO_PORTS;
+		printf("wrong no ports\n");
+		exit(-1);
 	}
 
 	memset(&cstate, 0, sizeof(cstate));
