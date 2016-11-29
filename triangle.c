@@ -441,7 +441,7 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
-	mat4_rotateX(unif_matrix, unif_matrix, M_PI / 2);
+	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2 + M_PI);//M_PI for jpeg coordinate
 	//float scale_factor[3] = { 1.0, 1.0, -1.0 };
 	//mat4_scale(unif_matrix, unif_matrix, scale_factor);
 

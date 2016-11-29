@@ -31,7 +31,7 @@ void main(void) {
 	pos.y = cos(roll_orig) * cos(yaw_orig); //yaw starts from y
 	pos.z = sin(roll_orig);
 	pos = unif_matrix * pos;
-	float roll = -asin(pos.z); //this is for jpeg cordinate
+	float roll = asin(pos.z);
 	float yaw = atan(pos.x, pos.y); //yaw starts from y
 
 	vec4 fc0;
@@ -42,7 +42,7 @@ void main(void) {
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
-		float yaw2 = -yaw + M_PI + cam0_offset_yaw;
+		float yaw2 = yaw + M_PI + cam0_offset_yaw;
 		u = cam0_horizon_r * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
 		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
@@ -77,7 +77,7 @@ void main(void) {
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
-		float yaw2 = yaw + M_PI + cam1_offset_yaw;
+		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
 		u = cam1_horizon_r * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
 		v = cam1_horizon_r * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
