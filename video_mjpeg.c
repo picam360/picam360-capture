@@ -163,8 +163,8 @@ void *video_mjpeg_decode(void* arg) {
 		int port_settings_changed = 0;
 		int first_packet = 1;
 		int marker = 0;
-		int eoi = 0;
 		int left_len = 0;
+		char *left_data = NULL;
 
 		ilclient_change_component_state(video_decode, OMX_StateExecuting);
 
@@ -172,109 +172,111 @@ void *video_mjpeg_decode(void* arg) {
 
 		while ((buf = ilclient_get_input_buffer(video_decode, 130, 1)) != NULL) {
 
+			int eoi = 0;
 			// feed data and wait until we get port settings changed
 			unsigned char *dest = buf->pBuffer;
-			do {
-				if (left_len != 0) {
-					memcpy(dest, dest + data_len, left_len);
-					data_len = left_len;
-					left_len = 0;
-				} else {
-					data_len = read(descriptor, dest, buf->nAllocLen);
-				}
-				for(int i=0;i<data_len) {
-					if(marker) {
-						marker = 0;
-						if(buf->pBuffer[i] == 0xd9) { //EOI
-							eoi = 1;
-							left_len = data_len - (i+1);
-							data_len = i+1;
-						}
-					} else if(buf->pBuffer[i] == 0xff) {
-						marker = 1;
-					}
-				}
-
-				if (port_settings_changed == 0
-						&& ((data_len > 0
-								&& ilclient_remove_event(video_decode,
-										OMX_EventPortSettingsChanged, 131, 0, 0,
-										1) == 0)
-								|| (data_len == 0
-										&& ilclient_wait_for_event(video_decode,
-												OMX_EventPortSettingsChanged,
-												131, 0, 0, 1,
-												ILCLIENT_EVENT_ERROR
-														| ILCLIENT_PARAMETER_CHANGED,
-												10000) == 0))) {
-					port_settings_changed = 1;
-
-					if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
-						status = -7;
+			if (left_len != 0) {
+				memcpy(dest, left_data, left_len);
+				free(left_data);
+				data_len = left_len;
+				left_len = 0;
+			} else {
+				data_len = read(descriptor, dest, buf->nAllocLen);
+			}
+			for(int i=0;i<data_len) {
+				if(marker) {
+					marker = 0;
+					if(buf->pBuffer[i] == 0xd9) { //EOI
+						eoi = 1;
+						left_len = data_len - (i+1);
+						data_len = i+1;
+						left_data = malloc(left_len);
+						memcpy(left_data, dest + data_len, left_len);
 						break;
 					}
-
-					ilclient_change_component_state(video_scheduler,
-							OMX_StateExecuting);
-
-					// now setup tunnel to egl_render
-					if (ilclient_setup_tunnel(tunnel + 1, 0, 1000) != 0) {
-						status = -12;
-						break;
-					}
-
-					// Set egl_render to idle
-					ilclient_change_component_state(egl_render[index],
-							OMX_StateIdle);
-
-					// Enable the output port and tell egl_render to use the texture as a buffer
-					//ilclient_enable_port(egl_render, 221); THIS BLOCKS SO CAN'T BE USED
-					if (OMX_SendCommand(ILC_GET_HANDLE(egl_render[index]),
-							OMX_CommandPortEnable, 221, NULL)
-							!= OMX_ErrorNone) {
-						printf("OMX_CommandPortEnable failed.\n");
-						exit(1);
-					}
-
-					if (OMX_UseEGLImage(ILC_GET_HANDLE(egl_render[index]),
-							&eglBuffer[index], 221, NULL, eglImage[index])
-							!= OMX_ErrorNone) {
-						printf("OMX_UseEGLImage failed.\n");
-						exit(1);
-					}
-
-					// Set egl_render to executing
-					ilclient_change_component_state(egl_render[index],
-							OMX_StateExecuting);
-
-					// Request egl_render to write data to the texture buffer
-					if (OMX_FillThisBuffer(ILC_GET_HANDLE(egl_render[index]),
-							eglBuffer[index]) != OMX_ErrorNone) {
-						printf("OMX_FillThisBuffer failed.\n");
-						exit(1);
-					}
+				} else if(buf->pBuffer[i] == 0xff) {
+					marker = 1;
 				}
-				if (!data_len) {
+			}
+
+			if (port_settings_changed == 0
+					&& ((data_len > 0
+							&& ilclient_remove_event(video_decode,
+									OMX_EventPortSettingsChanged, 131, 0, 0, 1)
+									== 0)
+							|| (data_len == 0
+									&& ilclient_wait_for_event(video_decode,
+											OMX_EventPortSettingsChanged, 131,
+											0, 0, 1,
+											ILCLIENT_EVENT_ERROR
+													| ILCLIENT_PARAMETER_CHANGED,
+											10000) == 0))) {
+				port_settings_changed = 1;
+
+				if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
+					status = -7;
 					break;
 				}
-				buf->nFilledLen = data_len;
 
-				buf->nOffset = 0;
-				if (first_packet) {
-					buf->nFlags = OMX_BUFFERFLAG_STARTTIME;
-					first_packet = 0;
+				ilclient_change_component_state(video_scheduler,
+						OMX_StateExecuting);
+
+				// now setup tunnel to egl_render
+				if (ilclient_setup_tunnel(tunnel + 1, 0, 1000) != 0) {
+					status = -12;
+					break;
 				}
 
-				if (eoi) {
-					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+				// Set egl_render to idle
+				ilclient_change_component_state(egl_render[index],
+						OMX_StateIdle);
+
+				// Enable the output port and tell egl_render to use the texture as a buffer
+				//ilclient_enable_port(egl_render, 221); THIS BLOCKS SO CAN'T BE USED
+				if (OMX_SendCommand(ILC_GET_HANDLE(egl_render[index]),
+						OMX_CommandPortEnable, 221, NULL) != OMX_ErrorNone) {
+					printf("OMX_CommandPortEnable failed.\n");
+					exit(1);
 				}
 
-				if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf)
+				if (OMX_UseEGLImage(ILC_GET_HANDLE(egl_render[index]),
+						&eglBuffer[index], 221, NULL, eglImage[index])
 						!= OMX_ErrorNone) {
-					status = -6;
-					break;
+					printf("OMX_UseEGLImage failed.\n");
+					exit(1);
 				}
-			} while (left_len != 0);
+
+				// Set egl_render to executing
+				ilclient_change_component_state(egl_render[index],
+						OMX_StateExecuting);
+
+				// Request egl_render to write data to the texture buffer
+				if (OMX_FillThisBuffer(ILC_GET_HANDLE(egl_render[index]),
+						eglBuffer[index]) != OMX_ErrorNone) {
+					printf("OMX_FillThisBuffer failed.\n");
+					exit(1);
+				}
+			}
+			if (!data_len) {
+				break;
+			}
+			buf->nFilledLen = data_len;
+
+			buf->nOffset = 0;
+			if (first_packet) {
+				buf->nFlags = OMX_BUFFERFLAG_STARTTIME;
+				first_packet = 0;
+			}
+
+			if (eoi) {
+				buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+			}
+
+			if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf)
+					!= OMX_ErrorNone) {
+				status = -6;
+				break;
+			}
 		}
 
 		buf->nFilledLen = 0;
