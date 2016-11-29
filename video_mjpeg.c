@@ -183,18 +183,18 @@ void *video_mjpeg_decode(void* arg) {
 			} else {
 				data_len = read(descriptor, dest, buf->nAllocLen);
 			}
-			for(int i=0;i<data_len) {
-				if(marker) {
+			for (int i = 0; i < data_len; i++) {
+				if (marker) {
 					marker = 0;
-					if(buf->pBuffer[i] == 0xd9) { //EOI
+					if (buf->pBuffer[i] == 0xd9) { //EOI
 						eoi = 1;
-						left_len = data_len - (i+1);
-						data_len = i+1;
+						left_len = data_len - (i + 1);
+						data_len = i + 1;
 						left_data = malloc(left_len);
 						memcpy(left_data, dest + data_len, left_len);
 						break;
 					}
-				} else if(buf->pBuffer[i] == 0xff) {
+				} else if (buf->pBuffer[i] == 0xff) {
 					marker = 1;
 				}
 			}
