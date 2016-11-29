@@ -263,8 +263,7 @@ void *video_mjpeg_decode(void* arg) {
 				if (first_packet) {
 					buf->nFlags = OMX_BUFFERFLAG_STARTTIME;
 					first_packet = 0;
-				} else
-					buf->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
+				}
 
 				if (eoi) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
