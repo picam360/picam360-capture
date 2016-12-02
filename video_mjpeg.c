@@ -63,7 +63,7 @@ typedef struct _IMAGE_RECEIVER_DATA {
 void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	unsigned char buff[4096];
-	unsigned char image_buff = NULL;
+	unsigned char *image_buff = NULL;
 	int image_buff_size = 0;
 	int image_buff_cur = 0;
 	int image_start = -1;
@@ -104,6 +104,7 @@ void *image_receiver(void* arg) {
 						}
 						image_buff_cur = 0;
 						image_buff = malloc(image_buff_size);
+						image_start = -	1;
 					}
 				}
 			} else if (buff == 0xff) {
