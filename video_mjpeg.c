@@ -69,19 +69,20 @@ void *image_receiver(void* arg) {
 	int image_start = -1;
 	int data_len = 0;
 	int data_len_total = 0;
+	int marker = 0;
 	int soicount = 0;
 	while (1) {
 		data_len = read(data->descriptor, buff, sizeof(buff));
 		for (int i = 0; i < data_len; i++) {
 			if (marker) {
 				marker = 0;
-				if (buff == 0xd8) { //SOI
+				if (buff[i] == 0xd8) { //SOI
 					if (soicount == 0) {
 						image_start = data_len_total + (i - 1);
 					}
 					soicount++;
 				}
-				if (buff == 0xd9 && image_start >= 0) { //EOI
+				if (buff[i] == 0xd9 && image_start >= 0) { //EOI
 					soicount--;
 					if (soicount == 0) {
 						int image_size = (data_len_total + i + 1) - image_start;
@@ -107,7 +108,7 @@ void *image_receiver(void* arg) {
 						image_start = -	1;
 					}
 				}
-			} else if (buff == 0xff) {
+			} else if (buff[i] == 0xff) {
 				marker = 1;
 			}
 		}
