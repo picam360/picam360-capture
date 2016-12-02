@@ -51,7 +51,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 }
 #define MAX_IMAGE_QUEUE 4
 typedef struct _IMAGE_RECEIVER_DATA {
-	pthread_mutex_t mlock = PTHREAD_MUTEX_INITIALIZER;
+	pthread_mutex_t mlock;
 	int descriptor;
 	int image_queue_count;
 	int image_size_queue[MAX_IMAGE_QUEUE];
