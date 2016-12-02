@@ -96,7 +96,6 @@ void *image_receiver(void* arg) {
 								data->image_size = image_size;
 								data->image_buff = image_buff;
 							} else { //throw it away
-								printf("image loss\n");
 								free(image_buff);
 							}
 							pthread_mutex_unlock(&data->mlock);
