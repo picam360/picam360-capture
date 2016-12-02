@@ -54,7 +54,6 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 typedef struct _IMAGE_RECEIVER_DATA {
 	pthread_mutex_t mlock;
 	int descriptor;
-	int image_queue_count;
 	int image_size;
 	unsigned char *image_buff;
 } IMAGE_RECEIVER_DATA;
