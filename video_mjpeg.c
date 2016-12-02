@@ -231,7 +231,7 @@ void *video_mjpeg_decode(void* arg) {
 			if (data.image_queue_count > 0) {
 				memcpy(data.image_size_queue, data.image_size_queue + 1,
 						sizeof(int) * data.image_queue_count);
-				memcpy(data.image_buff, data.image_buff + 1,
+				memcpy(data.image_queue, data.image_queue + 1,
 						sizeof(unsigned char*) * data.image_queue_count);
 			}
 			pthread_mutex_unlock(&data.mlock);
