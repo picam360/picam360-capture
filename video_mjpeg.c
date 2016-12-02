@@ -89,7 +89,7 @@ void *image_receiver(void* arg) {
 						if (image_buff == NULL) { //just allocate image buffer
 							image_buff_size = image_size * 2;
 						} else if (data->image_queue_count
-								< IMAGE_RECEIVER_DATA) {
+								< MAX_IMAGE_QUEUE) {
 							memcpy(image_buff + image_buff_cur, buff, i);
 							pthread_mutex_lock(&data->mlock);
 							data->image_size_queue[data->image_queue_count] =
