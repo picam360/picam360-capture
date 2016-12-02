@@ -35,6 +35,8 @@
 #include "bcm_host.h"
 #include "ilclient.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 static OMX_BUFFERHEADERTYPE* eglBuffer[2] = { };
 static COMPONENT_T* egl_render[2] = { };
 
@@ -207,7 +209,7 @@ void *video_mjpeg_decode(void* arg) {
 		printf("milestone\n");
 
 		IMAGE_RECEIVER_DATA data = { };
-		data.mlock = PTHREAD_MUTEX_INITIALIZER;
+		pthread_mutex_init(&data.mlock, NULL);
 		data.descriptor = descriptor;
 		pthread_t image_receiver_thread;
 		pthread_create(&image_receiver_thread, NULL, image_receiver,
@@ -239,7 +241,7 @@ void *video_mjpeg_decode(void* arg) {
 			while (image_cur < image_size) {
 				buf = ilclient_get_input_buffer(video_decode, 130, 1);
 
-				data_len = min(buf->nAllocLen, image_size - image_cur);
+				data_len = MIN(buf->nAllocLen, image_size - image_cur);
 				memcpy(buf->pBuffer, image_buff + image_cur, data_len);
 				image_cur += data_len;
 
