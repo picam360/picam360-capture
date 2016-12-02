@@ -51,13 +51,12 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		exit(1);
 	}
 }
-#define MAX_IMAGE_QUEUE 4
 typedef struct _IMAGE_RECEIVER_DATA {
 	pthread_mutex_t mlock;
 	int descriptor;
 	int image_queue_count;
-	int image_size_queue[MAX_IMAGE_QUEUE];
-	unsigned char *image_queue[MAX_IMAGE_QUEUE];
+	int image_size;
+	unsigned char *image_buff;
 } IMAGE_RECEIVER_DATA;
 
 void *image_receiver(void* arg) {
@@ -73,6 +72,9 @@ void *image_receiver(void* arg) {
 	int soicount = 0;
 	while (1) {
 		data_len = read(data->descriptor, buff, sizeof(buff));
+		if (data_len == 0) {
+			break;
+		}
 		for (int i = 0; i < data_len; i++) {
 			if (marker) {
 				marker = 0;
@@ -88,24 +90,21 @@ void *image_receiver(void* arg) {
 						int image_size = (data_len_total + i + 1) - image_start;
 						if (image_buff == NULL) { //just allocate image buffer
 							image_buff_size = image_size * 2;
-						} else if (data->image_queue_count
-								< MAX_IMAGE_QUEUE) {
+						} else {
 							memcpy(image_buff + image_buff_cur, buff, i);
 							pthread_mutex_lock(&data->mlock);
-							data->image_size_queue[data->image_queue_count] =
-									image_size;
-							data->image_queue[data->image_queue_count] =
-									image_buff;
-							data->image_queue_count++;
+							if (data->image_buff == NULL) {
+								data->image_size = image_size;
+								data->image_buff = image_buff;
+							} else { //throw it away
+								printf("image loss\n");
+								free(image_buff);
+							}
 							pthread_mutex_unlock(&data->mlock);
-							break;
-						} else { //throw it away
-							printf("image loss/n");
-							free(image_buff);
 						}
 						image_buff_cur = 0;
 						image_buff = malloc(image_buff_size);
-						image_start = -	1;
+						image_start = -1;
 					}
 				}
 			} else if (buff[i] == 0xff) {
@@ -118,6 +117,10 @@ void *image_receiver(void* arg) {
 				image_buff = NULL;
 				image_buff_size = 0;
 				image_buff_cur = 0;
+			} else if (image_start > data_len_total) { //soi
+				memcpy(image_buff, buff + (image_start - data_len_total),
+						data_len - (image_start - data_len_total));
+				image_buff_cur = data_len - (image_start - data_len_total);
 			} else {
 				memcpy(image_buff + image_buff_cur, buff, data_len);
 				image_buff_cur += data_len;
@@ -223,21 +226,15 @@ void *video_mjpeg_decode(void* arg) {
 			unsigned char *image_buff;
 
 			//wait untill image arived
-			if (data.image_queue_count <= 0) {
+			if (data.image_buff == NULL) {
 				usleep(1000);
 				continue;
 			}
 
 			pthread_mutex_lock(&data.mlock);
-			data.image_queue_count--;
-			image_size = data.image_size_queue[data.image_queue_count];
-			image_buff = data.image_queue[data.image_queue_count];
-			if (data.image_queue_count > 0) {
-				memcpy(data.image_size_queue, data.image_size_queue + 1,
-						sizeof(int) * data.image_queue_count);
-				memcpy(data.image_queue, data.image_queue + 1,
-						sizeof(unsigned char*) * data.image_queue_count);
-			}
+			image_size = data.image_size;
+			image_buff = data.image_buff;
+			data.image_buff = NULL;
 			pthread_mutex_unlock(&data.mlock);
 
 			while (image_cur < image_size) {
@@ -332,7 +329,7 @@ void *video_mjpeg_decode(void* arg) {
 				!= OMX_ErrorNone)
 			status = -20;
 
-		// need to flush the renderer to allow video_decode to disable its input port
+// need to flush the renderer to allow video_decode to disable its input port
 		ilclient_flush_tunnels(tunnel, 0);
 
 		ilclient_disable_port_buffers(video_decode, 130, NULL, NULL, NULL);
