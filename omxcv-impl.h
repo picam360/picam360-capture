@@ -58,6 +58,11 @@ extern "C" {
 extern void BGR2RGB(const cv::Mat &src, uint8_t *dst, int stride);
 
 namespace omxcv {
+	enum CODEC_TYPE {
+		H264,
+		MJPEG,
+		JPEG
+	};
     /**
      * Our implementation class of the encoder.
      */
@@ -70,6 +75,7 @@ namespace omxcv {
         private:
             int m_width, m_height, m_stride, m_bitrate, m_fpsnum, m_fpsden;
 
+            enum CODEC_TYPE mcodec_type;
             std::string m_filename;
             std::ofstream m_ofstream;
 
@@ -85,6 +91,15 @@ namespace omxcv {
 
             std::chrono::steady_clock::time_point m_frame_start;
             int m_frame_count;
+
+            //for jpeg
+        	unsigned char *image_buff;
+        	int image_buff_size;
+        	int image_buff_cur;
+        	int image_start;
+        	int data_len_total;
+        	int marker;
+        	int soicount;
 
             void input_worker();
             bool write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp);

@@ -56,6 +56,15 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	int ret;
 	bcm_host_init();
 
+	if (m_filename.substr(-5) == ".jpeg" || m_filename.substr(-4) == ".jpg") {
+		format.eCompressionFormat = JPEG;
+	} else if (m_filename.substr(-6) == ".mjpeg"
+			|| m_filename.substr(-5) == ".mjpg") {
+		format.eCompressionFormat = MJPEG;
+	} else {
+		format.eCompressionFormat = H264;
+	}
+
 	if (fpsden <= 0 || fpsnum <= 0) {
 		fpsden = 1;
 		fpsnum = 25;
@@ -76,7 +85,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	CHECKED(ret != 0, "ILCient video_encode component creation failed.");
 
 	//Set input definition to the encoder
-	OMX_PARAM_PORTDEFINITIONTYPE def = {};
+	OMX_PARAM_PORTDEFINITIONTYPE def = { };
 	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
 	def.nVersion.nVersion = OMX_VERSION;
 	def.nPortIndex = OMX_ENCODE_PORT_IN;
@@ -104,12 +113,15 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 			"OMX_SetParameter failed for input format definition.");
 
 	//Set the output format of the encoder
-	OMX_VIDEO_PARAM_PORTFORMATTYPE format = {};
+	OMX_VIDEO_PARAM_PORTFORMATTYPE format = { };
 	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
 	format.nVersion.nVersion = OMX_VERSION;
 	format.nPortIndex = OMX_ENCODE_PORT_OUT;
-	format.eCompressionFormat = OMX_VIDEO_CodingAVC;
-	//format.eCompressionFormat = OMX_VIDEO_CodingMPEG4;
+	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+		format.eCompressionFormat = OMX_VIDEO_CodingMJPEG;
+	} else {
+		format.eCompressionFormat = OMX_VIDEO_CodingAVC;
+	}
 
 	ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
 			OMX_IndexParamVideoPortFormat, &format);
@@ -117,7 +129,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 			"OMX_SetParameter failed for setting encoder output format.");
 
 	//Set the encoding bitrate
-	OMX_VIDEO_PARAM_BITRATETYPE bitrate_type = {};
+	OMX_VIDEO_PARAM_BITRATETYPE bitrate_type = { };
 	bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
 	bitrate_type.nVersion.nVersion = OMX_VERSION;
 	bitrate_type.eControlRate = OMX_Video_ControlRateVariable;
@@ -185,10 +197,22 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 			OMX_StateExecuting);
 	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
 
-	m_ofstream.open(m_filename, std::ios::out);
+	if (mcodec_type == JPEG) {
+	} else {
+		m_ofstream.open(m_filename, std::ios::out);
+	}
 
 	//Start the worker thread for dumping the encoded data
 	m_input_worker = std::thread(&OmxCvImpl::input_worker, this);
+
+	//for jpeg
+	image_buff = NULL;
+	image_buff_size = 0;
+	image_buff_cur = 0;
+	image_start = -1;
+	data_len_total = 0;
+	marker = 0;
+	soicount = 0;
 }
 
 /**
@@ -236,18 +260,18 @@ void OmxCvImpl::input_worker() {
 			}
 		}
 
-		//auto proc_start = steady_clock::now();
+//auto proc_start = steady_clock::now();
 		std::pair<OMX_BUFFERHEADERTYPE *, int64_t> frame =
 				m_input_queue.front();
 		m_input_queue.pop_front();
 		lock.unlock();
 
-		//auto conv_start = steady_clock::now();
-		//static int framecounter = 0;
+//auto conv_start = steady_clock::now();
+//static int framecounter = 0;
 
 		OMX_EmptyThisBuffer(ILC_GET_HANDLE(m_encoder_component), frame.first);
-		//fflush(stdout);
-		//printf("Encoding time (ms): %d [%d]\r", (int)TIMEDIFF(conv_start), ++framecounter);
+//fflush(stdout);
+//printf("Encoding time (ms): %d [%d]\r", (int)TIMEDIFF(conv_start), ++framecounter);
 		do {
 			out->nFilledLen = 0; //I don't think this is necessary, but whatever.
 			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), out);
@@ -256,7 +280,7 @@ void OmxCvImpl::input_worker() {
 		} while (!write_data(out, frame.second));
 
 		lock.lock();
-		//printf("Total processing time (ms): %d\n", (int)TIMEDIFF(proc_start));
+//printf("Total processing time (ms): %d\n", (int)TIMEDIFF(proc_start));
 	}
 
 	//Needed because we call ilclient_get_output_buffer last.
@@ -273,8 +297,61 @@ void OmxCvImpl::input_worker() {
 bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 
 	if (out->nFilledLen != 0) {
-		//printf("write data : %d\n", (int)out->nFilledLen);
-		m_ofstream.write((const char*)out->pBuffer, (int)out->nFilledLen);
+		if (mcodec_type == JPEG) {
+			unsigned char buff = out->pBuffer;
+			int data_len = out->nFilledLen;
+			for (int i = 0; i < data_len; i++) {
+				if (marker) {
+					marker = 0;
+					if (buff[i] == 0xd8) { //SOI
+						if (soicount == 0) {
+							image_start = data_len_total + (i - 1);
+						}
+						soicount++;
+					}
+					if (buff[i] == 0xd9 && image_start >= 0) { //EOI
+						soicount--;
+						if (soicount == 0) {
+							int image_size = (data_len_total + i + 1)
+									- image_start;
+							if (image_buff == NULL) { //just allocate image buffer
+								image_buff_size = image_size * 2;
+							} else {
+								memcpy(image_buff + image_buff_cur, buff, i);
+								m_ofstream.open(m_filename, std::ios::out);
+								m_ofstream.write((const char*) out->pBuffer, (int) out->nFilledLen);
+								m_ofstream.close();
+								free(image_buff);
+							}
+							image_buff_cur = 0;
+							image_buff = malloc(image_buff_size);
+							image_start = -1;
+						}
+					}
+				} else if (buff[i] == 0xff) {
+					marker = 1;
+				}
+			}
+			if (image_buff != NULL && image_start >= 0) {
+				if (image_buff_cur + data_len > image_buff_size) { //exceed buffer size
+					free (image_buff);
+					image_buff = NULL;
+					image_buff_size = 0;
+					image_buff_cur = 0;
+				} else if (image_start > data_len_total) { //soi
+					memcpy(image_buff, buff + (image_start - data_len_total),
+							data_len - (image_start - data_len_total));
+					image_buff_cur = data_len - (image_start - data_len_total);
+				} else {
+					memcpy(image_buff + image_buff_cur, buff, data_len);
+					image_buff_cur += data_len;
+				}
+			}
+			data_len_total += data_len;
+		} else {
+			//printf("write data : %d\n", (int)out->nFilledLen);
+			m_ofstream.write((const char*) out->pBuffer, (int) out->nFilledLen);
+		}
 		return true;
 	} else {
 		printf("write data : return false\n");
