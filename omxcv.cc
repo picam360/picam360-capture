@@ -56,10 +56,11 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	int ret;
 	bcm_host_init();
 
-	if (m_filename.substr(-5) == ".jpeg" || m_filename.substr(-4) == ".jpg") {
+	std::string extention = m_filename.substr(fn.find_last_of(".") + 1);
+	std::transform(extention.cbegin(), extention.cend(), extention.begin(), tolower);
+	if (extention == ".jpeg" || extention == ".jpg") {
 		mcodec_type = JPEG;
-	} else if (m_filename.substr(-6) == ".mjpeg"
-			|| m_filename.substr(-5) == ".mjpg") {
+	} else if (extention == ".mjpeg" || extention == ".mjpg") {
 		mcodec_type = MJPEG;
 	} else {
 		mcodec_type = H264;
@@ -319,12 +320,14 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 							} else {
 								memcpy(image_buff + image_buff_cur, buff, i);
 								m_ofstream.open(m_filename, std::ios::out);
-								m_ofstream.write((const char*) out->pBuffer, (int) out->nFilledLen);
+								m_ofstream.write((const char*) out->pBuffer,
+										(int) out->nFilledLen);
 								m_ofstream.close();
 								free(image_buff);
 							}
 							image_buff_cur = 0;
-							image_buff = (unsigned char*)malloc(image_buff_size);
+							image_buff = (unsigned char*) malloc(
+									image_buff_size);
 							image_start = -1;
 						}
 					}
@@ -334,7 +337,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 			}
 			if (image_buff != NULL && image_start >= 0) {
 				if (image_buff_cur + data_len > image_buff_size) { //exceed buffer size
-					free (image_buff);
+					free(image_buff);
 					image_buff = NULL;
 					image_buff_size = 0;
 					image_buff_cur = 0;
