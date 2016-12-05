@@ -57,12 +57,12 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	bcm_host_init();
 
 	if (m_filename.substr(-5) == ".jpeg" || m_filename.substr(-4) == ".jpg") {
-		format.eCompressionFormat = JPEG;
+		mcodec_type = JPEG;
 	} else if (m_filename.substr(-6) == ".mjpeg"
 			|| m_filename.substr(-5) == ".mjpg") {
-		format.eCompressionFormat = MJPEG;
+		mcodec_type = MJPEG;
 	} else {
-		format.eCompressionFormat = H264;
+		mcodec_type = H264;
 	}
 
 	if (fpsden <= 0 || fpsnum <= 0) {
@@ -298,7 +298,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 
 	if (out->nFilledLen != 0) {
 		if (mcodec_type == JPEG) {
-			unsigned char buff = out->pBuffer;
+			unsigned char *buff = out->pBuffer;
 			int data_len = out->nFilledLen;
 			for (int i = 0; i < data_len; i++) {
 				if (marker) {
@@ -324,7 +324,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 								free(image_buff);
 							}
 							image_buff_cur = 0;
-							image_buff = malloc(image_buff_size);
+							image_buff = (unsigned char*)malloc(image_buff_size);
 							image_start = -1;
 						}
 					}
