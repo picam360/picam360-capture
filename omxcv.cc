@@ -57,7 +57,8 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	bcm_host_init();
 
 	std::string extention = m_filename.substr(m_filename.find_last_of(".") + 1);
-	std::transform(extention.cbegin(), extention.cend(), extention.begin(), tolower);
+	std::transform(extention.cbegin(), extention.cend(), extention.begin(),
+			tolower);
 	if (extention == "jpeg" || extention == "jpg") {
 		mcodec_type = JPEG;
 	} else if (extention == "mjpeg" || extention == "mjpg") {
@@ -315,8 +316,11 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 						if (soicount == 0) {
 							int image_size = (data_len_total + i + 1)
 									- image_start;
-							if (image_buff == NULL) { //just allocate image buffer
+							if (image_size > image_buff_size) { //just allocate image buffer
 								image_buff_size = image_size * 2;
+								if (image_buff != NULL) {
+									free(image_buff);
+								}
 							} else {
 								memcpy(image_buff + image_buff_cur, buff, i);
 								m_ofstream.open(m_filename, std::ios::out);
