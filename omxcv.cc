@@ -56,11 +56,11 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	int ret;
 	bcm_host_init();
 
-	std::string extention = m_filename.substr(fn.find_last_of(".") + 1);
+	std::string extention = m_filename.substr(m_filename.find_last_of(".") + 1);
 	std::transform(extention.cbegin(), extention.cend(), extention.begin(), tolower);
-	if (extention == ".jpeg" || extention == ".jpg") {
+	if (extention == "jpeg" || extention == "jpg") {
 		mcodec_type = JPEG;
-	} else if (extention == ".mjpeg" || extention == ".mjpg") {
+	} else if (extention == "mjpeg" || extention == "mjpg") {
 		mcodec_type = MJPEG;
 	} else {
 		mcodec_type = H264;
