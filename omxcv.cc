@@ -98,7 +98,11 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	def.format.video.nFrameWidth = m_width;
 	def.format.video.nFrameHeight = m_height;
-	def.format.video.xFramerate = 30 << 16;
+	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+		def.format.video.xFramerate = 10 << 16;
+	} else {
+		def.format.video.xFramerate = 30 << 16;
+	}
 	//Must be a multiple of 16
 	def.format.video.nSliceHeight = (m_height + 15) & ~15;
 	//Must be a multiple of 32
@@ -135,7 +139,11 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
 	bitrate_type.nVersion.nVersion = OMX_VERSION;
 	bitrate_type.eControlRate = OMX_Video_ControlRateVariable;
-	bitrate_type.nTargetBitrate = bitrate * 1000;
+	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+		bitrate_type.nTargetBitrate = 8 * 1000 * 1000;
+	} else {
+		bitrate_type.nTargetBitrate = bitrate * 1000;
+	}
 	bitrate_type.nPortIndex = OMX_ENCODE_PORT_OUT;
 	ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
 			OMX_IndexParamVideoBitrate, &bitrate_type);
@@ -328,6 +336,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 										(int) out->nFilledLen);
 								m_ofstream.close();
 								free(image_buff);
+//printf("save frame\n");
 							}
 							image_buff_cur = 0;
 							image_buff = (unsigned char*) malloc(
@@ -364,6 +373,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 		printf("write data : return false\n");
 		return true;
 	}
+	out->nFilledLen = 0;
 }
 
 /**
