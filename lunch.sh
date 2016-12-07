@@ -77,9 +77,9 @@ if [ $REMOTE = true ]; then
 	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &
 elif [ $DIRECT = ]; then
 	if [ $CODEC = "MJPEG" ]; then
-		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -fps $FPS -o - > cam0 &
+		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -b $BITRATE -fps $FPS -o - > cam0 &
 	else
-		raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ih -b $BITRATE -fps $FPS -o - > cam0 &
+		raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -ih -b $BITRATE -fps $FPS -o - > cam0 &
 	fi
 fi
 
