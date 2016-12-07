@@ -49,6 +49,14 @@ void _init_device() {
 }
 
 void init_device() {
+	//reset quat x=90 y=0 z=0
+	{
+		quat[0] = 0.70711;
+		quat[1] = 0;
+		quat[2] = 0;
+		quat[3] = 0.70711;
+	}
+
 	dev = openRift(0, 0);
 
 	if (dev == NULL) {
@@ -72,17 +80,19 @@ float *_get_quatanion() {
 	quat[3] = (float) _q[0] / (1 << 30);
 	return quat;
 }
+
 float *get_quatanion() {
-	if (dev == NULL) {
-		//x=90 y=0 z=0
-		quat[0] = 0.70711;
-		quat[1] = 0;
-		quat[2] = 0;
-		quat[3] = 0.70711;
-	}else{
+	//update
+	if (dev != NULL) {
 		for (int i = 0; i < 4; i++) {
 			quat[i] = dev->Q[i];
 		}
 	}
 	return quat;
+}
+
+void set_quatanion(float *_quat) {
+	for (int i = 0; i < 4; i++) {
+		quat[i] = _quat[i];
+	}
 }

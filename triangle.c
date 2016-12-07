@@ -435,9 +435,9 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
-	mat4_rotateZ(camera_matrix, camera_matrix, 0);
-	mat4_rotateY(camera_matrix, camera_matrix, 0);
-	mat4_rotateX(camera_matrix, camera_matrix, lg_options.cam_offset_roll[0]);
+	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_yaw);
+	mat4_rotateY(camera_matrix, camera_matrix, state->camera_pitch);
+	mat4_rotateX(camera_matrix, camera_matrix, state->camera_roll + lg_options.cam_offset_roll[0]);
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
@@ -910,6 +910,17 @@ int main(int argc, char *argv[]) {
 					frame_elapsed /= frame_num;
 					printf("stop record : frame num : %d : fps %.3lf\n",
 							frame_num, 1000.0 / frame_elapsed);
+				}
+			} else if (strncmp(cmd, "set_orientation", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					float roll;
+					float pitch;
+					float yaw;
+					sscanf(param, "%f,%f,%f", &roll, &pitch, &yaw);
+					state->camera_roll = roll * M_PI / 180.0;
+					state->camera_pitch = pitch * M_PI / 180.0;
+					state->camera_yaw = yaw * M_PI / 180.0;
 				}
 			} else {
 				printf("unknown command : %s\n", buff);

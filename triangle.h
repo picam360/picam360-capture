@@ -89,4 +89,8 @@ typedef struct {
 	bool recording;
 	bool snap;
 	char snap_save_path[256];
+
+	float camera_roll;
+	float camera_pitch;
+	float camera_yaw;
 } CUBE_STATE_T;
