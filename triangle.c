@@ -435,8 +435,8 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
-	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_yaw);
-	mat4_rotateY(camera_matrix, camera_matrix, state->camera_pitch);
+	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);//vertical asis is y
+	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_pitch);//depth axis is z
 	mat4_rotateX(camera_matrix, camera_matrix, state->camera_roll + lg_options.cam_offset_roll[0]);
 
 	mat4 unif_matrix = mat4_create();
@@ -921,6 +921,7 @@ int main(int argc, char *argv[]) {
 					state->camera_roll = roll * M_PI / 180.0;
 					state->camera_pitch = pitch * M_PI / 180.0;
 					state->camera_yaw = yaw * M_PI / 180.0;
+					printf("set_camera_orientation\n");
 				}
 			} else {
 				printf("unknown command : %s\n", buff);
