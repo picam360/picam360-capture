@@ -911,7 +911,7 @@ int main(int argc, char *argv[]) {
 					printf("stop record : frame num : %d : fps %.3lf\n",
 							frame_num, 1000.0 / frame_elapsed);
 				}
-			} else if (strncmp(cmd, "set_orientation", sizeof(buff)) == 0) {
+			} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
 					float roll;
