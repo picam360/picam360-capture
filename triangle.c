@@ -856,34 +856,6 @@ int main(int argc, char *argv[]) {
 				state->active_cam = 0;
 			} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
 				state->active_cam = 1;
-			} else if (state->operation_mode == CALIBRATION) {
-				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
-					char *param = strtok(NULL, " \n");
-					if (param != NULL) {
-						sscanf(param, "%lf", &calib_step);
-					}
-				}
-				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[state->active_cam] -= calib_step;
-				}
-				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
-					lg_options.cam_offset_y[state->active_cam] += calib_step;
-				}
-				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[state->active_cam] += calib_step;
-				}
-				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
-					lg_options.cam_offset_x[state->active_cam] -= calib_step;
-				}
-				if (strncmp(cmd, "s", sizeof(buff)) == 0) {
-					lg_options.sharpness_gain += calib_step;
-				}
-				if (strncmp(cmd, "w", sizeof(buff)) == 0) {
-					lg_options.sharpness_gain -= calib_step;
-				}
-				if (strncmp(cmd, "save", sizeof(buff)) == 0) {
-					save_options(state);
-				}
 			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
@@ -922,6 +894,34 @@ int main(int argc, char *argv[]) {
 					state->camera_pitch = pitch * M_PI / 180.0;
 					state->camera_yaw = yaw * M_PI / 180.0;
 					printf("set_camera_orientation\n");
+				}
+			} else if (state->operation_mode == CALIBRATION) {
+				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
+					char *param = strtok(NULL, " \n");
+					if (param != NULL) {
+						sscanf(param, "%lf", &calib_step);
+					}
+				}
+				if (strncmp(cmd, "u", sizeof(buff)) == 0) {
+					lg_options.cam_offset_y[state->active_cam] -= calib_step;
+				}
+				if (strncmp(cmd, "d", sizeof(buff)) == 0) {
+					lg_options.cam_offset_y[state->active_cam] += calib_step;
+				}
+				if (strncmp(cmd, "l", sizeof(buff)) == 0) {
+					lg_options.cam_offset_x[state->active_cam] += calib_step;
+				}
+				if (strncmp(cmd, "r", sizeof(buff)) == 0) {
+					lg_options.cam_offset_x[state->active_cam] -= calib_step;
+				}
+				if (strncmp(cmd, "s", sizeof(buff)) == 0) {
+					lg_options.sharpness_gain += calib_step;
+				}
+				if (strncmp(cmd, "w", sizeof(buff)) == 0) {
+					lg_options.sharpness_gain -= calib_step;
+				}
+				if (strncmp(cmd, "save", sizeof(buff)) == 0) {
+					save_options(state);
 				}
 			} else {
 				printf("unknown command : %s\n", buff);
