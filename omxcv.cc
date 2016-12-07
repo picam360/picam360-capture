@@ -393,6 +393,12 @@ bool OmxCvImpl::process(const unsigned char *in_data) {
 	memcpy(in->pBuffer, in_data, m_stride * m_height);
 	//BGR2RGB(mat, in->pBuffer, m_stride);
 	in->nFilledLen = in->nAllocLen;
+	if (m_frame_count == 0) {
+		in->nFlags = OMX_BUFFERFLAG_STARTTIME;
+	} else {
+		in->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
+	}
+	in->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
 	std::unique_lock < std::mutex > lock(m_input_mutex);
 	if (m_frame_count++ == 0) {
