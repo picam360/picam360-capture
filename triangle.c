@@ -164,15 +164,6 @@ static void init_ogl(CUBE_STATE_T *state) {
 			&state->screen_height);
 	assert(success >= 0);
 
-	if (state->render_width == 0) {
-		state->render_width = 800 / 2;
-		state->render_height = 800 * state->screen_height / state->screen_width;
-		//state->render_width = state->screen_width / 2;
-		//state->render_height = state->screen_height / 1;
-	}
-
-	printf("width=%d,height=%d\n", state->render_width, state->render_height);
-
 	dst_rect.x = 0;
 	dst_rect.y = 0;
 	dst_rect.width = state->screen_width;
@@ -740,24 +731,18 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-bool setRenderSize(int render_width, int render_height) {
-	if (render_width >= 4096 || render_height >= 2048) {
+bool setRenderSize(CUBE_STATE_T *state, int render_width, int render_height) {
+	if (render_width >= 2048 || render_height >= 1024) {
 		return false;
-	} else if (render_width >= 2048) { //split rendering
-		state->render_width = render_width / 2;
-		state->render_height = render_height;
-		state->double_size = true;
 	} else {
 		state->render_width = render_width;
 		state->render_height = render_height;
-		state->double_size = false;
 	}
+
+	printf("width=%d,height=%d\n", state->render_width, state->render_height);
 
 	if (state->render_texture) {
 		glDeleteTextures(1, &state->render_texture);
-	}
-	if (state->render_double_texture) {
-		glDeleteTextures(1, &state->render_double_texture);
 	}
 
 	glGenTextures(1, &state->render_texture);
@@ -770,6 +755,10 @@ bool setRenderSize(int render_width, int render_height) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	if (state->render_double_texture) {
+		glDeleteTextures(1, &state->render_double_texture);
+	}
 
 	glGenTextures(1, &state->render_double_texture);
 	glBindTexture(GL_TEXTURE_2D, state->render_double_texture);
@@ -788,9 +777,9 @@ bool setRenderSize(int render_width, int render_height) {
 int main(int argc, char *argv[]) {
 	bool res;
 	int opt;
-	int render_width = 0;
-	int render_height = 0;
-// Clear application state
+	int render_width = 512;
+	int render_height = 512;
+	// Clear application state
 	memset(state, 0, sizeof(*state));
 	state->cam_width = 1024;
 	state->cam_height = 1024;
@@ -853,25 +842,25 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	//set render size
-	res = setRenderSize(render_width, render_height);
-	if (!res) {
-		printf("render size error");
-		exit(-1);
-	}
-
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
 
 	init_device();
 
-// Start OGLES
+	// Start OGLES
 	init_ogl(state);
 
-// Setup the model world
+	//set render size. this should be after init_ogl()
+	res = setRenderSize(state, render_width, render_height);
+	if (!res) {
+		printf("render size error");
+		exit(-1);
+	}
+
+	// Setup the model world
 	init_model_proj(state);
 
-// initialise the OGLES texture(s)
+	// initialise the OGLES texture(s)
 	init_textures(state);
 
 	double calib_step = 0.01;
@@ -966,7 +955,7 @@ int main(int argc, char *argv[]) {
 					int render_width;
 					int render_height;
 					sscanf(param, "%d,%d", &render_width, &render_height);
-					res = setRenderSize(render_width, render_height);
+					res = setRenderSize(state, render_width, render_height);
 					if (!res) {
 						printf("error in %s\n", param);
 					}

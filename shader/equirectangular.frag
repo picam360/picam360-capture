@@ -33,8 +33,8 @@ void main(void) {
 	float roll = asin(pos.y);
 	float yaw = atan(pos.x, pos.z); //yaw starts from z
 
-	if (split != 0) {
-		yaw = yaw / 2 + M_PI * split;
+	if (split != 0.0) {
+		yaw = yaw / 2.0 + M_PI * split;
 	}
 
 	float r = (M_PI / 2.0 - roll) / M_PI;
