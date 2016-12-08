@@ -203,15 +203,6 @@ static void init_ogl(CUBE_STATE_T *state) {
 	result = eglMakeCurrent(state->display, state->surface, state->surface,
 			state->context);
 	assert(EGL_FALSE != result);
-
-	//texture rendering
-	glGenFramebuffers(1, &state->framebuffer);
-
-	// Set background color and clear buffers
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-	// Enable back face culling.
-	glEnable(GL_CULL_FACE);
 }
 
 int load_texture(const char *filename, GLuint *tex_out) {
@@ -744,6 +735,13 @@ bool setRenderSize(CUBE_STATE_T *state, int render_width, int render_height) {
 	printf("width=%d,height=%d\n", state->render_width, state->render_height);
 
 	if (state->render_texture) {
+		glDeleteFramebuffers(1, &state->framebuffer);
+	}
+
+	//texture rendering
+	glGenFramebuffers(1, &state->framebuffer);
+
+	if (state->render_texture) {
 		glDeleteTextures(1, &state->render_texture);
 	}
 
@@ -754,7 +752,7 @@ bool setRenderSize(CUBE_STATE_T *state, int render_width, int render_height) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->render_width,
 			state->render_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
-		printf("glTexImage2D failed. Could not allocate texture buffer.");
+		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -769,9 +767,24 @@ bool setRenderSize(CUBE_STATE_T *state, int render_width, int render_height) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->render_width,
 			state->render_height * 2, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
-		printf("glTexImage2D failed. Could not allocate texture buffer.");
+		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+			state->render_texture, 0);
+	if (glGetError() != GL_NO_ERROR) {
+		printf(
+				"glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Set background color and clear buffers
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+	// Enable back face culling.
+	glEnable(GL_CULL_FACE);
 
 	return true;
 }
