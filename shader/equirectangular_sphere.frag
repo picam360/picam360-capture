@@ -3,7 +3,7 @@ uniform mat4 unif_matrix;
 uniform sampler2D cam0_texture;
 uniform sampler2D cam1_texture;
 uniform float pixel_size;
-uniform int split;
+uniform float split;
 //options start
 uniform float sharpness_gain;
 uniform float cam0_offset_yaw;
@@ -18,7 +18,6 @@ uniform float cam1_horizon_r;
 
 const float overlap = 0.03;
 const float M_PI = 3.1415926535;
-//const float aspect = 480.0 / 640.0;
 const float color_offset = 0.15;
 const float color_factor = 1.0 / (1.0 - color_offset);
 

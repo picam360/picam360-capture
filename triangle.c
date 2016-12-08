@@ -397,7 +397,8 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 			state->render_texture, 0);
 	if (glGetError() != GL_NO_ERROR) {
 		printf(
-				"glFramebufferTexture2D failed. Could not allocate framebuffer.");
+				"glFramebufferTexture2D failed. Could not allocate framebuffer. %d",
+				state->render_texture);
 	}
 
 	glViewport(0, 0, state->render_width, state->render_height);
@@ -430,13 +431,13 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
 
 	//Load in the texture and thresholding parameters.
+	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "scale"),
 			state->render_vbo_scale);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
 			1.0 / state->cam_width);
 
 	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
-	glUniform1i(glGetUniformLocation(program, "split"), state->split);
 
 	//options start
 	glUniform1f(glGetUniformLocation(program, "sharpness_gain"),

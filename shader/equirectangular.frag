@@ -3,7 +3,7 @@ uniform mat4 unif_matrix;
 uniform sampler2D cam_texture;
 uniform sampler2D logo_texture;
 uniform float pixel_size;
-uniform int split;
+uniform float split;
 //options start
 uniform float sharpness_gain;
 uniform float cam_offset_yaw;
@@ -13,14 +13,10 @@ uniform float cam_horizon_r;
 //options end
 
 const float M_PI = 3.1415926535;
-//const float aspect = 480.0 / 640.0;
-const float aspect = 1.0;
 const float color_offset = 0.15;
 const float color_factor = 1.0 / (1.0 - color_offset);
 
 void main(void) {
-	float u_factor = aspect * cam_horizon_r;
-	float v_factor = cam_horizon_r;
 	float u = 0.0;
 	float v = 0.0;
 	vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
@@ -54,8 +50,8 @@ void main(void) {
 	}
 
 	float yaw2 = yaw + M_PI + cam_offset_yaw;
-	u = u_factor * r * cos(yaw2) + 0.5 + cam_offset_x;
-	v = v_factor * r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
+	u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;
+	v = cam_horizon_r * r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 		u = 0.0;
 		v = 0.0;
@@ -83,16 +79,16 @@ void main(void) {
 		fc = (fc - color_offset) * color_factor;
 		if (r >= 0.45) {
 			float r_r = pow(r - 0.45, 1.006) + 0.45;
-			u = u_factor * r_r * cos(yaw2) + 0.5 + cam_offset_x;
-			v = v_factor * r_r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
+			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
 			vec4 fc_b = texture2D(cam_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
 			fc.z = fc_b.z;
 
 			r_r = pow(r - 0.45, 1.003) + 0.45;
-			u = u_factor * r_r * cos(yaw2) + 0.5 + cam_offset_x;
-			v = v_factor * r_r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
+			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y;//cordinate is different
 			fc_b = texture2D(cam_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
