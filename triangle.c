@@ -393,6 +393,7 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 
+	glBindTexture(GL_TEXTURE_2D, state->render_texture);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 			state->render_texture, 0);
 	if (glGetError() != GL_NO_ERROR) {
