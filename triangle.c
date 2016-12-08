@@ -384,15 +384,6 @@ static void redraw_render_texture(CUBE_STATE_T *state) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
 
-	glBindTexture(GL_TEXTURE_2D, state->render_texture);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-			state->render_texture, 0);
-	if (glGetError() != GL_NO_ERROR) {
-		printf(
-				"glFramebufferTexture2D failed. Could not allocate framebuffer. %d",
-				state->render_texture);
-	}
-
 	glViewport(0, 0, state->render_width, state->render_height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, state->render_vbo_ary[state->operation_mode]);
