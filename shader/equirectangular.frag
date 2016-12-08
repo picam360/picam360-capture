@@ -3,6 +3,7 @@ uniform mat4 unif_matrix;
 uniform sampler2D cam_texture;
 uniform sampler2D logo_texture;
 uniform float pixel_size;
+uniform int split;
 //options start
 uniform float sharpness_gain;
 uniform float cam_offset_yaw;
@@ -31,6 +32,10 @@ void main(void) {
 	pos = unif_matrix * pos;
 	float roll = asin(pos.y);
 	float yaw = atan(pos.x, pos.z); //yaw starts from z
+
+	if (split != 0) {
+		yaw = yaw / 2 + M_PI * split;
+	}
 
 	float r = (M_PI / 2.0 - roll) / M_PI;
 	if (r > 0.65) {

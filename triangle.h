@@ -32,15 +32,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "EGL/eglext.h"
 
 #define MAX_CAM_NUM 2
-#define MAX_OPERATION_NUM 4
+#define MAX_OPERATION_NUM 5
 
 enum OPERATION_MODE {
-	WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
+	BOARD, WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
 };
 enum CODEC_TYPE {
 	H264, MJPEG
 };
 typedef struct {
+	int split;
 	bool preview;
 	bool stereo;
 	bool video_direct;
@@ -58,21 +59,17 @@ typedef struct {
 	EGLSurface surface;
 	EGLContext context;
 	struct {
-		void *render;
 		void *render_ary[MAX_OPERATION_NUM];
-		void *stereo;
 	} program;
-	GLuint render_vbo;
-	GLuint render_vbo_nop;
 	GLuint render_vbo_ary[MAX_OPERATION_NUM];
 	GLuint render_vbo_nop_ary[MAX_OPERATION_NUM];
 	float render_vbo_scale;
-	GLuint stereo_vbo;
-	GLuint stereo_vbo_nop;
 	int num_of_cam;
 	GLuint cam_texture[MAX_CAM_NUM];
 	GLuint logo_texture;
+	GLuint calibration_texture;
 	GLuint render_texture;
+	GLuint render_double_texture;
 	GLuint framebuffer;
 // model rotation vector and direction
 	GLfloat rot_angle_x_inc;
@@ -89,6 +86,7 @@ typedef struct {
 	bool recording;
 	bool snap;
 	char snap_save_path[256];
+	bool double_size;
 
 	float camera_roll;
 	float camera_pitch;
