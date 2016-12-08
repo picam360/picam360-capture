@@ -740,7 +740,7 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-bool setRenderSize(int render_width, render_height) {
+bool setRenderSize(int render_width, int render_height) {
 	if (render_width >= 4096 || render_height >= 2048) {
 		return false;
 	} else if (render_width >= 2048) { //split rendering
@@ -881,7 +881,7 @@ int main(int argc, char *argv[]) {
 	double elapsed_ms;
 	int size = state->render_width * state->render_height * 3;
 	unsigned char *image_buffer = (unsigned char*) malloc(size);
-	unsigned char *image_buffer_double_size = (unsigned char*) malloc(size * 2);
+	unsigned char *image_buffer_double = (unsigned char*) malloc(size * 2);
 
 	while (!terminate) {
 		if (inputAvailable()) {
