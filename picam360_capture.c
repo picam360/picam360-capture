@@ -605,7 +605,9 @@ bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 
 int main(int argc, char *argv[]) {
 	MODEL_T model_data[MAX_OPERATION_NUM] = { };
-	FRAME_T frame_data[2] = { };
+	FRAME_T frame_data_window = { };
+	FRAME_T frame_data_equirectangular = { };
+	FRAME_T frame_data_equirectangular_double = { };
 	bool res;
 	int opt;
 	int render_width = 512;
@@ -684,12 +686,19 @@ int main(int argc, char *argv[]) {
 	printf("width=%d,height=%d\n", render_width, render_height);
 
 	//set render size. this should be after init_ogl()
-	res = init_frame(state, &frame_data[0], render_width, render_height);
+	res = init_frame(state, &frame_data_window, render_width, render_height);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
 	}
-	res = init_frame(state, &frame_data[1], render_width, render_height * 2);
+	res = init_frame(state, &frame_data_equirectangular, state->camera_width,
+			state->camera_height);
+	if (!res) {
+		printf("render size error");
+		exit(-1);
+	}
+	res = init_frame(state, &frame_data_equirectangular_double,
+			state->camera_width, state->camera_height * 2);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
@@ -758,6 +767,7 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
+					frame_data_preview = &frame_data_window;
 					switch (param[0]) {
 					case 'W':
 						state->operation_mode = WINDOW;
@@ -797,12 +807,14 @@ int main(int argc, char *argv[]) {
 					sscanf(param, "%d,%d", &render_width, &render_height);
 
 					//set render size. this should be after init_ogl()
-					res = init_frame(state, &frame_data[0], render_width, render_height);
+					res = init_frame(state, &frame_data[0], render_width,
+							render_height);
 					if (!res) {
 						printf("render size error");
 						exit(-1);
 					}
-					res = init_frame(state, &frame_data[1], render_width, render_height * 2);
+					res = init_frame(state, &frame_data[1], render_width,
+							render_height * 2);
 					if (!res) {
 						printf("render size error");
 						exit(-1);
@@ -860,18 +872,23 @@ int main(int argc, char *argv[]) {
 				printf("unknown command : %s\n", buff);
 			}
 		}
+		FRAME_T *frame =
+				(state->operation_mode == EQUIRECTANGULAR) ?
+						&frame_data_equirectangular_double : &frame_data_window;
 		gettimeofday(&s, NULL);
 		if (state->preview) {
-			redraw_render_texture(state, &frame_data[0], &model_data[state->operation_mode]);
-			redraw_scene(state, &frame_data[0], &model_data[state->operation_mode]);
+			redraw_render_texture(state, frame,
+					&model_data[state->operation_mode]);
+			redraw_scene(state, frame, &model_data[state->operation_mode]);
 		}
 		if (state->recording || state->snap) {
 			int img_width;
 			int img_height;
 			unsigned char *img_buff;
 
-			if (state->double_size) {
-				FRAME_T *frame = &frame_data[1];
+			if (state->operation_mode == EQUIRECTANGULAR
+					&& state->double_size) {
+				frame = &frame_data_equirectangular_double;
 				int size = frame->width * frame->height * 3;
 				unsigned char *image_buffer = (unsigned char*) malloc(size);
 				unsigned char *image_buffer_double = (unsigned char*) malloc(
@@ -881,7 +898,8 @@ int main(int argc, char *argv[]) {
 				img_buff = image_buffer_double;
 				for (int split = 0; split < 2; split++) {
 					state->split = split + 1;
-					redraw_render_texture(state, &frame_data[1], &model_data[state->operation_mode]);
+					redraw_render_texture(state, frame,
+							&model_data[state->operation_mode]);
 					glFinish();
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
@@ -897,14 +915,14 @@ int main(int argc, char *argv[]) {
 				}
 				free(image_buffer);
 			} else {
-				FRAME_T *frame = &frame_data[0];
 				int size = frame->width * frame->height * 3;
 				unsigned char *image_buffer = (unsigned char*) malloc(size);
 				img_width = frame->width;
 				img_height = frame->height;
 				img_buff = image_buffer;
 				if (!state->preview) {
-					redraw_render_texture(state, &frame_data[0], &model_data[state->operation_mode]);
+					redraw_render_texture(state, frame,
+							&model_data[state->operation_mode]);
 					glFinish();
 				}
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
