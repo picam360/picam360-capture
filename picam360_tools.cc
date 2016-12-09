@@ -26,14 +26,12 @@ using std::chrono::duration_cast;
 //structure difinition
 
 //global variables
-static int JPEG_QUALITY = 90;
 
-static OmxCvJpeg *encoder = NULL;
 static OmxCv *recorder = NULL;
 
-int StartRecord(const int width, const int height, const char *filename, int bitrate_kbps) {
-	recorder = new OmxCv(filename, width,
-			height, bitrate_kbps);
+int StartRecord(const int width, const int height, const char *filename,
+		int bitrate_kbps) {
+	recorder = new OmxCv(filename, width, height, bitrate_kbps);
 	return 0;
 }
 
@@ -54,21 +52,12 @@ int AddFrame(const unsigned char *in_data) {
 	return 0;
 }
 
-int SaveJpeg(const unsigned char *in_data, const int width, const int height, const char *out_filename,
-		int quality) {
-	if (JPEG_QUALITY != quality) {
-		JPEG_QUALITY = quality;
-		if (encoder != NULL) {
-			delete encoder;
-			encoder = NULL;
-		}
-	}
-	if (encoder == NULL) {
-		encoder = new OmxCvJpeg(width, height,
-				JPEG_QUALITY);
-	}
+int SaveJpeg(const unsigned char *in_data, const int width, const int height,
+		const char *out_filename, int quality) {
+
+	OmxCvJpeg encoder(width, height, quality);
 	if (out_filename != NULL) {
-		if (encoder->Encode(out_filename, in_data)) {
+		if (encoder.Encode(out_filename, in_data)) {
 		} else {
 			perror("error on jpeg encode");
 			return -1;
