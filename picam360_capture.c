@@ -36,7 +36,6 @@
 #include <sys/time.h>
 #include <sys/select.h>
 #include <stdbool.h>
-#include <pthread.h>
 #include <linux/input.h>
 
 #include "bcm_host.h"
@@ -45,7 +44,7 @@
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 
-#include "triangle.h"
+#include "picam360_capture.h"
 #include "video.h"
 #include "video_mjpeg.h"
 #include "video_direct.h"
@@ -89,32 +88,32 @@ typedef struct {
 } OPTIONS_T;
 OPTIONS_T lg_options = { };
 
-static void init_ogl(CUBE_STATE_T *state);
-static void init_model_proj(CUBE_STATE_T *state);
-static void redraw_render_texture(CUBE_STATE_T *state);
-static void redraw_scene(CUBE_STATE_T *state);
-static void init_textures(CUBE_STATE_T *state);
-static void init_options(CUBE_STATE_T *state);
-static void save_options(CUBE_STATE_T *state);
+static void init_ogl(PICAM360CAPTURE_T *state);
+static void init_model_proj(PICAM360CAPTURE_T *state);
+static void init_textures(PICAM360CAPTURE_T *state);
+static void init_options(PICAM360CAPTURE_T *state);
+static void save_options(PICAM360CAPTURE_T *state);
 static void exit_func(void);
-static volatile int terminate;
-static CUBE_STATE_T _state, *state = &_state;
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
+		MODEL_T *model);
+static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
+		MODEL_T *model);
 
-static void* eglImage[MAX_CAM_NUM] = { };
-static pthread_t thread[MAX_CAM_NUM] = { };
+static volatile int terminate;
+static PICAM360CAPTURE_T _state, *state = &_state;
 
 /***********************************************************
  * Name: init_ogl
  *
  * Arguments:
- *       CUBE_STATE_T *state - holds OGLES model info
+ *       PICAM360CAPTURE_T *state - holds OGLES model info
  *
  * Description: Sets the display, OpenGL|ES context and screen stuff
  *
  * Returns: void
  *
  ***********************************************************/
-static void init_ogl(CUBE_STATE_T *state) {
+static void init_ogl(PICAM360CAPTURE_T *state) {
 	int32_t success = 0;
 	EGLBoolean result;
 	EGLint num_config;
@@ -174,7 +173,8 @@ static void init_ogl(CUBE_STATE_T *state) {
 	src_rect.width = state->screen_width << 16;
 	src_rect.height = state->screen_height << 16;
 
-	if (state->preview) {
+	//if (state->preview)
+	{
 		dispman_display = vc_dispmanx_display_open(0 /* LCD */);
 		dispman_update = vc_dispmanx_update_start(0);
 
@@ -190,19 +190,23 @@ static void init_ogl(CUBE_STATE_T *state) {
 
 		state->surface = eglCreateWindowSurface(state->display, config,
 				&nativewindow, NULL);
-	} else {
-		//Create an offscreen rendering surface
-		EGLint rendering_attributes[] = { EGL_WIDTH, state->screen_width,
-				EGL_HEIGHT, state->screen_height, EGL_NONE };
-		state->surface = eglCreatePbufferSurface(state->display, config,
-				rendering_attributes);
 	}
+//	else {
+//		//Create an offscreen rendering surface
+//		EGLint rendering_attributes[] = { EGL_WIDTH, state->screen_width,
+//				EGL_HEIGHT, state->screen_height, EGL_NONE };
+//		state->surface = eglCreatePbufferSurface(state->display, config,
+//				rendering_attributes);
+//	}
 	assert(state->surface != EGL_NO_SURFACE);
 
 	// connect the context to the surface
 	result = eglMakeCurrent(state->display, state->surface, state->surface,
 			state->context);
 	assert(EGL_FALSE != result);
+
+	// Enable back face culling.
+	glEnable(GL_CULL_FACE);
 }
 
 int load_texture(const char *filename, GLuint *tex_out) {
@@ -317,219 +321,56 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
  * Name: init_model_proj
  *
  * Arguments:
- *       CUBE_STATE_T *state - holds OGLES model info
+ *       PICAM360CAPTURE_T *state - holds OGLES model info
  *
  * Description: Sets the OpenGL|ES model to default values
  *
  * Returns: void
  *
  ***********************************************************/
-static void init_model_proj(CUBE_STATE_T *state) {
+static void init_model_proj(PICAM360CAPTURE_T *state, MODEL_T *model_data) {
 	float fov = 120.0;
 	float aspect = state->render_height / state->render_width;
 
-	board_mesh(&state->render_vbo_ary[EQUIRECTANGULAR],
-			&state->render_vbo_nop_ary[EQUIRECTANGULAR]);
+	board_mesh(&model_data[EQUIRECTANGULAR].vbo,
+			&model_data[EQUIRECTANGULAR].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new(
+		model_data[EQUIRECTANGULAR].program = GLProgram_new(
 				"shader/equirectangular.vert", "shader/equirectangular.frag");
 	} else {
-		state->program.render_ary[EQUIRECTANGULAR] = GLProgram_new(
+		model_data[EQUIRECTANGULAR].program = GLProgram_new(
 				"shader/equirectangular.vert",
 				"shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(&state->render_vbo_ary[FISHEYE],
-			&state->render_vbo_nop_ary[FISHEYE]);
-	state->program.render_ary[FISHEYE] = GLProgram_new("shader/fisheye.vert",
+	board_mesh(&model_data[FISHEYE].vbo, &model_data[FISHEYE].vbo_nop);
+	model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert",
 			"shader/fisheye.frag");
 
-	board_mesh(&state->render_vbo_ary[CALIBRATION],
-			&state->render_vbo_nop_ary[CALIBRATION]);
-	state->program.render_ary[CALIBRATION] = GLProgram_new(
-			"shader/calibration.vert", "shader/calibration.frag");
+	board_mesh(&model_data[CALIBRATION].vbo, &model_data[CALIBRATION].vbo_nop);
+	model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert",
+			"shader/calibration.frag");
 
-	spherewindow_mesh(fov, fov * aspect, 50, &state->render_vbo_ary[WINDOW],
-			&state->render_vbo_nop_ary[WINDOW], &state->render_vbo_scale);
+	spherewindow_mesh(fov, fov * aspect, 50, &model_data[WINDOW].vbo,
+			&model_data[WINDOW].vbo_nop, &model_data[WINDOW].scale);
 	if (state->num_of_cam == 1) {
-		state->program.render_ary[WINDOW] = GLProgram_new("shader/window.vert",
+		model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window.frag");
 	} else {
-		state->program.render_ary[WINDOW] = GLProgram_new("shader/window.vert",
+		model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window_sphere.frag");
 	}
 
-	board_mesh(&state->render_vbo_ary[BOARD],
-			&state->render_vbo_nop_ary[BOARD]);
-	state->program.render_ary[BOARD] = GLProgram_new("shader/board.vert",
+	board_mesh(&model_data[BOARD].vbo, &model_data[BOARD].vbo_nop);
+	model_data[BOARD].program = GLProgram_new("shader/board.vert",
 			"shader/board.frag");
-}
-
-/***********************************************************
- * Name: redraw_scene
- *
- * Arguments:
- *       CUBE_STATE_T *state - holds OGLES model info
- *
- * Description:   Draws the model and calls eglSwapBuffers
- *                to render to screen
- *
- * Returns: void
- *
- ***********************************************************/
-static void redraw_render_texture(CUBE_STATE_T *state) {
-	int program = GLProgram_GetId(
-			state->program.render_ary[state->operation_mode]);
-	glUseProgram(program);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-
-	glViewport(0, 0, state->render_width, state->render_height);
-
-	glBindBuffer(GL_ARRAY_BUFFER, state->render_vbo_ary[state->operation_mode]);
-	glActiveTexture(GL_TEXTURE0);
-	if (state->operation_mode == CALIBRATION) {
-		glBindTexture(GL_TEXTURE_2D, state->calibration_texture);
-	} else {
-		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
-	}
-	for (int i = 0; i < state->num_of_cam; i++) {
-		glActiveTexture(GL_TEXTURE1 + i);
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
-	}
-
-	mat4 camera_matrix = mat4_create();
-	mat4_identity(camera_matrix);
-	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);//vertical asis is y
-	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_pitch);//depth axis is z
-	mat4_rotateX(camera_matrix, camera_matrix,
-			state->camera_roll + lg_options.cam_offset_roll[0]);
-
-	mat4 unif_matrix = mat4_create();
-	mat4_fromQuat(unif_matrix, get_quatanion());
-	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2 + M_PI);//M_PI for jpeg coordinate
-	//float scale_factor[3] = { 1.0, 1.0, -1.0 };
-	//mat4_scale(unif_matrix, unif_matrix, scale_factor);
-
-	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
-
-	//Load in the texture and thresholding parameters.
-	glUniform1f(glGetUniformLocation(program, "split"), state->split);
-	glUniform1f(glGetUniformLocation(program, "scale"),
-			state->render_vbo_scale);
-	glUniform1f(glGetUniformLocation(program, "pixel_size"),
-			1.0 / state->cam_width);
-
-	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
-
-	//options start
-	glUniform1f(glGetUniformLocation(program, "sharpness_gain"),
-			lg_options.sharpness_gain);
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_offset_yaw", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				lg_options.cam_offset_yaw[i]);
-		sprintf(buff, "cam%d_offset_x", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				lg_options.cam_offset_x[i]);
-		sprintf(buff, "cam%d_offset_y", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				lg_options.cam_offset_y[i]);
-		sprintf(buff, "cam%d_horizon_r", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				lg_options.cam_horizon_r[i]);
-	}
-	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"),
-			lg_options.cam_offset_yaw[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_offset_x"),
-			lg_options.cam_offset_x[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_offset_y"),
-			lg_options.cam_offset_y[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"),
-			lg_options.cam_horizon_r[state->active_cam]);
-	//options end
-
-	//texture start
-	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_texture", i);
-		glUniform1i(glGetUniformLocation(program, buff), i + 1);
-	}
-	glUniform1i(glGetUniformLocation(program, "cam_texture"),
-			state->active_cam + 1);
-	//texture end
-
-	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
-			GL_FALSE, (GLfloat*) unif_matrix);
-
-	GLuint loc = glGetAttribLocation(program, "vPosition");
-	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(loc);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0,
-			state->render_vbo_nop_ary[state->operation_mode]);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-static void redraw_scene(CUBE_STATE_T *state) {
-	int program = GLProgram_GetId(state->program.render_ary[BOARD]);
-	glUseProgram(program);
-
-	// Start with a clear screen
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glBindBuffer(GL_ARRAY_BUFFER, state->render_vbo_ary[BOARD]);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, state->render_texture);
-
-	//Load in the texture and thresholding parameters.
-	glUniform1i(glGetUniformLocation(program, "tex"), 0);
-
-	GLuint loc = glGetAttribLocation(program, "vPosition");
-	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(loc);
-
-	if (state->operation_mode == CALIBRATION) {
-		glViewport((state->screen_width - state->screen_height) / 2, 0,
-				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->render_vbo_nop_ary[BOARD]);
-	} else if (state->stereo) {
-		int offset_x = (state->screen_width / 2 - state->render_width) / 2;
-		int offset_y = (state->screen_height - state->render_height) / 2;
-		//left eye
-		//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-		glViewport(offset_x, offset_y, (GLsizei) state->render_width,
-				(GLsizei) state->render_height);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->render_vbo_nop_ary[BOARD]);
-
-		//right eye
-		//glViewport(state->screen_width/2, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-		glViewport(offset_x + state->screen_width / 2, offset_y,
-				(GLsizei) state->render_width, (GLsizei) state->render_height);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->render_vbo_nop_ary[BOARD]);
-	} else {
-		int offset_x = (state->screen_width - state->render_width) / 2;
-		int offset_y = (state->screen_height - state->render_height) / 2;
-		glViewport(offset_x, offset_y, (GLsizei) state->render_width,
-				(GLsizei) state->render_height);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, state->render_vbo_nop_ary[BOARD]);
-	}
-
-	eglSwapBuffers(state->display, state->surface);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 /***********************************************************
  * Name: init_textures
  *
  * Arguments:
- *       CUBE_STATE_T *state - holds OGLES model info
+ *       PICAM360CAPTURE_T *state - holds OGLES model info
  *
  * Description:   Initialise OGL|ES texture surfaces to use image
  *                buffers
@@ -537,7 +378,7 @@ static void redraw_scene(CUBE_STATE_T *state) {
  * Returns: void
  *
  ***********************************************************/
-static void init_textures(CUBE_STATE_T *state) {
+static void init_textures(PICAM360CAPTURE_T *state) {
 
 	load_texture("img/calibration_img.png", &state->calibration_texture);
 	load_texture("img/logo_img.png", &state->logo_texture);
@@ -556,11 +397,11 @@ static void init_textures(CUBE_STATE_T *state) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 		/* Create EGL Image */
-		eglImage[i] = eglCreateImageKHR(state->display, state->context,
+		state->egl_image[i] = eglCreateImageKHR(state->display, state->context,
 				EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i],
 				0);
 
-		if (eglImage[i] == EGL_NO_IMAGE_KHR) {
+		if (state->egl_image[i] == EGL_NO_IMAGE_KHR) {
 			printf("eglCreateImageKHR failed.\n");
 			exit(1);
 		}
@@ -568,9 +409,9 @@ static void init_textures(CUBE_STATE_T *state) {
 		// Start rendering
 		void **args = malloc(sizeof(void*) * 3);
 		args[0] = (void*) i;
-		args[1] = (void*) eglImage[i];
+		args[1] = (void*) state->egl_image[i];
 		args[2] = (void*) state;
-		pthread_create(&thread[i], NULL,
+		pthread_create(&state->thread[i], NULL,
 				(state->video_direct) ? video_direct :
 				(state->codec_type == H264) ?
 						video_decode_test : video_mjpeg_decode, args);
@@ -587,14 +428,14 @@ static void init_textures(CUBE_STATE_T *state) {
  * Name: init_options
  *
  * Arguments:
- *       CUBE_STATE_T *state - holds OGLES model info
+ *       PICAM360CAPTURE_T *state - holds OGLES model info
  *
  * Description:   Initialise options
  *
  * Returns: void
  *
  ***********************************************************/
-static void init_options(CUBE_STATE_T *state) {
+static void init_options(PICAM360CAPTURE_T *state) {
 	json_error_t error;
 	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
 	if (options == NULL) {
@@ -637,14 +478,14 @@ static void init_options(CUBE_STATE_T *state) {
  * Name: save_options
  *
  * Arguments:
- *       CUBE_STATE_T *state - holds OGLES model info
+ *       PICAM360CAPTURE_T *state - holds OGLES model info
  *
  * Description:   Initialise options
  *
  * Returns: void
  *
  ***********************************************************/
-static void save_options(CUBE_STATE_T *state) {
+static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
 	json_object_set_new(options, "sharpness_gain",
@@ -681,10 +522,11 @@ static void exit_func(void)
 // Function to be passed to atexit().
 {
 	for (int i = 0; i < state->num_of_cam; i++) {
-		if (eglImage[i] != 0) {
-			if (!eglDestroyImageKHR(state->display, (EGLImageKHR) eglImage[i]))
+		if (state->egl_image[i] != 0) {
+			if (!eglDestroyImageKHR(state->display,
+					(egl_imageKHR) state->egl_image[i]))
 				printf("eglDestroyImageKHR failed.");
-			eglImage[i] = NULL;
+			state->egl_image[i] = NULL;
 		}
 	}
 
@@ -715,72 +557,57 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-bool setRenderSize(CUBE_STATE_T *state, int render_width, int render_height) {
+bool setRenderSize(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
+		int render_height) {
 	if (render_width >= 2048 || render_height >= 1024) {
 		return false;
 	} else {
-		state->render_width = render_width;
-		state->render_height = render_height;
+		frame->width = render_width;
+		frame->height = render_height;
 	}
 
-	printf("width=%d,height=%d\n", state->render_width, state->render_height);
+	printf("width=%d,height=%d\n", frame->width, frame->height);
 
-	if (state->render_texture) {
-		glDeleteFramebuffers(1, &state->framebuffer);
+	if (frame->framebuffer) {
+		glDeleteFramebuffers(1, &frame->framebuffer);
 	}
 
 	//texture rendering
-	glGenFramebuffers(1, &state->framebuffer);
+	glGenFramebuffers(1, &frame->framebuffer);
 
-	if (state->render_texture) {
-		glDeleteTextures(1, &state->render_texture);
+	if (frame->texture) {
+		glDeleteTextures(1, &frame->texture);
 	}
 
-	glGenTextures(1, &state->render_texture);
-	glBindTexture(GL_TEXTURE_2D, state->render_texture);
+	glGenTextures(1, &frame->exture);
+	glBindTexture(GL_TEXTURE_2D, frame->texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->render_width,
-			state->render_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width,
+			frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	if (state->render_double_texture) {
-		glDeleteTextures(1, &state->render_double_texture);
-	}
-
-	glGenTextures(1, &state->render_double_texture);
-	glBindTexture(GL_TEXTURE_2D, state->render_double_texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, state->render_width,
-			state->render_height * 2, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	if (glGetError() != GL_NO_ERROR) {
-		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
-	}
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-			state->render_texture, 0);
+			frame->texture, 0);
 	if (glGetError() != GL_NO_ERROR) {
 		printf(
 				"glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
 	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// Set background color and clear buffers
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-	// Enable back face culling.
-	glEnable(GL_CULL_FACE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	return true;
 }
 
 int main(int argc, char *argv[]) {
+	MODEL_T model_data[MAX_OPERATION_NUM];
 	bool res;
 	int opt;
 	int render_width = 512;
@@ -973,6 +800,12 @@ int main(int argc, char *argv[]) {
 					state->stereo = (param[0] == '1');
 					printf("set_stereo %s\n", param);
 				}
+			} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					state->preview = (param[0] == '1');
+					printf("set_preview %s\n", param);
+				}
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 					char *param = strtok(NULL, " \n");
@@ -1076,5 +909,160 @@ int main(int argc, char *argv[]) {
 	}
 	exit_func();
 	return 0;
+}
+
+/***********************************************************
+ * Name: redraw_scene
+ *
+ * Arguments:
+ *       PICAM360CAPTURE_T *state - holds OGLES model info
+ *
+ * Description:   Draws the model and calls eglSwapBuffers
+ *                to render to screen
+ *
+ * Returns: void
+ *
+ ***********************************************************/
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
+		MODEL_T *model) {
+	int program = GLProgram_GetId(model->program);
+	glUseProgram(program);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+
+	glViewport(0, 0, frame->width, frame->height);
+
+	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
+	glActiveTexture(GL_TEXTURE0);
+	if (state->operation_mode == CALIBRATION) {
+		glBindTexture(GL_TEXTURE_2D, state->calibration_texture);
+	} else {
+		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
+	}
+	for (int i = 0; i < state->num_of_cam; i++) {
+		glActiveTexture(GL_TEXTURE1 + i);
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
+	}
+
+	mat4 camera_matrix = mat4_create();
+	mat4_identity(camera_matrix);
+	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw); //vertical asis is y
+	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_pitch); //depth axis is z
+	mat4_rotateX(camera_matrix, camera_matrix,
+			state->camera_roll + lg_options.cam_offset_roll[0]);
+
+	mat4 unif_matrix = mat4_create();
+	mat4_fromQuat(unif_matrix, get_quatanion());
+	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2 + M_PI); //M_PI for jpeg coordinate
+	//float scale_factor[3] = { 1.0, 1.0, -1.0 };
+	//mat4_scale(unif_matrix, unif_matrix, scale_factor);
+
+	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
+
+	//Load in the texture and thresholding parameters.
+	glUniform1f(glGetUniformLocation(program, "split"), state->split);
+	glUniform1f(glGetUniformLocation(program, "scale"), model->scale);
+	glUniform1f(glGetUniformLocation(program, "pixel_size"),
+			1.0 / state->cam_width);
+
+	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
+
+	//options start
+	glUniform1f(glGetUniformLocation(program, "sharpness_gain"),
+			lg_options.sharpness_gain);
+	for (int i = 0; i < state->num_of_cam; i++) {
+		char buff[256];
+		sprintf(buff, "cam%d_offset_yaw", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_offset_yaw[i]);
+		sprintf(buff, "cam%d_offset_x", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_offset_x[i]);
+		sprintf(buff, "cam%d_offset_y", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_offset_y[i]);
+		sprintf(buff, "cam%d_horizon_r", i);
+		glUniform1f(glGetUniformLocation(program, buff),
+				lg_options.cam_horizon_r[i]);
+	}
+	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"),
+			lg_options.cam_offset_yaw[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam_offset_x"),
+			lg_options.cam_offset_x[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam_offset_y"),
+			lg_options.cam_offset_y[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"),
+			lg_options.cam_horizon_r[state->active_cam]);
+	//options end
+
+	//texture start
+	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
+	for (int i = 0; i < state->num_of_cam; i++) {
+		char buff[256];
+		sprintf(buff, "cam%d_texture", i);
+		glUniform1i(glGetUniformLocation(program, buff), i + 1);
+	}
+	glUniform1i(glGetUniformLocation(program, "cam_texture"),
+			state->active_cam + 1);
+	//texture end
+
+	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
+			GL_FALSE, (GLfloat*) unif_matrix);
+
+	GLuint loc = glGetAttribLocation(program, "vPosition");
+	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(loc);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
+		MODEL_T *model) {
+	int program = GLProgram_GetId(model->program);
+	glUseProgram(program);
+
+	// Start with a clear screen
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, frame->texture);
+
+	//Load in the texture and thresholding parameters.
+	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+
+	GLuint loc = glGetAttribLocation(program, "vPosition");
+	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(loc);
+
+	if (state->operation_mode == CALIBRATION) {
+		glViewport((state->screen_width - state->screen_height) / 2, 0,
+				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+	} else if (state->stereo) {
+		int offset_x = (state->screen_width / 2 - frame->width) / 2;
+		int offset_y = (state->screen_height - frame->height) / 2;
+		for (int i = 0; i < 2; i++) {
+			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+			glViewport(offset_x + i * state->screen_width / 2, offset_y,
+					(GLsizei) frame->width, (GLsizei) frame->height);
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+		}
+	} else {
+		int offset_x = (state->screen_width - frame->width) / 2;
+		int offset_y = (state->screen_height - frame->height) / 2;
+		glViewport(offset_x, offset_y, (GLsizei) frame->width,
+				(GLsizei) frame->height);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+	}
+
+	eglSwapBuffers(state->display, state->surface);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
