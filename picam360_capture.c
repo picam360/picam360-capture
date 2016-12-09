@@ -330,7 +330,6 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
  ***********************************************************/
 static void init_model_proj(PICAM360CAPTURE_T *state, MODEL_T *model_data) {
 	float fov = 120.0;
-	float aspect = state->render_height / state->render_width;
 
 	board_mesh(&model_data[EQUIRECTANGULAR].vbo,
 			&model_data[EQUIRECTANGULAR].vbo_nop);
@@ -351,7 +350,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state, MODEL_T *model_data) {
 	model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert",
 			"shader/calibration.frag");
 
-	spherewindow_mesh(fov, fov * aspect, 50, &model_data[WINDOW].vbo,
+	spherewindow_mesh(fov, fov, 50, &model_data[WINDOW].vbo,
 			&model_data[WINDOW].vbo_nop, &model_data[WINDOW].scale);
 	if (state->num_of_cam == 1) {
 		model_data[WINDOW].program = GLProgram_new("shader/window.vert",
@@ -557,7 +556,7 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-bool setRenderSize(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
+bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 		int render_height) {
 	if (render_width >= 2048 || render_height >= 1024) {
 		return false;
@@ -567,6 +566,12 @@ bool setRenderSize(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 	}
 
 	printf("width=%d,height=%d\n", frame->width, frame->height);
+
+	int size = frame->width * frame->height * 3;
+	if (frame->image_buffer != NULL) {
+		free(frame->image_buffer);
+	}
+	frame->image_buffer = (unsigned char*) malloc(size);
 
 	if (frame->framebuffer) {
 		glDeleteFramebuffers(1, &frame->framebuffer);
@@ -583,8 +588,8 @@ bool setRenderSize(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 	glBindTexture(GL_TEXTURE_2D, frame->texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width,
-			frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0,
+			GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 	}
@@ -607,7 +612,8 @@ bool setRenderSize(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 }
 
 int main(int argc, char *argv[]) {
-	MODEL_T model_data[MAX_OPERATION_NUM];
+	MODEL_T model_data[MAX_OPERATION_NUM] = { };
+	FRAME_T frame_data[2] = { };
 	bool res;
 	int opt;
 	int render_width = 512;
@@ -684,7 +690,12 @@ int main(int argc, char *argv[]) {
 	init_ogl(state);
 
 	//set render size. this should be after init_ogl()
-	res = setRenderSize(state, render_width, render_height);
+	res = init_frame(state, &frame_data[0], render_width, render_height);
+	if (!res) {
+		printf("render size error");
+		exit(-1);
+	}
+	res = init_frame(state, &frame_data[1], render_width, render_height * 2);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
@@ -701,9 +712,6 @@ int main(int argc, char *argv[]) {
 	double frame_elapsed;
 	struct timeval s, f;
 	double elapsed_ms;
-	int size = state->render_width * state->render_height * 3;
-	unsigned char *image_buffer = (unsigned char*) malloc(size);
-	unsigned char *image_buffer_double = (unsigned char*) malloc(size * 2);
 
 	while (!terminate) {
 		if (inputAvailable()) {
@@ -731,8 +739,13 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					StartRecord(state->render_width, state->render_height,
-							param, 4000);
+					if (state->double_size) {
+						StartRecord(frame_data[0].width, frame_data[0].height,
+								param, 4000);
+					} else {
+						StartRecord(frame_data[0].width * 2,
+								frame_data[0].height * 2, param, 4000);
+					}
 					state->recording = true;
 					frame_num = 0;
 					frame_elapsed = 0;
@@ -788,10 +801,19 @@ int main(int argc, char *argv[]) {
 					int render_width;
 					int render_height;
 					sscanf(param, "%d,%d", &render_width, &render_height);
-					res = setRenderSize(state, render_width, render_height);
+
+					//set render size. this should be after init_ogl()
+					res = init_frame(state, &frame_data[0], render_width, render_height);
 					if (!res) {
-						printf("error in %s\n", param);
+						printf("render size error");
+						exit(-1);
 					}
+					res = init_frame(state, &frame_data[1], render_width, render_height * 2);
+					if (!res) {
+						printf("render size error");
+						exit(-1);
+					}
+
 					printf("set_render_size %s\n", param);
 				}
 			} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
@@ -805,6 +827,12 @@ int main(int argc, char *argv[]) {
 				if (param != NULL) {
 					state->preview = (param[0] == '1');
 					printf("set_preview %s\n", param);
+				}
+			} else if (strncmp(cmd, "set_double_size", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					state->double_size = (param[0] == '1');
+					printf("set_double_size %s\n", param);
 				}
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
@@ -840,8 +868,8 @@ int main(int argc, char *argv[]) {
 		}
 		gettimeofday(&s, NULL);
 		if (state->preview) {
-			redraw_render_texture(state);
-			redraw_scene(state);
+			redraw_render_texture(state, &frame_data[0], &render_data[state->operation_mode]);
+			redraw_scene(state, &frame_data[0], &render_data[state->operation_mode]);
 		}
 		if (state->recording || state->snap) {
 			int img_width;
@@ -849,38 +877,45 @@ int main(int argc, char *argv[]) {
 			unsigned char *img_buff;
 
 			if (state->double_size) {
-				img_width = state->render_width * 2;
-				img_height = state->render_height * 2;
+				FRAME_T *frame = &frame_data[1];
+				int size = frame->width * frame->height * 3;
+				unsigned char *image_buffer = (unsigned char*) malloc(size);
+				unsigned char *image_buffer_double = (unsigned char*) malloc(
+						size * 2);
+				img_width = frame->width * 2;
+				img_height = frame->height;
 				img_buff = image_buffer_double;
 				for (int split = 0; split < 2; split++) {
 					state->split = split + 1;
-					redraw_render_texture(state);
+					redraw_render_texture(state, &frame_data[1], &render_data[state->operation_mode]);
 					glFinish();
-					glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-					glReadPixels(0, 0, state->render_width,
-							state->render_height, GL_RGB, GL_UNSIGNED_BYTE,
-							image_buffer);
+					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
+							GL_UNSIGNED_BYTE, frame->image_buffer);
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
-					for (int y = 0; y < state->render_height; y++) {
+					for (int y = 0; y < frame->height; y++) {
 						memcpy(
-								image_buffer_double
-										+ state->render_width * 2 * 3 * y
-										+ state->render_width * 3 * split,
-								image_buffer + state->render_width * 3 * y,
-								state->render_width * 3);
+								image_buffer_double + frame->width * 2 * 3 * y
+										+ frame->width * 3 * split,
+								image_buffer + frame->width * 3 * y,
+								frame->width * 3);
 					}
 				}
+				free(image_buffer);
 			} else {
-				img_width = state->render_width;
-				img_height = state->render_height;
+				FRAME_T *frame = &frame_data[0];
+				int size = frame->width * frame->height * 3;
+				unsigned char *image_buffer = (unsigned char*) malloc(size);
+				img_width = frame->width;
+				img_height = frame->height;
 				img_buff = image_buffer;
 				if (!state->preview) {
-					redraw_render_texture(state);
+					redraw_render_texture(state, &frame_data[0], &render_data[state->operation_mode]);
 					glFinish();
 				}
-				glBindFramebuffer(GL_FRAMEBUFFER, state->framebuffer);
-				glReadPixels(0, 0, state->render_width, state->render_height,
-						GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
+				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
+						GL_UNSIGNED_BYTE, frame->image_buffer);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 
@@ -903,6 +938,9 @@ int main(int argc, char *argv[]) {
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				printf("elapsed %.3lf ms\n", elapsed_ms);
+			}
+			if (img_buff) {
+				free(img_buff);
 			}
 		}
 		gettimeofday(&f, NULL);

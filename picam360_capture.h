@@ -70,8 +70,8 @@ typedef struct {
 	EGLSurface surface;
 	EGLContext context;
 	int num_of_cam;
-	void* egl_image[MAX_CAM_NUM] = { };
-	pthread_t thread[MAX_CAM_NUM] = { };
+	void* egl_image[MAX_CAM_NUM];
+	pthread_t thread[MAX_CAM_NUM];
 	GLuint cam_texture[MAX_CAM_NUM];
 	GLuint logo_texture;
 	GLuint calibration_texture;
