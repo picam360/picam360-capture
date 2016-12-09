@@ -26,7 +26,12 @@ void main(void) {
 	float v = 0.0;
 	vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
 	float roll_orig = -M_PI / 2.0 + M_PI * tcoord.y;
-	float yaw_orig = 2.0 * M_PI * tcoord.x - M_PI;
+	float yaw_orig;
+	if (split == 0.0) {
+		yaw_orig = 2.0 * M_PI * tcoord.x - M_PI;
+	} else {
+		yaw_orig = 2.0 * M_PI * (tcoord.x / 2.0 + 0.5 * (split - 1)) - M_PI;
+	}
 	pos.x = cos(roll_orig) * sin(yaw_orig); //yaw starts from z
 	pos.y = sin(roll_orig);
 	pos.z = cos(roll_orig) * cos(yaw_orig); //yaw starts from z
