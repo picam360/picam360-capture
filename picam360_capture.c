@@ -745,11 +745,16 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					if (state->operation_mode == EQUIRECTANGULAR
-							&& state->double_size) {
-						StartRecord(frame_data_equirectangular_double.width,
-								frame_data_equirectangular_double.height, param,
-								4000);
+					if (state->operation_mode == EQUIRECTANGULAR) {
+						if (state->double_size) {
+							StartRecord(frame_data_equirectangular_double.width,
+									frame_data_equirectangular_double.height, param,
+									4000);
+						} else {
+							StartRecord(frame_data_equirectangular.width,
+									frame_data_equirectangular.height, param,
+									8000);
+						}
 					} else {
 						StartRecord(frame->width, frame->height, param, 4000);
 					}
