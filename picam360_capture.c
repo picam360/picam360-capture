@@ -523,7 +523,7 @@ static void exit_func(void)
 	for (int i = 0; i < state->num_of_cam; i++) {
 		if (state->egl_image[i] != 0) {
 			if (!eglDestroyImageKHR(state->display,
-					(egl_imageKHR) state->egl_image[i]))
+					(eglImageKHR) state->egl_image[i]))
 				printf("eglDestroyImageKHR failed.");
 			state->egl_image[i] = NULL;
 		}
@@ -565,14 +565,6 @@ bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 		frame->height = render_height;
 	}
 
-	printf("width=%d,height=%d\n", frame->width, frame->height);
-
-	int size = frame->width * frame->height * 3;
-	if (frame->image_buffer != NULL) {
-		free(frame->image_buffer);
-	}
-	frame->image_buffer = (unsigned char*) malloc(size);
-
 	if (frame->framebuffer) {
 		glDeleteFramebuffers(1, &frame->framebuffer);
 	}
@@ -584,7 +576,7 @@ bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 		glDeleteTextures(1, &frame->texture);
 	}
 
-	glGenTextures(1, &frame->exture);
+	glGenTextures(1, &frame->texture);
 	glBindTexture(GL_TEXTURE_2D, frame->texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -689,6 +681,8 @@ int main(int argc, char *argv[]) {
 	// Start OGLES
 	init_ogl(state);
 
+	printf("width=%d,height=%d\n", frame->width, frame->height);
+
 	//set render size. this should be after init_ogl()
 	res = init_frame(state, &frame_data[0], render_width, render_height);
 	if (!res) {
@@ -702,7 +696,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Setup the model world
-	init_model_proj(state);
+	init_model_proj(state, model_data);
 
 	// initialise the OGLES texture(s)
 	init_textures(state);
@@ -869,7 +863,7 @@ int main(int argc, char *argv[]) {
 		gettimeofday(&s, NULL);
 		if (state->preview) {
 			redraw_render_texture(state, &frame_data[0], &render_data[state->operation_mode]);
-			redraw_scene(state, &frame_data[0], &render_data[state->operation_mode]);
+			redraw_scene(state, &frame_data[0], &model_data[state->operation_mode]);
 		}
 		if (state->recording || state->snap) {
 			int img_width;
@@ -887,11 +881,11 @@ int main(int argc, char *argv[]) {
 				img_buff = image_buffer_double;
 				for (int split = 0; split < 2; split++) {
 					state->split = split + 1;
-					redraw_render_texture(state, &frame_data[1], &render_data[state->operation_mode]);
+					redraw_render_texture(state, &frame_data[1], &model_data[state->operation_mode]);
 					glFinish();
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-							GL_UNSIGNED_BYTE, frame->image_buffer);
+							GL_UNSIGNED_BYTE, image_buffer);
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
 					for (int y = 0; y < frame->height; y++) {
 						memcpy(
@@ -910,12 +904,12 @@ int main(int argc, char *argv[]) {
 				img_height = frame->height;
 				img_buff = image_buffer;
 				if (!state->preview) {
-					redraw_render_texture(state, &frame_data[0], &render_data[state->operation_mode]);
+					redraw_render_texture(state, &frame_data[0], &model_data[state->operation_mode]);
 					glFinish();
 				}
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-						GL_UNSIGNED_BYTE, frame->image_buffer);
+						GL_UNSIGNED_BYTE, image_buffer);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 
