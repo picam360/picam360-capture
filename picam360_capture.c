@@ -89,7 +89,7 @@ typedef struct {
 OPTIONS_T lg_options = { };
 
 static void init_ogl(PICAM360CAPTURE_T *state);
-static void init_model_proj(PICAM360CAPTURE_T *state);
+static void init_model_proj(PICAM360CAPTURE_T *state, MODEL_T *model_data);
 static void init_textures(PICAM360CAPTURE_T *state);
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
@@ -523,7 +523,7 @@ static void exit_func(void)
 	for (int i = 0; i < state->num_of_cam; i++) {
 		if (state->egl_image[i] != 0) {
 			if (!eglDestroyImageKHR(state->display,
-					(eglImageKHR) state->egl_image[i]))
+					(EGLImageKHR) state->egl_image[i]))
 				printf("eglDestroyImageKHR failed.");
 			state->egl_image[i] = NULL;
 		}
@@ -681,7 +681,7 @@ int main(int argc, char *argv[]) {
 	// Start OGLES
 	init_ogl(state);
 
-	printf("width=%d,height=%d\n", frame->width, frame->height);
+	printf("width=%d,height=%d\n", render_width, render_height);
 
 	//set render size. this should be after init_ogl()
 	res = init_frame(state, &frame_data[0], render_width, render_height);
@@ -862,7 +862,7 @@ int main(int argc, char *argv[]) {
 		}
 		gettimeofday(&s, NULL);
 		if (state->preview) {
-			redraw_render_texture(state, &frame_data[0], &render_data[state->operation_mode]);
+			redraw_render_texture(state, &frame_data[0], &model_data[state->operation_mode]);
 			redraw_scene(state, &frame_data[0], &model_data[state->operation_mode]);
 		}
 		if (state->recording || state->snap) {
