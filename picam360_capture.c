@@ -745,12 +745,13 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					if (state->operation_mode == EQUIRECTANGULAR && state->double_size) {
-						StartRecord(frame_data_equirectangular_double.width, frame_data_equirectangular_double.height,
-								param, 4000);
+					if (state->operation_mode == EQUIRECTANGULAR
+							&& state->double_size) {
+						StartRecord(frame_data_equirectangular_double.width,
+								frame_data_equirectangular_double.height, param,
+								4000);
 					} else {
-						StartRecord(frame->width,
-								frame->height, param, 4000);
+						StartRecord(frame->width, frame->height, param, 4000);
 					}
 					state->recording = true;
 					frame_num = 0;
@@ -809,17 +810,19 @@ int main(int argc, char *argv[]) {
 					sscanf(param, "%d,%d", &render_width, &render_height);
 
 					//set render size. this should be after init_ogl()
-					res = init_frame(state, &frame_data[0], render_width,
+					res = init_frame(state, frame, render_width,
 							render_height);
 					if (!res) {
 						printf("render size error");
 						exit(-1);
 					}
-					res = init_frame(state, &frame_data[1], render_width,
-							render_height * 2);
-					if (!res) {
-						printf("render size error");
-						exit(-1);
+					if (state->operation_mode == EQUIRECTANGULAR) {
+						res = init_frame(state, &frame_data_equirectangular_double, render_width,
+								render_height * 2);
+						if (!res) {
+							printf("render size error");
+							exit(-1);
+						}
 					}
 
 					printf("set_render_size %s\n", param);
