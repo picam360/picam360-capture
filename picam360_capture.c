@@ -719,7 +719,7 @@ int main(int argc, char *argv[]) {
 	while (!terminate) {
 		FRAME_T *frame =
 				(state->operation_mode == EQUIRECTANGULAR) ?
-						&frame_data_equirectangular_double : &frame_data_window;
+						&frame_data_equirectangular : &frame_data_window;
 		if (inputAvailable()) {
 			char buff[256];
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
@@ -810,15 +810,23 @@ int main(int argc, char *argv[]) {
 					sscanf(param, "%d,%d", &render_width, &render_height);
 
 					//set render size. this should be after init_ogl()
-					res = init_frame(state, frame, render_width, render_height);
-					if (!res) {
-						printf("render size error");
-						exit(-1);
-					}
 					if (state->operation_mode == EQUIRECTANGULAR) {
+						res = init_frame(state, frame, render_width,
+								render_width / 2);
+						if (!res) {
+							printf("render size error");
+							exit(-1);
+						}
 						res = init_frame(state,
 								&frame_data_equirectangular_double,
-								render_width, render_height * 2);
+								render_width, render_width);
+						if (!res) {
+							printf("render size error");
+							exit(-1);
+						}
+					} else {
+						res = init_frame(state, frame, render_width,
+								render_height);
 						if (!res) {
 							printf("render size error");
 							exit(-1);
@@ -881,7 +889,7 @@ int main(int argc, char *argv[]) {
 		if (state->preview) {
 			redraw_render_texture(state, frame,
 					&model_data[state->operation_mode]);
-			redraw_scene(state, frame, &model_data[state->operation_mode]);
+			redraw_scene(state, frame, &model_data[BOARD]);
 		}
 		if (state->recording || state->snap) {
 			int img_width;
