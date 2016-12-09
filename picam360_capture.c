@@ -558,7 +558,7 @@ bool inputAvailable() {
 
 bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 		int render_height) {
-	if (render_width >= 2048 || render_height >= 1024) {
+	if (render_width > 2048 || render_height > 2048) {
 		return false;
 	} else {
 		frame->width = render_width;
@@ -692,13 +692,13 @@ int main(int argc, char *argv[]) {
 		exit(-1);
 	}
 	res = init_frame(state, &frame_data_equirectangular, state->cam_width,
-			state->cam_height);
+			state->cam_width / 2);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
 	}
 	res = init_frame(state, &frame_data_equirectangular_double,
-			state->cam_width, state->cam_height * 2);
+			state->cam_width, state->cam_width);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
@@ -810,15 +810,15 @@ int main(int argc, char *argv[]) {
 					sscanf(param, "%d,%d", &render_width, &render_height);
 
 					//set render size. this should be after init_ogl()
-					res = init_frame(state, frame, render_width,
-							render_height);
+					res = init_frame(state, frame, render_width, render_height);
 					if (!res) {
 						printf("render size error");
 						exit(-1);
 					}
 					if (state->operation_mode == EQUIRECTANGULAR) {
-						res = init_frame(state, &frame_data_equirectangular_double, render_width,
-								render_height * 2);
+						res = init_frame(state,
+								&frame_data_equirectangular_double,
+								render_width, render_height * 2);
 						if (!res) {
 							printf("render size error");
 							exit(-1);
@@ -886,7 +886,7 @@ int main(int argc, char *argv[]) {
 		if (state->recording || state->snap) {
 			int img_width;
 			int img_height;
-			unsigned char *img_buff;
+			unsigned char *img_buff = NULL;
 
 			if (state->operation_mode == EQUIRECTANGULAR
 					&& state->double_size) {
