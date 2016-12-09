@@ -691,14 +691,14 @@ int main(int argc, char *argv[]) {
 		printf("render size error");
 		exit(-1);
 	}
-	res = init_frame(state, &frame_data_equirectangular, state->camera_width,
-			state->camera_height);
+	res = init_frame(state, &frame_data_equirectangular, state->cam_width,
+			state->cam_height);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
 	}
 	res = init_frame(state, &frame_data_equirectangular_double,
-			state->camera_width, state->camera_height * 2);
+			state->cam_width, state->cam_height * 2);
 	if (!res) {
 		printf("render size error");
 		exit(-1);
@@ -717,6 +717,9 @@ int main(int argc, char *argv[]) {
 	double elapsed_ms;
 
 	while (!terminate) {
+		FRAME_T *frame =
+				(state->operation_mode == EQUIRECTANGULAR) ?
+						&frame_data_equirectangular_double : &frame_data_window;
 		if (inputAvailable()) {
 			char buff[256];
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
@@ -742,12 +745,12 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					if (state->double_size) {
-						StartRecord(frame_data[0].width, frame_data[0].height,
+					if (state->operation_mode == EQUIRECTANGULAR && state->double_size) {
+						StartRecord(frame_data_equirectangular_double.width, frame_data_equirectangular_double.height,
 								param, 4000);
 					} else {
-						StartRecord(frame_data[0].width * 2,
-								frame_data[0].height * 2, param, 4000);
+						StartRecord(frame->width,
+								frame->height, param, 4000);
 					}
 					state->recording = true;
 					frame_num = 0;
@@ -767,7 +770,6 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					frame_data_preview = &frame_data_window;
 					switch (param[0]) {
 					case 'W':
 						state->operation_mode = WINDOW;
@@ -872,9 +874,6 @@ int main(int argc, char *argv[]) {
 				printf("unknown command : %s\n", buff);
 			}
 		}
-		FRAME_T *frame =
-				(state->operation_mode == EQUIRECTANGULAR) ?
-						&frame_data_equirectangular_double : &frame_data_window;
 		gettimeofday(&s, NULL);
 		if (state->preview) {
 			redraw_render_texture(state, frame,
