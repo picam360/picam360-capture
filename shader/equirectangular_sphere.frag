@@ -30,7 +30,7 @@ void main(void) {
 	if (split == 0.0) {
 		yaw_orig = 2.0 * M_PI * tcoord.x - M_PI;
 	} else {
-		yaw_orig = 2.0 * M_PI * (tcoord.x / 2.0 + 0.5 * (split - 1)) - M_PI;
+		yaw_orig = 2.0 * M_PI * (tcoord.x / 2.0 + 0.5 * (split - 1.0)) - M_PI;
 	}
 	pos.x = cos(roll_orig) * sin(yaw_orig); //yaw starts from z
 	pos.y = sin(roll_orig);
