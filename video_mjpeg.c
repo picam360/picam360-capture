@@ -131,9 +131,11 @@ void *image_receiver(void* arg) {
 // Modified function prototype to work with pthreads
 void *video_mjpeg_decode(void* arg) {
 	int index;
+	CUBE_STATE_T *state;
 
 	index = (int) ((void**) arg)[0];
 	eglImage[index] = ((void**) arg)[1];
+	state = (CUBE_STATE_T *) ((void**) arg)[2];
 
 	if (eglImage[index] == 0) {
 		printf("eglImage is null.\n");
@@ -222,6 +224,9 @@ void *video_mjpeg_decode(void* arg) {
 			int image_cur = 0;
 			int image_size;
 			unsigned char *image_buff;
+
+			mrevent_wait(&state->request_frame_event[index], 1000 * 1000000); //wait 1sec
+			mrevent_reset(&state->request_frame_event[index]);
 
 			//wait untill image arived
 			if (data.image_buff == NULL) {

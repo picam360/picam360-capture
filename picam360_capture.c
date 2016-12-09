@@ -675,6 +675,10 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
+		mrevent_init(&state->request_frame_event[index]);
+	}
+
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
 
@@ -717,6 +721,7 @@ int main(int argc, char *argv[]) {
 	double elapsed_ms;
 
 	while (!terminate) {
+		bool request_frame = false;
 		FRAME_T *frame =
 				(state->operation_mode == EQUIRECTANGULAR) ?
 						&frame_data_equirectangular : &frame_data_window;
@@ -748,8 +753,8 @@ int main(int argc, char *argv[]) {
 					if (state->operation_mode == EQUIRECTANGULAR) {
 						if (state->double_size) {
 							StartRecord(frame_data_equirectangular_double.width,
-									frame_data_equirectangular_double.height, param,
-									4000);
+									frame_data_equirectangular_double.height,
+									param, 4000);
 						} else {
 							StartRecord(frame_data_equirectangular.width,
 									frame_data_equirectangular.height, param,
@@ -895,6 +900,7 @@ int main(int argc, char *argv[]) {
 			redraw_render_texture(state, frame,
 					&model_data[state->operation_mode]);
 			redraw_scene(state, frame, &model_data[BOARD]);
+			request_frame = true;
 		}
 		if (state->recording || state->snap) {
 			int img_width;
@@ -968,6 +974,12 @@ int main(int argc, char *argv[]) {
 			}
 			if (img_buff) {
 				free(img_buff);
+			}
+			request_frame = true;
+		}
+		if(request_frame){
+			for (int i = 0; i < MAX_CAM_NUM; i++) {
+				mrevent_trigger(&state->request_frame_event[index]);
 			}
 		}
 		gettimeofday(&f, NULL);

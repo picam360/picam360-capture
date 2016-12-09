@@ -31,6 +31,7 @@
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 #include <pthread.h>
+#include "mrevent.h"
 
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
@@ -87,6 +88,7 @@ typedef struct {
 	GLfloat distance;
 	GLfloat distance_inc;
 
+	MREVENT_T request_frame_event[MAX_CAM_NUM];
 	bool recording;
 	bool snap;
 	char snap_save_path[256];
