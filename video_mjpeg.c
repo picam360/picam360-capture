@@ -34,6 +34,7 @@
 
 #include "bcm_host.h"
 #include "ilclient.h"
+#include "mrevent.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
