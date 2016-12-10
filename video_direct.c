@@ -49,7 +49,7 @@
 #include <IL/OMX_Video.h>
 #include <IL/OMX_Broadcom.h>
 
-#include "triangle.h"
+#include "picam360_capture.h"
 
 // Hard coded parameters
 #define VIDEO_FRAMERATE                 35
@@ -570,7 +570,7 @@ static int round_up(int value, int divisor) {
 void *video_direct(void* arg) {
 	bcm_host_init();
 
-	CUBE_STATE_T *state = (CUBE_STATE_T *) ((void**) arg)[2];
+	PICAM360CAPTURE_T *state = (PICAM360CAPTURE_T *) ((void**) arg)[2];
 
 	OMX_ERRORTYPE r;
 

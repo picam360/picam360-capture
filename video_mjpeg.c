@@ -34,7 +34,7 @@
 
 #include "bcm_host.h"
 #include "ilclient.h"
-#include "mrevent.h"
+#include "picam360_capture.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
