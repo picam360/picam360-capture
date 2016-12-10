@@ -26,11 +26,16 @@ int mrevent_wait(MREVENT_T *ev, long usec) {
 
 	pthread_mutex_lock(&ev->mutex);
 	if (usec > 0) {
+		long sec;
 		struct timeval now;
 		struct timespec timeout;
 		gettimeofday(&now, NULL);
-		timeout.tv_sec = now.tv_sec;
-		timeout.tv_nsec = (now.tv_usec + usec) * 1000;
+		usec += now.tv_usec;
+
+		sec = usec / 1000000;
+		usec = usec % 1000000;
+		timeout.tv_sec = now.tv_sec + sec;
+		timeout.tv_nsec = usec * 1000;
 		while (!ev->triggered && retcode != ETIMEDOUT) {
 			retcode = pthread_cond_timedwait(&ev->cond, &ev->mutex, &timeout);
 		}
