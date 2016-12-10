@@ -676,7 +676,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	for (int i = 0; i < MAX_CAM_NUM; i++) {
-		mrevent_init(&state->request_frame_event[index]);
+		mrevent_init(&state->request_frame_event[i]);
 	}
 
 	bcm_host_init();
@@ -979,7 +979,7 @@ int main(int argc, char *argv[]) {
 		}
 		if(request_frame){
 			for (int i = 0; i < MAX_CAM_NUM; i++) {
-				mrevent_trigger(&state->request_frame_event[index]);
+				mrevent_trigger(&state->request_frame_event[i]);
 			}
 		}
 		gettimeofday(&f, NULL);
