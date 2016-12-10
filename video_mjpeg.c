@@ -132,11 +132,11 @@ void *image_receiver(void* arg) {
 // Modified function prototype to work with pthreads
 void *video_mjpeg_decode(void* arg) {
 	int index;
-	CUBE_STATE_T *state;
+	PICAM360CAPTURE_T *state;
 
 	index = (int) ((void**) arg)[0];
 	eglImage[index] = ((void**) arg)[1];
-	state = (CUBE_STATE_T *) ((void**) arg)[2];
+	state = (PICAM360CAPTURE_T *) ((void**) arg)[2];
 
 	if (eglImage[index] == 0) {
 		printf("eglImage is null.\n");
