@@ -1,4 +1,6 @@
 #include "mrevent.h"
+#include <sys/time.h>
+#include <errno.h>
 
 void mrevent_init(MREVENT_T *ev) {
 	pthread_mutex_init(&ev->mutex, 0);
@@ -26,7 +28,7 @@ int mrevent_wait(MREVENT_T *ev, long usec) {
 	if (usec > 0) {
 		struct timeval now;
 		struct timespec timeout;
-		gettimeofday(&now);
+		gettimeofday(&now, NULL);
 		timeout.tv_sec = now.tv_sec;
 		timeout.tv_nsec = (now.tv_usec + usec) * 1000;
 		while (!ev->triggered && retcode != ETIMEDOUT) {
