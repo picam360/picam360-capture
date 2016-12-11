@@ -742,14 +742,14 @@ int main(int argc, char *argv[]) {
 				state->active_cam = 1;
 			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					strncpy(state->snap_save_path, param,
-							sizeof(state->snap_save_path) - 1);
-					state->snap = true;
+				if (param != NULL && state->output_mode == NONE) {
+					strncpy(state->output_filepath, param,
+							sizeof(state->output_filepath) - 1);
+					state->output_mode = STILL;
 				}
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
+				if (param != NULL && state->output_mode == NONE) {
 					if (state->operation_mode == EQUIRECTANGULAR) {
 						if (state->double_size) {
 							StartRecord(frame_data_equirectangular_double.width,
@@ -763,20 +763,32 @@ int main(int argc, char *argv[]) {
 					} else {
 						StartRecord(frame->width, frame->height, param, 4000);
 					}
-					state->recording = true;
+					state->output_mode = VIDEO;
 					frame_num = 0;
 					frame_elapsed = 0;
 					printf("start_record saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
-				if (state->recording) {
-					state->recording = false;
+				if (state->output_mode == VIDEO) {
+					state->output_mode = NONE;
 					StopRecord();
 
 					frame_elapsed /= frame_num;
 					printf("stop record : frame num : %d : fps %.3lf\n",
 							frame_num, 1000.0 / frame_elapsed);
+				}
+			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL && state->output_mode == RAW) {
+					strncpy(state->output_filepath, param,
+							sizeof(state->output_filepath) - 1);
+					state->output_mode = RAW;
+				}
+			} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
+				printf("stop_record_raw\n");
+				if (state->output_mode == RAW) {
+					state->output_mode = NONE;
 				}
 			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -902,7 +914,7 @@ int main(int argc, char *argv[]) {
 			redraw_scene(state, frame, &model_data[BOARD]);
 			request_frame = true;
 		}
-		if (state->recording || state->snap) {
+		if (state->output_mode == STILL || state->output_mode == VIDEO) {
 			int img_width;
 			int img_height;
 			unsigned char *img_buff = NULL;
@@ -952,7 +964,19 @@ int main(int argc, char *argv[]) {
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 
-			if (state->recording) {
+			switch (state->output_mode) {
+			case STILL:
+				state->output_mode = NONE;
+				SaveJpeg(img_buff, img_width, img_height, state->output_filepath,
+						70);
+				printf("snap saved to %s\n", state->output_filepath);
+
+				gettimeofday(&f, NULL);
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+						+ (f.tv_usec - s.tv_usec) / 1000.0;
+				printf("elapsed %.3lf ms\n", elapsed_ms);
+				break;
+			case VIDEO:
 				AddFrame(img_buff);
 
 				gettimeofday(&f, NULL);
@@ -960,17 +984,7 @@ int main(int argc, char *argv[]) {
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				frame_num++;
 				frame_elapsed += elapsed_ms;
-			}
-			if (state->snap) {
-				state->snap = false;
-				SaveJpeg(img_buff, img_width, img_height, state->snap_save_path,
-						70);
-				printf("snap saved to %s\n", state->snap_save_path);
-
-				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-						+ (f.tv_usec - s.tv_usec) / 1000.0;
-				printf("elapsed %.3lf ms\n", elapsed_ms);
+				break;
 			}
 			if (img_buff) {
 				free(img_buff);

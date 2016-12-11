@@ -52,16 +52,106 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		exit(1);
 	}
 }
-typedef struct _IMAGE_RECEIVER_DATA {
-	pthread_mutex_t mlock;
-	int descriptor;
+
+static pthread_mutex_t image_mlock = PTHREAD_MUTEX_INITIALIZER;
+typedef struct _IMAGE_DATA {
+	int refcount;
 	int image_size;
 	unsigned char *image_buff;
+} IMAGE_DATA;
+
+static IMAGE_DATA *create_image(int image_buff_size) {
+	IMAGE_DATA *image_data = malloc(sizeof(IMAGE_DATA) + image_buff_size);
+	memset(image_data, 0, sizeof(IMAGE_DATA));
+	image_data->refcount = 1;
+	image_data->image_buff = (unsigned char*) image_data + sizeof(IMAGE_DATA);
+	image_data->image_size = image_buff_size;
+}
+
+static int addref_image(IMAGE_DATA *image_data) {
+	if (image_data == NULL)
+		return 0;
+
+	int ret;
+	pthread_mutex_lock(&image_mlock);
+	if (image_data->refcount == 0) {
+		ret = 0;
+	} else {
+		image_data->refcount++;
+		ret = image_data->refcount;
+	}
+	pthread_mutex_unlock(&image_mlock);
+	return ret;
+}
+
+static int release_image(IMAGE_DATA *image_data) {
+	if (image_data == NULL)
+		return 0;
+
+	int ret;
+	pthread_mutex_lock(&image_mlock);
+	if (--image_data->refcount == 0) {
+		free(image_data);
+		ret = 0;
+	} else {
+		ret = image_data->refcount;
+	}
+	pthread_mutex_unlock(&image_mlock);
+	return ret;
+}
+
+typedef struct _IMAGE_RECEIVER_DATA {
+	PICAM360CAPTURE_T *state;
+	pthread_mutex_t *mlock_p;
+	IMAGE_DATA *image_data;
 } IMAGE_RECEIVER_DATA;
+
+void *image_dumper(void* arg) {
+	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
+	IMAGE_DATA *image_data = NULL;
+	int descriptor = -1;
+	while (1) {
+
+		//wait untill image arived
+		if (data->image_data == NULL || data->image_data == image_data) {
+			usleep(1000);
+			continue;
+		}
+		if (descriptor >= 0) {
+			if (data->state->ouput_mode != RAW) { //end
+				close(descriptor);
+				descriptor = -1;
+				continue;
+			} else { // write
+
+				pthread_mutex_lock(data->mlock_p);
+				image_data = data->image_data;
+				addref_image(image_data);
+				pthread_mutex_unlock(data->mlock_p);
+
+				write(descriptor, image_data->image_buff, image_data->image_size);
+
+				release_image(image_data);
+			}
+		} else if (data->state->ouput_mode == RAW) { // start
+			char buff[256];
+			sprintf(buff, data->state->output_filepath, index);
+			descriptor = open(buff, O_WRONLY);
+			if (descriptor == -1) {
+				printf("failed to open %s\n", buff);
+				data->state->ouput_mode = NONE;
+				continue;
+			}
+		} else {
+			usleep(1000);
+		}
+	}
+}
 
 void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	unsigned char buff[4096];
+	IMAGE_DATA *image_data = NULL;
 	unsigned char *image_buff = NULL;
 	int image_buff_size = 0;
 	int image_buff_cur = 0;
@@ -70,6 +160,7 @@ void *image_receiver(void* arg) {
 	int data_len_total = 0;
 	int marker = 0;
 	int soicount = 0;
+
 	while (1) {
 		data_len = read(data->descriptor, buff, sizeof(buff));
 		if (data_len == 0) {
@@ -88,21 +179,26 @@ void *image_receiver(void* arg) {
 					soicount--;
 					if (soicount == 0) {
 						int image_size = (data_len_total + i + 1) - image_start;
-						if (image_buff == NULL) { //just allocate image buffer
+
+						if (image_data == NULL) { //just allocate image buffer
+							image_buff_size = image_size * 2;
+						} else if (image_size > image_buff_size) { //exceed buffer size
+							free(image_data);
+							image_data = NULL;
 							image_buff_size = image_size * 2;
 						} else {
-							memcpy(image_buff + image_buff_cur, buff, i);
-							pthread_mutex_lock(&data->mlock);
-							if (data->image_buff == NULL) {
-								data->image_size = image_size;
-								data->image_buff = image_buff;
-							} else { //throw it away
-								free(image_buff);
+							memcpy(image_data->image_buff + image_buff_cur,
+									buff, i);
+							image_data->image_size = image_size;
+							pthread_mutex_lock(state->mlock_p);
+							if (data->image_data != NULL) {
+								release_image(&data->image_data);
 							}
-							pthread_mutex_unlock(&data->mlock);
+							data->image_data = image_data;
+							pthread_mutex_unlock(state->mlock_p);
 						}
 						image_buff_cur = 0;
-						image_buff = malloc(image_buff_size);
+						image_data = create_image(image_buff_size);
 						image_start = -1;
 					}
 				}
@@ -110,18 +206,17 @@ void *image_receiver(void* arg) {
 				marker = 1;
 			}
 		}
-		if (image_buff != NULL && image_start >= 0) {
+		if (image_data != NULL && image_start >= 0) {
 			if (image_buff_cur + data_len > image_buff_size) { //exceed buffer size
-				free(image_buff);
-				image_buff = NULL;
-				image_buff_size = 0;
-				image_buff_cur = 0;
+				free(image_data);
+				image_data = NULL;
 			} else if (image_start > data_len_total) { //soi
-				memcpy(image_buff, buff + (image_start - data_len_total),
+				memcpy(image_data->image_buff,
+						buff + (image_start - data_len_total),
 						data_len - (image_start - data_len_total));
 				image_buff_cur = data_len - (image_start - data_len_total);
 			} else {
-				memcpy(image_buff + image_buff_cur, buff, data_len);
+				memcpy(image_data->image_buff + image_buff_cur, buff, data_len);
 				image_buff_cur += data_len;
 			}
 		}
@@ -214,38 +309,45 @@ void *video_mjpeg_decode(void* arg) {
 
 		printf("milestone\n");
 
+		pthread_mutex_t mlock;
+		pthread_mutex_init(&mlock, NULL);
 		IMAGE_RECEIVER_DATA data = { };
-		pthread_mutex_init(&data.mlock, NULL);
+		data.state = state;
+		data.mlock_p = &mlock;
 		data.descriptor = descriptor;
+
 		pthread_t image_receiver_thread;
 		pthread_create(&image_receiver_thread, NULL, image_receiver,
 				(void*) &data);
 
+		pthread_t image_dumper_thread;
+		pthread_create(&image_dumper_thread, NULL, image_dumper, (void*) &data);
+
 		while (1) {
 			int image_cur = 0;
-			int image_size;
-			unsigned char *image_buff;
+			IMAGE_DATA *image_data;
 
-			mrevent_wait(&state->request_frame_event[index], 1000 * 1000000); //wait 1sec
+			mrevent_wait(&state->request_frame_event[index], 1000 * 1000); //wait 1sec
 			mrevent_reset(&state->request_frame_event[index]);
 
 			//wait untill image arived
-			if (data.image_buff == NULL) {
+			if (data.image_data == NULL) {
 				usleep(1000);
 				continue;
 			}
 
-			pthread_mutex_lock(&data.mlock);
-			image_size = data.image_size;
-			image_buff = data.image_buff;
-			data.image_buff = NULL;
-			pthread_mutex_unlock(&data.mlock);
+			pthread_mutex_lock(&mlock);
+			image_data = data.image_data;
+			addref_image(image_data);
+			pthread_mutex_unlock(&mlock);
 
-			while (image_cur < image_size) {
+			while (image_cur < image_data->image_size) {
 				buf = ilclient_get_input_buffer(video_decode, 130, 1);
 
-				data_len = MIN(buf->nAllocLen, image_size - image_cur);
-				memcpy(buf->pBuffer, image_buff + image_cur, data_len);
+				data_len = MIN(buf->nAllocLen,
+						image_data->image_size - image_cur);
+				memcpy(buf->pBuffer, image_data->image_buff + image_cur,
+						data_len);
 				image_cur += data_len;
 
 				if (port_settings_changed == 0
@@ -311,7 +413,7 @@ void *video_mjpeg_decode(void* arg) {
 					buf->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
 				}
 
-				if (image_cur >= image_size) {
+				if (image_cur >= image_data->image_size) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 				}
 
@@ -323,7 +425,7 @@ void *video_mjpeg_decode(void* arg) {
 			}
 
 			//release memory
-			free(image_buff);
+			release_image(image_data);
 		}
 
 		buf->nFilledLen = 0;
