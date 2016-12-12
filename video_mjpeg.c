@@ -163,11 +163,14 @@ void *image_receiver(void* arg) {
 	int marker = 0;
 	int soicount = 0;
 
-	sprintf(buff, "cam%d", data->index);
-	int descriptor = open(buff, O_RDONLY);
-	if (descriptor == -1) {
-		printf("failed to open %s\n", buff);
-		exit(-1);
+	{
+		char buff[256];
+		sprintf(buff, "cam%d", data->index);
+		int descriptor = open(buff, O_RDONLY);
+		if (descriptor == -1) {
+			printf("failed to open %s\n", buff);
+			exit(-1);
+		}
 	}
 
 	while (1) {
