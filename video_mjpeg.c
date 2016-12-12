@@ -66,6 +66,7 @@ static IMAGE_DATA *create_image(int image_buff_size) {
 	image_data->refcount = 1;
 	image_data->image_buff = (unsigned char*) image_data + sizeof(IMAGE_DATA);
 	image_data->image_size = image_buff_size;
+	return image_data;
 }
 
 static int addref_image(IMAGE_DATA *image_data) {
@@ -162,7 +163,6 @@ void *image_receiver(void* arg) {
 	int marker = 0;
 	int soicount = 0;
 
-	char buff[256];
 	sprintf(buff, "cam%d", data->index);
 	int descriptor = open(buff, O_RDONLY);
 	if (descriptor == -1) {
@@ -199,12 +199,12 @@ void *image_receiver(void* arg) {
 							memcpy(image_data->image_buff + image_buff_cur,
 									buff, i);
 							image_data->image_size = image_size;
-							pthread_mutex_lock(state->mlock_p);
+							pthread_mutex_lock(data->mlock_p);
 							if (data->image_data != NULL) {
 								release_image(data->image_data);
 							}
 							data->image_data = image_data;
-							pthread_mutex_unlock(state->mlock_p);
+							pthread_mutex_unlock(data->mlock_p);
 						}
 						image_buff_cur = 0;
 						image_data = create_image(image_buff_size);
