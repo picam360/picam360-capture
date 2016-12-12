@@ -780,10 +780,11 @@ int main(int argc, char *argv[]) {
 				}
 			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == RAW) {
+				if (param != NULL && state->output_mode == NONE) {
 					strncpy(state->output_filepath, param,
 							sizeof(state->output_filepath) - 1);
 					state->output_mode = RAW;
+					printf("start_record_raw saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
 				printf("stop_record_raw\n");
