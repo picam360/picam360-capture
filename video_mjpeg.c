@@ -120,7 +120,7 @@ void *image_dumper(void* arg) {
 			continue;
 		}
 		if (descriptor >= 0) {
-			if (data->state->output_mode != RAW) { //end
+			if (data->state->output_mode != OUTPUT_MODE_RAW) { //end
 				close(descriptor);
 				descriptor = -1;
 				continue;
@@ -136,14 +136,14 @@ void *image_dumper(void* arg) {
 
 				release_image(image_data);
 			}
-		} else if (data->state->output_mode == RAW) { // start
+		} else if (data->state->output_mode == OUTPUT_MODE_RAW) { // start
 			char buff[256];
 			sprintf(buff, data->state->output_filepath, index);
 			descriptor = open(buff, O_WRONLY | O_CREAT,
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 			if (descriptor == -1) {
 				printf("failed to open %s\n", buff);
-				data->state->output_mode = NONE;
+				data->state->output_mode = NOUTPUT_MODE_ONE;
 				continue;
 			}
 		} else {
@@ -184,21 +184,21 @@ void *image_receiver(void* arg) {
 			break;
 		}
 		if (file_fd >= 0) {
-			if (fdata->state->input_mode != FILE) { // end
+			if (fdata->state->input_mode != INPUT_MODE_FILE) { // end
 				close(file_fd);
 				file_fd = -1;
-				fdata->state->input_mode = CAM;
+				fdata->state->input_mode = INPUT_MODE_CAM;
 				continue;
 			} else { //read
 				data_len = read(descriptor, buff, sizeof(buff));
 				if (data_len == 0) { //end
 					close(file_fd);
 					file_fd = -1;
-					fdata->state->input_mode = CAM;
+					fdata->state->input_mode = INPUT_MODE_CAM;
 					continue;
 				}
 			}
-		} else if (data->state->input_mode == FILE) { //start
+		} else if (data->state->input_mode == INPUT_MODE_FILE) { //start
 			char buff[256];
 			sprintf(buff, data->state->input_filepath, data->index);
 			file_fd = open(buff, O_RDONLY);

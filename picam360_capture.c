@@ -781,23 +781,23 @@ int main(int argc, char *argv[]) {
 				}
 			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == NONE) {
+				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
 					strncpy(state->output_filepath, param,
 							sizeof(state->output_filepath) - 1);
-					state->output_mode = RAW;
+					state->output_mode = OUTPUT_MODE_RAW;
 					printf("start_record_raw saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
 				printf("stop_record_raw\n");
-				if (state->output_mode == RAW) {
-					state->output_mode = NONE;
+				if (state->output_mode == OUTPUT_MODE_RAW) {
+					state->output_mode = OUTPUT_MODE_NONE;
 				}
 			} else if (strncmp(cmd, "load_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
 					strncpy(state->input_filepath, param,
 							sizeof(state->input_filepath) - 1);
-					state->input_mode = FILE;
+					state->input_mode = INPUT_MODE_FILE;
 					printf("load_raw from %s\n", param);
 				}
 			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
