@@ -98,6 +98,8 @@ typedef struct {
 	MREVENT_T arrived_frame_event[MAX_CAM_NUM];
 	enum INPUT_MODE input_mode;
 	char input_filepath[256];
+	int input_file_size;
+	int input_file_cur;
 	enum OUTPUT_MODE output_mode;
 	char output_filepath[256];
 	bool double_size;

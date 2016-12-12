@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #include "bcm_host.h"
 #include "ilclient.h"
@@ -158,8 +159,8 @@ void *image_dumper(void* arg) {
 void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	int buff_size = 4096;
-	unsigned char buff = malloc(buff_size);
-	unsigned char buff_trash = malloc(buff_size);
+	unsigned char *buff = malloc(buff_size);
+	unsigned char *buff_trash = malloc(buff_size);
 	IMAGE_DATA *image_data = NULL;
 	int image_buff_size = 0;
 	int image_buff_cur = 0;
@@ -198,19 +199,19 @@ void *image_receiver(void* arg) {
 				data->state->input_mode = INPUT_MODE_CAM;
 				reset = true;
 			} else { //read
-				int res = mrevent_wait(
-						&data->state->request_frame_event[data->index], 1000); //wait 1msec
-				if (res != 0) {
-					continue;
+				if (data->state->frame_sync) {
+					int res = mrevent_wait(
+							&data->state->request_frame_event[data->index],
+							1000); //wait 1msec
+					if (res != 0) {
+						continue;
+					}
 				}
 
-				data_len = read(file_fd, buff, buff_size);
-				if (data_len == 0) { //end
-					close(file_fd);
-					file_fd = -1;
-					data->state->input_mode = INPUT_MODE_CAM;
-					printf("file end\n");
-					reset = true;
+				if (data->state->input_file_cur
+						< data->state->input_file_size) {
+					data_len = read(file_fd, buff, buff_size);
+					data->state->input_file_cur += data_len;
 				}
 			}
 		} else if (data->state->input_mode == INPUT_MODE_FILE) { //start
@@ -221,6 +222,11 @@ void *image_receiver(void* arg) {
 				printf("failed to open %s\n", buff);
 				data->state->input_mode = INPUT_MODE_CAM;
 			}
+			struct stat st;
+			stat("my_file.txt", &st);
+			data->state->input_file_size = st.st_size;
+			data->state->input_file_cur = 0;
+
 			reset = true;
 		}
 		if (reset) {
@@ -243,7 +249,8 @@ void *image_receiver(void* arg) {
 				if (buff[i] == 0xd9 && image_start >= 0) { //EOI
 					soicount--;
 					if (soicount == 0) {
-						int image_size = (data_len_total + i + 1) - image_start;
+						int image_size = (data_len_total - image_start)
+								+ (i + 1);
 
 						if (image_data == NULL) { //just allocate image buffer
 							image_buff_size = image_size * 2;
@@ -252,8 +259,15 @@ void *image_receiver(void* arg) {
 							image_data = NULL;
 							image_buff_size = image_size * 2;
 						} else {
-							memcpy(image_data->image_buff + image_buff_cur,
-									buff, i);
+							if (image_start > data_len_total) { //soi
+								memcpy(image_data->image_buff,
+										buff + (image_start - data_len_total),
+										(i + 1)
+												- (image_start - data_len_total));
+							} else {
+								memcpy(image_data->image_buff + image_buff_cur,
+										buff, i + 1);
+							}
 							image_data->image_size = image_size;
 							pthread_mutex_lock(data->mlock_p);
 							if (data->image_data != NULL) {

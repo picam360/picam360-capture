@@ -725,6 +725,7 @@ int main(int argc, char *argv[]) {
 	double elapsed_ms;
 
 	while (!terminate) {
+		bool stop_record = false;
 		bool request_frame = false;
 		FRAME_T *frame =
 				(state->operation_mode == EQUIRECTANGULAR) ?
@@ -774,14 +775,7 @@ int main(int argc, char *argv[]) {
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
-				if (state->output_mode == OUTPUT_MODE_VIDEO) {
-					state->output_mode = OUTPUT_MODE_NONE;
-					StopRecord();
-
-					frame_elapsed /= frame_num;
-					printf("stop record : frame num : %d : fps %.3lf\n",
-							frame_num, 1000.0 / frame_elapsed);
-				}
+				stop_record = true;
 			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
@@ -789,11 +783,6 @@ int main(int argc, char *argv[]) {
 							sizeof(state->output_filepath) - 1);
 					state->output_mode = OUTPUT_MODE_RAW;
 					printf("start_record_raw saved to %s\n", param);
-				}
-			} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
-				printf("stop_record_raw\n");
-				if (state->output_mode == OUTPUT_MODE_RAW) {
-					state->output_mode = OUTPUT_MODE_NONE;
 				}
 			} else if (strncmp(cmd, "load_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -924,6 +913,22 @@ int main(int argc, char *argv[]) {
 				}
 			} else {
 				printf("unknown command : %s\n", buff);
+			}
+		}
+		if (state->input_mode == INPUT_MODE_FILE
+				&& data->state->input_file_cur
+						>= data->state->input_file_size) { // end of file
+			state->input_mode == INPUT_MODE_CAM;
+			stop_record = true;
+		}
+		if (stop_record) { //stop record
+			state->output_mode = OUTPUT_MODE_NONE;
+			if (state->output_mode == OUTPUT_MODE_VIDEO) {
+				StopRecord();
+
+				frame_elapsed /= frame_num;
+				printf("stop record : frame num : %d : fps %.3lf\n", frame_num,
+						1000.0 / frame_elapsed);
 			}
 		}
 		if (state->frame_sync) {
