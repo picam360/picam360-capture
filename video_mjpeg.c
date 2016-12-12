@@ -180,6 +180,7 @@ void *image_receiver(void* arg) {
 	}
 
 	while (1) {
+		bool reset = false;
 		data_len = read(camd_fd, buff, sizeof(buff));
 		if (data_len == 0) {
 			break;
@@ -189,10 +190,10 @@ void *image_receiver(void* arg) {
 				close(file_fd);
 				file_fd = -1;
 				data->state->input_mode = INPUT_MODE_CAM;
-				continue;
+				reset = true;
 			} else { //read
-				int res = mrevent_wait(&data->state->request_frame_event[data->index],
-						1000); //wait 1msec
+				int res = mrevent_wait(
+						&data->state->request_frame_event[data->index], 1000); //wait 1msec
 				if (res != 0) {
 					continue;
 				}
@@ -203,7 +204,7 @@ void *image_receiver(void* arg) {
 					file_fd = -1;
 					data->state->input_mode = INPUT_MODE_CAM;
 					printf("file end\n");
-					continue;
+					reset = true;
 				}
 			}
 		} else if (data->state->input_mode == INPUT_MODE_FILE) { //start
@@ -214,8 +215,15 @@ void *image_receiver(void* arg) {
 				printf("failed to open %s\n", buff);
 				data->state->input_mode = INPUT_MODE_CAM;
 			}
+			reset = true;
+		}
+		if (reset) {
+			image_buff_cur = 0;
+			image_start = -1;
+			data_len_total = 0;
+			marker = 0;
+			soicount = 0;
 			continue;
-
 		}
 		for (int i = 0; i < data_len; i++) {
 			if (marker) {
