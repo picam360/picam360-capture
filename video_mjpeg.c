@@ -149,6 +149,8 @@ void *image_dumper(void* arg) {
 			usleep(1000);
 		}
 	}
+
+	return NULL;
 }
 
 void *image_receiver(void* arg) {
@@ -235,6 +237,8 @@ void *image_receiver(void* arg) {
 		}
 		data_len_total += data_len;
 	}
+
+	return NULL;
 }
 
 // Modified function prototype to work with pthreads
