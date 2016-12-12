@@ -119,26 +119,27 @@ void *image_dumper(void* arg) {
 			usleep(1000);
 			continue;
 		}
+
+		pthread_mutex_lock(data->mlock_p);
+		if (image_data != NULL) { // release memory
+			release_image(image_data);
+		}
+		image_data = data->image_data;
+		addref_image(image_data);
+		pthread_mutex_unlock(data->mlock_p);
+
 		if (descriptor >= 0) {
 			if (data->state->output_mode != OUTPUT_MODE_RAW) { //end
 				close(descriptor);
 				descriptor = -1;
 				continue;
 			} else { // write
-
-				pthread_mutex_lock(data->mlock_p);
-				image_data = data->image_data;
-				addref_image(image_data);
-				pthread_mutex_unlock(data->mlock_p);
-
 				write(descriptor, image_data->image_buff,
 						image_data->image_size);
-
-				release_image(image_data);
 			}
 		} else if (data->state->output_mode == OUTPUT_MODE_RAW) { // start
 			char buff[256];
-			sprintf(buff, data->state->output_filepath, index);
+			sprintf(buff, data->state->output_filepath, daa->index);
 			descriptor = open(buff, O_WRONLY | O_CREAT,
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 			if (descriptor == -1) {
@@ -190,11 +191,18 @@ void *image_receiver(void* arg) {
 				data->state->input_mode = INPUT_MODE_CAM;
 				continue;
 			} else { //read
+				int res = mrevent_wait(&state->request_frame_event[data->index],
+						1000); //wait 1msec
+				if (res != 0) {
+					continue;
+				}
+
 				data_len = read(file_fd, buff, sizeof(buff));
 				if (data_len == 0) { //end
 					close(file_fd);
 					file_fd = -1;
 					data->state->input_mode = INPUT_MODE_CAM;
+					printf("file end\n");
 					continue;
 				}
 			}
@@ -239,6 +247,11 @@ void *image_receiver(void* arg) {
 							}
 							data->image_data = image_data;
 							pthread_mutex_unlock(data->mlock_p);
+
+							mrevent_reset(
+									&state->request_frame_event[data->index]);
+							mrevent_trigger(
+									&state->arrived_frame_event[data->index]);
 						}
 						image_buff_cur = 0;
 						image_data = create_image(image_buff_size);
@@ -360,20 +373,20 @@ void *video_mjpeg_decode(void* arg) {
 		pthread_t image_dumper_thread;
 		pthread_create(&image_dumper_thread, NULL, image_dumper, (void*) &data);
 
+		IMAGE_DATA *image_data = NULL;
 		while (1) {
 			int image_cur = 0;
-			IMAGE_DATA *image_data;
-
-			mrevent_wait(&state->request_frame_event[index], 1000 * 1000); //wait 1sec
-			mrevent_reset(&state->request_frame_event[index]);
 
 			//wait untill image arived
-			if (data.image_data == NULL) {
+			if (data.image_data == NULL || data.image_data == image_data) {
 				usleep(1000);
 				continue;
 			}
 
 			pthread_mutex_lock(&mlock);
+			if (image_data != NULL) { // release memory
+				release_image(image_data);
+			}
 			image_data = data.image_data;
 			addref_image(image_data);
 			pthread_mutex_unlock(&mlock);
@@ -460,9 +473,6 @@ void *video_mjpeg_decode(void* arg) {
 					break;
 				}
 			}
-
-			//release memory
-			release_image(image_data);
 		}
 
 		buf->nFilledLen = 0;

@@ -95,11 +95,13 @@ typedef struct {
 	GLfloat distance_inc;
 
 	MREVENT_T request_frame_event[MAX_CAM_NUM];
+	MREVENT_T arrived_frame_event[MAX_CAM_NUM];
 	enum INPUT_MODE input_mode;
 	char input_filepath[256];
 	enum OUTPUT_MODE output_mode;
 	char output_filepath[256];
 	bool double_size;
+	bool frame_sync;
 
 	float camera_roll;
 	float camera_pitch;

@@ -678,6 +678,9 @@ int main(int argc, char *argv[]) {
 
 	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		mrevent_init(&state->request_frame_event[i]);
+		mrevent_trigger(&state->request_frame_event[i]);
+		mrevent_init(&state->arrived_frame_event[i]);
+		mrevent_reset(&state->arrived_frame_event[i]);
 	}
 
 	bcm_host_init();
@@ -885,6 +888,12 @@ int main(int argc, char *argv[]) {
 					state->double_size = (param[0] == '1');
 					printf("set_double_size %s\n", param);
 				}
+			} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					state->frame_sync = (param[0] == '1');
+					printf("set_frame_sync %s\n", param);
+				}
 			} else if (state->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 					char *param = strtok(NULL, " \n");
@@ -917,6 +926,18 @@ int main(int argc, char *argv[]) {
 				printf("unknown command : %s\n", buff);
 			}
 		}
+		if (state->frame_sync) {
+			int res = 0;
+			for (int i = 0; i < state->num_of_cam; i++) {
+				int res = mrevent_wait(&state->arrived_frame_event[i], 1000); //wait 1msec
+				if (res != 0) {
+					break;
+				}
+			}
+			if (res != 0) {
+				continue; // skip
+			}
+		}
 		gettimeofday(&s, NULL);
 		if (state->preview) {
 			redraw_render_texture(state, frame,
@@ -924,7 +945,8 @@ int main(int argc, char *argv[]) {
 			redraw_scene(state, frame, &model_data[BOARD]);
 			request_frame = true;
 		}
-		if (state->output_mode == OUTPUT_MODE_STILL || state->output_mode == OUTPUT_MODE_VIDEO) {
+		if (state->output_mode == OUTPUT_MODE_STILL
+				|| state->output_mode == OUTPUT_MODE_VIDEO) {
 			int img_width;
 			int img_height;
 			unsigned char *img_buff = NULL;
@@ -977,8 +999,8 @@ int main(int argc, char *argv[]) {
 			switch (state->output_mode) {
 			case OUTPUT_MODE_STILL:
 				state->output_mode = OUTPUT_MODE_NONE;
-				SaveJpeg(img_buff, img_width, img_height, state->output_filepath,
-						70);
+				SaveJpeg(img_buff, img_width, img_height,
+						state->output_filepath, 70);
 				printf("snap saved to %s\n", state->output_filepath);
 
 				gettimeofday(&f, NULL);
@@ -1003,8 +1025,9 @@ int main(int argc, char *argv[]) {
 			}
 			request_frame = true;
 		}
-		if(request_frame){
-			for (int i = 0; i < MAX_CAM_NUM; i++) {
+		if (request_frame) {
+			for (int i = 0; i < state->num_of_cam; i++) {
+				mrevent_reset(&state->arrived_frame_event[i]);
 				mrevent_trigger(&state->request_frame_event[i]);
 			}
 		}
