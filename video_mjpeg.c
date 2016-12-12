@@ -180,6 +180,7 @@ void *image_receiver(void* arg) {
 			printf("failed to open %s\n", buff);
 			exit(-1);
 		}
+		printf("%s ready\n", buff);
 	}
 
 	while (1) {
@@ -187,6 +188,7 @@ void *image_receiver(void* arg) {
 		if (data->state->input_mode == INPUT_MODE_CAM) {
 			data_len = read(camd_fd, buff, buff_size);
 			if (data_len == 0) {
+				printf("camera input invalid\n");
 				break;
 			}
 		} else {
@@ -223,9 +225,11 @@ void *image_receiver(void* arg) {
 				data->state->input_mode = INPUT_MODE_CAM;
 			}
 			struct stat st;
-			stat("my_file.txt", &st);
+			stat(buff, &st);
 			data->state->input_file_size = st.st_size;
 			data->state->input_file_cur = 0;
+
+			printf("open %s : %ldB\n", buff, (long int)st.st_size);
 
 			reset = true;
 		}

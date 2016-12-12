@@ -790,6 +790,8 @@ int main(int argc, char *argv[]) {
 					strncpy(state->input_filepath, param,
 							sizeof(state->input_filepath) - 1);
 					state->input_mode = INPUT_MODE_FILE;
+					state->input_file_cur = -1;
+					state->input_file_size = 0;
 					printf("load_raw from %s\n", param);
 				}
 			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
@@ -916,9 +918,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		if (state->input_mode == INPUT_MODE_FILE
-				&& data->state->input_file_cur
-						>= data->state->input_file_size) { // end of file
-			state->input_mode == INPUT_MODE_CAM;
+				&& state->input_file_cur >= state->input_file_size) { // end of file
+			state->input_mode = INPUT_MODE_CAM;
 			stop_record = true;
 		}
 		if (stop_record) { //stop record
