@@ -837,18 +837,21 @@ int main(int argc, char *argv[]) {
 
 					//set render size. this should be after init_ogl()
 					if (state->operation_mode == EQUIRECTANGULAR) {
-						res = init_frame(state, frame, render_width,
-								render_width / 2);
-						if (!res) {
-							printf("render size error");
-							exit(-1);
-						}
-						res = init_frame(state,
-								&frame_data_equirectangular_double,
-								render_width, render_width);
-						if (!res) {
-							printf("render size error");
-							exit(-1);
+						if (!state->double_size) {
+							res = init_frame(state, frame, render_width,
+									render_width / 2);
+							if (!res) {
+								printf("render size error");
+								exit(-1);
+							}
+						} else {
+							res = init_frame(state,
+									&frame_data_equirectangular_double,
+									render_width / 2, render_width / 2);
+							if (!res) {
+								printf("render size error");
+								exit(-1);
+							}
 						}
 					} else {
 						res = init_frame(state, frame, render_width,
@@ -923,7 +926,6 @@ int main(int argc, char *argv[]) {
 			stop_record = true;
 		}
 		if (stop_record) { //stop record
-			state->output_mode = OUTPUT_MODE_NONE;
 			if (state->output_mode == OUTPUT_MODE_VIDEO) {
 				StopRecord();
 
@@ -931,6 +933,7 @@ int main(int argc, char *argv[]) {
 				printf("stop record : frame num : %d : fps %.3lf\n", frame_num,
 						1000.0 / frame_elapsed);
 			}
+			state->output_mode = OUTPUT_MODE_NONE;
 		}
 		if (state->frame_sync) {
 			int res = 0;
