@@ -139,7 +139,7 @@ void *image_dumper(void* arg) {
 			}
 		} else if (data->state->output_mode == OUTPUT_MODE_RAW) { // start
 			char buff[256];
-			sprintf(buff, data->state->output_filepath, daa->index);
+			sprintf(buff, data->state->output_filepath, data->index);
 			descriptor = open(buff, O_WRONLY | O_CREAT,
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 			if (descriptor == -1) {
@@ -191,7 +191,7 @@ void *image_receiver(void* arg) {
 				data->state->input_mode = INPUT_MODE_CAM;
 				continue;
 			} else { //read
-				int res = mrevent_wait(&state->request_frame_event[data->index],
+				int res = mrevent_wait(&data->state->request_frame_event[data->index],
 						1000); //wait 1msec
 				if (res != 0) {
 					continue;
@@ -249,9 +249,9 @@ void *image_receiver(void* arg) {
 							pthread_mutex_unlock(data->mlock_p);
 
 							mrevent_reset(
-									&state->request_frame_event[data->index]);
+									&data->state->request_frame_event[data->index]);
 							mrevent_trigger(
-									&state->arrived_frame_event[data->index]);
+									&data->state->arrived_frame_event[data->index]);
 						}
 						image_buff_cur = 0;
 						image_data = create_image(image_buff_size);
