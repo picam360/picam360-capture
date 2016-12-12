@@ -102,6 +102,7 @@ static int release_image(IMAGE_DATA *image_data) {
 
 typedef struct _IMAGE_RECEIVER_DATA {
 	PICAM360CAPTURE_T *state;
+	int index;
 	pthread_mutex_t *mlock_p;
 	IMAGE_DATA *image_data;
 } IMAGE_RECEIVER_DATA;
@@ -118,7 +119,7 @@ void *image_dumper(void* arg) {
 			continue;
 		}
 		if (descriptor >= 0) {
-			if (data->state->ouput_mode != RAW) { //end
+			if (data->state->output_mode != RAW) { //end
 				close(descriptor);
 				descriptor = -1;
 				continue;
@@ -129,17 +130,18 @@ void *image_dumper(void* arg) {
 				addref_image(image_data);
 				pthread_mutex_unlock(data->mlock_p);
 
-				write(descriptor, image_data->image_buff, image_data->image_size);
+				write(descriptor, image_data->image_buff,
+						image_data->image_size);
 
 				release_image(image_data);
 			}
-		} else if (data->state->ouput_mode == RAW) { // start
+		} else if (data->state->output_mode == RAW) { // start
 			char buff[256];
 			sprintf(buff, data->state->output_filepath, index);
 			descriptor = open(buff, O_WRONLY);
 			if (descriptor == -1) {
 				printf("failed to open %s\n", buff);
-				data->state->ouput_mode = NONE;
+				data->state->output_mode = NONE;
 				continue;
 			}
 		} else {
@@ -152,7 +154,6 @@ void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	unsigned char buff[4096];
 	IMAGE_DATA *image_data = NULL;
-	unsigned char *image_buff = NULL;
 	int image_buff_size = 0;
 	int image_buff_cur = 0;
 	int image_start = -1;
@@ -161,8 +162,16 @@ void *image_receiver(void* arg) {
 	int marker = 0;
 	int soicount = 0;
 
+	char buff[256];
+	sprintf(buff, "cam%d", data->index);
+	int descriptor = open(buff, O_RDONLY);
+	if (descriptor == -1) {
+		printf("failed to open %s\n", buff);
+		exit(-1);
+	}
+
 	while (1) {
-		data_len = read(data->descriptor, buff, sizeof(buff));
+		data_len = read(descriptor, buff, sizeof(buff));
 		if (data_len == 0) {
 			break;
 		}
@@ -192,7 +201,7 @@ void *image_receiver(void* arg) {
 							image_data->image_size = image_size;
 							pthread_mutex_lock(state->mlock_p);
 							if (data->image_data != NULL) {
-								release_image(&data->image_data);
+								release_image(data->image_data);
 							}
 							data->image_data = image_data;
 							pthread_mutex_unlock(state->mlock_p);
@@ -288,14 +297,6 @@ void *video_mjpeg_decode(void* arg) {
 	format.nPortIndex = 130;
 	format.eCompressionFormat = OMX_VIDEO_CodingMJPEG;
 
-	char buff[256];
-	sprintf(buff, "cam%d", index);
-	int descriptor = open(buff, O_RDONLY);
-	if (descriptor == -1) {
-		printf("failed to open %s\n", buff);
-		exit(-1);
-	}
-
 	if (status == 0
 			&& OMX_SetParameter(ILC_GET_HANDLE(video_decode),
 					OMX_IndexParamVideoPortFormat, &format) == OMX_ErrorNone
@@ -313,8 +314,8 @@ void *video_mjpeg_decode(void* arg) {
 		pthread_mutex_init(&mlock, NULL);
 		IMAGE_RECEIVER_DATA data = { };
 		data.state = state;
+		data.index = index;
 		data.mlock_p = &mlock;
-		data.descriptor = descriptor;
 
 		pthread_t image_receiver_thread;
 		pthread_create(&image_receiver_thread, NULL, image_receiver,
