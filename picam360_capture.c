@@ -622,7 +622,7 @@ int main(int argc, char *argv[]) {
 	state->codec_type = H264;
 	state->operation_mode = WINDOW;
 	state->video_direct = false;
-	state->input_mode = CAM;
+	state->input_mode = INPUT_MODE_CAM;
 
 	//init options
 	init_options(state);

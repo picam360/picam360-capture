@@ -143,7 +143,7 @@ void *image_dumper(void* arg) {
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 			if (descriptor == -1) {
 				printf("failed to open %s\n", buff);
-				data->state->output_mode = NOUTPUT_MODE_ONE;
+				data->state->output_mode = OUTPUT_MODE_NONE;
 				continue;
 			}
 		} else {
@@ -179,12 +179,12 @@ void *image_receiver(void* arg) {
 	}
 
 	while (1) {
-		data_len = read(descriptor, buff, sizeof(buff));
+		data_len = read(camd_fd, buff, sizeof(buff));
 		if (data_len == 0) {
 			break;
 		}
 		if (file_fd >= 0) {
-			if (fdata->state->input_mode != INPUT_MODE_FILE) { // end
+			if (data->state->input_mode != INPUT_MODE_FILE) { // end
 				close(file_fd);
 				file_fd = -1;
 				fdata->state->input_mode = INPUT_MODE_CAM;
