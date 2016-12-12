@@ -743,14 +743,14 @@ int main(int argc, char *argv[]) {
 				state->active_cam = 1;
 			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == NONE) {
+				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
 					strncpy(state->output_filepath, param,
 							sizeof(state->output_filepath) - 1);
-					state->output_mode = STILL;
+					state->output_mode = OUTPUT_MODE_STILL;
 				}
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == NONE) {
+				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
 					if (state->operation_mode == EQUIRECTANGULAR) {
 						if (state->double_size) {
 							StartRecord(frame_data_equirectangular_double.width,
@@ -764,15 +764,15 @@ int main(int argc, char *argv[]) {
 					} else {
 						StartRecord(frame->width, frame->height, param, 4000);
 					}
-					state->output_mode = VIDEO;
+					state->output_mode = OUTPUT_MODE_VIDEO;
 					frame_num = 0;
 					frame_elapsed = 0;
 					printf("start_record saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
-				if (state->output_mode == VIDEO) {
-					state->output_mode = NONE;
+				if (state->output_mode == OUTPUT_MODE_VIDEO) {
+					state->output_mode = OUTPUT_MODE_NONE;
 					StopRecord();
 
 					frame_elapsed /= frame_num;
@@ -924,7 +924,7 @@ int main(int argc, char *argv[]) {
 			redraw_scene(state, frame, &model_data[BOARD]);
 			request_frame = true;
 		}
-		if (state->output_mode == STILL || state->output_mode == VIDEO) {
+		if (state->output_mode == OUTPUT_MODE_STILL || state->output_mode == OUTPUT_MODE_VIDEO) {
 			int img_width;
 			int img_height;
 			unsigned char *img_buff = NULL;
@@ -975,8 +975,8 @@ int main(int argc, char *argv[]) {
 			}
 
 			switch (state->output_mode) {
-			case STILL:
-				state->output_mode = NONE;
+			case OUTPUT_MODE_STILL:
+				state->output_mode = OUTPUT_MODE_NONE;
 				SaveJpeg(img_buff, img_width, img_height, state->output_filepath,
 						70);
 				printf("snap saved to %s\n", state->output_filepath);
@@ -986,7 +986,7 @@ int main(int argc, char *argv[]) {
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				printf("elapsed %.3lf ms\n", elapsed_ms);
 				break;
-			case VIDEO:
+			case OUTPUT_MODE_VIDEO:
 				AddFrame(img_buff);
 
 				gettimeofday(&f, NULL);
