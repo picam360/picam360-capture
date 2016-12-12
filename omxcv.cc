@@ -322,18 +322,19 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 					if (buff[i] == 0xd9 && image_start >= 0) { //EOI
 						soicount--;
 						if (soicount == 0) {
-							int image_size = (data_len_total + i + 1)
-									- image_start;
+							int image_size = (data_len_total - image_start)
+									+ (i + 1);
 							if (image_size > image_buff_size) { //just allocate image buffer
 								image_buff_size = image_size * 2;
 								if (image_buff != NULL) {
 									free(image_buff);
 								}
 							} else {
-								memcpy(image_buff + image_buff_cur, buff, i);
+								memcpy(image_buff + image_buff_cur, buff,
+										i + 1);
 								m_ofstream.open(m_filename, std::ios::out);
-								m_ofstream.write((const char*) out->pBuffer,
-										(int) out->nFilledLen);
+								m_ofstream.write((const char*) image_buff,
+										image_size);
 								m_ofstream.close();
 								free(image_buff);
 //printf("save frame\n");
