@@ -187,14 +187,14 @@ void *image_receiver(void* arg) {
 			if (data->state->input_mode != INPUT_MODE_FILE) { // end
 				close(file_fd);
 				file_fd = -1;
-				fdata->state->input_mode = INPUT_MODE_CAM;
+				data->state->input_mode = INPUT_MODE_CAM;
 				continue;
 			} else { //read
-				data_len = read(descriptor, buff, sizeof(buff));
+				data_len = read(file_fd, buff, sizeof(buff));
 				if (data_len == 0) { //end
 					close(file_fd);
 					file_fd = -1;
-					fdata->state->input_mode = INPUT_MODE_CAM;
+					data->state->input_mode = INPUT_MODE_CAM;
 					continue;
 				}
 			}
@@ -204,7 +204,7 @@ void *image_receiver(void* arg) {
 			file_fd = open(buff, O_RDONLY);
 			if (file_fd == -1) {
 				printf("failed to open %s\n", buff);
-				exit(-1);
+				data->state->input_mode = INPUT_MODE_CAM;
 			}
 			continue;
 
