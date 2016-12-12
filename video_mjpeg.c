@@ -157,7 +157,9 @@ void *image_dumper(void* arg) {
 
 void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
-	unsigned char buff[4096];
+	int buff_size = 4096;
+	unsigned char buff = malloc(buff_size);
+	unsigned char buff_trash = malloc(buff_size);
 	IMAGE_DATA *image_data = NULL;
 	int image_buff_size = 0;
 	int image_buff_cur = 0;
@@ -181,9 +183,13 @@ void *image_receiver(void* arg) {
 
 	while (1) {
 		bool reset = false;
-		data_len = read(camd_fd, buff, sizeof(buff));
-		if (data_len == 0) {
-			break;
+		if (data->state->input_mode == INPUT_MODE_CAM) {
+			data_len = read(camd_fd, buff, buff_size);
+			if (data_len == 0) {
+				break;
+			}
+		} else {
+			read(camd_fd, buff_trash, buff_size);
 		}
 		if (file_fd >= 0) {
 			if (data->state->input_mode != INPUT_MODE_FILE) { // end
@@ -198,7 +204,7 @@ void *image_receiver(void* arg) {
 					continue;
 				}
 
-				data_len = read(file_fd, buff, sizeof(buff));
+				data_len = read(file_fd, buff, buff_size);
 				if (data_len == 0) { //end
 					close(file_fd);
 					file_fd = -1;
