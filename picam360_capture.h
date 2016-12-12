@@ -36,6 +36,9 @@
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
 
+enum INPUT_MODE {
+	NONE, CAM, FILE
+};
 enum OUTPUT_MODE {
 	NONE, STILL, VIDEO, RAW
 };
@@ -92,9 +95,10 @@ typedef struct {
 	GLfloat distance_inc;
 
 	MREVENT_T request_frame_event[MAX_CAM_NUM];
+	enum INPUT_MODE input_mode;
+	char input_filepath[256];
 	enum OUTPUT_MODE output_mode;
 	char output_filepath[256];
-	char input_filepath[256];
 	bool double_size;
 
 	float camera_roll;

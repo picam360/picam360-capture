@@ -622,6 +622,7 @@ int main(int argc, char *argv[]) {
 	state->codec_type = H264;
 	state->operation_mode = WINDOW;
 	state->video_direct = false;
+	state->input_mode = CAM;
 
 	//init options
 	init_options(state);
@@ -790,6 +791,14 @@ int main(int argc, char *argv[]) {
 				printf("stop_record_raw\n");
 				if (state->output_mode == RAW) {
 					state->output_mode = NONE;
+				}
+			} else if (strncmp(cmd, "load_raw", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					strncpy(state->input_filepath, param,
+							sizeof(state->input_filepath) - 1);
+					state->input_mode = FILE;
+					printf("load_raw from %s\n", param);
 				}
 			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -985,6 +994,8 @@ int main(int argc, char *argv[]) {
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				frame_num++;
 				frame_elapsed += elapsed_ms;
+				break;
+			default:
 				break;
 			}
 			if (img_buff) {

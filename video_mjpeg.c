@@ -165,13 +165,14 @@ void *image_receiver(void* arg) {
 	int data_len_total = 0;
 	int marker = 0;
 	int soicount = 0;
-	int descriptor = -1;
+	int camd_fd = -1;
+	int file_fd = -1;
 
 	{
 		char buff[256];
 		sprintf(buff, "cam%d", data->index);
-		descriptor = open(buff, O_RDONLY);
-		if (descriptor == -1) {
+		camd_fd = open(buff, O_RDONLY);
+		if (camd_fd == -1) {
 			printf("failed to open %s\n", buff);
 			exit(-1);
 		}
@@ -181,6 +182,32 @@ void *image_receiver(void* arg) {
 		data_len = read(descriptor, buff, sizeof(buff));
 		if (data_len == 0) {
 			break;
+		}
+		if (file_fd >= 0) {
+			if (fdata->state->input_mode != FILE) { // end
+				close(file_fd);
+				file_fd = -1;
+				fdata->state->input_mode = CAM;
+				continue;
+			} else { //read
+				data_len = read(descriptor, buff, sizeof(buff));
+				if (data_len == 0) { //end
+					close(file_fd);
+					file_fd = -1;
+					fdata->state->input_mode = CAM;
+					continue;
+				}
+			}
+		} else if (data->state->input_mode == FILE) { //start
+			char buff[256];
+			sprintf(buff, data->state->input_filepath, data->index);
+			file_fd = open(buff, O_RDONLY);
+			if (file_fd == -1) {
+				printf("failed to open %s\n", buff);
+				exit(-1);
+			}
+			continue;
+
 		}
 		for (int i = 0; i < data_len; i++) {
 			if (marker) {
