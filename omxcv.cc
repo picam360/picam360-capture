@@ -118,21 +118,6 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for input format definition.");
 
-	OMX_PARAM_PORTDEFINITIONTYPE def_out = { };
-	def_out.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
-	def_out.nVersion.nVersion = OMX_VERSION;
-	def_out.nPortIndex = OMX_ENCODE_PORT_OUT;
-	ret = OMX_GetParameter(ILC_GET_HANDLE(m_encoder_component),
-			OMX_IndexParamPortDefinition, &def);
-	CHECKED(ret != OMX_ErrorNone,
-			"OMX_GetParameter failed for encode port out.");
-	def_out.nBufferSize = 1024*1024; //1MB
-
-	ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
-			OMX_IndexParamPortDefinition, &def_out);
-	CHECKED(ret != OMX_ErrorNone,
-			"OMX_SetParameter failed for output format definition.");
-
 	//Set the output format of the encoder
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format = { };
 	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
@@ -212,12 +197,27 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	ret = ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
 	CHECKED(ret != 0, "ILClient failed to change encoder to idle state.");
-	ret = ilclient_enable_port_buffers(m_encoder_component, OMX_ENCODE_PORT_IN,
-			NULL, NULL, NULL);
-	CHECKED(ret != 0, "ILClient failed to enable input buffers.");
-	ret = ilclient_enable_port_buffers(m_encoder_component, OMX_ENCODE_PORT_OUT,
-			NULL, NULL, NULL);
-	CHECKED(ret != 0, "ILClient failed to enable output buffers.");
+
+	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
+	OMX_ENCODE_PORT_IN, NULL);
+	ilclient_wait_for_event(ILC_GET_HANDLE(m_encoder_component),
+			OMX_EventCmdComplete, OMX_CommandPortEnable, 1,
+			OMX_ENCODE_PORT_IN, 1, 0, 1000);
+	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
+	OMX_ENCODE_PORT_OUT, NULL);
+	ilclient_wait_for_event(ILC_GET_HANDLE(m_encoder_component),
+			OMX_EventCmdComplete, OMX_CommandPortEnable, 1,
+			OMX_ENCODE_PORT_OUT, 1, 0, 1000);
+
+	ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component), &input_buffer,
+	OMX_ENCODE_PORT_IN, NULL, def.nBufferSize);
+	CHECKED(ret != 0, "OMX_AllocateBuffer input");
+
+	ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component),
+			&output_buffer,
+			OMX_ENCODE_PORT_OUT, NULL, def.nBufferSize);
+	CHECKED(ret != 0, "OMX_AllocateBuffer output");
+
 	ret = ilclient_change_component_state(m_encoder_component,
 			OMX_StateExecuting);
 	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
@@ -269,8 +269,6 @@ OmxCvImpl::~OmxCvImpl() {
  */
 void OmxCvImpl::input_worker() {
 	std::unique_lock < std::mutex > lock(m_input_mutex);
-	OMX_BUFFERHEADERTYPE *out = ilclient_get_output_buffer(m_encoder_component,
-	OMX_ENCODE_PORT_OUT, 1);
 
 	while (true) {
 		m_input_signaller.wait(lock,
@@ -298,10 +296,9 @@ void OmxCvImpl::input_worker() {
 //fflush(stdout);
 //printf("Encoding time (ms): %d [%d]\r", (int)TIMEDIFF(conv_start), ++framecounter);
 		do {
-			out->nFilledLen = 0; //I don't think this is necessary, but whatever.
-			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), out);
-			out = ilclient_get_output_buffer(m_encoder_component,
-			OMX_ENCODE_PORT_OUT, 1);
+			output_buffer->nFilledLen = 0; //I don't think this is necessary, but whatever.
+			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component),
+					output_buffer);
 		} while (!write_data(out, frame.second));
 
 		lock.lock();
@@ -310,7 +307,7 @@ void OmxCvImpl::input_worker() {
 
 	//Needed because we call ilclient_get_output_buffer last.
 	//Otherwise ilclient waits forever for the buffer to be filled.
-	OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), out);
+	OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), output_buffer);
 }
 
 /**
@@ -398,30 +395,23 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
  * @return true iff enqueued.
  */
 bool OmxCvImpl::process(const unsigned char *in_data) {
-	OMX_BUFFERHEADERTYPE *in = ilclient_get_input_buffer(m_encoder_component,
-	OMX_ENCODE_PORT_IN, 0);
-	if (in == NULL) {
-		printf("No free buffer; dropping frame!\n");
-		return false;
-	}
-
 	auto now = steady_clock::now();
-	memcpy(in->pBuffer, in_data, m_stride * m_height);
+	memcpy(input_buffer->pBuffer, in_data, m_stride * m_height);
 	//BGR2RGB(mat, in->pBuffer, m_stride);
-	in->nFilledLen = in->nAllocLen;
+	input_buffer->nFilledLen = input_buffer->nAllocLen;
 	if (m_frame_count == 0) {
-		in->nFlags = OMX_BUFFERFLAG_STARTTIME;
+		input_buffer->nFlags = OMX_BUFFERFLAG_STARTTIME;
 	} else {
-		in->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
+		input_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
 	}
-	in->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+	input_buffer->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
 	std::unique_lock < std::mutex > lock(m_input_mutex);
 	if (m_frame_count++ == 0) {
 		m_frame_start = now;
 	}
 	m_input_queue.push_back(
-			std::pair<OMX_BUFFERHEADERTYPE *, int64_t>(in,
+			std::pair<OMX_BUFFERHEADERTYPE *, int64_t>(input_buffer,
 					duration_cast < milliseconds
 							> (now - m_frame_start).count()));
 	lock.unlock();
