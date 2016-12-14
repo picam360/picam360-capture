@@ -118,6 +118,21 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for input format definition.");
 
+	OMX_PARAM_PORTDEFINITIONTYPE def_out = { };
+	def_out.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	def_out.nVersion.nVersion = OMX_VERSION;
+	def_out.nPortIndex = OMX_ENCODE_PORT_OUT;
+	ret = OMX_GetParameter(ILC_GET_HANDLE(m_encoder_component),
+			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone,
+			"OMX_GetParameter failed for encode port out.");
+	def_out.nBufferSize = 1024*1024; //1MB
+
+	ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+			OMX_IndexParamPortDefinition, &def_out);
+	CHECKED(ret != OMX_ErrorNone,
+			"OMX_SetParameter failed for output format definition.");
+
 	//Set the output format of the encoder
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format = { };
 	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
