@@ -200,12 +200,12 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
 	OMX_ENCODE_PORT_IN, NULL);
-	ilclient_wait_for_event(ILC_GET_HANDLE(m_encoder_component),
+	ilclient_wait_for_event(m_encoder_component,
 			OMX_EventCmdComplete, OMX_CommandPortEnable, 1,
 			OMX_ENCODE_PORT_IN, 1, 0, 1000);
 	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
 	OMX_ENCODE_PORT_OUT, NULL);
-	ilclient_wait_for_event(ILC_GET_HANDLE(m_encoder_component),
+	ilclient_wait_for_event(m_encoder_component,
 			OMX_EventCmdComplete, OMX_CommandPortEnable, 1,
 			OMX_ENCODE_PORT_OUT, 1, 0, 1000);
 
@@ -299,7 +299,7 @@ void OmxCvImpl::input_worker() {
 			output_buffer->nFilledLen = 0; //I don't think this is necessary, but whatever.
 			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component),
 					output_buffer);
-		} while (!write_data(out, frame.second));
+		} while (!write_data(output_buffer, frame.second));
 
 		lock.lock();
 //printf("Total processing time (ms): %d\n", (int)TIMEDIFF(proc_start));
