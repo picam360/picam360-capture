@@ -675,7 +675,7 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'r':
 			state->output_raw = true;
-			strncpy(state->output_raw_filepath, optarg, sizeof(state->outpu_rawt_filepath));
+			strncpy(state->output_raw_filepath, optarg, sizeof(state->output_raw_filepath));
 			break;
 		default:
 			/* '?' */
