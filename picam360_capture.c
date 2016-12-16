@@ -773,7 +773,9 @@ int main(int argc, char *argv[]) {
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
-				stop_record = true;
+				if (state->output_mode == OUTPUT_MODE_VIDEO) {
+					state->output_mode = OUTPUT_MODE_NONE;
+				}
 			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL && !state->output_raw) {
@@ -924,7 +926,9 @@ int main(int argc, char *argv[]) {
 		if (state->input_mode == INPUT_MODE_FILE
 				&& state->input_file_cur >= state->input_file_size) { // end of file
 			state->input_mode = INPUT_MODE_CAM;
-			state->output_mode == OUTPUT_MODE_NONE;
+			if (state->output_mode == OUTPUT_MODE_VIDEO) {
+				state->output_mode = OUTPUT_MODE_NONE;
+			}
 		}
 		if (is_recording && state->output_mode == OUTPUT_MODE_NONE) { //stop record
 			if (state->output_mode == OUTPUT_MODE_VIDEO) {
