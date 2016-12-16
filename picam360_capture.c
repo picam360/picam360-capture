@@ -671,11 +671,13 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'o':
 			state->output_mode = OUTPUT_MODE_VIDEO;
-			strncpy(state->output_filepath, optarg, sizeof(state->output_filepath));
+			strncpy(state->output_filepath, optarg,
+					sizeof(state->output_filepath));
 			break;
 		case 'r':
 			state->output_raw = true;
-			strncpy(state->output_raw_filepath, optarg, sizeof(state->output_raw_filepath));
+			strncpy(state->output_raw_filepath, optarg,
+					sizeof(state->output_raw_filepath));
 			break;
 		default:
 			/* '?' */
@@ -733,9 +735,9 @@ int main(int argc, char *argv[]) {
 	double frame_elapsed;
 	struct timeval s, f;
 	double elapsed_ms;
+	bool is_recording = false;
 
 	while (!terminate) {
-		bool stop_record = false;
 		bool request_frame = false;
 		FRAME_T *frame =
 				(state->operation_mode == EQUIRECTANGULAR) ?
@@ -765,23 +767,9 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
-					if (state->operation_mode == EQUIRECTANGULAR) {
-						if (state->double_size) {
-							StartRecord(frame_data_equirectangular_double.width,
-									frame_data_equirectangular_double.height,
-									param, 4000);
-						} else {
-							StartRecord(frame_data_equirectangular.width,
-									frame_data_equirectangular.height, param,
-									8000);
-						}
-					} else {
-						StartRecord(frame->width, frame->height, param, 4000);
-					}
+					strncpy(state->output_filepath, param,
+							sizeof(state->output_filepath) - 1);
 					state->output_mode = OUTPUT_MODE_VIDEO;
-					frame_num = 0;
-					frame_elapsed = 0;
-					printf("start_record saved to %s\n", param);
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 				printf("stop_record\n");
@@ -936,9 +924,9 @@ int main(int argc, char *argv[]) {
 		if (state->input_mode == INPUT_MODE_FILE
 				&& state->input_file_cur >= state->input_file_size) { // end of file
 			state->input_mode = INPUT_MODE_CAM;
-			stop_record = true;
+			state->output_mode == OUTPUT_MODE_NONE;
 		}
-		if (stop_record) { //stop record
+		if (is_recording && state->output_mode == OUTPUT_MODE_NONE) { //stop record
 			if (state->output_mode == OUTPUT_MODE_VIDEO) {
 				StopRecord();
 
@@ -947,6 +935,28 @@ int main(int argc, char *argv[]) {
 						1000.0 / frame_elapsed);
 			}
 			state->output_mode = OUTPUT_MODE_NONE;
+			is_recording = false;
+		}
+		if (!is_recording && state->output_mode == OUTPUT_MODE_VIDEO) {
+			if (state->operation_mode == EQUIRECTANGULAR) {
+				if (state->double_size) {
+					StartRecord(frame_data_equirectangular_double.width,
+							frame_data_equirectangular_double.height,
+							state->output_filepath, 4000);
+				} else {
+					StartRecord(frame_data_equirectangular.width,
+							frame_data_equirectangular.height,
+							state->output_filepath, 8000);
+				}
+			} else {
+				StartRecord(frame->width, frame->height, state->output_filepath,
+						4000);
+			}
+			state->output_mode = OUTPUT_MODE_VIDEO;
+			frame_num = 0;
+			frame_elapsed = 0;
+			is_recording = true;
+			printf("start_record saved to %s\n", state->output_filepath);
 		}
 		if (state->frame_sync) {
 			int res = 0;
