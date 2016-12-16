@@ -200,13 +200,13 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
 	OMX_ENCODE_PORT_IN, NULL);
-	ilclient_wait_for_event(m_encoder_component,
-			OMX_EventCmdComplete, OMX_CommandPortEnable, 1,
+	ilclient_wait_for_event(m_encoder_component, OMX_EventCmdComplete,
+			OMX_CommandPortEnable, 1,
 			OMX_ENCODE_PORT_IN, 1, 0, 1000);
 	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
 	OMX_ENCODE_PORT_OUT, NULL);
-	ilclient_wait_for_event(m_encoder_component,
-			OMX_EventCmdComplete, OMX_CommandPortEnable, 1,
+	ilclient_wait_for_event(m_encoder_component, OMX_EventCmdComplete,
+			OMX_CommandPortEnable, 1,
 			OMX_ENCODE_PORT_OUT, 1, 0, 1000);
 
 	ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component), &input_buffer,
@@ -395,6 +395,9 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
  * @return true iff enqueued.
  */
 bool OmxCvImpl::process(const unsigned char *in_data) {
+	if (m_input_queue.size() > 0) {
+		return false;
+	}
 	auto now = steady_clock::now();
 	memcpy(input_buffer->pBuffer, in_data, m_stride * m_height);
 	//BGR2RGB(mat, in->pBuffer, m_stride);
