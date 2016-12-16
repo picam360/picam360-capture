@@ -21,8 +21,10 @@ MODE=
 DIRECT=
 FPS=30
 CODEC=H264
+STREAM=false
+STREAM_PARAM=
 
-while getopts c:n:w:h:W:H:BsCEFf:rD OPT
+while getopts c:n:w:h:W:H:BsCEFf:rDS OPT
 do
     case $OPT in
         c)  CODEC=$OPTARG
@@ -53,10 +55,19 @@ do
             ;;
         D)  DIRECT="-D"
             ;;
+        S)  STREAM=true
+            ;;
         \?) usage_exit
             ;;
     esac
 done
+
+if [ $STREAM = true ]; then
+	sudo killall mjpg_streamer 
+	mjpg_streamer -i "input_file.so -f /tmp" &
+	STREAM_PARAM="-o /tmp/steam.jpeg"
+fi
+
 
 if [ -e cam0 ]; then
 	rm cam0
@@ -84,7 +95,7 @@ elif [ $DIRECT = ]; then
 fi
 
 if [ $BACKGROUND = true ]; then
-	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO < cmd &
+	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM < cmd &
 else
-	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO -p
+	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM -p
 fi

@@ -40,7 +40,7 @@ enum INPUT_MODE {
 	INPUT_MODE_NONE, INPUT_MODE_CAM, INPUT_MODE_FILE
 };
 enum OUTPUT_MODE {
-	OUTPUT_MODE_NONE, OUTPUT_MODE_STILL, OUTPUT_MODE_VIDEO, OUTPUT_MODE_RAW
+	OUTPUT_MODE_NONE, OUTPUT_MODE_STILL, OUTPUT_MODE_VIDEO
 };
 enum OPERATION_MODE {
 	BOARD, WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
@@ -104,6 +104,8 @@ typedef struct {
 	char output_filepath[256];
 	bool double_size;
 	bool frame_sync;
+	bool output_raw;
+	char output_raw_filepath[256];
 
 	float camera_roll;
 	float camera_pitch;

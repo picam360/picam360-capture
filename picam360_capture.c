@@ -623,11 +623,13 @@ int main(int argc, char *argv[]) {
 	state->operation_mode = WINDOW;
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
+	state->output_mode = OUTPUT_MODE_NONE;
+	state->output_raw = false;
 
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFD")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:r:")) != -1) {
 		switch (opt) {
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {
@@ -666,6 +668,14 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'D':
 			state->video_direct = true;
+			break;
+		case 'o':
+			state->output_mode = OUTPUT_MODE_VIDEO;
+			strncpy(state->output_filepath, optarg, sizeof(state->output_filepath));
+			break;
+		case 'r':
+			state->output_raw = true;
+			strncpy(state->output_raw_filepath, optarg, sizeof(state->outpu_rawt_filepath));
 			break;
 		default:
 			/* '?' */
@@ -778,12 +788,15 @@ int main(int argc, char *argv[]) {
 				stop_record = true;
 			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
-					strncpy(state->output_filepath, param,
-							sizeof(state->output_filepath) - 1);
-					state->output_mode = OUTPUT_MODE_RAW;
+				if (param != NULL && !state->output_raw) {
+					strncpy(state->output_raw_filepath, param,
+							sizeof(state->output_raw_filepath) - 1);
+					state->output_raw = true;
 					printf("start_record_raw saved to %s\n", param);
 				}
+			} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
+				printf("stop_record_raw\n");
+				state->output_raw = false;
 			} else if (strncmp(cmd, "load_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {

@@ -130,7 +130,7 @@ void *image_dumper(void* arg) {
 		pthread_mutex_unlock(data->mlock_p);
 
 		if (descriptor >= 0) {
-			if (data->state->output_mode != OUTPUT_MODE_RAW) { //end
+			if (!data->state->output_raw) { //end
 				close(descriptor);
 				descriptor = -1;
 				continue;
@@ -138,14 +138,14 @@ void *image_dumper(void* arg) {
 				write(descriptor, image_data->image_buff,
 						image_data->image_size);
 			}
-		} else if (data->state->output_mode == OUTPUT_MODE_RAW) { // start
+		} else if (data->state->output_raw) { // start
 			char buff[256];
-			sprintf(buff, data->state->output_filepath, data->index);
+			sprintf(buff, data->state->output_raw_filepath, data->index);
 			descriptor = open(buff, O_WRONLY | O_CREAT,
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 			if (descriptor == -1) {
 				printf("failed to open %s\n", buff);
-				data->state->output_mode = OUTPUT_MODE_NONE;
+				data->state->output_raw = false;
 				continue;
 			}
 		} else {
