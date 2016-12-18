@@ -15,6 +15,9 @@ using std::chrono::duration_cast;
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #define TIMEDIFF(start) (duration_cast<milliseconds>(steady_clock::now() - start).count())
 
@@ -344,10 +347,13 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 							} else {
 								memcpy(image_buff + image_buff_cur, buff,
 										i + 1);
-								m_ofstream.open(m_filename, std::ios::out);
-								m_ofstream.write((const char*) image_buff,
-										image_size);
-								m_ofstream.close();
+								int fd = open(m_filename.c_str(),
+										O_WRONLY | O_CREAT, 0666);
+								if (fd != -1) {
+									write(fd, (const char*) image_buff,
+											image_size);
+									close(fd);
+								}
 								free(image_buff);
 //printf("save frame\n");
 							}

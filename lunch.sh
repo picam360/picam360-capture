@@ -74,16 +74,19 @@ if [ -e cam0 ]; then
 	rm cam0
 fi
 mkfifo cam0
+chmod 0666 cam0
 
 if [ -e cam1 ]; then
 	rm cam1
 fi
 mkfifo cam1
+chmod 0666 cam1
 
 if [ -e cmd ]; then
 	rm cmd
 fi
 mkfifo cmd
+chmod 0666 cmd
 
 if [ $REMOTE = true ]; then
 	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &

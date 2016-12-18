@@ -141,8 +141,7 @@ void *image_dumper(void* arg) {
 		} else if (data->state->output_raw) { // start
 			char buff[256];
 			sprintf(buff, data->state->output_raw_filepath, data->index);
-			descriptor = open(buff, O_WRONLY | O_CREAT,
-					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+			descriptor = open(buff, O_WRONLY | O_CREAT, 0666);
 			if (descriptor == -1) {
 				printf("failed to open %s\n", buff);
 				data->state->output_raw = false;

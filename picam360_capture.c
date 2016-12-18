@@ -626,6 +626,8 @@ int main(int argc, char *argv[]) {
 	state->output_mode = OUTPUT_MODE_NONE;
 	state->output_raw = false;
 
+	umask(0000);
+
 	//init options
 	init_options(state);
 
