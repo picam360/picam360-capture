@@ -20,21 +20,21 @@ void main(void) {
 	float u = 0.0;
 	float v = 0.0;
 	vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
-	float roll_orig = -M_PI / 2.0 + M_PI * tcoord.y;
+	float pitch_orig = -M_PI / 2.0 + M_PI * tcoord.y;
 	float yaw_orig;
 	if (split == 0.0) {
 		yaw_orig = 2.0 * M_PI * tcoord.x - M_PI;
 	} else {
 		yaw_orig = 2.0 * M_PI * (tcoord.x / 2.0 + 0.5 * (split - 1.0)) - M_PI;
 	}
-	pos.x = cos(roll_orig) * sin(yaw_orig); //yaw starts from z
-	pos.y = sin(roll_orig);
-	pos.z = cos(roll_orig) * cos(yaw_orig); //yaw starts from z
+	pos.x = cos(pitch_orig) * sin(yaw_orig); //yaw starts from z
+	pos.y = sin(pitch_orig);
+	pos.z = cos(pitch_orig) * cos(yaw_orig); //yaw starts from z
 	pos = unif_matrix * pos;
-	float roll = asin(pos.y);
+	float pitch = asin(pos.y);
 	float yaw = atan(pos.x, pos.z); //yaw starts from z
 
-	float r = (M_PI / 2.0 - roll) / M_PI;
+	float r = (M_PI / 2.0 - pitch) / M_PI;
 	if (r > 0.65) {
 		float yaw2 = -yaw;
 		r = (1.0 - r) / 0.35 * 0.5;

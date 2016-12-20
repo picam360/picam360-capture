@@ -18,9 +18,9 @@ void main(void) {
 	float u = 0.0;
 	float v = 0.0;
 	vec4 pos = unif_matrix * position;
-	float roll = asin(pos.y);
+	float pitch = asin(pos.y);
 	float yaw = atan(pos.x, pos.z);
-	float r = (M_PI / 2.0 - roll) / M_PI;
+	float r = (M_PI / 2.0 - pitch) / M_PI;
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	if (r < 0.65) {
 		float yaw2 = yaw + M_PI + cam_offset_yaw;

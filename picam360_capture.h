@@ -107,7 +107,7 @@ typedef struct {
 	bool output_raw;
 	char output_raw_filepath[256];
 
-	float camera_roll;
 	float camera_pitch;
 	float camera_yaw;
+	float camera_roll;
 } PICAM360CAPTURE_T;

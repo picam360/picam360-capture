@@ -79,9 +79,9 @@
 
 typedef struct {
 	float sharpness_gain;
-	float cam_offset_roll[MAX_CAM_NUM];
 	float cam_offset_pitch[MAX_CAM_NUM];
 	float cam_offset_yaw[MAX_CAM_NUM];
+	float cam_offset_roll[MAX_CAM_NUM];
 	float cam_offset_x[MAX_CAM_NUM];
 	float cam_offset_y[MAX_CAM_NUM];
 	float cam_horizon_r[MAX_CAM_NUM];
@@ -444,14 +444,14 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				json_object_get(options, "sharpness_gain"));
 		for (int i = 0; i < MAX_CAM_NUM; i++) {
 			char buff[256];
-			sprintf(buff, "cam%d_offset_roll", i);
-			lg_options.cam_offset_roll[i] = json_number_value(
-					json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_pitch", i);
 			lg_options.cam_offset_pitch[i] = json_number_value(
 					json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_yaw", i);
 			lg_options.cam_offset_yaw[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, "cam%d_offset_roll", i);
+			lg_options.cam_offset_roll[i] = json_number_value(
 					json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_x", i);
 			lg_options.cam_offset_x[i] = json_number_value(
@@ -491,15 +491,15 @@ static void save_options(PICAM360CAPTURE_T *state) {
 			json_real(lg_options.sharpness_gain));
 	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		char buff[256];
-		sprintf(buff, "cam%d_offset_roll", i);
-		json_object_set_new(options, buff,
-				json_real(lg_options.cam_offset_roll[i]));
 		sprintf(buff, "cam%d_offset_pitch", i);
 		json_object_set_new(options, buff,
 				json_real(lg_options.cam_offset_pitch[i]));
 		sprintf(buff, "cam%d_offset_yaw", i);
 		json_object_set_new(options, buff,
 				json_real(lg_options.cam_offset_yaw[i]));
+		sprintf(buff, "cam%d_offset_roll", i);
+		json_object_set_new(options, buff,
+				json_real(lg_options.cam_offset_roll[i]));
 		sprintf(buff, "cam%d_offset_x", i);
 		json_object_set_new(options, buff,
 				json_real(lg_options.cam_offset_x[i]));
@@ -824,13 +824,13 @@ int main(int argc, char *argv[]) {
 					== 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
-					float roll;
 					float pitch;
 					float yaw;
-					sscanf(param, "%f,%f,%f", &roll, &pitch, &yaw);
-					state->camera_roll = roll * M_PI / 180.0;
+					float roll;
+					sscanf(param, "%f,%f,%f", &pitch, &yaw, &roll);
 					state->camera_pitch = pitch * M_PI / 180.0;
 					state->camera_yaw = yaw * M_PI / 180.0;
+					state->camera_roll = roll * M_PI / 180.0;
 					printf("set_camera_orientation\n");
 				}
 			} else if (strncmp(cmd, "set_render_size", sizeof(buff)) == 0) {
@@ -1111,9 +1111,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
 	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw); //vertical asis is y
-	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_pitch); //depth axis is z
 	mat4_rotateX(camera_matrix, camera_matrix,
-			state->camera_roll + lg_options.cam_offset_roll[0]);
+			state->camera_pitch + lg_options.cam_offset_pitch[0]);
+	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll); //depth axis is z
 
 	mat4 unif_matrix = mat4_create();
 	mat4_fromQuat(unif_matrix, get_quatanion());
