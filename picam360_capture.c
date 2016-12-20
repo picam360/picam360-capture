@@ -1110,14 +1110,14 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	mat4 camera_matrix = mat4_create();
 	mat4_identity(camera_matrix);
+	mat4_rotateX(camera_matrix, camera_matrix, lg_options.cam_offset_pitch[0]);
 	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw); //vertical asis is y
-	mat4_rotateX(camera_matrix, camera_matrix,
-			state->camera_pitch + lg_options.cam_offset_pitch[0]);
+	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
 	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll); //depth axis is z
 
 	mat4 unif_matrix = mat4_create();
-	mat4_fromQuat(unif_matrix, get_quatanion());
-	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2 + M_PI); //M_PI for jpeg coordinate
+	//mat4_fromQuat(unif_matrix, get_quatanion());
+	//mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2);
 	//float scale_factor[3] = { 1.0, 1.0, -1.0 };
 	//mat4_scale(unif_matrix, unif_matrix, scale_factor);
 
