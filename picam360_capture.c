@@ -625,6 +625,7 @@ int main(int argc, char *argv[]) {
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_mode = OUTPUT_MODE_NONE;
 	state->output_raw = false;
+	state->view_coordinate_from_device = true;
 
 	umask(0000);
 
@@ -832,6 +833,22 @@ int main(int argc, char *argv[]) {
 					state->camera_yaw = yaw * M_PI / 180.0;
 					state->camera_roll = roll * M_PI / 180.0;
 					printf("set_camera_orientation\n");
+				}
+			} else if (strncmp(cmd, "set_view_orientation", sizeof(buff))
+					== 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					float pitch;
+					float yaw;
+					float roll;
+					sscanf(param, "%f,%f,%f", &pitch, &yaw, &roll);
+					state->view_pitch = pitch * M_PI / 180.0;
+					state->view_yaw = yaw * M_PI / 180.0;
+					state->view_roll = roll * M_PI / 180.0;
+					state->view_coordinate_from_device = false;
+					printf("set_view_orientation\n");
+				} else {
+					state->view_coordinate_from_device = true;
 				}
 			} else if (strncmp(cmd, "set_render_size", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -1108,20 +1125,44 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
 
-	mat4 camera_matrix = mat4_create();
+	//depth axis is z, vertical asis is y
+	float unif_matrix[16];
+	float camera_offset_matrix;
+	float camera_matrix;
+	float view_matrix;
+	mat4_identity(unif_matrix);
+	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
-	mat4_rotateX(camera_matrix, camera_matrix, lg_options.cam_offset_pitch[0]);
-	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw); //vertical asis is y
+	mat4_identity(view_matrix);
+
+	//euler Y(yaw)X(pitch)Y(roll)
+	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
+			slg_options.cam_offset_roll[0]);
+	mat4_rotateX(camera_offset_matrix, camera_offset_matrix,
+			lg_options.cam_offset_pitch[0]);
+	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
+			lg_options.cam_offset_yaw[0]);
+
+	//euler Y(yaw)X(pitch)Y(roll)
+	mat4_rotateY(camera_matrix, camera_matrix, state->camera_roll);
 	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
-	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll); //depth axis is z
+	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 
-	mat4 unif_matrix = mat4_create();
-	//mat4_fromQuat(unif_matrix, get_quatanion());
-	//mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2);
-	//float scale_factor[3] = { 1.0, 1.0, -1.0 };
-	//mat4_scale(unif_matrix, unif_matrix, scale_factor);
+	mat4 view_matrix = mat4_create();
+	if (state->view_coordinate_from_device) {
+		mat4_fromQuat(view_matrix, get_quatanion());
+	} else {
+		mat4_identity(view_matrix);
+		mat4_rotateY(view_matrix, view_matrix, state->view_yaw);
+		mat4_rotateX(view_matrix, view_matrix, state->view_pitch);
+		mat4_rotateY(view_matrix, view_matrix, state->view_roll);
+	}
 
-	mat4_multiply(unif_matrix, camera_matrix, unif_matrix);
+	//(RcoRc)Rv(RcoRc)^-1R(Rco)Rc(Rco)^-1RcoRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_offset_matrix); // Rco : camera offset
+	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc : camera orientation
+	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // Rv : view orientation
+	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2); // Rw : view coodinate to world coodinate and view heading to ground initially
 
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);

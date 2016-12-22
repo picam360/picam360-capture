@@ -107,7 +107,13 @@ typedef struct {
 	bool output_raw;
 	char output_raw_filepath[256];
 
+	//for unif matrix
+	//euler angles
 	float camera_pitch;
 	float camera_yaw;
 	float camera_roll;
+	float view_pitch;
+	float view_yaw;
+	float view_roll;
+	bool view_coordinate_from_device;
 } PICAM360CAPTURE_T;
