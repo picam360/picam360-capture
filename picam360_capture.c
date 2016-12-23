@@ -1130,11 +1130,14 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
 	float view_matrix[16];
+	float world_matrix[16];
 	mat4_identity(unif_matrix);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
 	mat4_identity(view_matrix);
+	mat4_identity(world_matrix);
 
+	// Rco : camera offset
 	//euler Y(yaw)X(pitch)Z(roll)
 	mat4_rotateZ(camera_offset_matrix, camera_offset_matrix,
 			lg_options.cam_offset_roll[0]);
@@ -1143,6 +1146,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
 			lg_options.cam_offset_yaw[0]);
 
+	// Rc : camera orientation
 	//euler Y(yaw)X(pitch)Z(roll)
 	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
 	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
@@ -1152,16 +1156,22 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_fromQuat(view_matrix, get_quatanion());
 	} else {
 		//euler Y(yaw)X(pitch)Z(roll)
-		mat4_rotateZ(view_matrix, view_matrix, state->view_yaw);
+		mat4_rotateZ(view_matrix, view_matrix, state->view_roll);
 		mat4_rotateX(view_matrix, view_matrix, state->view_pitch);
-		mat4_rotateY(view_matrix, view_matrix, state->view_roll);
+		mat4_rotateY(view_matrix, view_matrix, state->view_yaw);
 	}
 
+	// Rw : view coodinate to world coodinate and view heading to ground initially
+	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
+
+	// Rv : view orientation
 	//(RcoRc)Rv(RcoRc)^-1R(Rco)Rc(Rco)^-1RcoRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_offset_matrix); // Rco : camera offset
-	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc : camera orientation
-	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // Rv : view orientation
-	mat4_rotateX(unif_matrix, unif_matrix, -M_PI / 2); // Rw : view coodinate to world coodinate and view heading to ground initially
+	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
+	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRvRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_offset_matrix); // RcoRcRvRw
+
+	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
 
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
