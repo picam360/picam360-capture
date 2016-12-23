@@ -1135,16 +1135,16 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_identity(camera_matrix);
 	mat4_identity(view_matrix);
 
-	//euler Y(yaw)X(pitch)Y(roll)
-	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
+	//euler Y(yaw)X(pitch)Z(roll)
+	mat4_rotateZ(camera_offset_matrix, camera_offset_matrix,
 			slg_options.cam_offset_roll[0]);
 	mat4_rotateX(camera_offset_matrix, camera_offset_matrix,
 			lg_options.cam_offset_pitch[0]);
 	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
 			lg_options.cam_offset_yaw[0]);
 
-	//euler Y(yaw)X(pitch)Y(roll)
-	mat4_rotateY(camera_matrix, camera_matrix, state->camera_roll);
+	//euler Y(yaw)X(pitch)Z(roll)
+	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
 	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
 	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 
@@ -1152,8 +1152,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	if (state->view_coordinate_from_device) {
 		mat4_fromQuat(view_matrix, get_quatanion());
 	} else {
-		mat4_identity(view_matrix);
-		mat4_rotateY(view_matrix, view_matrix, state->view_yaw);
+		//euler Y(yaw)X(pitch)Z(roll)
+		mat4_rotateZ(view_matrix, view_matrix, state->view_yaw);
 		mat4_rotateX(view_matrix, view_matrix, state->view_pitch);
 		mat4_rotateY(view_matrix, view_matrix, state->view_roll);
 	}
