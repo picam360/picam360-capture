@@ -1127,9 +1127,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	//depth axis is z, vertical asis is y
 	float unif_matrix[16];
-	float camera_offset_matrix;
-	float camera_matrix;
-	float view_matrix;
+	float camera_offset_matrix[16];
+	float camera_matrix[16];
+	float view_matrix[16];
 	mat4_identity(unif_matrix);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
