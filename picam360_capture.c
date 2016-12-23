@@ -1137,7 +1137,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	//euler Y(yaw)X(pitch)Z(roll)
 	mat4_rotateZ(camera_offset_matrix, camera_offset_matrix,
-			slg_options.cam_offset_roll[0]);
+			lg_options.cam_offset_roll[0]);
 	mat4_rotateX(camera_offset_matrix, camera_offset_matrix,
 			lg_options.cam_offset_pitch[0]);
 	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
@@ -1148,7 +1148,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
 	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 
-	mat4 view_matrix = mat4_create();
 	if (state->view_coordinate_from_device) {
 		mat4_fromQuat(view_matrix, get_quatanion());
 	} else {
