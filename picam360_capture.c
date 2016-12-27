@@ -1029,6 +1029,13 @@ int main(int argc, char *argv[]) {
 			strncpy(state->output_raw_filepath, optarg,
 					sizeof(state->output_raw_filepath));
 			break;
+		case 'W':
+		case 'H':
+		case 'E':
+		case 'C':
+		case 'F':
+		case 'o':
+			break;
 		default:
 			/* '?' */
 			printf(
