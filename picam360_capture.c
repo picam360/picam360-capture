@@ -557,7 +557,7 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-static next_frame_id = 0;
+static int next_frame_id = 0;
 
 FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	int opt;
