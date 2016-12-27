@@ -48,11 +48,30 @@ enum OPERATION_MODE {
 enum CODEC_TYPE {
 	H264, MJPEG
 };
-typedef struct {
+typedef struct _FRAME_T {
+	int id;
 	GLuint framebuffer;
 	GLuint texture;
 	uint32_t width;
 	uint32_t height;
+	bool delete_after_processed;
+	int frame_num;
+	double frame_elapsed;
+	bool is_recording;
+
+	enum OPERATION_MODE operation_mode;
+	enum OUTPUT_MODE output_mode;
+	char output_filepath[256];
+	bool double_size;
+
+	//for unif matrix
+	//euler angles
+	float view_pitch;
+	float view_yaw;
+	float view_roll;
+	bool view_coordinate_from_device;
+
+	struct _FRAME_T *next;
 } FRAME_T;
 typedef struct {
 	void *program;
@@ -66,7 +85,6 @@ typedef struct {
 	bool stereo;
 	bool video_direct;
 	enum CODEC_TYPE codec_type;
-	enum OPERATION_MODE operation_mode;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t cam_width;
@@ -100,9 +118,6 @@ typedef struct {
 	char input_filepath[256];
 	int input_file_size;
 	int input_file_cur;
-	enum OUTPUT_MODE output_mode;
-	char output_filepath[256];
-	bool double_size;
 	bool frame_sync;
 	bool output_raw;
 	char output_raw_filepath[256];
@@ -112,8 +127,6 @@ typedef struct {
 	float camera_pitch;
 	float camera_yaw;
 	float camera_roll;
-	float view_pitch;
-	float view_yaw;
-	float view_roll;
-	bool view_coordinate_from_device;
+
+	FRAME_T *frame;
 } PICAM360CAPTURE_T;

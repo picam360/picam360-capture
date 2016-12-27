@@ -556,10 +556,43 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
-		int render_height) {
-	if (render_width > 2048 || render_height > 2048) {
-		return false;
+FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
+	int render_width = 512;
+	int render_height = 512;
+	FRAME_T *frame = malloc(sizeof(FRAME_T));
+	memset(frame, 0, sizeof(FRAME_T));
+	frame->operation_mode = WINDOW;
+	frame->output_mode = OUTPUT_MODE_NONE;
+	frame->view_coordinate_from_device = true;
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:r:")) != -1) {
+		switch (opt) {
+		case 'W':
+			sscanf(optarg, "%d", &render_width);
+			break;
+		case 'H':
+			sscanf(optarg, "%d", &render_height);
+			break;
+		case 'E':
+			state->operation_mode = EQUIRECTANGULAR;
+			break;
+		case 'C':
+			state->operation_mode = CALIBRATION;
+			break;
+		case 'F':
+			state->operation_mode = FISHEYE;
+			break;
+		case 'o':
+			state->output_mode = OUTPUT_MODE_VIDEO;
+			strncpy(state->output_filepath, optarg,
+					sizeof(state->output_filepath));
+			break;
+		default:
+		}
+	}
+	if (render_width > 2048) {
+		frame->double_size = true;
+		frame->width = render_width / 2;
+		frame->height = render_height;
 	} else {
 		frame->width = render_width;
 		frame->height = render_height;
@@ -600,18 +633,152 @@ bool init_frame(PICAM360CAPTURE_T *state, FRAME_T *frame, int render_width,
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	return frame;
+}
+
+bool delete_frame(FRAME_T *frame) {
+
+	if (frame->framebuffer) {
+		glDeleteFramebuffers(1, &frame->framebuffer);
+	}
+	if (frame->texture) {
+		glDeleteTextures(1, &frame->texture);
+	}
+	free(frame);
+
 	return true;
+}
+
+void frame_handler(bool *request_frame_out) {
+	struct timeval s, f;
+	FRAME_T **frame_pp = &state->frame;
+	while (!*frame_pp) {
+		FRAME_T *frame = *frame_pp;
+		gettimeofday(&s, NULL);
+
+		//start & stop recording
+		if (frame->is_recording && state->output_mode == OUTPUT_MODE_NONE) { //stop record
+			StopRecord();
+
+			frame->frame_elapsed /= frame->frame_num;
+			printf("stop record : frame num : %d : fps %.3lf\n",
+					frame->frame_num, 1000.0 / frame->frame_elapsed);
+
+			frame->output_mode = OUTPUT_MODE_NONE;
+			frame->is_recording = false;
+			frame->delete_after_processed = true;
+		}
+		if (!frame->is_recording && state->output_mode == OUTPUT_MODE_VIDEO) {
+			int ratio = state->double_size ? 2 : 1;
+			StartRecord(frame->width * ratio, frame->height,
+					state->output_filepath, 4000 * ratio);
+			frame->output_mode = OUTPUT_MODE_VIDEO;
+			frame->frame_num = 0;
+			frame->frame_elapsed = 0;
+			frame->is_recording = true;
+			printf("start_record saved to %s\n", state->output_filepath);
+		}
+
+		//rendering to buffer
+		if (frame->output_mode == OUTPUT_MODE_STILL
+				|| frame->output_mode == OUTPUT_MODE_VIDEO) {
+			int img_width;
+			int img_height;
+			unsigned char *img_buff = NULL;
+			if (frame->double_size) {
+				int size = frame->width * frame->height * 3;
+				unsigned char *image_buffer = (unsigned char*) malloc(size);
+				unsigned char *image_buffer_double = (unsigned char*) malloc(
+						size * 2);
+				img_width = frame->width * 2;
+				img_height = frame->height;
+				img_buff = image_buffer_double;
+				for (int split = 0; split < 2; split++) {
+					state->split = split + 1;
+					redraw_render_texture(state, frame,
+							&model_data[frame->operation_mode]);
+					glFinish();
+					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
+							GL_UNSIGNED_BYTE, image_buffer);
+					glBindFramebuffer(GL_FRAMEBUFFER, 0);
+					for (int y = 0; y < frame->height; y++) {
+						memcpy(
+								image_buffer_double + frame->width * 2 * 3 * y
+										+ frame->width * 3 * split,
+								image_buffer + frame->width * 3 * y,
+								frame->width * 3);
+					}
+				}
+				free(image_buffer);
+			} else {
+				int size = frame->width * frame->height * 3;
+				unsigned char *image_buffer = (unsigned char*) malloc(size);
+				img_width = frame->width;
+				img_height = frame->height;
+				img_buff = image_buffer;
+				redraw_render_texture(state, frame,
+						&model_data[frame->operation_mode]);
+				glFinish();
+				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
+						GL_UNSIGNED_BYTE, image_buffer);
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			}
+
+			switch (frame->output_mode) {
+			case OUTPUT_MODE_STILL:
+				frame->output_mode = OUTPUT_MODE_NONE;
+				SaveJpeg(img_buff, img_width, img_height,
+						frame->output_filepath, 70);
+				printf("snap saved to %s\n", frame->output_filepath);
+
+				gettimeofday(&f, NULL);
+				double elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+						+ (f.tv_usec - s.tv_usec) / 1000.0;
+				printf("elapsed %.3lf ms\n", elapsed_ms);
+				break;
+			case OUTPUT_MODE_VIDEO:
+				AddFrame(img_buff);
+
+				gettimeofday(&f, NULL);
+				double elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+						+ (f.tv_usec - s.tv_usec) / 1000.0;
+				frame->frame_num++;
+				frame->frame_elapsed += elapsed_ms;
+				break;
+			default:
+				break;
+			}
+			if (img_buff) {
+				free(img_buff);
+			}
+			*request_frame_out = true;
+		} else if (frame == state->frame && state->prevew) {
+			redraw_render_texture(state, frame,
+					&model_data[frame->operation_mode]);
+			glFinish();
+			*request_frame_out = true;
+		}
+		//next rendering
+		if (frame->delete_after_processed) {
+			*frame_pp = frame->next;
+			delete_frame(frame);
+			frame = NULL;
+		} else {
+			frame_pp = &frame->next;
+		}
+		//preview
+		if (frame == state->frame && state->prevew) {
+			redraw_scene(state, frame, &model_data[BOARD]);
+		}
+	}
 }
 
 int main(int argc, char *argv[]) {
 	MODEL_T model_data[MAX_OPERATION_NUM] = { };
-	FRAME_T frame_data_window = { };
-	FRAME_T frame_data_equirectangular = { };
-	FRAME_T frame_data_equirectangular_double = { };
 	bool res;
 	int opt;
-	int render_width = 512;
-	int render_height = 512;
 	// Clear application state
 	memset(state, 0, sizeof(*state));
 	state->cam_width = 1024;
@@ -620,12 +787,9 @@ int main(int argc, char *argv[]) {
 	state->preview = false;
 	state->stereo = false;
 	state->codec_type = H264;
-	state->operation_mode = WINDOW;
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
-	state->output_mode = OUTPUT_MODE_NONE;
 	state->output_raw = false;
-	state->view_coordinate_from_device = true;
 
 	umask(0000);
 
@@ -649,33 +813,13 @@ int main(int argc, char *argv[]) {
 			sscanf(optarg, "%d", &state->num_of_cam);
 			break;
 		case 'p':
-			state->preview = true;
+			preview = true;
 			break;
 		case 's':
 			state->stereo = true;
 			break;
-		case 'W':
-			sscanf(optarg, "%d", &render_width);
-			break;
-		case 'H':
-			sscanf(optarg, "%d", &render_height);
-			break;
-		case 'E':
-			state->operation_mode = EQUIRECTANGULAR;
-			break;
-		case 'C':
-			state->operation_mode = CALIBRATION;
-			break;
-		case 'F':
-			state->operation_mode = FISHEYE;
-			break;
 		case 'D':
 			state->video_direct = true;
-			break;
-		case 'o':
-			state->output_mode = OUTPUT_MODE_VIDEO;
-			strncpy(state->output_filepath, optarg,
-					sizeof(state->output_filepath));
 			break;
 		case 'r':
 			state->output_raw = true;
@@ -706,26 +850,8 @@ int main(int argc, char *argv[]) {
 	// Start OGLES
 	init_ogl(state);
 
-	printf("width=%d,height=%d\n", render_width, render_height);
-
-	//set render size. this should be after init_ogl()
-	res = init_frame(state, &frame_data_window, render_width, render_height);
-	if (!res) {
-		printf("render size error");
-		exit(-1);
-	}
-	res = init_frame(state, &frame_data_equirectangular, state->cam_width,
-			state->cam_width / 2);
-	if (!res) {
-		printf("render size error");
-		exit(-1);
-	}
-	res = init_frame(state, &frame_data_equirectangular_double,
-			state->cam_width, state->cam_width);
-	if (!res) {
-		printf("render size error");
-		exit(-1);
-	}
+	//frame;
+	state->frame = create_frame(state, argc, argv);
 
 	// Setup the model world
 	init_model_proj(state, model_data);
@@ -734,17 +860,8 @@ int main(int argc, char *argv[]) {
 	init_textures(state);
 
 	double calib_step = 0.01;
-	int frame_num;
-	double frame_elapsed;
-	struct timeval s, f;
-	double elapsed_ms;
-	bool is_recording = false;
 
 	while (!terminate) {
-		bool request_frame = false;
-		FRAME_T *frame =
-				(state->operation_mode == EQUIRECTANGULAR) ?
-						&frame_data_equirectangular : &frame_data_window;
 		if (inputAvailable()) {
 			char buff[256];
 			int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
@@ -761,23 +878,52 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
 				state->active_cam = 1;
 			} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
-					strncpy(state->output_filepath, param,
-							sizeof(state->output_filepath) - 1);
-					state->output_mode = OUTPUT_MODE_STILL;
+				char *param = strtok(NULL, "\n");
+				if (param != NULL) {
+					const int kMaxArgs = 10;
+					int argc = 0;
+					char *argv[kMaxArgs];
+					char *p2 = strtok(param, " ");
+					while (p2 && argc < kMaxArgs - 1) {
+						argv[argc++] = p2;
+						p2 = strtok(0, " ");
+					}
+					argv[argc] = 0;
+					FRAME_T *frame = create_frame(state, argc, argv);
+					frame->next = state->frame;
+					frame->output_mode = OUTPUT_MODE_STILL;
+					state->frame = frame;
 				}
 			} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
-				if (param != NULL && state->output_mode == OUTPUT_MODE_NONE) {
-					strncpy(state->output_filepath, param,
-							sizeof(state->output_filepath) - 1);
+				if (param != NULL) {
+					const int kMaxArgs = 10;
+					int argc = 0;
+					char *argv[kMaxArgs];
+					char *p2 = strtok(param, " ");
+					while (p2 && argc < kMaxArgs - 1) {
+						argv[argc++] = p2;
+						p2 = strtok(0, " ");
+					}
+					argv[argc] = 0;
+					FRAME_T *frame = create_frame(state, argc, argv);
+					frame->next = state->frame;
 					state->output_mode = OUTPUT_MODE_VIDEO;
+					state->frame = frame;
 				}
 			} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
-				printf("stop_record\n");
-				if (state->output_mode == OUTPUT_MODE_VIDEO) {
-					state->output_mode = OUTPUT_MODE_NONE;
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					int id = 0;
+					sscanf(param, "%d", &id);
+					for (FRAME_T *frame = state->frame; frame != NULL; frame =
+							frame->next) {
+						if (frame->id == id) {
+							frame->output_mode = OUTPUT_MODE_NONE;
+							printf("stop_record\n");
+							break;
+						}
+					}
 				}
 			} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -800,27 +946,27 @@ int main(int argc, char *argv[]) {
 					state->input_file_size = 0;
 					printf("load_raw from %s\n", param);
 				}
-			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					switch (param[0]) {
-					case 'W':
-						state->operation_mode = WINDOW;
-						break;
-					case 'E':
-						state->operation_mode = EQUIRECTANGULAR;
-						break;
-					case 'F':
-						state->operation_mode = FISHEYE;
-						break;
-					case 'C':
-						state->operation_mode = CALIBRATION;
-						break;
-					default:
-						printf("unknown mode %s\n", param);
-					}
-					printf("set_mode %s\n", param);
-				}
+//			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
+//				char *param = strtok(NULL, " \n");
+//				if (param != NULL) {
+//					switch (param[0]) {
+//					case 'W':
+//						state->operation_mode = WINDOW;
+//						break;
+//					case 'E':
+//						state->operation_mode = EQUIRECTANGULAR;
+//						break;
+//					case 'F':
+//						state->operation_mode = FISHEYE;
+//						break;
+//					case 'C':
+//						state->operation_mode = CALIBRATION;
+//						break;
+//					default:
+//						printf("unknown mode %s\n", param);
+//					}
+//					printf("set_mode %s\n", param);
+//				}
 			} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff))
 					== 0) {
 				char *param = strtok(NULL, " \n");
@@ -838,53 +984,22 @@ int main(int argc, char *argv[]) {
 					== 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
+					int id;
 					float pitch;
 					float yaw;
 					float roll;
-					sscanf(param, "%f,%f,%f", &pitch, &yaw, &roll);
-					state->view_pitch = pitch * M_PI / 180.0;
-					state->view_yaw = yaw * M_PI / 180.0;
-					state->view_roll = roll * M_PI / 180.0;
-					state->view_coordinate_from_device = false;
-					printf("set_view_orientation\n");
-				} else {
-					state->view_coordinate_from_device = true;
-				}
-			} else if (strncmp(cmd, "set_render_size", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					int render_width;
-					int render_height;
-					sscanf(param, "%d,%d", &render_width, &render_height);
-
-					//set render size. this should be after init_ogl()
-					if (state->operation_mode == EQUIRECTANGULAR) {
-						if (!state->double_size) {
-							res = init_frame(state, frame, render_width,
-									render_width / 2);
-							if (!res) {
-								printf("render size error");
-								exit(-1);
-							}
-						} else {
-							res = init_frame(state,
-									&frame_data_equirectangular_double,
-									render_width / 2, render_width / 2);
-							if (!res) {
-								printf("render size error");
-								exit(-1);
-							}
-						}
-					} else {
-						res = init_frame(state, frame, render_width,
-								render_height);
-						if (!res) {
-							printf("render size error");
-							exit(-1);
+					sscanf(param, "%i %f,%f,%f", &id, &pitch, &yaw, &roll);
+					for (FRAME_T *frame = state->frame; frame != NULL; frame =
+							frame->next) {
+						if (frame->id == id) {
+							frame->view_pitch = pitch * M_PI / 180.0;
+							frame->view_yaw = yaw * M_PI / 180.0;
+							frame->view_roll = roll * M_PI / 180.0;
+							frame->view_coordinate_from_device = false;
+							printf("set_view_orientation\n");
+							break;
 						}
 					}
-
-					printf("set_render_size %s\n", param);
 				}
 			} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -898,19 +1013,13 @@ int main(int argc, char *argv[]) {
 					state->preview = (param[0] == '1');
 					printf("set_preview %s\n", param);
 				}
-			} else if (strncmp(cmd, "set_double_size", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					state->double_size = (param[0] == '1');
-					printf("set_double_size %s\n", param);
-				}
 			} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
 				if (param != NULL) {
 					state->frame_sync = (param[0] == '1');
 					printf("set_frame_sync %s\n", param);
 				}
-			} else if (state->operation_mode == CALIBRATION) {
+			} else if (state->frame->operation_mode == CALIBRATION) {
 				if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 					char *param = strtok(NULL, " \n");
 					if (param != NULL) {
@@ -945,41 +1054,12 @@ int main(int argc, char *argv[]) {
 		if (state->input_mode == INPUT_MODE_FILE
 				&& state->input_file_cur >= state->input_file_size) { // end of file
 			state->input_mode = INPUT_MODE_CAM;
-			if (state->output_mode == OUTPUT_MODE_VIDEO) {
-				state->output_mode = OUTPUT_MODE_NONE;
-			}
-		}
-		if (is_recording && state->output_mode == OUTPUT_MODE_NONE) { //stop record
-			if (state->output_mode == OUTPUT_MODE_VIDEO) {
-				StopRecord();
-
-				frame_elapsed /= frame_num;
-				printf("stop record : frame num : %d : fps %.3lf\n", frame_num,
-						1000.0 / frame_elapsed);
-			}
-			state->output_mode = OUTPUT_MODE_NONE;
-			is_recording = false;
-		}
-		if (!is_recording && state->output_mode == OUTPUT_MODE_VIDEO) {
-			if (state->operation_mode == EQUIRECTANGULAR) {
-				if (state->double_size) {
-					StartRecord(frame_data_equirectangular_double.width,
-							frame_data_equirectangular_double.height,
-							state->output_filepath, 4000);
-				} else {
-					StartRecord(frame_data_equirectangular.width,
-							frame_data_equirectangular.height,
-							state->output_filepath, 8000);
+			for (FRAME_T *frame = state->frame; frame != NULL;
+					frame = frame->next) {
+				if (state->output_mode == OUTPUT_MODE_VIDEO) {
+					state->output_mode = OUTPUT_MODE_NONE;
 				}
-			} else {
-				StartRecord(frame->width, frame->height, state->output_filepath,
-						4000);
 			}
-			state->output_mode = OUTPUT_MODE_VIDEO;
-			frame_num = 0;
-			frame_elapsed = 0;
-			is_recording = true;
-			printf("start_record saved to %s\n", state->output_filepath);
 		}
 		if (state->frame_sync) {
 			int res = 0;
@@ -993,100 +1073,13 @@ int main(int argc, char *argv[]) {
 				continue; // skip
 			}
 		}
-		gettimeofday(&s, NULL);
-		if (state->preview) {
-			redraw_render_texture(state, frame,
-					&model_data[state->operation_mode]);
-			redraw_scene(state, frame, &model_data[BOARD]);
-			request_frame = true;
-		}
-		if (state->output_mode == OUTPUT_MODE_STILL
-				|| state->output_mode == OUTPUT_MODE_VIDEO) {
-			int img_width;
-			int img_height;
-			unsigned char *img_buff = NULL;
-
-			if (state->operation_mode == EQUIRECTANGULAR
-					&& state->double_size) {
-				frame = &frame_data_equirectangular_double;
-				int size = frame->width * frame->height * 3;
-				unsigned char *image_buffer = (unsigned char*) malloc(size);
-				unsigned char *image_buffer_double = (unsigned char*) malloc(
-						size * 2);
-				img_width = frame->width * 2;
-				img_height = frame->height;
-				img_buff = image_buffer_double;
-				for (int split = 0; split < 2; split++) {
-					state->split = split + 1;
-					redraw_render_texture(state, frame,
-							&model_data[state->operation_mode]);
-					glFinish();
-					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-							GL_UNSIGNED_BYTE, image_buffer);
-					glBindFramebuffer(GL_FRAMEBUFFER, 0);
-					for (int y = 0; y < frame->height; y++) {
-						memcpy(
-								image_buffer_double + frame->width * 2 * 3 * y
-										+ frame->width * 3 * split,
-								image_buffer + frame->width * 3 * y,
-								frame->width * 3);
-					}
-				}
-				free(image_buffer);
-			} else {
-				int size = frame->width * frame->height * 3;
-				unsigned char *image_buffer = (unsigned char*) malloc(size);
-				img_width = frame->width;
-				img_height = frame->height;
-				img_buff = image_buffer;
-				if (!state->preview) {
-					redraw_render_texture(state, frame,
-							&model_data[state->operation_mode]);
-					glFinish();
-				}
-				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-						GL_UNSIGNED_BYTE, image_buffer);
-				glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			}
-
-			switch (state->output_mode) {
-			case OUTPUT_MODE_STILL:
-				state->output_mode = OUTPUT_MODE_NONE;
-				SaveJpeg(img_buff, img_width, img_height,
-						state->output_filepath, 70);
-				printf("snap saved to %s\n", state->output_filepath);
-
-				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-						+ (f.tv_usec - s.tv_usec) / 1000.0;
-				printf("elapsed %.3lf ms\n", elapsed_ms);
-				break;
-			case OUTPUT_MODE_VIDEO:
-				AddFrame(img_buff);
-
-				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-						+ (f.tv_usec - s.tv_usec) / 1000.0;
-				frame_num++;
-				frame_elapsed += elapsed_ms;
-				break;
-			default:
-				break;
-			}
-			if (img_buff) {
-				free(img_buff);
-			}
-			request_frame = true;
-		}
+		frame_handler(&request_frame);
 		if (request_frame) {
 			for (int i = 0; i < state->num_of_cam; i++) {
 				mrevent_reset(&state->arrived_frame_event[i]);
 				mrevent_trigger(&state->request_frame_event[i]);
 			}
 		}
-		gettimeofday(&f, NULL);
 	}
 	exit_func();
 	return 0;
@@ -1156,9 +1149,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_fromQuat(view_matrix, get_quatanion());
 	} else {
 		//euler Y(yaw)X(pitch)Z(roll)
-		mat4_rotateZ(view_matrix, view_matrix, state->view_roll);
-		mat4_rotateX(view_matrix, view_matrix, state->view_pitch);
-		mat4_rotateY(view_matrix, view_matrix, state->view_yaw);
+		mat4_rotateZ(view_matrix, view_matrix, frame->view_roll);
+		mat4_rotateX(view_matrix, view_matrix, frame->view_pitch);
+		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
 	}
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially
