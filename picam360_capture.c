@@ -794,7 +794,7 @@ void command_handler() {
 			state->active_cam = 0;
 		} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
 			state->active_cam = 1;
-		} else if (strncmp(cmd, "still", sizeof(buff)) == 0) {
+		} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, "\n");
 			if (param != NULL) {
 				const int kMaxArgs = 10;
@@ -827,6 +827,7 @@ void command_handler() {
 				frame->next = state->frame;
 				frame->output_mode = OUTPUT_MODE_VIDEO;
 				state->frame = frame;
+				printf("start_record id=%d\n", frame->id);
 			}
 		} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
