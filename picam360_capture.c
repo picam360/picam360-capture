@@ -566,6 +566,8 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->view_coordinate_from_device = true;
+
+	optind = 1; // reset getopt
 	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:r:")) != -1) {
 		switch (opt) {
 		case 'W':
@@ -601,16 +603,8 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		frame->height = render_height;
 	}
 
-	if (frame->framebuffer) {
-		glDeleteFramebuffers(1, &frame->framebuffer);
-	}
-
 	//texture rendering
 	glGenFramebuffers(1, &frame->framebuffer);
-
-	if (frame->texture) {
-		glDeleteTextures(1, &frame->texture);
-	}
 
 	glGenTextures(1, &frame->texture);
 	glBindTexture(GL_TEXTURE_2D, frame->texture);
@@ -656,7 +650,7 @@ void frame_handler() {
 	struct timeval s, f;
 	double elapsed_ms;
 	FRAME_T **frame_pp = &state->frame;
-	while (!*frame_pp) {
+	while (*frame_pp) {
 		FRAME_T *frame = *frame_pp;
 		gettimeofday(&s, NULL);
 
@@ -732,7 +726,6 @@ void frame_handler() {
 
 			switch (frame->output_mode) {
 			case OUTPUT_MODE_STILL:
-				frame->output_mode = OUTPUT_MODE_NONE;
 				SaveJpeg(img_buff, img_width, img_height,
 						frame->output_filepath, 70);
 				printf("snap saved to %s\n", frame->output_filepath);
@@ -741,6 +734,9 @@ void frame_handler() {
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				printf("elapsed %.3lf ms\n", elapsed_ms);
+
+				frame->output_mode = OUTPUT_MODE_NONE;
+				frame->delete_after_processed = true;
 				break;
 			case OUTPUT_MODE_VIDEO:
 				AddFrame(img_buff);
@@ -771,7 +767,7 @@ void frame_handler() {
 			frame_pp = &frame->next;
 		}
 		//preview
-		if (frame == state->frame && state->preview) {
+		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
 		}
 	}
@@ -795,7 +791,7 @@ void command_handler() {
 			state->active_cam = 0;
 		} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
 			state->active_cam = 1;
-		} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
+		} else if (strncmp(cmd, "still", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, "\n");
 			if (param != NULL) {
 				const int kMaxArgs = 10;
