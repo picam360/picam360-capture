@@ -798,13 +798,14 @@ void command_handler() {
 			char *param = strtok(NULL, "\n");
 			if (param != NULL) {
 				const int kMaxArgs = 10;
-				int argc = 0;
+				int argc = 1;
 				char *argv[kMaxArgs];
 				char *p2 = strtok(param, " ");
 				while (p2 && argc < kMaxArgs - 1) {
 					argv[argc++] = p2;
 					p2 = strtok(0, " ");
 				}
+				argv[0] = cmd;
 				argv[argc] = 0;
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
@@ -815,13 +816,14 @@ void command_handler() {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
 				const int kMaxArgs = 10;
-				int argc = 0;
+				int argc = 1;
 				char *argv[kMaxArgs];
 				char *p2 = strtok(param, " ");
 				while (p2 && argc < kMaxArgs - 1) {
 					argv[argc++] = p2;
 					p2 = strtok(0, " ");
 				}
+				argv[0] = cmd;
 				argv[argc] = 0;
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
