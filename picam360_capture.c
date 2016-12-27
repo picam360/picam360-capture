@@ -557,12 +557,15 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
+static next_frame_id = 0;
+
 FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	int opt;
 	int render_width = 512;
 	int render_height = 512;
 	FRAME_T *frame = malloc(sizeof(FRAME_T));
 	memset(frame, 0, sizeof(FRAME_T));
+	frame->id = next_frame_id++;
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->view_coordinate_from_device = true;
