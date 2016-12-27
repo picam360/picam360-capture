@@ -825,7 +825,7 @@ void command_handler() {
 				argv[argc] = 0;
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
-				state->output_mode = OUTPUT_MODE_VIDEO;
+				frame->output_mode = OUTPUT_MODE_VIDEO;
 				state->frame = frame;
 			}
 		} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
@@ -1110,7 +1110,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
-	if (state->operation_mode == CALIBRATION) {
+	if (frame->operation_mode == CALIBRATION) {
 		glBindTexture(GL_TEXTURE_2D, state->calibration_texture);
 	} else {
 		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
@@ -1147,7 +1147,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
 	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 
-	if (state->view_coordinate_from_device) {
+	if (frame->view_coordinate_from_device) {
 		mat4_fromQuat(view_matrix, get_quatanion());
 	} else {
 		//euler Y(yaw)X(pitch)Z(roll)
