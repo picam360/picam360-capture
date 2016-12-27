@@ -915,7 +915,7 @@ void command_handler() {
 				float pitch;
 				float yaw;
 				float roll;
-				sscanf(param, "%i %f,%f,%f", &id, &pitch, &yaw, &roll);
+				sscanf(param, "%i=%f,%f,%f", &id, &pitch, &yaw, &roll);
 				for (FRAME_T *frame = state->frame; frame != NULL; frame =
 						frame->next) {
 					if (frame->id == id) {
