@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <stdbool.h>
 #include <linux/input.h>
 
