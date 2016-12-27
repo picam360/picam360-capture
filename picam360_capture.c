@@ -588,6 +588,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 					sizeof(frame->output_filepath));
 			break;
 		default:
+			break;
 		}
 	}
 	if (render_width > 2048) {
@@ -652,6 +653,7 @@ bool delete_frame(FRAME_T *frame) {
 
 void frame_handler() {
 	struct timeval s, f;
+	double elapsed_ms;
 	FRAME_T **frame_pp = &state->frame;
 	while (!*frame_pp) {
 		FRAME_T *frame = *frame_pp;
@@ -735,7 +737,7 @@ void frame_handler() {
 				printf("snap saved to %s\n", frame->output_filepath);
 
 				gettimeofday(&f, NULL);
-				double elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				printf("elapsed %.3lf ms\n", elapsed_ms);
 				break;
@@ -743,7 +745,7 @@ void frame_handler() {
 				AddFrame(img_buff);
 
 				gettimeofday(&f, NULL);
-				double elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
 						+ (f.tv_usec - s.tv_usec) / 1000.0;
 				frame->frame_num++;
 				frame->frame_elapsed += elapsed_ms;
@@ -754,7 +756,7 @@ void frame_handler() {
 			if (img_buff) {
 				free(img_buff);
 			}
-		} else if (frame == state->frame && state->prevew) {
+		} else if (frame == state->frame && state->preview) {
 			redraw_render_texture(state, frame,
 					&state->model_data[frame->operation_mode]);
 			glFinish();
@@ -768,11 +770,15 @@ void frame_handler() {
 			frame_pp = &frame->next;
 		}
 		//preview
-		if (frame == state->frame && state->prevew) {
+		if (frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
 		}
 	}
 }
+
+
+static double calib_step = 0.01;
+
 void command_handler() {
 	if (inputAvailable()) {
 		char buff[256];
@@ -784,7 +790,6 @@ void command_handler() {
 		} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
 			printf("exit\n");
 			exit(0); //temporary
-			break;
 		} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
 			state->active_cam = 0;
 		} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
@@ -975,7 +980,6 @@ void command_handler() {
 }
 
 int main(int argc, char *argv[]) {
-	bool res;
 	int opt;
 	// Clear application state
 	memset(state, 0, sizeof(*state));
@@ -1011,7 +1015,7 @@ int main(int argc, char *argv[]) {
 			sscanf(optarg, "%d", &state->num_of_cam);
 			break;
 		case 'p':
-			preview = true;
+			state->preview = true;
 			break;
 		case 's':
 			state->stereo = true;
@@ -1056,8 +1060,6 @@ int main(int argc, char *argv[]) {
 
 	// initialise the OGLES texture(s)
 	init_textures(state);
-
-	double calib_step = 0.01;
 
 	while (!terminate) {
 		command_handler();
@@ -1246,7 +1248,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
-	if (state->operation_mode == CALIBRATION) {
+	if (frame->operation_mode == CALIBRATION) {
 		glViewport((state->screen_width - state->screen_height) / 2, 0,
 				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
