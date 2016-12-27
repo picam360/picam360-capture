@@ -89,7 +89,7 @@ typedef struct {
 OPTIONS_T lg_options = { };
 
 static void init_ogl(PICAM360CAPTURE_T *state);
-static void init_model_proj(PICAM360CAPTURE_T *state, MODEL_T *model_data);
+static void init_model_proj(PICAM360CAPTURE_T *state);
 static void init_textures(PICAM360CAPTURE_T *state);
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
@@ -328,40 +328,40 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
  * Returns: void
  *
  ***********************************************************/
-static void init_model_proj(PICAM360CAPTURE_T *state, MODEL_T *model_data) {
+static void init_model_proj(PICAM360CAPTURE_T *state) {
 	float fov = 120.0;
 
-	board_mesh(&model_data[EQUIRECTANGULAR].vbo,
-			&model_data[EQUIRECTANGULAR].vbo_nop);
+	board_mesh(&state->model_data[EQUIRECTANGULAR].vbo,
+			&state->model_data[EQUIRECTANGULAR].vbo_nop);
 	if (state->num_of_cam == 1) {
-		model_data[EQUIRECTANGULAR].program = GLProgram_new(
+		state->model_data[EQUIRECTANGULAR].program = GLProgram_new(
 				"shader/equirectangular.vert", "shader/equirectangular.frag");
 	} else {
-		model_data[EQUIRECTANGULAR].program = GLProgram_new(
+		state->model_data[EQUIRECTANGULAR].program = GLProgram_new(
 				"shader/equirectangular.vert",
 				"shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(&model_data[FISHEYE].vbo, &model_data[FISHEYE].vbo_nop);
-	model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert",
+	board_mesh(&state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
+	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert",
 			"shader/fisheye.frag");
 
-	board_mesh(&model_data[CALIBRATION].vbo, &model_data[CALIBRATION].vbo_nop);
-	model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert",
+	board_mesh(&state->model_data[CALIBRATION].vbo, &state->model_data[CALIBRATION].vbo_nop);
+	state->model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert",
 			"shader/calibration.frag");
 
-	spherewindow_mesh(fov, fov, 50, &model_data[WINDOW].vbo,
-			&model_data[WINDOW].vbo_nop, &model_data[WINDOW].scale);
+	spherewindow_mesh(fov, fov, 50, &state->model_data[WINDOW].vbo,
+			&state->model_data[WINDOW].vbo_nop, &state->model_data[WINDOW].scale);
 	if (state->num_of_cam == 1) {
-		model_data[WINDOW].program = GLProgram_new("shader/window.vert",
+		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window.frag");
 	} else {
-		model_data[WINDOW].program = GLProgram_new("shader/window.vert",
+		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window_sphere.frag");
 	}
 
-	board_mesh(&model_data[BOARD].vbo, &model_data[BOARD].vbo_nop);
-	model_data[BOARD].program = GLProgram_new("shader/board.vert",
+	board_mesh(&state->model_data[BOARD].vbo, &state->model_data[BOARD].vbo_nop);
+	state->model_data[BOARD].program = GLProgram_new("shader/board.vert",
 			"shader/board.frag");
 }
 
@@ -557,6 +557,7 @@ bool inputAvailable() {
 }
 
 FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
+	int opt;
 	int render_width = 512;
 	int render_height = 512;
 	FRAME_T *frame = malloc(sizeof(FRAME_T));
@@ -573,18 +574,18 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			sscanf(optarg, "%d", &render_height);
 			break;
 		case 'E':
-			state->operation_mode = EQUIRECTANGULAR;
+			frame->operation_mode = EQUIRECTANGULAR;
 			break;
 		case 'C':
-			state->operation_mode = CALIBRATION;
+			frame->operation_mode = CALIBRATION;
 			break;
 		case 'F':
-			state->operation_mode = FISHEYE;
+			frame->operation_mode = FISHEYE;
 			break;
 		case 'o':
-			state->output_mode = OUTPUT_MODE_VIDEO;
-			strncpy(state->output_filepath, optarg,
-					sizeof(state->output_filepath));
+			frame->output_mode = OUTPUT_MODE_VIDEO;
+			strncpy(frame->output_filepath, optarg,
+					sizeof(frame->output_filepath));
 			break;
 		default:
 		}
@@ -657,7 +658,7 @@ void frame_handler() {
 		gettimeofday(&s, NULL);
 
 		//start & stop recording
-		if (frame->is_recording && state->output_mode == OUTPUT_MODE_NONE) { //stop record
+		if (frame->is_recording && frame->output_mode == OUTPUT_MODE_NONE) { //stop record
 			StopRecord();
 
 			frame->frame_elapsed /= frame->frame_num;
@@ -668,15 +669,15 @@ void frame_handler() {
 			frame->is_recording = false;
 			frame->delete_after_processed = true;
 		}
-		if (!frame->is_recording && state->output_mode == OUTPUT_MODE_VIDEO) {
-			int ratio = state->double_size ? 2 : 1;
+		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
+			int ratio = frame->double_size ? 2 : 1;
 			StartRecord(frame->width * ratio, frame->height,
-					state->output_filepath, 4000 * ratio);
+					frame->output_filepath, 4000 * ratio);
 			frame->output_mode = OUTPUT_MODE_VIDEO;
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
-			printf("start_record saved to %s\n", state->output_filepath);
+			printf("start_record saved to %s\n", frame->output_filepath);
 		}
 
 		//rendering to buffer
@@ -696,7 +697,7 @@ void frame_handler() {
 				for (int split = 0; split < 2; split++) {
 					state->split = split + 1;
 					redraw_render_texture(state, frame,
-							&model_data[frame->operation_mode]);
+							&state->model_data[frame->operation_mode]);
 					glFinish();
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
@@ -718,7 +719,7 @@ void frame_handler() {
 				img_height = frame->height;
 				img_buff = image_buffer;
 				redraw_render_texture(state, frame,
-						&model_data[frame->operation_mode]);
+						&state->model_data[frame->operation_mode]);
 				glFinish();
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
@@ -755,7 +756,7 @@ void frame_handler() {
 			}
 		} else if (frame == state->frame && state->prevew) {
 			redraw_render_texture(state, frame,
-					&model_data[frame->operation_mode]);
+					&state->model_data[frame->operation_mode]);
 			glFinish();
 		}
 		//next rendering
@@ -768,7 +769,7 @@ void frame_handler() {
 		}
 		//preview
 		if (frame == state->frame && state->prevew) {
-			redraw_scene(state, frame, &model_data[BOARD]);
+			redraw_scene(state, frame, &state->model_data[BOARD]);
 		}
 	}
 }
@@ -974,7 +975,6 @@ void command_handler() {
 }
 
 int main(int argc, char *argv[]) {
-	MODEL_T model_data[MAX_OPERATION_NUM] = { };
 	bool res;
 	int opt;
 	// Clear application state
@@ -1052,7 +1052,7 @@ int main(int argc, char *argv[]) {
 	state->frame = create_frame(state, argc, argv);
 
 	// Setup the model world
-	init_model_proj(state, model_data);
+	init_model_proj(state);
 
 	// initialise the OGLES texture(s)
 	init_textures(state);

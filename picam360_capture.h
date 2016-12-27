@@ -129,4 +129,5 @@ typedef struct {
 	float camera_roll;
 
 	FRAME_T *frame;
+	MODEL_T model_data[MAX_OPERATION_NUM];
 } PICAM360CAPTURE_T;
