@@ -84,9 +84,10 @@ float *_get_quatanion() {
 float *get_quatanion() {
 	//update
 	if (dev != NULL) {
-		for (int i = 0; i < 4; i++) {
-			quat[i] = dev->Q[i];
-		}
+		quat[0] = -dev->Q[0];
+		quat[1] = dev->Q[1];
+		quat[2] = -dev->Q[2];
+		quat[3] = dev->Q[3];
 	}
 	return quat;
 }

@@ -416,8 +416,6 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 				(state->codec_type == H264) ?
 						video_decode_test : video_mjpeg_decode, args);
 
-		glEnable(GL_TEXTURE_2D);
-
 		// Bind texture surface to current vertices
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
@@ -1159,6 +1157,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	if (frame->view_coordinate_from_device) {
 		mat4_fromQuat(view_matrix, get_quatanion());
+		mat4_transpose(view_matrix, view_matrix);
 	} else {
 		//euler Y(yaw)X(pitch)Z(roll)
 		mat4_rotateZ(view_matrix, view_matrix, frame->view_roll);
