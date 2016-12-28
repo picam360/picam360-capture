@@ -189,7 +189,7 @@ void *image_receiver(void* arg) {
 				printf("camera input invalid\n");
 				break;
 			}
-		} else if (cam_fd >= 0) {
+		} else if (camd_fd >= 0) {
 			read(camd_fd, buff_trash, buff_size);
 		}
 		if (file_fd >= 0) {
