@@ -254,10 +254,9 @@ OmxCvImpl::~OmxCvImpl() {
 
 	//Teardown similar to hello_encode
 	ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
-	ilclient_disable_port_buffers(m_encoder_component, OMX_ENCODE_PORT_IN, NULL,
-			NULL, NULL);
-	ilclient_disable_port_buffers(m_encoder_component, OMX_ENCODE_PORT_OUT,
-			NULL, NULL, NULL);
+
+	OMX_FreeBuffer(ILC_GET_HANDLE(m_encoder_component), OMX_ENCODE_PORT_IN, input_buffer);
+	OMX_FreeBuffer(ILC_GET_HANDLE(m_encoder_component), OMX_ENCODE_PORT_OUT, output_buffer);
 
 	//ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
 	ilclient_change_component_state(m_encoder_component, OMX_StateLoaded);
