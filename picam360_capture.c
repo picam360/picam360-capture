@@ -1000,7 +1000,7 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:r:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:")) != -1) {
 		switch (opt) {
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {
@@ -1029,6 +1029,14 @@ int main(int argc, char *argv[]) {
 			state->output_raw = true;
 			strncpy(state->output_raw_filepath, optarg,
 					sizeof(state->output_raw_filepath));
+			break;
+		case 'i':
+			strncpy(state->input_filepath, optarg,
+					sizeof(state->input_filepath));
+			state->input_mode = INPUT_MODE_FILE;
+			state->input_file_cur = -1;
+			state->input_file_size = 0;
+			state->frame_sync = true;
 			break;
 		case 'W':
 		case 'H':
