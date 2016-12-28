@@ -569,7 +569,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->view_coordinate_from_device = true;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:r:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:")) != -1) {
 		switch (opt) {
 		case 'W':
 			sscanf(optarg, "%d", &render_width);
@@ -863,7 +863,7 @@ void command_handler() {
 				state->input_mode = INPUT_MODE_FILE;
 				state->input_file_cur = -1;
 				state->input_file_size = 0;
-				printf("load_raw from %s\n", param);
+				printf("load_file from %s\n", param);
 			}
 		} else if (strncmp(cmd, "cam_mode", sizeof(buff)) == 0) {
 			state->input_mode = INPUT_MODE_CAM;
