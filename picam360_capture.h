@@ -58,6 +58,7 @@ typedef struct _FRAME_T {
 	int frame_num;
 	double frame_elapsed;
 	bool is_recording;
+	void *recorder;
 
 	enum OPERATION_MODE operation_mode;
 	enum OUTPUT_MODE output_mode;

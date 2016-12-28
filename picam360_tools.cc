@@ -27,15 +27,14 @@ using std::chrono::duration_cast;
 
 //global variables
 
-static OmxCv *recorder = NULL;
-
-int StartRecord(const int width, const int height, const char *filename,
+void* StartRecord(const int width, const int height, const char *filename,
 		int bitrate_kbps) {
-	recorder = new OmxCv(filename, width, height, bitrate_kbps);
-	return 0;
+	OmxCv *recorder = new OmxCv(filename, width, height, bitrate_kbps);
+	return (void*)recorder;
 }
 
-int StopRecord() {
+int StopRecord(void *obj) {
+	OmxCv *recorder = (OmxCv*)obj;
 	if (recorder == NULL) {
 		return -1;
 	}
@@ -44,7 +43,8 @@ int StopRecord() {
 	return 0;
 }
 
-int AddFrame(const unsigned char *in_data) {
+int AddFrame(void *obj, const unsigned char *in_data) {
+	OmxCv *recorder = (OmxCv*)obj;
 	if (recorder == NULL) {
 		return -1;
 	}

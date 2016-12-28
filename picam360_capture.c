@@ -657,7 +657,8 @@ void frame_handler() {
 
 		//start & stop recording
 		if (frame->is_recording && frame->output_mode == OUTPUT_MODE_NONE) { //stop record
-			StopRecord();
+			StopRecord(frame->recorder);
+			frame->recorder = NULL;
 
 			frame->frame_elapsed /= frame->frame_num;
 			printf("stop record : frame num : %d : fps %.3lf\n",
@@ -669,7 +670,7 @@ void frame_handler() {
 		}
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
-			StartRecord(frame->width * ratio, frame->height,
+			frame->recorder = StartRecord(frame->width * ratio, frame->height,
 					frame->output_filepath, 4000 * ratio);
 			frame->output_mode = OUTPUT_MODE_VIDEO;
 			frame->frame_num = 0;
@@ -740,7 +741,7 @@ void frame_handler() {
 				frame->delete_after_processed = true;
 				break;
 			case OUTPUT_MODE_VIDEO:
-				AddFrame(img_buff);
+				AddFrame(frame->recorder, img_buff);
 
 				gettimeofday(&f, NULL);
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
