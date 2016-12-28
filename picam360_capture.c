@@ -867,7 +867,7 @@ void command_handler() {
 			}
 		} else if (strncmp(cmd, "cam_mode", sizeof(buff)) == 0) {
 			state->input_mode = INPUT_MODE_CAM;
-		} else if (strncmp(cmd, "get_raw_pos", sizeof(buff)) == 0) {
+		} else if (strncmp(cmd, "get_loading_pos", sizeof(buff)) == 0) {
 			if (state->input_file_size == 0) {
 				printf("%d\n", -1);
 			} else {
