@@ -171,26 +171,25 @@ void *image_receiver(void* arg) {
 	int camd_fd = -1;
 	int file_fd = -1;
 
-	{
-		char buff[256];
-		sprintf(buff, "cam%d", data->index);
-		camd_fd = open(buff, O_RDONLY);
-		if (camd_fd == -1) {
-			printf("failed to open %s\n", buff);
-			exit(-1);
-		}
-		printf("%s ready\n", buff);
-	}
-
 	while (1) {
 		bool reset = false;
 		if (data->state->input_mode == INPUT_MODE_CAM) {
+			if (cam_fd < 0) {
+				char buff[256];
+				sprintf(buff, "cam%d", data->index);
+				camd_fd = open(buff, O_RDONLY);
+				if (camd_fd == -1) {
+					printf("failed to open %s\n", buff);
+					exit(-1);
+				}
+				printf("%s ready\n", buff);
+			}
 			data_len = read(camd_fd, buff, buff_size);
 			if (data_len == 0) {
 				printf("camera input invalid\n");
 				break;
 			}
-		} else {
+		} else if (cam_fd >= 0) {
 			read(camd_fd, buff_trash, buff_size);
 		}
 		if (file_fd >= 0) {
@@ -228,7 +227,7 @@ void *image_receiver(void* arg) {
 			data->state->input_file_size = st.st_size;
 			data->state->input_file_cur = 0;
 
-			printf("open %s : %ldB\n", buff, (long int)st.st_size);
+			printf("open %s : %ldB\n", buff, (long int) st.st_size);
 
 			reset = true;
 		}
