@@ -174,7 +174,7 @@ void *image_receiver(void* arg) {
 	while (1) {
 		bool reset = false;
 		if (data->state->input_mode == INPUT_MODE_CAM) {
-			if (cam_fd < 0) {
+			if (camd_fd < 0) {
 				char buff[256];
 				sprintf(buff, "cam%d", data->index);
 				camd_fd = open(buff, O_RDONLY);
