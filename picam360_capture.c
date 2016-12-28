@@ -811,7 +811,7 @@ void command_handler() {
 				state->frame = frame;
 			}
 		} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
+			char *param = strtok(NULL, "\n");
 			if (param != NULL) {
 				const int kMaxArgs = 10;
 				int argc = 1;
