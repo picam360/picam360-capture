@@ -139,7 +139,8 @@ void OmxCvJpegImpl::input_worker() {
         m_input_queue.pop_front();
         lock.unlock();
 
-        FILE *fp = fopen(frame.second.c_str(), "wb");
+        std::string tmpname = frame.second + ".tmp";
+        FILE *fp = fopen(tmpname.c_str(), "wb");
         if (!fp) {
             perror(frame.second.c_str());
         }
@@ -155,6 +156,7 @@ void OmxCvJpegImpl::input_worker() {
 
         if (fp) {
             fclose(fp);
+            rename(tmpname.c_str(), frame.second.c_str());
         }
         lock.lock();
     }
