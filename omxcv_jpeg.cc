@@ -142,7 +142,7 @@ void OmxCvJpegImpl::input_worker() {
         std::string tmpname = frame.second + ".tmp";
         FILE *fp = fopen(tmpname.c_str(), "wb");
         if (!fp) {
-            perror(frame.second.c_str());
+            perror(tmpname.c_str());
         }
 
         OMX_EmptyThisBuffer(ILC_GET_HANDLE(m_encoder_component), frame.first);

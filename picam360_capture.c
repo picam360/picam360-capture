@@ -809,6 +809,10 @@ void command_handler() {
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
 				frame->output_mode = OUTPUT_MODE_STILL;
+				frame->view_pitch = 90;
+				frame->view_yaw = 0;
+				frame->view_roll = 0;
+				frame->view_coordinate_from_device = false;
 				state->frame = frame;
 			}
 		} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
@@ -827,6 +831,10 @@ void command_handler() {
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
 				frame->output_mode = OUTPUT_MODE_VIDEO;
+				frame->view_pitch = 90;
+				frame->view_yaw = 0;
+				frame->view_roll = 0;
+				frame->view_coordinate_from_device = false;
 				state->frame = frame;
 				printf("start_record id=%d\n", frame->id);
 			}
