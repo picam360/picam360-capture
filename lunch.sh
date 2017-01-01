@@ -63,10 +63,15 @@ do
 done
 
 if [ $STREAM = true ]; then
+	if [ -e /tmp/stream ]; then
+		rm /tmp/stream
+	fi
+	mkdir /tmp/stream
+	chmod 0777 /tmp/stream
 	export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 	sudo killall mjpg_streamer 
-	mjpg_streamer -i "input_file.so -f /tmp" &
-	STREAM_PARAM="-o /tmp/steam.jpeg"
+	mjpg_streamer -i "input_file.so -f /tmp/stream" &
+	STREAM_PARAM="-o /tmp/stream/steam.jpeg"
 fi
 
 
