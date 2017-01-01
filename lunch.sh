@@ -14,7 +14,7 @@ CAM_HEIGHT=1024
 BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
-BACKGROUND=false
+PREVIEW=
 REMOTE=false
 STEREO=
 MODE=
@@ -24,7 +24,7 @@ CODEC=H264
 STREAM=false
 STREAM_PARAM=
 
-while getopts c:n:w:h:W:H:BsCEFf:rDS OPT
+while getopts c:n:w:h:W:H:psCEFf:rDS OPT
 do
     case $OPT in
         c)  CODEC=$OPTARG
@@ -39,7 +39,7 @@ do
             ;;
         H)  RENDER_HEIGHT=$OPTARG
             ;;
-        B)  BACKGROUND=true
+        p)  PREVIEW="-p"
             ;;
         s)  STEREO="-s"
             ;;
@@ -98,8 +98,4 @@ elif [ $DIRECT = ]; then
 	fi
 fi
 
-if [ $BACKGROUND = true ]; then
-	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM < cmd &
-else
-	./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM -p
-fi
+./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM $PREVIEW < $1 > $2
