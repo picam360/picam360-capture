@@ -343,16 +343,19 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 				"shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(&state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
+	board_mesh(&state->model_data[FISHEYE].vbo,
+			&state->model_data[FISHEYE].vbo_nop);
 	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert",
 			"shader/fisheye.frag");
 
-	board_mesh(&state->model_data[CALIBRATION].vbo, &state->model_data[CALIBRATION].vbo_nop);
-	state->model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert",
-			"shader/calibration.frag");
+	board_mesh(&state->model_data[CALIBRATION].vbo,
+			&state->model_data[CALIBRATION].vbo_nop);
+	state->model_data[CALIBRATION].program = GLProgram_new(
+			"shader/calibration.vert", "shader/calibration.frag");
 
 	spherewindow_mesh(fov, fov, 50, &state->model_data[WINDOW].vbo,
-			&state->model_data[WINDOW].vbo_nop, &state->model_data[WINDOW].scale);
+			&state->model_data[WINDOW].vbo_nop,
+			&state->model_data[WINDOW].scale);
 	if (state->num_of_cam == 1) {
 		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window.frag");
@@ -361,7 +364,8 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 				"shader/window_sphere.frag");
 	}
 
-	board_mesh(&state->model_data[BOARD].vbo, &state->model_data[BOARD].vbo_nop);
+	board_mesh(&state->model_data[BOARD].vbo,
+			&state->model_data[BOARD].vbo_nop);
 	state->model_data[BOARD].program = GLProgram_new("shader/board.vert",
 			"shader/board.frag");
 }
@@ -775,7 +779,6 @@ void frame_handler() {
 	}
 }
 
-
 static double calib_step = 0.01;
 
 void command_handler() {
@@ -843,8 +846,8 @@ void command_handler() {
 			if (param != NULL) {
 				int id = 0;
 				sscanf(param, "%d", &id);
-				for (FRAME_T *frame = state->frame; frame != NULL; frame =
-						frame->next) {
+				for (FRAME_T *frame = state->frame; frame != NULL;
+						frame = frame->next) {
 					if (frame->id == id) {
 						frame->output_mode = OUTPUT_MODE_NONE;
 						printf("stop_record\n");
@@ -879,8 +882,9 @@ void command_handler() {
 			if (state->input_file_size == 0) {
 				printf("%d\n", -1);
 			} else {
-				double ratio = 100 * state->input_file_cur / state->input_file_size;
-				printf("%d\n", (int)ratio);
+				double ratio = 100 * state->input_file_cur
+						/ state->input_file_size;
+				printf("%d\n", (int) ratio);
 			}
 //			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
 //				char *param = strtok(NULL, " \n");
@@ -903,8 +907,7 @@ void command_handler() {
 //					}
 //					printf("set_mode %s\n", param);
 //				}
-		} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff))
-				== 0) {
+		} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
 				float pitch;
@@ -916,8 +919,7 @@ void command_handler() {
 				state->camera_roll = roll * M_PI / 180.0;
 				printf("set_camera_orientation\n");
 			}
-		} else if (strncmp(cmd, "set_view_orientation", sizeof(buff))
-				== 0) {
+		} else if (strncmp(cmd, "set_view_orientation", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
 				int id;
@@ -925,8 +927,8 @@ void command_handler() {
 				float yaw;
 				float roll;
 				sscanf(param, "%i=%f,%f,%f", &id, &pitch, &yaw, &roll);
-				for (FRAME_T *frame = state->frame; frame != NULL; frame =
-						frame->next) {
+				for (FRAME_T *frame = state->frame; frame != NULL;
+						frame = frame->next) {
 					if (frame->id == id) {
 						frame->view_pitch = pitch * M_PI / 180.0;
 						frame->view_yaw = yaw * M_PI / 180.0;
@@ -990,6 +992,7 @@ void command_handler() {
 }
 
 int main(int argc, char *argv[]) {
+	bool input_file_mode = false;
 	int opt;
 	// Clear application state
 	memset(state, 0, sizeof(*state));
@@ -1045,6 +1048,7 @@ int main(int argc, char *argv[]) {
 			state->input_file_cur = -1;
 			state->input_file_size = 0;
 			state->frame_sync = true;
+			input_file_mode = true;
 			break;
 		case 'W':
 		case 'H':
@@ -1106,6 +1110,10 @@ int main(int argc, char *argv[]) {
 				mrevent_reset(&state->arrived_frame_event[i]);
 				mrevent_trigger(&state->request_frame_event[i]);
 			}
+		}
+		if (input_file_mode
+				&& state->input_file_cur == state->input_file_size) {
+			terminate = true;
 		}
 	}
 	exit_func();
