@@ -571,6 +571,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->view_coordinate_from_device = true;
+	frame->zoom = 1.0
 
 	optind = 1; // reset getopt
 	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:")) != -1) {
@@ -939,6 +940,21 @@ void command_handler() {
 					}
 				}
 			}
+		} else if (strncmp(cmd, "set_zoom", sizeof(buff)) == 0) {
+			char *param = strtok(NULL, " \n");
+			if (param != NULL) {
+				int id;
+				float zoom;
+				sscanf(param, "%i=%f", &id, &zoom);
+				for (FRAME_T *frame = state->frame; frame != NULL;
+						frame = frame->next) {
+					if (frame->id == id) {
+						frame->zoom = zoom;
+						printf("set_zoom\n");
+						break;
+					}
+				}
+			}
 		} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
@@ -1207,6 +1223,10 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glUniform1f(glGetUniformLocation(program, "scale"), model->scale);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
 			1.0 / state->cam_width);
+
+	glUniform1f(glGetUniformLocation(program, "zoom"), frame->zoom);
+	glUniform1f(glGetUniformLocation(program, "aspect_ratio"),
+			frame->width / frame->height);
 
 	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
 

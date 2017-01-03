@@ -65,6 +65,7 @@ typedef struct _FRAME_T {
 	char output_filepath[256];
 	bool double_size;
 
+	float zoom;
 	//for unif matrix
 	//euler angles
 	float view_pitch;
