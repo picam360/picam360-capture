@@ -715,6 +715,7 @@ void frame_handler() {
 				img_width = frame->width;
 				img_height = frame->height;
 				img_buff = image_buffer;
+				state->split = 0;
 				redraw_render_texture(state, frame,
 						&state->model_data[frame->operation_mode]);
 				glFinish();
