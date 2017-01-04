@@ -1220,8 +1220,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		float scale = 1.0 / tan(fov_rad / 2);
 		glUniform1f(glGetUniformLocation(program, "scale"), scale);
 	}
-	glUniform1f(glGetUniformLocation(program, "aspect_ratio"),
-			frame->width / frame->height);
+	{
+		float aspect_ratio = (float) frame->width / (float) frame->height;
+		glUniform1f(glGetUniformLocation(program, "aspect_ratio"),
+				aspect_ratio);
+	}
 
 	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
 
