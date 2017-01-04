@@ -22,6 +22,14 @@ void main(void) {
 	float yaw = atan(pos.x, pos.z);
 	float r = (M_PI / 2.0 - pitch) / M_PI;
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+	if (r > 0.65) {
+	} else if (r >= 0.55) {
+		r = pow(r - 0.55, 1.2) + pow(0.05, 1.1) + pow(0.10, 1.09) + 0.4;
+	} else if (r >= 0.50) {
+		r = pow(r - 0.50, 1.1) + pow(0.10, 1.09) + 0.4;
+	} else if (r >= 0.40) {
+		r = pow(r - 0.4, 1.09) + 0.4;
+	}
 	if (r < 0.65) {
 		float yaw2 = yaw + M_PI + cam_offset_yaw;
 		u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;

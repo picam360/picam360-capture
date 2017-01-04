@@ -250,7 +250,7 @@ int board_mesh(GLuint *vbo_out, GLuint *n_out) {
 }
 
 int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
-		GLuint *vbo_out, GLuint *n_out, float *scale_out) {
+		GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
@@ -268,7 +268,6 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 	float step_x = (end_x - start_x) / num_of_steps;
 	float step_y = (end_y - start_y) / num_of_steps;
 
-	float scale = 0;
 	int idx = 0;
 	int i, j;
 	for (i = 0; i < num_of_steps; i++) {	//x
@@ -282,9 +281,6 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 				points[idx++] = y / len;
 				points[idx++] = z / len;
 				points[idx++] = 1.0;
-				if (scale == 0) {
-					scale = z / -x;
-				}
 				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
 				//		points[idx - 3], points[idx - 2], points[idx - 1]);
 			}
@@ -312,8 +308,6 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 		*vbo_out = vbo;
 	if (n_out != NULL)
 		*n_out = n;
-	if (scale_out != NULL)
-		*scale_out = scale;
 
 	return 0;
 }
@@ -330,7 +324,7 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
  *
  ***********************************************************/
 static void init_model_proj(PICAM360CAPTURE_T *state) {
-	float fov = 120.0;
+	float maxfov = 150.0;
 
 	board_mesh(&state->model_data[EQUIRECTANGULAR].vbo,
 			&state->model_data[EQUIRECTANGULAR].vbo_nop);
@@ -353,9 +347,8 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	state->model_data[CALIBRATION].program = GLProgram_new(
 			"shader/calibration.vert", "shader/calibration.frag");
 
-	spherewindow_mesh(fov, fov, 50, &state->model_data[WINDOW].vbo,
-			&state->model_data[WINDOW].vbo_nop,
-			&state->model_data[WINDOW].scale);
+	spherewindow_mesh(maxfov, maxfov, 50, &state->model_data[WINDOW].vbo,
+			&state->model_data[WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
 		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window.frag");
@@ -571,7 +564,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->view_coordinate_from_device = true;
-	frame->zoom = 1.0
+	frame->fov = 120;
 
 	optind = 1; // reset getopt
 	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:")) != -1) {
@@ -940,17 +933,17 @@ void command_handler() {
 					}
 				}
 			}
-		} else if (strncmp(cmd, "set_zoom", sizeof(buff)) == 0) {
+		} else if (strncmp(cmd, "set_fov", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
 				int id;
-				float zoom;
-				sscanf(param, "%i=%f", &id, &zoom);
+				float fov;
+				sscanf(param, "%i=%f", &id, &fov);
 				for (FRAME_T *frame = state->frame; frame != NULL;
 						frame = frame->next) {
 					if (frame->id == id) {
-						frame->zoom = zoom;
-						printf("set_zoom\n");
+						frame->fov = fov;
+						printf("set_fov\n");
 						break;
 					}
 				}
@@ -1220,11 +1213,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
-	glUniform1f(glGetUniformLocation(program, "scale"), model->scale);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
 			1.0 / state->cam_width);
 
-	glUniform1f(glGetUniformLocation(program, "zoom"), frame->zoom);
+	glUniform1f(glGetUniformLocation(program, "scale"),
+			1.0 / tan(frame->fov / 2));
 	glUniform1f(glGetUniformLocation(program, "aspect_ratio"),
 			frame->width / frame->height);
 

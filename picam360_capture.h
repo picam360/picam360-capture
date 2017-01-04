@@ -65,7 +65,7 @@ typedef struct _FRAME_T {
 	char output_filepath[256];
 	bool double_size;
 
-	float zoom;
+	float fov;
 	//for unif matrix
 	//euler angles
 	float view_pitch;
@@ -79,7 +79,6 @@ typedef struct {
 	void *program;
 	GLuint vbo;
 	GLuint vbo_nop;
-	float scale;
 } MODEL_T;
 typedef struct {
 	int split;
