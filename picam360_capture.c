@@ -974,10 +974,10 @@ void command_handler() {
 					sscanf(param, "%lf", &calib_step);
 				}
 			}
-			if (strncmp(cmd, "u", sizeof(buff)) == 0) {
+			if (strncmp(cmd, "u", sizeof(buff)) == 0 || strncmp(cmd, "t", sizeof(buff)) == 0) {
 				lg_options.cam_offset_y[state->active_cam] -= calib_step;
 			}
-			if (strncmp(cmd, "d", sizeof(buff)) == 0) {
+			if (strncmp(cmd, "d", sizeof(buff)) == 0 || strncmp(cmd, "b", sizeof(buff)) == 0) {
 				lg_options.cam_offset_y[state->active_cam] += calib_step;
 			}
 			if (strncmp(cmd, "l", sizeof(buff)) == 0) {

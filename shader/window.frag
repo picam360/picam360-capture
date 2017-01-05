@@ -51,7 +51,7 @@ void main(void) {
 			fc -= texture2D(cam_texture, vec2(u + 1.0 * pixel_size, v))
 					* gain;
 		}
-		gl_FragColor = fc;
+        gl_FragColor = vec4(fc.r - 0.1, fc.g - 0.1, fc.b - 0.1, 1.0);
 	} else {
 		float yaw2 = -yaw;
 		r = (1.0 - r) / 0.35 * 0.5;
