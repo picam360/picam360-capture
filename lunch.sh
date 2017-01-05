@@ -87,12 +87,6 @@ fi
 mkfifo cam1
 chmod 0666 cam1
 
-if [ -e cmd ]; then
-	rm cmd
-fi
-mkfifo cmd
-chmod 0666 cmd
-
 if [ $REMOTE = true ]; then
 	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &
 elif [ $DIRECT = ]; then
