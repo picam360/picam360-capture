@@ -13,6 +13,8 @@ uniform float cam_horizon_r;
 //options end
 
 const float M_PI = 3.1415926535;
+const float color_offset = 0.15;
+const float color_factor = 1.0 / (1.0 - color_offset);
 
 void main(void) {
 	float u = 0.0;
@@ -69,7 +71,7 @@ void main(void) {
 			fc -= texture2D(cam_texture, vec2(u + 1.0 * pixel_size, v))
 					* gain;
 		}
-        gl_FragColor = vec4(fc.r - 0.1, fc.g - 0.1, fc.b - 0.1, 1.0);
+        gl_FragColor = vec4((fc.r - color_offset)*color_factor, (fc.g - color_offset)*color_factor, (fc.b - color_offset)*color_factor, 1.0);
 	} else {
 		float yaw2 = -yaw;
 		r = (1.0 - r) / 0.35 * 0.5;
