@@ -347,7 +347,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	state->model_data[CALIBRATION].program = GLProgram_new(
 			"shader/calibration.vert", "shader/calibration.frag");
 
-	spherewindow_mesh(maxfov, maxfov, 50, &state->model_data[WINDOW].vbo,
+	spherewindow_mesh(maxfov, maxfov, 128, &state->model_data[WINDOW].vbo,
 			&state->model_data[WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
 		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
