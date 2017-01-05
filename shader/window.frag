@@ -35,11 +35,29 @@ void main(void) {
 		u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;
 		v = cam_horizon_r * r * sin(yaw2) + 0.5 - cam_offset_y;
 		vec4 fc;
-		if (sharpness_gain == 0.0) {
+		if (r >= 0.45) {
+			fc = texture2D(cam_texture, vec2(u, v));
+			
+			float r_r = pow(r - 0.45, 1.006) + 0.45;
+			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+			vec4 fc_b = texture2D(cam_texture, vec2(u, v));
+
+			fc_b = (fc_b - color_offset) * color_factor;
+			fc.z = fc_b.z;
+
+			r_r = pow(r - 0.45, 1.003) + 0.45;
+			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+			fc_b = texture2D(cam_texture, vec2(u, v));
+
+			fc_b = (fc_b - color_offset) * color_factor;
+			fc.y = fc_b.y;
+		} else if (sharpness_gain == 0.0) {
 			fc = texture2D(cam_texture, vec2(u, v));
 		} else {
 			//sharpness
-			float gain = sharpness_gain + r;
+			float gain = sharpness_gain + r/2.0;
 			fc = texture2D(cam_texture, vec2(u, v))
 					* (1.0 + 4.0 * gain);
 			fc -= texture2D(cam_texture, vec2(u - 1.0 * pixel_size, v))
