@@ -969,11 +969,11 @@ void command_handler() {
 			}
 			if (strncmp(cmd, "u", sizeof(buff)) == 0
 					|| strncmp(cmd, "t", sizeof(buff)) == 0) {
-				state->options.cam_offset_y[state->active_cam] -= calib_step;
+				state->options.cam_offset_y[state->active_cam] += calib_step;
 			}
 			if (strncmp(cmd, "d", sizeof(buff)) == 0
 					|| strncmp(cmd, "b", sizeof(buff)) == 0) {
-				state->options.cam_offset_y[state->active_cam] += calib_step;
+				state->options.cam_offset_y[state->active_cam] -= calib_step;
 			}
 			if (strncmp(cmd, "l", sizeof(buff)) == 0) {
 				state->options.cam_offset_x[state->active_cam] += calib_step;

@@ -15,7 +15,7 @@ void main(void) {
 	vec4 fc = texture2D(logo_texture, vec2(tcoord.x, tcoord.y));
 	if (fc.g == 0.0) {
 		float u = tcoord.x + cam_offset_x;
-		float v = tcoord.y - cam_offset_y;
+		float v = tcoord.y + cam_offset_y;
 		if (sharpness_gain == 0.0) {
 			fc = texture2D(cam_texture, vec2(u, v));
 		} else {

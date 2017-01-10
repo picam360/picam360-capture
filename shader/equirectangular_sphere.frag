@@ -49,7 +49,7 @@ void main(void) {
 		}
 		float yaw2 = yaw + M_PI + cam0_offset_yaw;
 		u = cam0_horizon_r * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
-		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 - cam0_offset_y; //cordinate is different
+		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;
@@ -85,7 +85,7 @@ void main(void) {
 		}
 		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
 		u = cam1_horizon_r * r2 * cos(yaw2) + 0.5 + cam1_offset_x;
-		v = cam1_horizon_r * r2 * sin(yaw2) + 0.5 - cam1_offset_y; //cordinate is different
+		v = cam1_horizon_r * r2 * sin(yaw2) + 0.5 + cam1_offset_y; //cordinate is different
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
 			v = 0.0;

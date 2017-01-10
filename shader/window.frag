@@ -33,7 +33,7 @@ void main(void) {
 	if (r < 0.65) {
 		float yaw2 = yaw + M_PI + cam_offset_yaw;
 		u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;
-		v = cam_horizon_r * r * sin(yaw2) + 0.5 - cam_offset_y;
+		v = cam_horizon_r * r * sin(yaw2) + 0.5 + cam_offset_y;
 		vec4 fc;
 		if (sharpness_gain == 0.0) {
 			fc = texture2D(cam_texture, vec2(u, v));

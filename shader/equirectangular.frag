@@ -52,7 +52,7 @@ void main(void) {
 
 	float yaw2 = yaw + M_PI + cam_offset_yaw;
 	u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;
-	v = cam_horizon_r * r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+	v = cam_horizon_r * r * sin(yaw2) + 0.5 + cam_offset_y; //cordinate is different
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 		u = 0.0;
 		v = 0.0;
@@ -82,7 +82,7 @@ void main(void) {
 		if (r >= 0.45) {
 			float r_r = pow(r - 0.45, 1.006) + 0.45;
 			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
-			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 + cam_offset_y; //cordinate is different
 			vec4 fc_b = texture2D(cam_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
@@ -90,7 +90,7 @@ void main(void) {
 
 			r_r = pow(r - 0.45, 1.003) + 0.45;
 			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
-			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 + cam_offset_y; //cordinate is different
 			fc_b = texture2D(cam_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
