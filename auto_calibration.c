@@ -33,7 +33,7 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
 			int _x = x - margin;
 			int _y = y - margin;
-			if (_x >= 0 && _y >= 0) {
+			if (_x >= 0 && _x < frame->width && _y >= 0 && _y < frame->height) {
 				val = (frame->img_buff + frame->width * 3 * _y)[_x * 3];
 			}
 

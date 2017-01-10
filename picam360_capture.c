@@ -1018,7 +1018,7 @@ int main(int argc, char *argv[]) {
 	bool auto_calibration_mode = false;
 	bool input_file_mode = false;
 	int opt;
-	char *frame_param = NULL;
+	char frame_param[256];
 
 	// Clear application state
 	memset(state, 0, sizeof(*state));
@@ -1080,7 +1080,6 @@ int main(int argc, char *argv[]) {
 			input_file_mode = true;
 			break;
 		case 'F':
-			frame_param = malloc(MAX(strlen(optarg), 256));
 			strncpy(frame_param, optarg, 256);
 			break;
 		default:
@@ -1124,7 +1123,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (auto_calibration_mode) {
-		char *param = "-W 256 -H 256 -C";
+		char param[256];
+		strncpy(param, "-W 256 -H 256 -C", 256);
+
 		const int kMaxArgs = 10;
 		int argc = 1;
 		char *argv[kMaxArgs];
