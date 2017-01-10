@@ -1,6 +1,17 @@
 #include "auto_calibration.h"
 
-#include <opencv/core.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/select.h>
+#include <sys/stat.h>
+#include <stdbool.h>
+
+#include <opencv/cv.h>
 
 void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
@@ -55,7 +66,7 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			}
 			cp = cp->h_next;
 		}
-		printf("%d,%d\n", box.center.x, box.center.y)
+		printf("%lf,%lf\n", box.center.x, box.center.y);
 	}
 
 	//Release

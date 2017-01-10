@@ -1136,7 +1136,7 @@ int main(int argc, char *argv[]) {
 		argv[0] = "auto_calibration";
 		argv[argc] = 0;
 		state->frame->next = create_frame(state, argc, argv);
-		state->frame->next->state->frame->next = auto_calibration;
+		state->frame->next->after_processed_callback = auto_calibration;
 	}
 
 	// Setup the model world
