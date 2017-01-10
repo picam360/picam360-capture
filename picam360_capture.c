@@ -52,6 +52,7 @@
 #include "picam360_tools.h"
 #include "gl_program.h"
 #include "device.h"
+#include "auto_calibration.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -347,7 +348,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	state->model_data[CALIBRATION].program = GLProgram_new(
 			"shader/calibration.vert", "shader/calibration.frag");
 
-	spherewindow_mesh(maxfov, maxfov, 50, &state->model_data[WINDOW].vbo,
+	spherewindow_mesh(maxfov, maxfov, 128, &state->model_data[WINDOW].vbo,
 			&state->model_data[WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
 		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
@@ -629,6 +630,15 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	//buffer memory
+	if (frame->double_size) {
+		int size = frame->width * frame->height * 3;
+		frame->img_buf = (unsigned char*) malloc(size * 2);
+	} else {
+		int size = frame->width * frame->height * 3;
+		frame->img_buf = (unsigned char*) malloc(size);
+	}
+
 	return frame;
 }
 
@@ -636,9 +646,15 @@ bool delete_frame(FRAME_T *frame) {
 
 	if (frame->framebuffer) {
 		glDeleteFramebuffers(1, &frame->framebuffer);
+		frame->framebuffer = NULL;
 	}
 	if (frame->texture) {
 		glDeleteTextures(1, &frame->texture);
+		frame->texture = NULL;
+	}
+	if (frame->img_buf) {
+		free(frame->img_buf);
+		frame->img_buf = NULL;
 	}
 	free(frame);
 
@@ -682,15 +698,13 @@ void frame_handler() {
 				|| frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int img_width;
 			int img_height;
-			unsigned char *img_buff = NULL;
 			if (frame->double_size) {
 				int size = frame->width * frame->height * 3;
 				unsigned char *image_buffer = (unsigned char*) malloc(size);
-				unsigned char *image_buffer_double = (unsigned char*) malloc(
+				unsigned char *image_buffer_double = frame->img_buff;
 						size * 2);
 				img_width = frame->width * 2;
 				img_height = frame->height;
-				img_buff = image_buffer_double;
 				for (int split = 0; split < 2; split++) {
 					state->split = split + 1;
 					redraw_render_texture(state, frame,
@@ -711,10 +725,9 @@ void frame_handler() {
 				free(image_buffer);
 			} else {
 				int size = frame->width * frame->height * 3;
-				unsigned char *image_buffer = (unsigned char*) malloc(size);
+				unsigned char *image_buffer = frame->img_buff;
 				img_width = frame->width;
 				img_height = frame->height;
-				img_buff = image_buffer;
 				state->split = 0;
 				redraw_render_texture(state, frame,
 						&state->model_data[frame->operation_mode]);
@@ -727,7 +740,7 @@ void frame_handler() {
 
 			switch (frame->output_mode) {
 			case OUTPUT_MODE_STILL:
-				SaveJpeg(img_buff, img_width, img_height,
+				SaveJpeg(frame->img_buff, img_width, img_height,
 						frame->output_filepath, 70);
 				printf("snap saved to %s\n", frame->output_filepath);
 
@@ -740,7 +753,7 @@ void frame_handler() {
 				frame->delete_after_processed = true;
 				break;
 			case OUTPUT_MODE_VIDEO:
-				AddFrame(frame->recorder, img_buff);
+				AddFrame(frame->recorder, frame->img_buff);
 
 				gettimeofday(&f, NULL);
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
@@ -751,13 +764,13 @@ void frame_handler() {
 			default:
 				break;
 			}
-			if (img_buff) {
-				free(img_buff);
-			}
 		} else if (frame == state->frame && state->preview) {
 			redraw_render_texture(state, frame,
 					&state->model_data[frame->operation_mode]);
 			glFinish();
+		}
+		if (frame->after_processed_callback) {
+			frame->after_processed_callback(state, frame);
 		}
 		//next rendering
 		if (frame->delete_after_processed) {
@@ -974,10 +987,12 @@ void command_handler() {
 					sscanf(param, "%lf", &calib_step);
 				}
 			}
-			if (strncmp(cmd, "u", sizeof(buff)) == 0) {
+			if (strncmp(cmd, "u", sizeof(buff)) == 0
+					|| strncmp(cmd, "t", sizeof(buff)) == 0) {
 				lg_options.cam_offset_y[state->active_cam] -= calib_step;
 			}
-			if (strncmp(cmd, "d", sizeof(buff)) == 0) {
+			if (strncmp(cmd, "d", sizeof(buff)) == 0
+					|| strncmp(cmd, "b", sizeof(buff)) == 0) {
 				lg_options.cam_offset_y[state->active_cam] += calib_step;
 			}
 			if (strncmp(cmd, "l", sizeof(buff)) == 0) {
@@ -1002,8 +1017,11 @@ void command_handler() {
 }
 
 int main(int argc, char *argv[]) {
+	bool auto_calibration_mode = false;
 	bool input_file_mode = false;
 	int opt;
+	char *frame_param = NULL;
+
 	// Clear application state
 	memset(state, 0, sizeof(*state));
 	state->cam_width = 1024;
@@ -1021,8 +1039,11 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:")) != -1) {
+	while ((opt = getopt(argc, argv, "ac:w:h:n:psd:i:r:F:")) != -1) {
 		switch (opt) {
+		case 'a':
+			auto_calibration_mode = true;
+			break;
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {
 				state->codec_type = MJPEG;
@@ -1043,7 +1064,7 @@ int main(int argc, char *argv[]) {
 		case 's':
 			state->stereo = true;
 			break;
-		case 'D':
+		case 'd':
 			state->video_direct = true;
 			break;
 		case 'r':
@@ -1060,12 +1081,9 @@ int main(int argc, char *argv[]) {
 			state->frame_sync = true;
 			input_file_mode = true;
 			break;
-		case 'W':
-		case 'H':
-		case 'E':
-		case 'C':
 		case 'F':
-		case 'o':
+			frame_param = malloc(MAX(strlen(optarg), 256));
+			strncpy(frame_param, optarg, 256);
 			break;
 		default:
 			/* '?' */
@@ -1092,7 +1110,36 @@ int main(int argc, char *argv[]) {
 	init_ogl(state);
 
 	//frame;
-	state->frame = create_frame(state, argc, argv);
+	{
+		const char *param = frame_param;
+		const int kMaxArgs = 10;
+		int argc = 1;
+		char *argv[kMaxArgs];
+		char *p2 = strtok(param, " ");
+		while (p2 && argc < kMaxArgs - 1) {
+			argv[argc++] = p2;
+			p2 = strtok(0, " ");
+		}
+		argv[0] = cmd;
+		argv[argc] = 0;
+		state->frame = create_frame(state, argc, argv);
+	}
+
+	if (auto_calibration_mode) {
+		const char *param = "-W 256 -H 256 -C";
+		const int kMaxArgs = 10;
+		int argc = 1;
+		char *argv[kMaxArgs];
+		char *p2 = strtok(param, " ");
+		while (p2 && argc < kMaxArgs - 1) {
+			argv[argc++] = p2;
+			p2 = strtok(0, " ");
+		}
+		argv[0] = cmd;
+		argv[argc] = 0;
+		state->frame->next = create_frame(state, argc, argv);
+		state->frame->next->state->frame->next = auto_calibration;
+	}
 
 	// Setup the model world
 	init_model_proj(state);

@@ -48,10 +48,14 @@ enum OPERATION_MODE {
 enum CODEC_TYPE {
 	H264, MJPEG
 };
+
+struct _PICAM360CAPTURE_T;
+
 typedef struct _FRAME_T {
 	int id;
 	GLuint framebuffer;
 	GLuint texture;
+	uchar_t *img_buf;
 	uint32_t width;
 	uint32_t height;
 	bool delete_after_processed;
@@ -73,6 +77,9 @@ typedef struct _FRAME_T {
 	float view_roll;
 	bool view_coordinate_from_device;
 
+	//event
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, FRAME_T *);
+
 	struct _FRAME_T *next;
 } FRAME_T;
 typedef struct {
@@ -80,7 +87,7 @@ typedef struct {
 	GLuint vbo;
 	GLuint vbo_nop;
 } MODEL_T;
-typedef struct {
+typedef struct _PICAM360CAPTURE_T {
 	int split;
 	bool preview;
 	bool stereo;
