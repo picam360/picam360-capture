@@ -15,12 +15,12 @@ extern "C" {
 #include <sys/stat.h>
 #include <stdbool.h>
 
-#include <opencv/cv.h>
-#include <opencv/highgui.h>
-
 #ifdef __cplusplus
 }
 #endif
+
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
 
 
 void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
@@ -53,9 +53,10 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		}
 	}
 	{
-		vector<Vec3f> circles;
-		HoughCircles(image_bin, circles, CV_HOUGH_GRADIENT,
-					 2, image_bin->width/4, 200, 100 );
+		Mat src = image_bin;
+		std::vector<cv::Vec3f> circles;
+		HoughCircles(src, circles, CV_HOUGH_GRADIENT,
+					 2, src->raws/4, 200, 100 );
 	    for( int i = 0; i < circles.size(); i++ )
 	    {
 			printf("%lf,%lf,lf\n", circles[i][0], circles[i][1], circles[i][2]);
