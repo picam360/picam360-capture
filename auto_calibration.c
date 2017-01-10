@@ -55,7 +55,7 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			}
 			cp = cp->h_next;
 		}
-		printf("%d,%d¥n", box.center.x, box.center.y)
+		printf("%d,%d\n", box.center.x, box.center.y)
 	}
 
 	//Release
