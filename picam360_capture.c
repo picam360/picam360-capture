@@ -694,39 +694,16 @@ void frame_handler() {
 		}
 
 		//rendering to buffer
-		if (frame->output_mode == OUTPUT_MODE_STILL
-				|| frame->output_mode == OUTPUT_MODE_VIDEO) {
-			int img_width;
-			int img_height;
-			if (frame->double_size) {
-				int size = frame->width * frame->height * 3;
-				unsigned char *image_buffer = (unsigned char*) malloc(size);
-				unsigned char *image_buffer_double = frame->img_buff;
-				img_width = frame->width * 2;
-				img_height = frame->height;
-				for (int split = 0; split < 2; split++) {
-					state->split = split + 1;
-					redraw_render_texture(state, frame,
-							&state->model_data[frame->operation_mode]);
-					glFinish();
-					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-					glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-							GL_UNSIGNED_BYTE, image_buffer);
-					glBindFramebuffer(GL_FRAMEBUFFER, 0);
-					for (int y = 0; y < frame->height; y++) {
-						memcpy(
-								image_buffer_double + frame->width * 2 * 3 * y
-										+ frame->width * 3 * split,
-								image_buffer + frame->width * 3 * y,
-								frame->width * 3);
-					}
-				}
-				free(image_buffer);
-			} else {
-				unsigned char *image_buffer = frame->img_buff;
-				img_width = frame->width;
-				img_height = frame->height;
-				state->split = 0;
+		int img_width;
+		int img_height;
+		if (frame->double_size) {
+			int size = frame->width * frame->height * 3;
+			unsigned char *image_buffer = (unsigned char*) malloc(size);
+			unsigned char *image_buffer_double = frame->img_buff;
+			img_width = frame->width * 2;
+			img_height = frame->height;
+			for (int split = 0; split < 2; split++) {
+				state->split = split + 1;
 				redraw_render_texture(state, frame,
 						&state->model_data[frame->operation_mode]);
 				glFinish();
@@ -734,38 +711,54 @@ void frame_handler() {
 				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
 						GL_UNSIGNED_BYTE, image_buffer);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+				for (int y = 0; y < frame->height; y++) {
+					memcpy(
+							image_buffer_double + frame->width * 2 * 3 * y
+									+ frame->width * 3 * split,
+							image_buffer + frame->width * 3 * y,
+							frame->width * 3);
+				}
 			}
-
-			switch (frame->output_mode) {
-			case OUTPUT_MODE_STILL:
-				SaveJpeg(frame->img_buff, img_width, img_height,
-						frame->output_filepath, 70);
-				printf("snap saved to %s\n", frame->output_filepath);
-
-				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-						+ (f.tv_usec - s.tv_usec) / 1000.0;
-				printf("elapsed %.3lf ms\n", elapsed_ms);
-
-				frame->output_mode = OUTPUT_MODE_NONE;
-				frame->delete_after_processed = true;
-				break;
-			case OUTPUT_MODE_VIDEO:
-				AddFrame(frame->recorder, frame->img_buff);
-
-				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-						+ (f.tv_usec - s.tv_usec) / 1000.0;
-				frame->frame_num++;
-				frame->frame_elapsed += elapsed_ms;
-				break;
-			default:
-				break;
-			}
-		} else if (frame == state->frame && state->preview) {
+			free(image_buffer);
+		} else {
+			unsigned char *image_buffer = frame->img_buff;
+			img_width = frame->width;
+			img_height = frame->height;
+			state->split = 0;
 			redraw_render_texture(state, frame,
 					&state->model_data[frame->operation_mode]);
 			glFinish();
+			glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+			glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
+					GL_UNSIGNED_BYTE, image_buffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+
+		switch (frame->output_mode) {
+		case OUTPUT_MODE_STILL:
+			SaveJpeg(frame->img_buff, img_width, img_height,
+					frame->output_filepath, 70);
+			printf("snap saved to %s\n", frame->output_filepath);
+
+			gettimeofday(&f, NULL);
+			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+					+ (f.tv_usec - s.tv_usec) / 1000.0;
+			printf("elapsed %.3lf ms\n", elapsed_ms);
+
+			frame->output_mode = OUTPUT_MODE_NONE;
+			frame->delete_after_processed = true;
+			break;
+		case OUTPUT_MODE_VIDEO:
+			AddFrame(frame->recorder, frame->img_buff);
+
+			gettimeofday(&f, NULL);
+			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+					+ (f.tv_usec - s.tv_usec) / 1000.0;
+			frame->frame_num++;
+			frame->frame_elapsed += elapsed_ms;
+			break;
+		default:
+			break;
 		}
 		if (frame->after_processed_callback) {
 			frame->after_processed_callback(state, frame);

@@ -22,7 +22,6 @@ extern "C" {
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
-
 void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
 	int margin = 32;
@@ -32,17 +31,15 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	CvMemStorage* storage = cvCreateMemStorage(0);
 	CvSeq* contour = NULL;
 
-	IplImage *image_bin = cvCreateImage(cvSize(width, height),
-			IPL_DEPTH_8U, 1);
-
+	IplImage *image_bin = cvCreateImage(cvSize(width, height), IPL_DEPTH_8U, 1);
 
 	//binalize
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			unsigned char val = 0;
 
-			int _x = x - margin;
-			int _y = y - margin;
+			uint32_t _x = x - margin;
+			uint32_t _y = y - margin;
 			if (_x >= 0 && _x < frame->width && _y >= 0 && _y < frame->height) {
 				val = (frame->img_buff + frame->width * 3 * _y)[_x * 3];
 			}
@@ -54,13 +51,16 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	}
 	{
 		Mat src = image_bin;
-		std::vector<cv::Vec3f> circles;
-		HoughCircles(src, circles, CV_HOUGH_GRADIENT,
-					 2, src->raws/4, 200, 100 );
-	    for( int i = 0; i < circles.size(); i++ )
-	    {
-			printf("%lf,%lf,lf\n", circles[i][0], circles[i][1], circles[i][2]);
-	    }
+		std::vector < cv::Vec3f > circles;
+		HoughCircles(src, circles, CV_HOUGH_GRADIENT, 2, src->raws / 4, 200,
+				100);
+		for (size_t i = 0; i < circles.size(); i++) {
+			cv::Point center(cvRound (circles[i][0]), cvRound (circles[i][1]));
+			int radius = cvRound(circles[i][2]);
+			cv::circle(image_bin, center, radius, Scalar(255, 255, 255), 3, 8,
+					0);
+			//printf("%lf,%lf,lf\n", circles[i][0], circles[i][1], circles[i][2]);
+		}
 	}
 
 	//find countor
