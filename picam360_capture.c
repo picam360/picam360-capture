@@ -702,7 +702,6 @@ void frame_handler() {
 				int size = frame->width * frame->height * 3;
 				unsigned char *image_buffer = (unsigned char*) malloc(size);
 				unsigned char *image_buffer_double = frame->img_buff;
-						size * 2);
 				img_width = frame->width * 2;
 				img_height = frame->height;
 				for (int split = 0; split < 2; split++) {
@@ -724,7 +723,6 @@ void frame_handler() {
 				}
 				free(image_buffer);
 			} else {
-				int size = frame->width * frame->height * 3;
 				unsigned char *image_buffer = frame->img_buff;
 				img_width = frame->width;
 				img_height = frame->height;
@@ -1109,9 +1107,9 @@ int main(int argc, char *argv[]) {
 	// Start OGLES
 	init_ogl(state);
 
-	//frame;
+	//frame
 	{
-		const char *param = frame_param;
+		char *param = frame_param;
 		const int kMaxArgs = 10;
 		int argc = 1;
 		char *argv[kMaxArgs];
@@ -1120,13 +1118,13 @@ int main(int argc, char *argv[]) {
 			argv[argc++] = p2;
 			p2 = strtok(0, " ");
 		}
-		argv[0] = cmd;
+		argv[0] = "default_frame";
 		argv[argc] = 0;
 		state->frame = create_frame(state, argc, argv);
 	}
 
 	if (auto_calibration_mode) {
-		const char *param = "-W 256 -H 256 -C";
+		char *param = "-W 256 -H 256 -C";
 		const int kMaxArgs = 10;
 		int argc = 1;
 		char *argv[kMaxArgs];
@@ -1135,7 +1133,7 @@ int main(int argc, char *argv[]) {
 			argv[argc++] = p2;
 			p2 = strtok(0, " ");
 		}
-		argv[0] = cmd;
+		argv[0] = "auto_calibration";
 		argv[argc] = 0;
 		state->frame->next = create_frame(state, argc, argv);
 		state->frame->next->state->frame->next = auto_calibration;
