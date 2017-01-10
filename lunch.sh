@@ -23,10 +23,13 @@ FPS=30
 CODEC=H264
 STREAM=false
 STREAM_PARAM=
+AUTO_CALIBRATION=
 
-while getopts c:n:w:h:W:H:psCEFf:rDS OPT
+while getopts ac:n:w:h:W:H:psCEFf:rDS OPT
 do
     case $OPT in
+        a)  AUTO_CALIBRATION="-a"
+            ;;
         c)  CODEC=$OPTARG
             ;;
         n)  CAM_NUM=$OPTARG
@@ -104,4 +107,4 @@ elif [ $DIRECT = ]; then
 	fi
 fi
 
-./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM $PREVIEW
+./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM"
