@@ -1,5 +1,9 @@
 #include "auto_calibration.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +17,11 @@
 
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
+
+#ifdef __cplusplus
+}
+#endif
+
 
 void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
