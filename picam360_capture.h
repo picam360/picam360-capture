@@ -51,6 +51,16 @@ enum CODEC_TYPE {
 
 struct _PICAM360CAPTURE_T;
 
+typedef struct _OPTIONS_T{
+	float sharpness_gain;
+	float cam_offset_pitch[MAX_CAM_NUM];
+	float cam_offset_yaw[MAX_CAM_NUM];
+	float cam_offset_roll[MAX_CAM_NUM];
+	float cam_offset_x[MAX_CAM_NUM];
+	float cam_offset_y[MAX_CAM_NUM];
+	float cam_horizon_r[MAX_CAM_NUM];
+} OPTIONS_T;
+
 typedef struct _FRAME_T {
 	int id;
 	GLuint framebuffer;
@@ -77,6 +87,7 @@ typedef struct _FRAME_T {
 	float view_roll;
 	bool view_coordinate_from_device;
 
+	void *custom_data;
 	//event
 	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
 
@@ -138,4 +149,6 @@ typedef struct _PICAM360CAPTURE_T {
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
+
+	struct _OPTIONS_T options;
 } PICAM360CAPTURE_T;
