@@ -1088,6 +1088,22 @@ int main(int argc, char *argv[]) {
 	// Start OGLES
 	init_ogl(state);
 
+	//frame id=0
+	if (frame_param[0]) {
+		char *param = frame_param;
+		const int kMaxArgs = 10;
+		int argc = 1;
+		char *argv[kMaxArgs];
+		char *p2 = strtok(param, " ");
+		while (p2 && argc < kMaxArgs - 1) {
+			argv[argc++] = p2;
+			p2 = strtok(0, " ");
+		}
+		argv[0] = "default_frame";
+		argv[argc] = 0;
+		state->frame = create_frame(state, argc, argv);
+	}
+
 	if (auto_calibration_mode) {
 		char param[256];
 		strncpy(param, "-W 256 -H 256 -F", 256);
@@ -1105,26 +1121,11 @@ int main(int argc, char *argv[]) {
 
 		FRAME_T *frame = create_frame(state, argc, argv);
 		frame->after_processed_callback = auto_calibration;
-		frame->next = state->frame;
-		state->frame = frame;
-	}
-
-	//frame
-	if (frame_param[0]) {
-		char *param = frame_param;
-		const int kMaxArgs = 10;
-		int argc = 1;
-		char *argv[kMaxArgs];
-		char *p2 = strtok(param, " ");
-		while (p2 && argc < kMaxArgs - 1) {
-			argv[argc++] = p2;
-			p2 = strtok(0, " ");
+		if(state->frame) {
+			state->frame->next = frame;
+		} else {
+			state->frame = frame;
 		}
-		argv[0] = "default_frame";
-		argv[argc] = 0;
-		FRAME_T *frame = create_frame(state, argc, argv);
-		frame->next = state->frame;
-		state->frame = frame;
 	}
 
 	// Setup the model world

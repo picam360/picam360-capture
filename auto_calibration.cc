@@ -45,8 +45,8 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		for (int x = 0; x < width; x++) {
 			unsigned char val = 0;
 
-			uint32_t _x = x - margin + offset_x;
-			uint32_t _y = y - margin + offset_y;
+			uint32_t _x = x - margin - offset_x;
+			uint32_t _y = y - margin - offset_y;
 			if (_x >= 0 && _x < frame->width && _y >= 0 && _y < frame->height) {
 				val = (frame->img_buff + frame->width * 3 * _y)[_x * 3];
 			}
@@ -97,7 +97,7 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			}
 			cp = cp->h_next;
 		}
-		printf("%lf,%lf\n", box.center.x, box.center.y);
+		//printf("%lf,%lf\n", box.center.x, box.center.y);
 		if (box.size.width > (float) frame->width * 0.8
 				&& box.size.height > (float) frame->height * 0.8) {
 			state->options.cam_offset_x[0] = box.center.x / width - 0.5;
