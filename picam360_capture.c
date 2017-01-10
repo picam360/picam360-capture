@@ -1018,7 +1018,7 @@ int main(int argc, char *argv[]) {
 	bool auto_calibration_mode = false;
 	bool input_file_mode = false;
 	int opt;
-	char frame_param[256];
+	char frame_param[256] = { };
 
 	// Clear application state
 	memset(state, 0, sizeof(*state));
@@ -1107,7 +1107,7 @@ int main(int argc, char *argv[]) {
 	init_ogl(state);
 
 	//frame
-	{
+	if (frame_param[0]) {
 		char *param = frame_param;
 		const int kMaxArgs = 10;
 		int argc = 1;

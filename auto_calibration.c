@@ -16,8 +16,7 @@
 void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
 	CvMemStorage* storage = cvCreateMemStorage(0);
-	CvSeq* contour = cvCreateSeq(CV_SEQ_ELTYPE_POINT, sizeof(CvSeq),
-			sizeof(CvPoint), storage);
+	CvSeq* contour = NULL;
 
 	IplImage *image_bin = cvCreateImage(cvSize(frame->width, frame->height),
 			IPL_DEPTH_8U, 1);
@@ -44,15 +43,15 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	}
 
 	//find countor
-	cvDilate(image_bin, image_bin, 0, 1);
-	cvErode(image_bin, image_bin, 0, 1);
+	//cvDilate(image_bin, image_bin, 0, 1);
+	//cvErode(image_bin, image_bin, 0, 1);
 	cvFindContours(image_bin, storage, &contour, sizeof(CvContour),
 			CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE, cvPoint(0, 0));
 
 	// loop over all contours
 	{
 		CvBox2D box = { };
-		CvPoint2D32f box_point[4];
+		//CvPoint2D32f box_point[4];
 		CvBox2D tmp;
 		double max_val = INT_MIN;
 		CvSeq *cp = contour;
