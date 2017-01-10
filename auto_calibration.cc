@@ -27,6 +27,8 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	int margin = 32;
 	int width = frame->width + 2 * margin;
 	int height = frame->height + 2 * margin;
+	int offset_x = frame->width * state->options.cam_offset_x[0];
+	int offset_y = frame->height * state->options.cam_offset_y[0];
 
 	CvMemStorage* storage = cvCreateMemStorage(0);
 	CvSeq* contour = NULL;
@@ -43,8 +45,8 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		for (int x = 0; x < width; x++) {
 			unsigned char val = 0;
 
-			uint32_t _x = x - margin;
-			uint32_t _y = y - margin;
+			uint32_t _x = x - margin + offset_x;
+			uint32_t _y = y - margin + offset_y;
 			if (_x >= 0 && _x < frame->width && _y >= 0 && _y < frame->height) {
 				val = (frame->img_buff + frame->width * 3 * _y)[_x * 3];
 			}
@@ -96,8 +98,11 @@ void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			cp = cp->h_next;
 		}
 		printf("%lf,%lf\n", box.center.x, box.center.y);
-		state->options.cam_offset_x[0] = box.center.x - width / 2.0;
-		state->options.cam_offset_y[0] = box.center.y - height / 2.0;
+		if (box.size.width > (float) frame->width * 0.8
+				&& box.size.height > (float) frame->height * 0.8) {
+			state->options.cam_offset_x[0] = box.center.x / width - 0.5;
+			state->options.cam_offset_y[0] = box.center.y / height - 0.5;
+		}
 	}
 
 	//Release
