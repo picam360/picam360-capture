@@ -55,7 +55,7 @@ typedef struct _FRAME_T {
 	int id;
 	GLuint framebuffer;
 	GLuint texture;
-	uchar_t *img_buf;
+	uint8_t *img_buff;
 	uint32_t width;
 	uint32_t height;
 	bool delete_after_processed;
@@ -78,7 +78,7 @@ typedef struct _FRAME_T {
 	bool view_coordinate_from_device;
 
 	//event
-	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, FRAME_T *);
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
 
 	struct _FRAME_T *next;
 } FRAME_T;

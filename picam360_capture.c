@@ -633,10 +633,10 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	//buffer memory
 	if (frame->double_size) {
 		int size = frame->width * frame->height * 3;
-		frame->img_buf = (unsigned char*) malloc(size * 2);
+		frame->img_buff = (unsigned char*) malloc(size * 2);
 	} else {
 		int size = frame->width * frame->height * 3;
-		frame->img_buf = (unsigned char*) malloc(size);
+		frame->img_buff = (unsigned char*) malloc(size);
 	}
 
 	return frame;
@@ -646,15 +646,15 @@ bool delete_frame(FRAME_T *frame) {
 
 	if (frame->framebuffer) {
 		glDeleteFramebuffers(1, &frame->framebuffer);
-		frame->framebuffer = NULL;
+		frame->framebuffer = 0;
 	}
 	if (frame->texture) {
 		glDeleteTextures(1, &frame->texture);
-		frame->texture = NULL;
+		frame->texture = 0;
 	}
-	if (frame->img_buf) {
-		free(frame->img_buf);
-		frame->img_buf = NULL;
+	if (frame->img_buff) {
+		free(frame->img_buff);
+		frame->img_buff = NULL;
 	}
 	free(frame);
 
