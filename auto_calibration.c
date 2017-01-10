@@ -15,15 +15,16 @@
 
 void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
-	CvMemStorage* storage = cvCreateMemStorage(0);
-	CvSeq* contour = NULL;
-
-	IplImage *image_bin = cvCreateImage(cvSize(frame->width, frame->height),
-			IPL_DEPTH_8U, 1);
-
 	int margin = 32;
 	int width = frame->width + 2 * margin;
 	int height = frame->height + 2 * margin;
+
+	CvMemStorage* storage = cvCreateMemStorage(0);
+	CvSeq* contour = NULL;
+
+	IplImage *image_bin = cvCreateImage(cvSize(width, height),
+			IPL_DEPTH_8U, 1);
+
 
 	//binalize
 	for (int y = 0; y < height; y++) {
