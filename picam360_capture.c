@@ -972,6 +972,8 @@ void command_handler() {
 				state->frame_sync = (param[0] == '1');
 				printf("set_frame_sync %s\n", param);
 			}
+		} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
+			save_options(state);
 		} else if (state->frame->operation_mode == CALIBRATION) {
 			if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 				char *param = strtok(NULL, " \n");
@@ -998,9 +1000,6 @@ void command_handler() {
 			}
 			if (strncmp(cmd, "w", sizeof(buff)) == 0) {
 				state->options.sharpness_gain -= calib_step;
-			}
-			if (strncmp(cmd, "save", sizeof(buff)) == 0) {
-				save_options(state);
 			}
 		} else {
 			printf("unknown command : %s\n", buff);
