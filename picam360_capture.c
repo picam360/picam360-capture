@@ -773,7 +773,7 @@ void frame_handler() {
 static double calib_step = 0.01;
 
 void command_handler() {
-	if (inputAvailable()) {
+	while (inputAvailable()) {
 		char buff[256];
 		for (int i = 0; i < sizeof(buff) - 1; i++) {
 			read(STDIN_FILENO, &buff[i], 1);
