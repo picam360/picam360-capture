@@ -45,10 +45,11 @@ static void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	int offset_y = frame->height * state->options.cam_offset_y[0];
 
 	if (frame->custom_data == NULL) { // first call
-		AutoCalibrationData *acd = malloc(sizeof(AutoCalibrationData));
+		AutoCalibrationData *acd = (AutoCalibrationData*) malloc(
+				sizeof(AutoCalibrationData));
 		memset(acd, 0, sizeof(AutoCalibrationData));
 		for (int i = 0; i < state->num_of_cam; i++) {
-			acd->imgAry[i] = vCreateImage(cvSize(width, height), IPL_DEPTH_8U,
+			acd->imgAry[i] = cvCreateImage(cvSize(width, height), IPL_DEPTH_8U,
 					1);
 			//reset
 			state->options.cam_offset_x[i] = 0.0;
