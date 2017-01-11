@@ -775,8 +775,13 @@ static double calib_step = 0.01;
 void command_handler() {
 	if (inputAvailable()) {
 		char buff[256];
-		int size = read(STDIN_FILENO, buff, sizeof(buff) - 1);
-		buff[size] = '\0';
+		for (int i = 0; i < sizeof(buff) - 1; i++) {
+			read(STDIN_FILENO, &buff[i], 1);
+			if (buff[i] == '\n') {
+				buff[i + 1] = '\0';
+				break;
+			}
+		}
 		char *cmd = strtok(buff, " \n");
 		if (cmd == NULL) {
 			//do nothing
@@ -855,7 +860,7 @@ void command_handler() {
 					break;
 				}
 			}
-			if (checkAcMode) {
+			if (!checkAcMode) {
 				char param[256];
 				strncpy(param, "-W 256 -H 256 -F", 256);
 
