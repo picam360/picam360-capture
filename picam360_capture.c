@@ -632,6 +632,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 }
 
 bool delete_frame(FRAME_T *frame) {
+	if (frame->befor_deleted_callback) {
+		frame->befor_deleted_callback(state, frame);
+	}
 
 	if (frame->framebuffer) {
 		glDeleteFramebuffers(1, &frame->framebuffer);
@@ -843,6 +846,41 @@ void command_handler() {
 					}
 				}
 			}
+		} else if (strncmp(cmd, "start_ac", sizeof(buff)) == 0) {
+			char param[256];
+			strncpy(param, "-W 256 -H 256 -F", 256);
+
+			const int kMaxArgs = 10;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = "auto_calibration";
+			argv[argc] = 0;
+
+			FRAME_T *frame = create_frame(state, argc, argv);
+			set_auto_calibration(frame);
+			frame->next = state->frame;
+			state->frame = frame;
+
+			printf("start_ac\n");
+		} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
+			char *param = strtok(NULL, " \n");
+			if (param != NULL) {
+				int id = 0;
+				sscanf(param, "%d", &id);
+				for (FRAME_T *frame = state->frame; frame != NULL;
+						frame = frame->next) {
+					if (is_auto_calibration(frame)) {
+						frame->delete_after_processed = true;
+						printf("stop_ac\n");
+						break;
+					}
+				}
+			}
 		} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL && !state->output_raw) {
@@ -874,27 +912,6 @@ void command_handler() {
 						/ state->input_file_size;
 				printf("%d\n", (int) ratio);
 			}
-//			} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
-//				char *param = strtok(NULL, " \n");
-//				if (param != NULL) {
-//					switch (param[0]) {
-//					case 'W':
-//						state->operation_mode = WINDOW;
-//						break;
-//					case 'E':
-//						state->operation_mode = EQUIRECTANGULAR;
-//						break;
-//					case 'F':
-//						state->operation_mode = FISHEYE;
-//						break;
-//					case 'C':
-//						state->operation_mode = CALIBRATION;
-//						break;
-//					default:
-//						printf("unknown mode %s\n", param);
-//					}
-//					printf("set_mode %s\n", param);
-//				}
 		} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
@@ -997,7 +1014,6 @@ void command_handler() {
 }
 
 int main(int argc, char *argv[]) {
-	bool auto_calibration_mode = false;
 	bool input_file_mode = false;
 	int opt;
 	char frame_param[256] = { };
@@ -1019,11 +1035,8 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "ac:w:h:n:psd:i:r:F:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:")) != -1) {
 		switch (opt) {
-		case 'a':
-			auto_calibration_mode = true;
-			break;
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {
 				state->codec_type = MJPEG;
@@ -1102,30 +1115,6 @@ int main(int argc, char *argv[]) {
 		argv[0] = "default_frame";
 		argv[argc] = 0;
 		state->frame = create_frame(state, argc, argv);
-	}
-
-	if (auto_calibration_mode) {
-		char param[256];
-		strncpy(param, "-W 256 -H 256 -F", 256);
-
-		const int kMaxArgs = 10;
-		int argc = 1;
-		char *argv[kMaxArgs];
-		char *p2 = strtok(param, " ");
-		while (p2 && argc < kMaxArgs - 1) {
-			argv[argc++] = p2;
-			p2 = strtok(0, " ");
-		}
-		argv[0] = "auto_calibration";
-		argv[argc] = 0;
-
-		FRAME_T *frame = create_frame(state, argc, argv);
-		frame->after_processed_callback = auto_calibration;
-		if(state->frame) {
-			state->frame->next = frame;
-		} else {
-			state->frame = frame;
-		}
 	}
 
 	// Setup the model world

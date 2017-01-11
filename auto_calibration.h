@@ -7,7 +7,8 @@ extern "C" {
 
 #include "picam360_capture.h"
 
-void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame);
+void set_auto_calibration(FRAME_T *frame);
+bool is_auto_calibration(FRAME_T *frame);
 
 #ifdef __cplusplus
 }

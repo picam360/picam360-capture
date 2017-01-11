@@ -90,6 +90,7 @@ typedef struct _FRAME_T {
 	void *custom_data;
 	//event
 	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
+	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
 
 	struct _FRAME_T *next;
 } FRAME_T;
