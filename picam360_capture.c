@@ -847,26 +847,36 @@ void command_handler() {
 				}
 			}
 		} else if (strncmp(cmd, "start_ac", sizeof(buff)) == 0) {
-			char param[256];
-			strncpy(param, "-W 256 -H 256 -F", 256);
-
-			const int kMaxArgs = 10;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
+			bool checkAcMode = false;
+			for (FRAME_T *frame = state->frame; frame != NULL;
+					frame = frame->next) {
+				if (is_auto_calibration(frame)) {
+					checkAcMode = true;
+					break;
+				}
 			}
-			argv[0] = "auto_calibration";
-			argv[argc] = 0;
+			if (checkAcMode) {
+				char param[256];
+				strncpy(param, "-W 256 -H 256 -F", 256);
 
-			FRAME_T *frame = create_frame(state, argc, argv);
-			set_auto_calibration(frame);
-			frame->next = state->frame;
-			state->frame = frame;
+				const int kMaxArgs = 10;
+				int argc = 1;
+				char *argv[kMaxArgs];
+				char *p2 = strtok(param, " ");
+				while (p2 && argc < kMaxArgs - 1) {
+					argv[argc++] = p2;
+					p2 = strtok(0, " ");
+				}
+				argv[0] = "auto_calibration";
+				argv[argc] = 0;
 
-			printf("start_ac\n");
+				FRAME_T *frame = create_frame(state, argc, argv);
+				set_auto_calibration(frame);
+				frame->next = state->frame;
+				state->frame = frame;
+
+				printf("start_ac\n");
+			}
 		} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
 			for (FRAME_T *frame = state->frame; frame != NULL;
 					frame = frame->next) {
