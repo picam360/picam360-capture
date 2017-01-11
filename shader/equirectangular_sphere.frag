@@ -62,7 +62,7 @@ void main(void) {
 				fc = texture2D(cam0_texture, vec2(u, v));
 			} else {
 				//sharpness
-				float gain = sharpness_gain + r2;
+				float gain = sharpness_gain + r2/2.0;
 				fc = texture2D(cam0_texture, vec2(u, v))
 						* (1.0 + 4.0 * gain);
 				fc -= texture2D(cam0_texture, vec2(u - 1.0 * pixel_size, v))
@@ -98,7 +98,7 @@ void main(void) {
 				fc = texture2D(cam1_texture, vec2(u, v));
 			} else {
 				//sharpness
-				float gain = sharpness_gain + r2;
+				float gain = sharpness_gain + r2/2.0;
 				fc = texture2D(cam1_texture, vec2(u, v))
 						* (1.0 + 4.0 * gain);
 				fc -= texture2D(cam1_texture, vec2(u - 1.0 * pixel_size, v))
