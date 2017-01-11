@@ -34,6 +34,11 @@ bool is_auto_calibration(FRAME_T *frame) {
 }
 
 static void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
+	int margin = 32;
+	int width = frame->width + 2 * margin;
+	int height = frame->height + 2 * margin;
+	int offset_x = frame->width * state->options.cam_offset_x[0];
+	int offset_y = frame->height * state->options.cam_offset_y[0];
 
 	if (frame->custom_data == NULL) { // first call
 		frame->custom_data = (void*) cvCreateImage(cvSize(width, height),
@@ -46,12 +51,6 @@ static void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		return;
 	}
 
-	int margin = 32;
-	int width = frame->width + 2 * margin;
-	int height = frame->height + 2 * margin;
-	int offset_x = frame->width * state->options.cam_offset_x[0];
-	int offset_y = frame->height * state->options.cam_offset_y[0];
-
 	CvMemStorage* storage = cvCreateMemStorage(0);
 	CvSeq* contour = NULL;
 	IplImage *img = (IplImage*) frame->custom_data;
@@ -60,12 +59,15 @@ static void auto_calibration(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	//binalize
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			unsigned char val = 0;
+			uint8_t val = 0;
 
 			uint32_t _x = x - margin - offset_x;
 			uint32_t _y = y - margin - offset_y;
 			if (_x >= 0 && _x < frame->width && _y >= 0 && _y < frame->height) {
-				val = (frame->img_buff + frame->width * 3 * _y)[_x * 3];
+				uint8_t ch1 = (frame->img_buff + frame->width * 3 * _y)[_x * 3 + 0];
+				uint8_t ch2 = (frame->img_buff + frame->width * 3 * _y)[_x * 3 + 1];
+				uint8_t ch3 = (frame->img_buff + frame->width * 3 * _y)[_x * 3 + 2];
+				val = MAX(ch1, MAX(ch2, ch3));
 			}
 
 			val = (val >= 32) ? 255 : 0;

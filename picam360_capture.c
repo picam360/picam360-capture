@@ -868,17 +868,12 @@ void command_handler() {
 
 			printf("start_ac\n");
 		} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				int id = 0;
-				sscanf(param, "%d", &id);
-				for (FRAME_T *frame = state->frame; frame != NULL;
-						frame = frame->next) {
-					if (is_auto_calibration(frame)) {
-						frame->delete_after_processed = true;
-						printf("stop_ac\n");
-						break;
-					}
+			for (FRAME_T *frame = state->frame; frame != NULL;
+					frame = frame->next) {
+				if (is_auto_calibration(frame)) {
+					frame->delete_after_processed = true;
+					printf("stop_ac\n");
+					break;
 				}
 			}
 		} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
