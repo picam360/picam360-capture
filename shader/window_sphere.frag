@@ -18,7 +18,7 @@ uniform float cam1_horizon_r;
 
 const float overlap = 0.03;
 const float M_PI = 3.1415926535;
-const float color_offset = 0.15;
+const float color_offset = 0.10;
 const float color_factor = 1.0 / (1.0 - color_offset);
 
 void main(void) {
