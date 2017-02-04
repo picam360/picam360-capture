@@ -178,7 +178,7 @@ void *image_receiver(void* arg) {
 	int camd_fd = -1;
 	int file_fd = -1;
 	bool xmp = false;
-	unsigned char *buff_xmp = NULL;
+	char *buff_xmp = NULL;
 	int xmp_len = 0;
 	int xmp_idx = 0;
 
@@ -265,26 +265,26 @@ void *image_receiver(void* arg) {
 				xmp_idx++;
 				if (xmp_idx >= xmp_len) {
 					float pitch, yaw, roll;
-					char *cur = NULL;
+					char *xml = buff_xmp + strlen(buff_xmp) + 1;
 					xmp = false;
 
-					cur = strstr("<GPano:PosePitchDegrees>", buff_xmp);
-					sscanf(cur,
-							"<GPano:PosePitchDegrees>%f</GPano:PosePitchDegrees>",
-							&pitch);
+					char *pitch_str = strstr(xml, "<GPano:PosePitchDegrees>");
+					char *yaw_str = strstr(xml, "<GPano:PoseHeadingDegrees>");
+					char *roll_str = strstr(xml, "<GPano:PoseRollDegrees>");
+					if (pitch_str && yaw_str && roll_str) {
+						sscanf(pitch_str,
+								"<GPano:PosePitchDegrees>%f</GPano:PosePitchDegrees>",
+								&pitch);
+						sscanf(yaw_str,
+								"<GPano:PoseHeadingDegrees>%f</GPano:PoseHeadingDegrees>",
+								&yaw);
+						sscanf(roll_str,
+								"<GPano:PoseRollDegrees>%f</GPano:PoseRollDegrees>",
+								&roll);
 
-					cur = strstr("<GPano:PoseHeadingDegrees>", buff_xmp);
-					sscanf(cur,
-							"<GPano:PoseHeadingDegrees>%f</GPano:PoseHeadingDegrees>",
-							&yaw);
-
-					cur = strstr("<GPano:PoseRollDegrees>", buff_xmp);
-					sscanf(cur,
-							"<GPano:PoseRollDegrees>%f</GPano:PoseRollDegrees>",
-							&roll);
-
-					if (lg_attitude_callback) {
-						lg_attitude_callback(pitch, yaw, roll);
+						if (lg_attitude_callback) {
+							lg_attitude_callback(pitch, yaw, roll);
+						}
 					}
 				}
 			}
@@ -335,11 +335,11 @@ void *image_receiver(void* arg) {
 						image_data = create_image(image_buff_size);
 						image_start = -1;
 					}
-					if (buff[i] == 0xE1) { //APP1
-						xmp = true;
-						xmp_len = 0;
-						xmp_idx = 0;
-					}
+				}
+				if (buff[i] == 0xE1) { //APP1
+					xmp = true;
+					xmp_len = 0;
+					xmp_idx = 0;
 				}
 			} else if (buff[i] == 0xFF) {
 				marker = 1;
