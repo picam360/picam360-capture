@@ -264,27 +264,27 @@ void *image_receiver(void* arg) {
 				}
 				xmp_idx++;
 				if (xmp_idx >= xmp_len) {
-					float yaw, pitch, roll;
+					float pitch, yaw, roll;
 					char *cur = NULL;
 					xmp = false;
 
-					cur = strsrc("<GPano:PoseHeadingDegrees>", buff_xmp);
-					sscanf(cur,
-							"<GPano:PoseHeadingDegrees>%f</GPano:PoseHeadingDegrees>",
-							&yaw);
-
-					cur = strsrc("<GPano:PosePitchDegrees>", buff_xmp);
+					cur = strstr("<GPano:PosePitchDegrees>", buff_xmp);
 					sscanf(cur,
 							"<GPano:PosePitchDegrees>%f</GPano:PosePitchDegrees>",
 							&pitch);
 
-					cur = strsrc("<GPano:PoseRollDegrees>", buff_xmp);
+					cur = strstr("<GPano:PoseHeadingDegrees>", buff_xmp);
+					sscanf(cur,
+							"<GPano:PoseHeadingDegrees>%f</GPano:PoseHeadingDegrees>",
+							&yaw);
+
+					cur = strstr("<GPano:PoseRollDegrees>", buff_xmp);
 					sscanf(cur,
 							"<GPano:PoseRollDegrees>%f</GPano:PoseRollDegrees>",
 							&roll);
 
 					if (lg_attitude_callback) {
-						lg_attitude_callback(yaw, pitch, rall);
+						lg_attitude_callback(pitch, yaw, roll);
 					}
 				}
 			}
