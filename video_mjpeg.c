@@ -36,6 +36,7 @@
 #include "bcm_host.h"
 #include "ilclient.h"
 #include "picam360_capture.h"
+#include "video_mjpeg.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -43,6 +44,8 @@ static OMX_BUFFERHEADERTYPE* eglBuffer[2] = { };
 static COMPONENT_T* egl_render[2] = { };
 
 static void* eglImage[2] = { };
+
+static ATTITUDE_CALLBACK lg_attitude_callback = NULL;
 
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int index = (int) data;
@@ -52,6 +55,10 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
+}
+
+void set_attitude_callback(ATTITUDE_CALLBACK callback) {
+	lg_attitude_callback = callback;
 }
 
 static pthread_mutex_t image_mlock = PTHREAD_MUTEX_INITIALIZER;
@@ -170,6 +177,10 @@ void *image_receiver(void* arg) {
 	int soicount = 0;
 	int camd_fd = -1;
 	int file_fd = -1;
+	bool xmp = false;
+	unsigned char *buff_xmp = NULL;
+	int xmp_len = 0;
+	int xmp_idx = 0;
 
 	while (1) {
 		bool reset = false;
@@ -240,15 +251,52 @@ void *image_receiver(void* arg) {
 			continue;
 		}
 		for (int i = 0; i < data_len; i++) {
+			if (xmp) {
+				if (xmp_idx == 0) {
+					xmp_len = ((unsigned char*) buff)[i] << 8;
+				} else if (xmp_idx == 1) {
+					xmp_len += ((unsigned char*) buff)[i];
+					buff_xmp = malloc(xmp_len);
+					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
+					buff_xmp[1] = (xmp_len) & 0xFF;
+				} else {
+					buff_xmp[xmp_idx] = buff[i];
+				}
+				xmp_idx++;
+				if (xmp_idx >= xmp_len) {
+					float yaw, pitch, roll;
+					char *cur = NULL;
+					xmp = false;
+
+					cur = strsrc("<GPano:PoseHeadingDegrees>", buff_xmp);
+					sscanf(cur,
+							"<GPano:PoseHeadingDegrees>%f</GPano:PoseHeadingDegrees>",
+							&yaw);
+
+					cur = strsrc("<GPano:PosePitchDegrees>", buff_xmp);
+					sscanf(cur,
+							"<GPano:PosePitchDegrees>%f</GPano:PosePitchDegrees>",
+							&pitch);
+
+					cur = strsrc("<GPano:PoseRollDegrees>", buff_xmp);
+					sscanf(cur,
+							"<GPano:PoseRollDegrees>%f</GPano:PoseRollDegrees>",
+							&roll);
+
+					if (lg_attitude_callback) {
+						lg_attitude_callback(yaw, pitch, rall);
+					}
+				}
+			}
 			if (marker) {
 				marker = 0;
-				if (buff[i] == 0xd8) { //SOI
+				if (buff[i] == 0xD8) { //SOI
 					if (soicount == 0) {
 						image_start = data_len_total + (i - 1);
 					}
 					soicount++;
 				}
-				if (buff[i] == 0xd9 && image_start >= 0) { //EOI
+				if (buff[i] == 0xD9 && image_start >= 0) { //EOI
 					soicount--;
 					if (soicount == 0) {
 						int image_size = (data_len_total - image_start)
@@ -287,8 +335,13 @@ void *image_receiver(void* arg) {
 						image_data = create_image(image_buff_size);
 						image_start = -1;
 					}
+					if (buff[i] == 0xE1) { //APP1
+						xmp = true;
+						xmp_len = 0;
+						xmp_idx = 0;
+					}
 				}
-			} else if (buff[i] == 0xff) {
+			} else if (buff[i] == 0xFF) {
 				marker = 1;
 			}
 		}

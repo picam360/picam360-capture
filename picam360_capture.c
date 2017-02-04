@@ -353,6 +353,12 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 			"shader/board.frag");
 }
 
+static void attitude_callback(float yaw, float pitch, float rall) {
+	state->camera_yaw = yaw;
+	state->camera_pitch = pitch;
+	state->camera_rall = rall;
+}
+
 /***********************************************************
  * Name: init_textures
  *
@@ -405,6 +411,10 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 		// Bind texture surface to current vertices
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
+	}
+
+	if (state->codec_type == MJPEG) {
+		set_attitude_callback(attitude_callback);
 	}
 }
 //------------------------------------------------------------------------------

@@ -28,3 +28,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 void* video_mjpeg_decode(void* arg);
+
+typedef ATTITUDE_CALLBACK void (*callback)(float yaw, float pitch, float rall);
+void set_attitude_callback(ATTITUDE_CALLBACK callback);
