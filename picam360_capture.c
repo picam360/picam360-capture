@@ -353,10 +353,10 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 			"shader/board.frag");
 }
 
-static void attitude_callback(float yaw, float pitch, float rall) {
+static void attitude_callback(float yaw, float pitch, float roll) {
 	state->camera_yaw = yaw;
 	state->camera_pitch = pitch;
-	state->camera_rall = rall;
+	state->camera_roll = roll;
 }
 
 /***********************************************************
