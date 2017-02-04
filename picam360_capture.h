@@ -53,9 +53,9 @@ struct _PICAM360CAPTURE_T;
 
 typedef struct _OPTIONS_T{
 	float sharpness_gain;
-	float cam_offset_pitch[MAX_CAM_NUM];
-	float cam_offset_yaw[MAX_CAM_NUM];
-	float cam_offset_roll[MAX_CAM_NUM];
+	float cam_offset_pitch[MAX_CAM_NUM]; // x axis
+	float cam_offset_yaw[MAX_CAM_NUM]; // y axis
+	float cam_offset_roll[MAX_CAM_NUM]; // z axis
 	float cam_offset_x[MAX_CAM_NUM];
 	float cam_offset_y[MAX_CAM_NUM];
 	float cam_horizon_r[MAX_CAM_NUM];
@@ -144,9 +144,9 @@ typedef struct _PICAM360CAPTURE_T {
 
 	//for unif matrix
 	//euler angles
-	float camera_pitch;
-	float camera_yaw;
-	float camera_roll;
+	float camera_pitch; // x axis
+	float camera_yaw; // y axis
+	float camera_roll; // z axis
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
