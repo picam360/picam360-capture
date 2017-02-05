@@ -278,7 +278,7 @@ void *image_receiver(void* arg) {
 						quat[3] = _q[0];
 
 						if (lg_attitude_callback) {
-							lg_attitude_callback(q);
+							lg_attitude_callback(quat);
 						}
 					}
 
