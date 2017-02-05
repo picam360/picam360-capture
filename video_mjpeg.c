@@ -264,19 +264,27 @@ void *image_receiver(void* arg) {
 				}
 				xmp_idx++;
 				if (xmp_idx >= xmp_len) {
-					float q[4];
 					char *xml = buff_xmp + strlen(buff_xmp) + 1;
-					xmp = false;
 
 					char *q_str = strstr(xml, "<Picam360:Quaternion>");
 					if (q_str) {
+						float quat[4];
+						float _q[4];
 						sscanf(q_str,
-								"<Picam360:Quaternion>%f,%f,%f,%f</Picam360:Quaternion>", &q[0], &q[1], &q[2], &q[3]);
+								"<Picam360:Quaternion>%f,%f,%f,%f</Picam360:Quaternion>", &_q[0], &_q[1], &_q[2], &_q[3]);
+						quat[0] = _q[2];
+						quat[1] = -_q[3];
+						quat[2] = -_q[1];
+						quat[3] = _q[0];
 
 						if (lg_attitude_callback) {
 							lg_attitude_callback(q);
 						}
 					}
+
+					xmp = false;
+					free(buff_xmp);
+					buff_xmp = NULL;
 				}
 			}
 			if (marker) {
