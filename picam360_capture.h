@@ -147,6 +147,8 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_pitch; // x axis
 	float camera_yaw; // y axis
 	float camera_roll; // z axis
+	float camera_quatanion[4];
+	bool camera_coordinate_from_device;
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];

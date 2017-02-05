@@ -353,10 +353,12 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 			"shader/board.frag");
 }
 
-static void attitude_callback(float pitch, float yaw, float roll) {
-	state->camera_pitch = pitch;
-	state->camera_yaw = yaw;
-	state->camera_roll = roll;
+static void attitude_callback(float *q) {
+	state->camera_quatanion[0] = q[0];
+	state->camera_quatanion[1] = q[1];
+	state->camera_quatanion[2] = q[2];
+	state->camera_quatanion[3] = q[3];
+	state->camera_coordinate_from_device = true;
 }
 
 /***********************************************************
@@ -1227,10 +1229,15 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 			state->options.cam_offset_yaw[0]);
 
 	// Rc : camera orientation
-	//euler Y(yaw)X(pitch)Z(roll)
-	mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
-	mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
-	mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
+
+	if (state->camera_coordinate_from_device) {
+		mat4_fromQuat(camera_matrix, state->camera_quatanion);
+	} else {
+		//euler Y(yaw)X(pitch)Z(roll)
+		mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
+		mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
+		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
+	}
 
 	if (frame->view_coordinate_from_device) {
 		mat4_fromQuat(view_matrix, get_quatanion());
