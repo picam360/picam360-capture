@@ -77,6 +77,11 @@ if [ $STREAM = true ]; then
 	STREAM_PARAM="-o /tmp/stream/steam.jpeg"
 fi
 
+if [ -e status ]; then
+	rm status
+fi
+mkfifo status
+chmod 0666 status
 
 if [ -e cam0 ]; then
 	rm cam0
@@ -97,7 +102,7 @@ mkfifo cmd
 chmod 0666 cmd
 
 if [ $REMOTE = true ]; then
-	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &
+	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
 	if [ $CODEC = "MJPEG" ]; then
 #		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -b $BITRATE -fps $FPS -o - > cam0 &

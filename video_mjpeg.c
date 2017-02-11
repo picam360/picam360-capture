@@ -45,8 +45,6 @@ static COMPONENT_T* egl_render[2] = { };
 
 static void* eglImage[2] = { };
 
-static ATTITUDE_CALLBACK lg_attitude_callback = NULL;
-
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int index = (int) data;
 
@@ -55,10 +53,6 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
-}
-
-void set_attitude_callback(ATTITUDE_CALLBACK callback) {
-	lg_attitude_callback = callback;
 }
 
 static pthread_mutex_t image_mlock = PTHREAD_MUTEX_INITIALIZER;
@@ -251,42 +245,6 @@ void *image_receiver(void* arg) {
 			continue;
 		}
 		for (int i = 0; i < data_len; i++) {
-			if (xmp) {
-				if (xmp_idx == 0) {
-					xmp_len = ((unsigned char*) buff)[i] << 8;
-				} else if (xmp_idx == 1) {
-					xmp_len += ((unsigned char*) buff)[i];
-					buff_xmp = malloc(xmp_len);
-					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
-					buff_xmp[1] = (xmp_len) & 0xFF;
-				} else {
-					buff_xmp[xmp_idx] = buff[i];
-				}
-				xmp_idx++;
-				if (xmp_idx >= xmp_len) {
-					char *xml = buff_xmp + strlen(buff_xmp) + 1;
-
-					char *q_str = strstr(xml, "<Picam360:Quaternion>");
-					if (q_str) {
-						float quat[4];
-						float _q[4];
-						sscanf(q_str,
-								"<Picam360:Quaternion>%f,%f,%f,%f</Picam360:Quaternion>", &_q[0], &_q[1], &_q[2], &_q[3]);
-						quat[0] = _q[2];
-						quat[1] = -_q[3];
-						quat[2] = -_q[1];
-						quat[3] = _q[0];
-
-						if (lg_attitude_callback) {
-							lg_attitude_callback(quat);
-						}
-					}
-
-					xmp = false;
-					free(buff_xmp);
-					buff_xmp = NULL;
-				}
-			}
 			if (marker) {
 				marker = 0;
 				if (buff[i] == 0xD8) { //SOI
@@ -334,11 +292,6 @@ void *image_receiver(void* arg) {
 						image_data = create_image(image_buff_size);
 						image_start = -1;
 					}
-				}
-				if (buff[i] == 0xE1) { //APP1
-					xmp = true;
-					xmp_len = 0;
-					xmp_idx = 0;
 				}
 			} else if (buff[i] == 0xFF) {
 				marker = 1;

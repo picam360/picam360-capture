@@ -53,6 +53,7 @@
 #include "gl_program.h"
 #include "device.h"
 #include "auto_calibration.h"
+#include "status_watcher.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -415,7 +416,8 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
 
-	if (state->codec_type == MJPEG) {
+	{ // init status watch
+		status_watch((void*)state);
 		set_attitude_callback(attitude_callback);
 	}
 }
