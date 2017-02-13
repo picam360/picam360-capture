@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 
 #include "status_watcher.h"
+#include "picam360_capture.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -43,20 +44,14 @@ void set_attitude_callback(ATTITUDE_CALLBACK callback) {
 	lg_attitude_callback = callback;
 }
 
-void *image_receiver(void* arg) {
+static void *image_receiver(void* arg) {
 	PICAM360CAPTURE_T *state = (PICAM360CAPTURE_T *) arg;
 
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
 	unsigned char *buff_trash = malloc(buff_size);
-	IMAGE_DATA *image_data = NULL;
-	int image_buff_size = 0;
-	int image_buff_cur = 0;
-	int image_start = -1;
 	int data_len = 0;
-	int data_len_total = 0;
 	int marker = 0;
-	int soicount = 0;
 	int camd_fd = -1;
 	int file_fd = -1;
 	bool xmp = false;
@@ -92,15 +87,6 @@ void *image_receiver(void* arg) {
 				state->input_mode = INPUT_MODE_CAM;
 				reset = true;
 			} else { //read
-				if (state->frame_sync) {
-					int res = mrevent_wait(
-							&state->request_frame_event[index],
-							1000); //wait 1msec
-					if (res != 0) {
-						continue;
-					}
-				}
-
 				if (state->input_file_cur
 						< state->input_file_size) {
 					data_len = read(file_fd, buff, buff_size);
@@ -125,11 +111,7 @@ void *image_receiver(void* arg) {
 			reset = true;
 		}
 		if (reset) {
-			image_buff_cur = 0;
-			image_start = -1;
-			data_len_total = 0;
 			marker = 0;
-			soicount = 0;
 			continue;
 		}
 		for (int i = 0; i < data_len; i++) {
@@ -195,6 +177,6 @@ void *status_watch(void* arg) {
 	pthread_t image_receiver_thread;
 	pthread_create(&image_receiver_thread, NULL, image_receiver, (void*) state);
 
-	return (void*) status;
+	return (void*) NULL;
 }
 
