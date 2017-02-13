@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #include "MotionSensor.h"
 

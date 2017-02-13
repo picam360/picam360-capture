@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include <libovr_nsb/OVR.h>
 
 static Device *dev = NULL;
