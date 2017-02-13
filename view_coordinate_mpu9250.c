@@ -14,7 +14,7 @@ void *threadFunc(void *data) {
 	} while (1);
 }
 
-void init_device_mpu9250() {
+void init_mpu9250() {
 
 	ms_open();
 

@@ -187,7 +187,7 @@ void *image_receiver(void* arg) {
 }
 
 // Modified function prototype to work with pthreads
-void *status_watcher(void* arg) {
+void *status_watch(void* arg) {
 	PICAM360CAPTURE_T *state = (PICAM360CAPTURE_T *) arg;
 
 	printf("milestone\n");
