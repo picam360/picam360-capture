@@ -572,7 +572,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:")) != -1) {
 		switch (opt) {
 		case 'W':
 			sscanf(optarg, "%d", &render_width);
@@ -1059,7 +1059,7 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {

@@ -24,7 +24,7 @@ CODEC=H264
 STREAM=false
 STREAM_PARAM=
 AUTO_CALIBRATION=
-VIEW_ORIENTATION=MANUAL
+VIEW_COODINATE=MANUAL
 
 while getopts ac:n:w:h:W:H:psCEFf:rDSv OPT
 do
@@ -61,7 +61,7 @@ do
             ;;
         S)  STREAM=true
             ;;
-        v)  VIEW_ORIENTATION=$OPTARG
+        v)  VIEW_COODINATE=$OPTARG
             ;;            
         \?) usage_exit
             ;;
@@ -115,4 +115,4 @@ elif [ $DIRECT = ]; then
 	fi
 fi
 
-./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM -v VIEW_ORIENTATION"
+./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM -v $VIEW_COODINATE"
