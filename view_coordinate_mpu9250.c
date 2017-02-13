@@ -28,9 +28,9 @@ void init_device_mpu9250() {
 }
 
 float *get_quatanion_mpu9250() {
-	quat[0] = -(float) _q[2] / (1 << 30);
-	quat[1] = (float) _q[3] / (1 << 30);
-	quat[2] = -(float) _q[1] / (1 << 30);
-	quat[3] = (float) _q[0] / (1 << 30);
+	quat[0] = -quatanion[2];
+	quat[1] = quatanion[3];
+	quat[2] = -quatanion[1];
+	quat[3] = quatanion[0]);
 	return quat;
 }
