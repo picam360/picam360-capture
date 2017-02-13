@@ -594,10 +594,28 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			strncpy(frame->output_filepath, optarg,
 					sizeof(frame->output_filepath));
 			break;
+		case 'v':
+			if (strcmp(optarg, "MPU9250") == 0) {
+				frame->view_coordinate_mode = MPU9250;
+			}
+			else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
+				frame->view_coordinate_mode = OCULUS_RIFT;
+			}
+			break;
 		default:
 			break;
 		}
 	}
+
+	switch(frame->view_coordinate_mode){
+	case MPU9250:
+		init_mpu9250();
+		break;
+	case OCULUS_RIFT:
+		init_device();
+		break;
+	}
+
 	if (render_width > 2048) {
 		frame->double_size = true;
 		frame->width = render_width / 2;
@@ -1105,7 +1123,7 @@ int main(int argc, char *argv[]) {
 			if (strcmp(optarg, "MPU9250") == 0) {
 				state->default_view_coordinate_mode = MPU9250;
 			}
-			if (strcmp(optarg, "OCULUS-RIFT") == 0) {
+			else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
 				state->default_view_coordinate_mode = OCULUS_RIFT;
 			}
 			break;
@@ -1127,15 +1145,6 @@ int main(int argc, char *argv[]) {
 
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
-
-	switch(state->default_view_coordinate_mode){
-	case MPU9250:
-		init_mpu9250();
-		break;
-	case OCULUS_RIFT:
-		init_device();
-		break;
-	}
 
 	// Start OGLES
 	init_ogl(state);

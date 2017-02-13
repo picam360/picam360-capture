@@ -26,7 +26,7 @@ STREAM_PARAM=
 AUTO_CALIBRATION=
 VIEW_COODINATE=MANUAL
 
-while getopts ac:n:w:h:W:H:psCEFf:rDSv OPT
+while getopts ac:n:w:h:W:H:psCEFf:rDSv: OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
@@ -62,7 +62,7 @@ do
         S)  STREAM=true
             ;;
         v)  VIEW_COODINATE=$OPTARG
-            ;;            
+            ;;
         \?) usage_exit
             ;;
     esac

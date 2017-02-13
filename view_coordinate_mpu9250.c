@@ -14,7 +14,14 @@ void *threadFunc(void *data) {
 	} while (1);
 }
 
+static bool is_init = false;
+
 void init_mpu9250() {
+	if (is_init) {
+		return;
+	} else {
+		is_init = true;
+	}
 
 	ms_open();
 

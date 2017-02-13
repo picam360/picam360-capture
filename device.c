@@ -24,7 +24,14 @@ static void *threadFunc(void *data) {
 	return 0;
 }
 
+static bool is_init = false;
+
 void init_device() {
+	if (is_init) {
+		return;
+	} else {
+		is_init = true;
+	}
 	//reset quat x=90 y=0 z=0
 	{
 		quat[0] = 0.70711;
