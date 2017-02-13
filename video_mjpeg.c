@@ -110,7 +110,7 @@ typedef struct _IMAGE_RECEIVER_DATA {
 	IMAGE_DATA *image_data;
 } IMAGE_RECEIVER_DATA;
 
-void *image_dumper(void* arg) {
+static void *image_dumper(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	IMAGE_DATA *image_data = NULL;
 	int descriptor = -1;
@@ -156,7 +156,7 @@ void *image_dumper(void* arg) {
 	return NULL;
 }
 
-void *image_receiver(void* arg) {
+static void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
@@ -171,10 +171,6 @@ void *image_receiver(void* arg) {
 	int soicount = 0;
 	int camd_fd = -1;
 	int file_fd = -1;
-	bool xmp = false;
-	char *buff_xmp = NULL;
-	int xmp_len = 0;
-	int xmp_idx = 0;
 
 	while (1) {
 		bool reset = false;
