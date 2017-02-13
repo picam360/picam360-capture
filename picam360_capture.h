@@ -48,6 +48,9 @@ enum OPERATION_MODE {
 enum CODEC_TYPE {
 	H264, MJPEG
 };
+enum VIEW_COODINATE_MODE {
+	MANUAL, MPU9250, OCULUS_RIFT
+};
 
 struct _PICAM360CAPTURE_T;
 
@@ -85,7 +88,7 @@ typedef struct _FRAME_T {
 	float view_pitch;
 	float view_yaw;
 	float view_roll;
-	bool view_coordinate_from_device;
+	enum VIEW_COODINATE_MODE view_coordinate_mode;
 
 	void *custom_data;
 	//event
@@ -149,6 +152,7 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_roll; // z axis
 	float camera_quatanion[4];
 	bool camera_coordinate_from_device;
+	enum VIEW_COODINATE_MODE default_view_coordinate_mode;
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];

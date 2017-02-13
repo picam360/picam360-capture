@@ -54,6 +54,7 @@
 #include "device.h"
 #include "auto_calibration.h"
 #include "status_watcher.h"
+#include "view_coordinate_mpu9250.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -567,7 +568,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->id = next_frame_id++;
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
-	frame->view_coordinate_from_device = true;
+	frame->view_coordinate_mode = state->default_view_coordinate_mode;
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
@@ -825,7 +826,7 @@ void command_handler() {
 				frame->view_pitch = 90 * M_PI / 180.0;
 				frame->view_yaw = 0;
 				frame->view_roll = 0;
-				frame->view_coordinate_from_device = false;
+				frame->view_coordinate_mode = MANUAL;
 				state->frame = frame;
 			}
 		} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
@@ -847,7 +848,7 @@ void command_handler() {
 				frame->view_pitch = 90 * M_PI / 180.0;
 				frame->view_yaw = 0;
 				frame->view_roll = 0;
-				frame->view_coordinate_from_device = false;
+				frame->view_coordinate_mode = MANUAL;
 				state->frame = frame;
 				printf("start_record id=%d\n", frame->id);
 			}
@@ -962,7 +963,7 @@ void command_handler() {
 						frame->view_pitch = pitch * M_PI / 180.0;
 						frame->view_yaw = yaw * M_PI / 180.0;
 						frame->view_roll = roll * M_PI / 180.0;
-						frame->view_coordinate_from_device = false;
+						frame->view_coordinate_mode = MANUAL;
 						printf("set_view_orientation\n");
 						break;
 					}
@@ -1058,7 +1059,7 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options(state);
 
-	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v")) != -1) {
 		switch (opt) {
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {
@@ -1100,6 +1101,14 @@ int main(int argc, char *argv[]) {
 		case 'F':
 			strncpy(frame_param, optarg, 256);
 			break;
+		case 'v':
+			if (strcmp(optarg, "MPU9250") == 0) {
+				state->default_view_coordinate_mode = MPU9250;
+			}
+			if (strcmp(optarg, "OCULUS-RIFT") == 0) {
+				state->default_view_coordinate_mode = OCULUS_RIFT;
+			}
+			break;
 		default:
 			/* '?' */
 			printf(
@@ -1119,7 +1128,14 @@ int main(int argc, char *argv[]) {
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
 
-	init_device();
+	switch(state->default_view_coordinate_mode){
+	case MPU9250:
+		init_mpu9250();
+		break;
+	case OCULUS_RIFT:
+		init_device();
+		break;
+	}
 
 	// Start OGLES
 	init_ogl(state);
@@ -1241,14 +1257,20 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 	}
 
-	if (frame->view_coordinate_from_device) {
+	switch(frame->view_coordinate_mode){
+	case MPU9250:
+		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
+		break;
+	case OCULUS_RIFT:
 		mat4_fromQuat(view_matrix, get_quatanion());
 		mat4_transpose(view_matrix, view_matrix);
-	} else {
+		break;
+	case MANUAL:
 		//euler Y(yaw)X(pitch)Z(roll)
 		mat4_rotateZ(view_matrix, view_matrix, frame->view_roll);
 		mat4_rotateX(view_matrix, view_matrix, frame->view_pitch);
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
+		break;
 	}
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially

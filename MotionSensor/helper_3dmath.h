@@ -47,7 +47,7 @@ class Quaternion {
             z = 0.0f;
         }
         
-	Quaternion(int32_t *data) {
+	Quaternion(long *data) {
 	    w = (float)data[0] / 16384.0f;
 	    x = (float)data[1] / 16384.0f;
 	    y = (float)data[2] / 16384.0f;

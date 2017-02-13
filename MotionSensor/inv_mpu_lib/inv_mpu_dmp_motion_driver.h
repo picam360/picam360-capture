@@ -1,6 +1,7 @@
 /*
  $License:
     Copyright (C) 2011-2012 InvenSense Corporation, All Rights Reserved.
+    See included License.txt for License information.
  $
  */
 /**
@@ -13,7 +14,6 @@
  *      @details    All functions are preceded by the dmp_ prefix to
  *                  differentiate among MPL and general driver function calls.
  */
-
 #ifndef _INV_MPU_DMP_MOTION_DRIVER_H_
 #define _INV_MPU_DMP_MOTION_DRIVER_H_
 
@@ -50,47 +50,49 @@
 #define INV_WXYZ_QUAT       (0x100)
 
 /* Set up functions. */
-uint8_t dmp_load_motion_driver_firmware(void);
-uint8_t dmp_set_fifo_rate(uint16_t rate);
-uint8_t dmp_get_fifo_rate(uint16_t *rate);
-uint8_t dmp_enable_feature(uint16_t mask);
-uint8_t dmp_get_enabled_features(uint16_t *mask);
-uint8_t dmp_set_interrupt_mode(uint8_t mode);
-uint8_t dmp_set_orientation(uint16_t orient);
-uint8_t dmp_set_gyro_bias(int32_t *bias);
-uint8_t dmp_set_accel_bias(int32_t *bias);
+int dmp_load_motion_driver_firmware(void);
+int dmp_set_fifo_rate(unsigned short rate);
+int dmp_get_fifo_rate(unsigned short *rate);
+int dmp_enable_feature(unsigned short mask);
+int dmp_get_enabled_features(unsigned short *mask);
+int dmp_set_interrupt_mode(unsigned char mode);
+int dmp_set_orientation(unsigned short orient);
+int dmp_set_gyro_bias(long *bias);
+int dmp_set_accel_bias(long *bias);
 
 /* Tap functions. */
-uint8_t dmp_register_tap_cb(void (*func)(uint8_t, uint8_t));
-uint8_t dmp_set_tap_thresh(uint8_t axis, uint16_t thresh);
-uint8_t dmp_set_tap_axes(uint8_t axis);
-uint8_t dmp_set_tap_count(uint8_t min_taps);
-uint8_t dmp_set_tap_time(uint16_t time);
-uint8_t dmp_set_tap_time_multi(uint16_t time);
-uint8_t dmp_set_shake_reject_thresh(int32_t sf, uint16_t thresh);
-uint8_t dmp_set_shake_reject_time(uint16_t time);
-uint8_t dmp_set_shake_reject_timeout(uint16_t time);
+int dmp_register_tap_cb(void (*func)(unsigned char, unsigned char));
+int dmp_set_tap_thresh(unsigned char axis, unsigned short thresh);
+int dmp_set_tap_axes(unsigned char axis);
+int dmp_set_tap_count(unsigned char min_taps);
+int dmp_set_tap_time(unsigned short time);
+int dmp_set_tap_time_multi(unsigned short time);
+int dmp_set_shake_reject_thresh(long sf, unsigned short thresh);
+int dmp_set_shake_reject_time(unsigned short time);
+int dmp_set_shake_reject_timeout(unsigned short time);
 
 /* Android orientation functions. */
-uint8_t dmp_register_android_orient_cb(void (*func)(uint8_t));
+int dmp_register_android_orient_cb(void (*func)(unsigned char));
 
 /* LP quaternion functions. */
-uint8_t dmp_enable_lp_quat(uint8_t enable);
-uint8_t dmp_enable_6x_lp_quat(uint8_t enable);
+int dmp_enable_lp_quat(unsigned char enable);
+int dmp_enable_6x_lp_quat(unsigned char enable);
 
 /* Pedometer functions. */
-uint8_t dmp_get_pedometer_step_count(uint32_t *count);
-uint8_t dmp_set_pedometer_step_count(uint32_t count);
-uint8_t dmp_get_pedometer_walk_time(uint32_t *time);
-uint8_t dmp_set_pedometer_walk_time(uint32_t time);
+int dmp_get_pedometer_step_count(unsigned long *count);
+int dmp_set_pedometer_step_count(unsigned long count);
+int dmp_get_pedometer_walk_time(unsigned long *time);
+int dmp_set_pedometer_walk_time(unsigned long time);
 
 /* DMP gyro calibration functions. */
-uint8_t dmp_enable_gyro_cal(uint8_t enable);
+int dmp_enable_gyro_cal(unsigned char enable);
 
 /* Read function. This function should be called whenever the MPU interrupt is
  * detected.
  */
-uint8_t dmp_read_fifo(int16_t *gyro, int16_t *accel, int32_t *quat, int16_t *sensors, uint8_t *more);
+int dmp_read_fifo(short *gyro, short *accel, long *quat,
+    unsigned long *timestamp, short *sensors, unsigned char *more);
 
-#endif  /* _INV_MPU_DMP_MOTION_DRIVER_H_ */
+#endif  /* #ifndef _INV_MPU_DMP_MOTION_DRIVER_H_ */
+
 

@@ -7,8 +7,16 @@
 
 #include "helper_3dmath.h"
 #include "../MotionSensor.h"
+
+#ifdef __cplusplus
+extern "C"{
+#endif
 #include "inv_mpu_lib/inv_mpu.h"
 #include "inv_mpu_lib/inv_mpu_dmp_motion_driver.h"
+#ifdef __cplusplus
+}
+#endif
+
 #include "sensor.h"
 
 #define wrap_180(x) (x < -180 ? x+360 : (x > 180 ? x - 360: x))
@@ -22,9 +30,10 @@ uint8_t fifoBuffer[64]; // FIFO storage buffer
 
 int16_t a[3];              // [x, y, z]            accel vector
 int16_t g[3];              // [x, y, z]            gyro vector
-int32_t _q[4];
-int32_t t;
+long _q[4];
+long t;
 int16_t c[3];
+unsigned long timestamp;
 
 VectorFloat gravity;    // [x, y, z]            gravity vector
 
@@ -34,6 +43,7 @@ int dmpReady = 0;
 float lastval[3];
 int16_t sensors;
 
+float quatanion[4];
 float ypr[3];
 Quaternion q; 
 float temp;
@@ -119,7 +129,7 @@ int ms_open() {
 	printf("Checking... ");
 	do {
 		delay_ms(1000/rate);  //dmp will habve 4 (5-1) packets based on the fifo_rate
-		r=dmp_read_fifo(g,a,_q,&sensors,&fifoCount);
+		r=dmp_read_fifo(g,a,_q,&timestamp,&sensors,&fifoCount);
 	} while (r!=0 || fifoCount<5); //packtets!!!
 	printf("Done.\n");
 
@@ -133,15 +143,20 @@ int ms_update() {
 		return -1;
 	}
 
-	while (dmp_read_fifo(g,a,_q,&sensors,&fifoCount)!=0); //gyro and accel can be null because of being disabled in the efeatures
+	while (dmp_read_fifo(g,a,_q,&timestamp,&sensors,&fifoCount)!=0 || fifoCount > 0); //gyro and accel can be null because of being disabled in the efeatures
 	q = _q;
 	GetGravity(&gravity, &q);
 	GetYawPitchRoll(ypr, &q, &gravity);
 
-	mpu_get_temperature(&t);
+	quatanion[0] = (float)_q[0] / (1 << 30);
+	quatanion[1] = (float)_q[1] / (1 << 30);
+	quatanion[2] = (float)_q[2] / (1 << 30);
+	quatanion[3] = (float)_q[3] / (1 << 30);
+
+	mpu_get_temperature(&t,&timestamp);
 	temp=(float)t/65536L;
 
-	mpu_get_compass_reg(c);
+	mpu_get_compass_reg(c,&timestamp);
 
 	//scaling for degrees output
 	for (int i=0;i<DIM;i++){
