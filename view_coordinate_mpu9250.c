@@ -31,6 +31,6 @@ float *get_quatanion_mpu9250() {
 	quat[0] = -quatanion[2];
 	quat[1] = quatanion[3];
 	quat[2] = -quatanion[1];
-	quat[3] = quatanion[0]);
+	quat[3] = quatanion[0];
 	return quat;
 }
