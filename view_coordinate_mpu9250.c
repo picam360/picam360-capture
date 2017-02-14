@@ -36,9 +36,16 @@ void init_mpu9250() {
 }
 
 float *get_quatanion_mpu9250() {
-	quat[0] = -quatanion[1];
-	quat[1] = -quatanion[3];
-	quat[2] = quatanion[2];
-	quat[3] = quatanion[0];
+	//convert from mpu coodinate to opengl coodinate
+	quat[0] = quatanion[1];//x
+	quat[1] = quatanion[3];//y : swap y and z
+	quat[2] = -quatanion[2];//z : swap y and z
+	quat[3] = quatanion[0];//w
+
+	//conjuction
+	quat[0] *= -1;
+	quat[1] *= -1;
+	quat[2] *= -1;
+	quat[3] *= 1;
 	return quat;
 }
