@@ -1266,6 +1266,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 	}
 
+	mat4_multiply(camera_matrix, camera_offset_matrix, camera_matrix); // Rc'=RcoRc
+
 	switch(frame->view_coordinate_mode){
 	case MPU9250:
 		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
@@ -1287,11 +1289,10 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
 
 	// Rv : view orientation
-	//(RcRco)Rv(RcRco)^-1R(Rc)Rco(Rc)^-1RcRw
+	//RcRv(Rc^-1)RcRw
 	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
 	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_offset_matrix); // RcoRvRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRcoRvRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRvRw
 
 	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
 
