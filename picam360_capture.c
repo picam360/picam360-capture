@@ -1266,7 +1266,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 	}
 
-	mat4_multiply(camera_matrix, camera_offset_matrix, camera_matrix); // Rc'=RcoRc
+	mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
 
 	switch(frame->view_coordinate_mode){
 	case MPU9250:
