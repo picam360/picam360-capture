@@ -1269,6 +1269,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	switch(frame->view_coordinate_mode){
 	case MPU9250:
 		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
+		mat4_transpose(view_matrix, view_matrix);
 		break;
 	case OCULUS_RIFT:
 		mat4_fromQuat(view_matrix, get_quatanion());
