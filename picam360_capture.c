@@ -418,7 +418,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 	}
 
 	{ // init status watch
-		status_watch((void*)state);
+		status_watch((void*) state);
 		set_attitude_callback(attitude_callback);
 	}
 }
@@ -597,8 +597,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		case 'v':
 			if (strcmp(optarg, "MPU9250") == 0) {
 				frame->view_coordinate_mode = MPU9250;
-			}
-			else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
+			} else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
 				frame->view_coordinate_mode = OCULUS_RIFT;
 			}
 			break;
@@ -607,7 +606,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		}
 	}
 
-	switch(frame->view_coordinate_mode){
+	switch (frame->view_coordinate_mode) {
 	case MPU9250:
 		init_mpu9250();
 		break;
@@ -808,12 +807,20 @@ static double calib_step = 0.01;
 void command_handler() {
 	while (inputAvailable()) {
 		char buff[256];
+		bool error = false;
 		for (int i = 0; i < sizeof(buff) - 1; i++) {
-			read(STDIN_FILENO, &buff[i], 1);
+			int n = read(STDIN_FILENO, &buff[i], 1);
+			if (n == 0) {
+				error = true;
+				break;
+			}
 			if (buff[i] == '\n') {
 				buff[i + 1] = '\0';
 				break;
 			}
+		}
+		if (error) {
+			break;
 		}
 		char *cmd = strtok(buff, " \n");
 		if (cmd == NULL) {
@@ -1122,8 +1129,7 @@ int main(int argc, char *argv[]) {
 		case 'v':
 			if (strcmp(optarg, "MPU9250") == 0) {
 				state->default_view_coordinate_mode = MPU9250;
-			}
-			else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
+			} else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
 				state->default_view_coordinate_mode = OCULUS_RIFT;
 			}
 			break;
@@ -1268,7 +1274,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 //
 //	mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
 
-	switch(frame->view_coordinate_mode){
+	switch (frame->view_coordinate_mode) {
 	case MPU9250:
 		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
 		mat4_transpose(view_matrix, view_matrix);
