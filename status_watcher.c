@@ -133,14 +133,15 @@ static void *image_receiver(void* arg) {
 					char *q_str = strstr(xml, "<quaternion");
 					if (q_str) {
 						float quat[4];
-						float _q[4];
+						float quatanion[4];
 						sscanf(q_str,
 								"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-								&_q[0], &_q[1], &_q[2], &_q[3]);
-						quat[0] = _q[2];
-						quat[1] = -_q[3];
-						quat[2] = -_q[1];
-						quat[3] = _q[0];
+								&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+						//convert from mpu coodinate to opengl coodinate
+						quat[0] = quatanion[1];//x
+						quat[1] = quatanion[3];//y : swap y and z
+						quat[2] = -quatanion[2];//z : swap y and z
+						quat[3] = quatanion[0];//w
 
 						if (lg_attitude_callback) {
 							lg_attitude_callback(quat);
