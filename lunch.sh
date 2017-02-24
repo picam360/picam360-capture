@@ -104,9 +104,18 @@ fi
 mkfifo cmd
 chmod 0666 cmd
 
+if [ -e driver ]; then
+	rm driver
+fi
+mkfifo driver
+chmod 0666 driver
+
 if [ $REMOTE = true ]; then
+	sudo killall socat
+	/usr/bin/socat PIPE:driver UDP-DATAGRAM:192.168.40.1:9001 &
 	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
+	sudo killall raspivid
 	if [ $CODEC = "MJPEG" ]; then
 #		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -b $BITRATE -fps $FPS -o - > cam0 &
 		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -b $BITRATE -fps $FPS -o - > cam0 &
@@ -115,4 +124,5 @@ elif [ $DIRECT = ]; then
 	fi
 fi
 
+sudo killall picam360-capture.bin
 ./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM -v $VIEW_COODINATE"
