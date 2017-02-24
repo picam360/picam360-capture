@@ -802,6 +802,41 @@ void frame_handler() {
 	}
 }
 
+int picam360_driver_xmp(char *buff, int buff_len, float light_value) {
+	int xmp_len = 0;
+
+	xmp_len = 0;
+	buff[xmp_len++] = 0xFF;
+	buff[xmp_len++] = 0xE1;
+	buff[xmp_len++] = 0; // size MSB
+	buff[xmp_len++] = 0; // size LSB
+	xmp_len += sprintf(buff + xmp_len, "http://ns.adobe.com/xap/1.0/");
+	buff[xmp_len++] = '\0';
+	xmp_len += sprintf(buff + xmp_len, "<?xpacket begin=\"﻿");
+	buff[xmp_len++] = 0xEF;
+	buff[xmp_len++] = 0xBB;
+	buff[xmp_len++] = 0xBF;
+	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
+	xmp_len +=
+			sprintf(buff + xmp_len,
+					"<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-capture rev1\">");
+	xmp_len +=
+			sprintf(buff + xmp_len,
+					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
+	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
+	xmp_len += sprintf(buff + xmp_len, "<picam360_driver light_value=\"%f\" />",
+			light_value);
+	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
+	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
+	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
+	xmp_len += sprintf(buff + xmp_len, "<?xpacket end=\"w\"?>");
+	buff[xmp_len++] = '\0';
+	buff[2] = ((xmp_len - 2) >> 8) & 0xFF; // size MSB
+	buff[3] = (xmp_len - 2) & 0xFF; // size LSB
+
+	return xmp_len;
+}
+
 static double calib_step = 0.01;
 
 void command_handler() {
@@ -822,7 +857,7 @@ void command_handler() {
 		if (error) {
 			break;
 		}
-		char *cmd = strtok(buff, " \n");
+		char *cmd = strtok(buff, " .\n");
 		if (cmd == NULL) {
 			//do nothing
 		} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
@@ -938,6 +973,17 @@ void command_handler() {
 						sizeof(state->output_raw_filepath) - 1);
 				state->output_raw = true;
 				printf("start_record_raw saved to %s\n", param);
+			}
+		} else if (strncmp(cmd, "driver", sizeof(buff)) == 0) {
+			cmd = strtok(NULL, " \n");
+			if (cmd == NULL) {
+				//do nothing
+			} else if (strncmp(cmd, "set_light_value", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					float value;
+					sscanf(param, "%f", &value);
+				}
 			}
 		} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
 			printf("stop_record_raw\n");
