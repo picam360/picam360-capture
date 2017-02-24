@@ -983,6 +983,15 @@ void command_handler() {
 				if (param != NULL) {
 					float value;
 					sscanf(param, "%f", &value);
+
+					char *buff[1024];
+					int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
+							value);
+					int fd = open("driver", O_RDWR);
+					if (fd > 0) {
+						write(fd, buff, xmp_len);
+						close(fd);
+					}
 				}
 			}
 		} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
