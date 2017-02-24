@@ -36,8 +36,10 @@
 #include <sys/time.h>
 #include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <stdbool.h>
 #include <linux/input.h>
+#include <fcntl.h>
 
 #include "bcm_host.h"
 
@@ -613,6 +615,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	case OCULUS_RIFT:
 		init_device();
 		break;
+	case MANUAL:
+	default:
+		break;
 	}
 
 	if (render_width > 2048) {
@@ -984,7 +989,7 @@ void command_handler() {
 					float value;
 					sscanf(param, "%f", &value);
 
-					char *buff[1024];
+					char buff[1024];
 					int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
 							value);
 					int fd = open("driver", O_RDWR);
