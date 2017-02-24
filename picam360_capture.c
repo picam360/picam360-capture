@@ -807,7 +807,8 @@ void frame_handler() {
 	}
 }
 
-int picam360_driver_xmp(char *buff, int buff_len, float light_value) {
+int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
+		float light1_value, float motor0_value, float motor1_value, float motor2_value, float motor3_value) {
 	int xmp_len = 0;
 
 	xmp_len = 0;
@@ -829,8 +830,13 @@ int picam360_driver_xmp(char *buff, int buff_len, float light_value) {
 			sprintf(buff + xmp_len,
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
-	xmp_len += sprintf(buff + xmp_len, "<picam360_driver light_value=\"%f\" />",
-			light_value);
+	xmp_len +=
+			sprintf(buff + xmp_len,
+					"<picam360_driver"
+							" light0_value=\"%f\" light1_value=\"%f\""
+							" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\""
+							" />", light0_value, light1_value, motor0_value,
+					motor1_value, motor2_value, motor3_value);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -991,7 +997,22 @@ void command_handler() {
 
 					char buff[1024];
 					int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
-							value);
+							value, value, 0, 0, 0, 0);
+					int fd = open("driver", O_RDWR);
+					if (fd > 0) {
+						write(fd, buff, xmp_len);
+						close(fd);
+					}
+				}
+			} else if (strncmp(cmd, "set_motor_value", sizeof(buff)) == 0) {
+				char *param = strtok(NULL, " \n");
+				if (param != NULL) {
+					float value;
+					sscanf(param, "%f", &value);
+
+					char buff[1024];
+					int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
+							0, 0, value, value, value, value);
 					int fd = open("driver", O_RDWR);
 					if (fd > 0) {
 						write(fd, buff, xmp_len);
