@@ -95,6 +95,11 @@ static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 0.1;
 static bool lowlevel_control = false;
 
+//kokuyoseki
+static struct timeval lg_last_kokuyoseki_time = { };
+static int lg_last_button = -1;
+static int lg_func = -1;
+
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
 	int buff_size = 4096;
@@ -105,7 +110,7 @@ void *transmit_thread_func(void* arg) {
 		static struct timeval time = { };
 		gettimeofday(&time, NULL);
 		struct timeval diff;
-		timersub(&time, &lg_last_time, &diff);
+		timersub(&time, &last_time, &diff);
 		int diff_usec = diff.tv_sec * 1000 + diff.tv_usec;
 		//cal
 		if (!lowlevel_control) {
@@ -117,6 +122,22 @@ void *transmit_thread_func(void* arg) {
 			lg_motor_value[1] = lg_thrust;
 			lg_motor_value[2] = lg_thrust;
 			lg_motor_value[3] = lg_thrust;
+		}
+		//kokuyoseki func
+		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
+			timersub(&time, &lg_last_kokuyoseki_time, &diff);
+			diff_usec = diff.tv_sec * 1000 + diff.tv_usec;
+			if (diff_usec > 1000) {
+				switch (lg_func) {
+				case 1:
+					lg_light_strength = 0;
+					break;
+				case 2:
+					lg_motor_value = 0;
+					break;
+				}
+				lg_func = -1;
+			}
 		}
 
 		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
@@ -168,15 +189,12 @@ static void command_handler(void *user_data, char *_buff) {
 	}
 }
 
-static struct timeval lg_last_time = { };
-static int lg_last_button = { };
-static int lg_func = 0;
 static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	if (value == 1) {
 		return;
 	}
 	struct timeval diff;
-	timersub(&time, &lg_last_time, &diff);
+	timersub(&time, &lg_last_kokuyoseki_time, &diff);
 	int diff_usec = diff.tv_sec * 1000 + diff.tv_usec;
 	switch (button) {
 	case NEXT_BUTTON:
@@ -195,13 +213,11 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			return;
 		lg_light_strength -= 1;
 		break;
-	case BLACKOUT_BUTTON_LONG:
-		if (diff_usec < 100)
-			return;
+	case BLACKOUT_BUTTON:
 		lg_func++;
 		break;
 	}
-	lg_last_time = time;
+	lg_last_kokuyoseki_time = time;
 	lg_last_button = button;
 }
 
