@@ -135,10 +135,10 @@ static void command_handler(void *user_data, char *_buff) {
 			if (id < MOTOR_NUM) {
 				lg_motor_value[id] = value;
 			}
-			printf(":unknown command : %s\n", buff);
+			printf("set_motor_value : completed\n");
 		}
 	} else {
-		printf("set_motor_value : completed\n");
+		printf(":unknown command : %s\n", buff);
 	}
 }
 
