@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "driver_agent.h"
+#include "kokuyoseki.h"
 
 #define PLUGIN_NAME "driver_agent"
 
@@ -142,7 +143,22 @@ static void command_handler(void *user_data, char *_buff) {
 	}
 }
 
+static bool is_init = false;
+static void init() {
+	if (!is_init) {
+		is_init = true;
+
+		open_kokuyoseki();
+
+		pthread_t transmit_thread;
+		pthread_create(&transmit_thread, NULL, transmit_thread_func,
+				(void*) NULL);
+	}
+}
+
 void create_driver_agent(PLUGIN_T **_plugin) {
+	init();
+
 	PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
 	strcpy(plugin->name, PLUGIN_NAME);
 	plugin->release = release;
@@ -150,7 +166,4 @@ void create_driver_agent(PLUGIN_T **_plugin) {
 	plugin->user_data = plugin;
 
 	*_plugin = plugin;
-
-	pthread_t transmit_thread;
-	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
 }
