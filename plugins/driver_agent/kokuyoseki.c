@@ -8,8 +8,7 @@
 
 #include "kokuyoseki.h"
 
-static bool stop_thread = false;
-static pthread_t lg_poling_thread;
+static bool lg_stop_thread = false;
 void *poling_thread_func(void* arg) {
 	char *kokuyoseki_event = "/dev/input/event0";
 	int fd = open(kokuyoseki_event, O_RDWR);
@@ -17,7 +16,7 @@ void *poling_thread_func(void* arg) {
 	if (fd < 0) {
 		return;
 	}
-	while (!stop_thread) {
+	while (!lg_stop_thread) {
 		struct input_event event;
 
 		if (read(mousefd, &event, sizeof(event)) != sizeof(event)) {
@@ -31,13 +30,14 @@ void *poling_thread_func(void* arg) {
 // Scan /dev looking for hidraw devices and then check to see if each is a kokuyoseki
 /////////////////////////////////////////////////////////////////////////////////////////////
 void open_kokuyoseki() {
-	stop_thread = false;
-	pthread_create(&lg_poling_thread, NULL, transmit_thread_func, (void*) NULL);
+	lg_stop_thread = false;
+	static pthread_t poling_thread;
+	pthread_create(&poling_thread, NULL, poling_thread_func, (void*) NULL);
 	return;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
 void close_kokuyoseki() {
-	stop_thread = true;
+	lg_stop_thread = true;
 }
