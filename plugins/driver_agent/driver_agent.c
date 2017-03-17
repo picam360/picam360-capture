@@ -124,8 +124,8 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust = MIN(MAX(lg_thrust, -100), 100);
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 			lg_motor_value[0] = lg_thrust;
-			lg_motor_value[1] = lg_thrust;
-			lg_motor_value[2] = lg_thrust;
+			lg_motor_value[1] = -lg_thrust;
+			lg_motor_value[2] = -lg_thrust;
 			lg_motor_value[3] = lg_thrust;
 		}
 		//kokuyoseki func
@@ -133,13 +133,19 @@ void *transmit_thread_func(void* arg) {
 			timersub(&time, &lg_last_kokuyoseki_time, &diff);
 			diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
 			if (diff_sec > 0.5) {
+				printf("func %d: ", lg_func);
 				switch (lg_func) {
 				case 1:
 					lg_light_strength = 0;
+					printf("light off\n");
 					break;
 				case 2:
 					lg_thrust = 0;
+					printf("thrust off\n");
 					break;
+				}
+				if(lg_func > 10){
+					exit(0);
 				}
 				lg_func = -1;
 			}
@@ -204,19 +210,23 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	switch (button) {
 	case NEXT_BUTTON:
 		lg_thrust += 1;
+		printf("thrust %f\n", lg_thrust);
 		break;
 	case BACK_BUTTON:
 		lg_thrust -= 1;
+		printf("thrust %f\n", lg_thrust);
 		break;
 	case NEXT_BUTTON_LONG:
-		if (diff_sec < 0.5)
+		if (diff_sec < 0.25)
 			return;
 		lg_light_strength += 1;
+		printf("light %f\n", lg_light_strength);
 		break;
 	case BACK_BUTTON_LONG:
-		if (diff_sec < 0.5)
+		if (diff_sec < 0.25)
 			return;
 		lg_light_strength -= 1;
+		printf("light %f\n", lg_light_strength);
 		break;
 	case BLACKOUT_BUTTON:
 		lg_func++;

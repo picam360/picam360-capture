@@ -14,9 +14,58 @@ void set_kokuyoseki_callback(KOKUYOSEKI_CALLBACK callback) {
 	lg_kokuyoseki_callback = callback;
 }
 
+static int read_hex(const char * const filename) {
+	FILE *in;
+	unsigned int value;
+
+	in = fopen(filename, "rb");
+	if (!in)
+		return -1;
+
+	if (fscanf(in, "%x", &value) == 1) {
+		fclose(in);
+		return (int) value;
+	}
+
+	fclose(in);
+	return -1;
+}
+
 static bool lg_stop_thread = false;
 void *poling_thread_func(void* arg) {
-	char *kokuyoseki_event = "/dev/input/event0";
+	struct dirent *d;
+	DIR *dir;
+	char fileName[256];
+	char *kokuyoseki_event = NULL;
+
+	// Open /dev directory
+	dir = opendir("/sys/class/input");
+
+	// Iterate over /dev files
+	while ((d = readdir(dir)) != 0) {
+		int _fd;
+		int vendor = 0;
+		int product = 0;
+		{
+			sprintf(fileName, "/sys/class/input/%s/device/id/vendor",
+					d->d_name);
+			vendor = read_hex(fileName);
+		}
+		{
+			sprintf(fileName, "/sys/class/input/%s/device/id/product",
+					d->d_name);
+			product = read_hex(fileName);
+		}
+
+		if (vendor == KOKUYOSEKI_VENDOR && product == KOKUYOSEKI_PRODUCT) {
+			sprintf(fileName, "/dev/input/%s", d->d_name);
+			kokuyoseki_event = fileName;
+			break;
+		}
+	}
+	if (kokuyoseki_event == NULL) {
+		return;
+	}
 	int fd = open(kokuyoseki_event, O_RDWR);
 	if (fd < 0) {
 		return NULL;
