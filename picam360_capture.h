@@ -157,5 +157,6 @@ typedef struct _PICAM360CAPTURE_T {
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
 
+	PLUGIN_T **plugins;
 	struct _OPTIONS_T options;
 } PICAM360CAPTURE_T;

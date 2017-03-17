@@ -807,48 +807,246 @@ void frame_handler() {
 	}
 }
 
-int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
-		float light1_value, float motor0_value, float motor1_value, float motor2_value, float motor3_value) {
-	int xmp_len = 0;
-
-	xmp_len = 0;
-	buff[xmp_len++] = 0xFF;
-	buff[xmp_len++] = 0xE1;
-	buff[xmp_len++] = 0; // size MSB
-	buff[xmp_len++] = 0; // size LSB
-	xmp_len += sprintf(buff + xmp_len, "http://ns.adobe.com/xap/1.0/");
-	buff[xmp_len++] = '\0';
-	xmp_len += sprintf(buff + xmp_len, "<?xpacket begin=\"﻿");
-	buff[xmp_len++] = 0xEF;
-	buff[xmp_len++] = 0xBB;
-	buff[xmp_len++] = 0xBF;
-	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-capture rev1\">");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
-	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<picam360_driver"
-							" light0_value=\"%f\" light1_value=\"%f\""
-							" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\""
-							" />", light0_value, light1_value, motor0_value,
-					motor1_value, motor2_value, motor3_value);
-	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
-	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
-	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
-	xmp_len += sprintf(buff + xmp_len, "<?xpacket end=\"w\"?>");
-	buff[xmp_len++] = '\0';
-	buff[2] = ((xmp_len - 2) >> 8) & 0xFF; // size MSB
-	buff[3] = (xmp_len - 2) & 0xFF; // size LSB
-
-	return xmp_len;
-}
-
 static double calib_step = 0.01;
+
+void _command_handler(char *buff) {
+	char *cmd = strtok(buff, " \n");
+	if (cmd == NULL) {
+		//do nothing
+	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
+		printf("exit\n");
+		exit(0); //temporary
+	} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
+		state->active_cam = 0;
+	} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
+		state->active_cam = 1;
+	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			const int kMaxArgs = 10;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+			FRAME_T *frame = create_frame(state, argc, argv);
+			frame->next = state->frame;
+			frame->output_mode = OUTPUT_MODE_STILL;
+			frame->view_pitch = 90 * M_PI / 180.0;
+			frame->view_yaw = 0;
+			frame->view_roll = 0;
+			frame->view_coordinate_mode = MANUAL;
+			state->frame = frame;
+		}
+	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			const int kMaxArgs = 10;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+			FRAME_T *frame = create_frame(state, argc, argv);
+			frame->next = state->frame;
+			frame->output_mode = OUTPUT_MODE_VIDEO;
+			frame->view_pitch = 90 * M_PI / 180.0;
+			frame->view_yaw = 0;
+			frame->view_roll = 0;
+			frame->view_coordinate_mode = MANUAL;
+			state->frame = frame;
+			printf("start_record id=%d\n", frame->id);
+		}
+	} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int id = 0;
+			sscanf(param, "%d", &id);
+			for (FRAME_T *frame = state->frame; frame != NULL;
+					frame = frame->next) {
+				if (frame->id == id) {
+					frame->output_mode = OUTPUT_MODE_NONE;
+					printf("stop_record\n");
+					break;
+				}
+			}
+		}
+	} else if (strncmp(cmd, "start_ac", sizeof(buff)) == 0) {
+		bool checkAcMode = false;
+		for (FRAME_T *frame = state->frame; frame != NULL; frame =
+				frame->next) {
+			if (is_auto_calibration(frame)) {
+				checkAcMode = true;
+				break;
+			}
+		}
+		if (!checkAcMode) {
+			char param[256];
+			strncpy(param, "-W 256 -H 256 -F", 256);
+
+			const int kMaxArgs = 10;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = "auto_calibration";
+			argv[argc] = 0;
+
+			FRAME_T *frame = create_frame(state, argc, argv);
+			set_auto_calibration(frame);
+			frame->next = state->frame;
+			state->frame = frame;
+
+			printf("start_ac\n");
+		}
+	} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
+		for (FRAME_T *frame = state->frame; frame != NULL; frame =
+				frame->next) {
+			if (is_auto_calibration(frame)) {
+				frame->delete_after_processed = true;
+				printf("stop_ac\n");
+				break;
+			}
+		}
+	} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL && !state->output_raw) {
+			strncpy(state->output_raw_filepath, param,
+					sizeof(state->output_raw_filepath) - 1);
+			state->output_raw = true;
+			printf("start_record_raw saved to %s\n", param);
+		}
+	} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
+		printf("stop_record_raw\n");
+		state->output_raw = false;
+	} else if (strncmp(cmd, "load_file", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			strncpy(state->input_filepath, param,
+					sizeof(state->input_filepath) - 1);
+			state->input_mode = INPUT_MODE_FILE;
+			state->input_file_cur = -1;
+			state->input_file_size = 0;
+			printf("load_file from %s\n", param);
+		}
+	} else if (strncmp(cmd, "cam_mode", sizeof(buff)) == 0) {
+		state->input_mode = INPUT_MODE_CAM;
+	} else if (strncmp(cmd, "get_loading_pos", sizeof(buff)) == 0) {
+		if (state->input_file_size == 0) {
+			printf("%d\n", -1);
+		} else {
+			double ratio = 100 * state->input_file_cur / state->input_file_size;
+			printf("%d\n", (int) ratio);
+		}
+	} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float pitch;
+			float yaw;
+			float roll;
+			sscanf(param, "%f,%f,%f", &pitch, &yaw, &roll);
+			state->camera_pitch = pitch * M_PI / 180.0;
+			state->camera_yaw = yaw * M_PI / 180.0;
+			state->camera_roll = roll * M_PI / 180.0;
+			printf("set_camera_orientation\n");
+		}
+	} else if (strncmp(cmd, "set_view_orientation", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int id;
+			float pitch;
+			float yaw;
+			float roll;
+			sscanf(param, "%i=%f,%f,%f", &id, &pitch, &yaw, &roll);
+			for (FRAME_T *frame = state->frame; frame != NULL;
+					frame = frame->next) {
+				if (frame->id == id) {
+					frame->view_pitch = pitch * M_PI / 180.0;
+					frame->view_yaw = yaw * M_PI / 180.0;
+					frame->view_roll = roll * M_PI / 180.0;
+					frame->view_coordinate_mode = MANUAL;
+					printf("set_view_orientation\n");
+					break;
+				}
+			}
+		}
+	} else if (strncmp(cmd, "set_fov", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int id;
+			float fov;
+			sscanf(param, "%i=%f", &id, &fov);
+			for (FRAME_T *frame = state->frame; frame != NULL;
+					frame = frame->next) {
+				if (frame->id == id) {
+					frame->fov = fov;
+					printf("set_fov\n");
+					break;
+				}
+			}
+		}
+	} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			state->stereo = (param[0] == '1');
+			printf("set_stereo %s\n", param);
+		}
+	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			state->preview = (param[0] == '1');
+			printf("set_preview %s\n", param);
+		}
+	} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			state->frame_sync = (param[0] == '1');
+			printf("set_frame_sync %s\n", param);
+		}
+	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
+		save_options(state);
+	} else if (state->frame->operation_mode == CALIBRATION) {
+		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
+			char *param = strtok(NULL, " \n");
+			if (param != NULL) {
+				sscanf(param, "%lf", &calib_step);
+			}
+		}
+		if (strncmp(cmd, "u", sizeof(buff)) == 0
+				|| strncmp(cmd, "t", sizeof(buff)) == 0) {
+			state->options.cam_offset_y[state->active_cam] += calib_step;
+		}
+		if (strncmp(cmd, "d", sizeof(buff)) == 0
+				|| strncmp(cmd, "b", sizeof(buff)) == 0) {
+			state->options.cam_offset_y[state->active_cam] -= calib_step;
+		}
+		if (strncmp(cmd, "l", sizeof(buff)) == 0) {
+			state->options.cam_offset_x[state->active_cam] += calib_step;
+		}
+		if (strncmp(cmd, "r", sizeof(buff)) == 0) {
+			state->options.cam_offset_x[state->active_cam] -= calib_step;
+		}
+		if (strncmp(cmd, "s", sizeof(buff)) == 0) {
+			state->options.sharpness_gain += calib_step;
+		}
+		if (strncmp(cmd, "w", sizeof(buff)) == 0) {
+			state->options.sharpness_gain -= calib_step;
+		}
+	} else {
+		printf("unknown command : %s\n", buff);
+	}
+}
 
 void command_handler() {
 	while (inputAvailable()) {
@@ -868,279 +1066,30 @@ void command_handler() {
 		if (error) {
 			break;
 		}
-		char *cmd = strtok(buff, " .\n");
-		if (cmd == NULL) {
-			//do nothing
-		} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
-			printf("exit\n");
-			exit(0); //temporary
-		} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
-			state->active_cam = 0;
-		} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
-			state->active_cam = 1;
-		} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, "\n");
-			if (param != NULL) {
-				const int kMaxArgs = 10;
-				int argc = 1;
-				char *argv[kMaxArgs];
-				char *p2 = strtok(param, " ");
-				while (p2 && argc < kMaxArgs - 1) {
-					argv[argc++] = p2;
-					p2 = strtok(0, " ");
-				}
-				argv[0] = cmd;
-				argv[argc] = 0;
-				FRAME_T *frame = create_frame(state, argc, argv);
-				frame->next = state->frame;
-				frame->output_mode = OUTPUT_MODE_STILL;
-				frame->view_pitch = 90 * M_PI / 180.0;
-				frame->view_yaw = 0;
-				frame->view_roll = 0;
-				frame->view_coordinate_mode = MANUAL;
-				state->frame = frame;
+		bool handled = false;
+		for (int i = 0; state->plugins[0] != NULL; i++) {
+			int name_len = strlen(state->plugins[i]->name);
+			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+					&& buff[name_len] == '.') {
+				state->plugins[i]->command_handler(buff);
+				handled = true;
 			}
-		} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, "\n");
-			if (param != NULL) {
-				const int kMaxArgs = 10;
-				int argc = 1;
-				char *argv[kMaxArgs];
-				char *p2 = strtok(param, " ");
-				while (p2 && argc < kMaxArgs - 1) {
-					argv[argc++] = p2;
-					p2 = strtok(0, " ");
-				}
-				argv[0] = cmd;
-				argv[argc] = 0;
-				FRAME_T *frame = create_frame(state, argc, argv);
-				frame->next = state->frame;
-				frame->output_mode = OUTPUT_MODE_VIDEO;
-				frame->view_pitch = 90 * M_PI / 180.0;
-				frame->view_yaw = 0;
-				frame->view_roll = 0;
-				frame->view_coordinate_mode = MANUAL;
-				state->frame = frame;
-				printf("start_record id=%d\n", frame->id);
-			}
-		} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				int id = 0;
-				sscanf(param, "%d", &id);
-				for (FRAME_T *frame = state->frame; frame != NULL;
-						frame = frame->next) {
-					if (frame->id == id) {
-						frame->output_mode = OUTPUT_MODE_NONE;
-						printf("stop_record\n");
-						break;
-					}
-				}
-			}
-		} else if (strncmp(cmd, "start_ac", sizeof(buff)) == 0) {
-			bool checkAcMode = false;
-			for (FRAME_T *frame = state->frame; frame != NULL;
-					frame = frame->next) {
-				if (is_auto_calibration(frame)) {
-					checkAcMode = true;
-					break;
-				}
-			}
-			if (!checkAcMode) {
-				char param[256];
-				strncpy(param, "-W 256 -H 256 -F", 256);
-
-				const int kMaxArgs = 10;
-				int argc = 1;
-				char *argv[kMaxArgs];
-				char *p2 = strtok(param, " ");
-				while (p2 && argc < kMaxArgs - 1) {
-					argv[argc++] = p2;
-					p2 = strtok(0, " ");
-				}
-				argv[0] = "auto_calibration";
-				argv[argc] = 0;
-
-				FRAME_T *frame = create_frame(state, argc, argv);
-				set_auto_calibration(frame);
-				frame->next = state->frame;
-				state->frame = frame;
-
-				printf("start_ac\n");
-			}
-		} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
-			for (FRAME_T *frame = state->frame; frame != NULL;
-					frame = frame->next) {
-				if (is_auto_calibration(frame)) {
-					frame->delete_after_processed = true;
-					printf("stop_ac\n");
-					break;
-				}
-			}
-		} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL && !state->output_raw) {
-				strncpy(state->output_raw_filepath, param,
-						sizeof(state->output_raw_filepath) - 1);
-				state->output_raw = true;
-				printf("start_record_raw saved to %s\n", param);
-			}
-		} else if (strncmp(cmd, "driver", sizeof(buff)) == 0) {
-			cmd = strtok(NULL, " \n");
-			if (cmd == NULL) {
-				//do nothing
-			} else if (strncmp(cmd, "set_light_value", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					float value;
-					sscanf(param, "%f", &value);
-
-					char buff[1024];
-					int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
-							value, value, 0, 0, 0, 0);
-					int fd = open("driver", O_RDWR);
-					if (fd > 0) {
-						write(fd, buff, xmp_len);
-						close(fd);
-					}
-				}
-			} else if (strncmp(cmd, "set_motor_value", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					float value;
-					sscanf(param, "%f", &value);
-
-					char buff[1024];
-					int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
-							0, 0, value, value, value, value);
-					int fd = open("driver", O_RDWR);
-					if (fd > 0) {
-						write(fd, buff, xmp_len);
-						close(fd);
-					}
-				}
-			}
-		} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
-			printf("stop_record_raw\n");
-			state->output_raw = false;
-		} else if (strncmp(cmd, "load_file", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				strncpy(state->input_filepath, param,
-						sizeof(state->input_filepath) - 1);
-				state->input_mode = INPUT_MODE_FILE;
-				state->input_file_cur = -1;
-				state->input_file_size = 0;
-				printf("load_file from %s\n", param);
-			}
-		} else if (strncmp(cmd, "cam_mode", sizeof(buff)) == 0) {
-			state->input_mode = INPUT_MODE_CAM;
-		} else if (strncmp(cmd, "get_loading_pos", sizeof(buff)) == 0) {
-			if (state->input_file_size == 0) {
-				printf("%d\n", -1);
-			} else {
-				double ratio = 100 * state->input_file_cur
-						/ state->input_file_size;
-				printf("%d\n", (int) ratio);
-			}
-		} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				float pitch;
-				float yaw;
-				float roll;
-				sscanf(param, "%f,%f,%f", &pitch, &yaw, &roll);
-				state->camera_pitch = pitch * M_PI / 180.0;
-				state->camera_yaw = yaw * M_PI / 180.0;
-				state->camera_roll = roll * M_PI / 180.0;
-				printf("set_camera_orientation\n");
-			}
-		} else if (strncmp(cmd, "set_view_orientation", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				int id;
-				float pitch;
-				float yaw;
-				float roll;
-				sscanf(param, "%i=%f,%f,%f", &id, &pitch, &yaw, &roll);
-				for (FRAME_T *frame = state->frame; frame != NULL;
-						frame = frame->next) {
-					if (frame->id == id) {
-						frame->view_pitch = pitch * M_PI / 180.0;
-						frame->view_yaw = yaw * M_PI / 180.0;
-						frame->view_roll = roll * M_PI / 180.0;
-						frame->view_coordinate_mode = MANUAL;
-						printf("set_view_orientation\n");
-						break;
-					}
-				}
-			}
-		} else if (strncmp(cmd, "set_fov", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				int id;
-				float fov;
-				sscanf(param, "%i=%f", &id, &fov);
-				for (FRAME_T *frame = state->frame; frame != NULL;
-						frame = frame->next) {
-					if (frame->id == id) {
-						frame->fov = fov;
-						printf("set_fov\n");
-						break;
-					}
-				}
-			}
-		} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				state->stereo = (param[0] == '1');
-				printf("set_stereo %s\n", param);
-			}
-		} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				state->preview = (param[0] == '1');
-				printf("set_preview %s\n", param);
-			}
-		} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
-			char *param = strtok(NULL, " \n");
-			if (param != NULL) {
-				state->frame_sync = (param[0] == '1');
-				printf("set_frame_sync %s\n", param);
-			}
-		} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
-			save_options(state);
-		} else if (state->frame->operation_mode == CALIBRATION) {
-			if (strncmp(cmd, "step", sizeof(buff)) == 0) {
-				char *param = strtok(NULL, " \n");
-				if (param != NULL) {
-					sscanf(param, "%lf", &calib_step);
-				}
-			}
-			if (strncmp(cmd, "u", sizeof(buff)) == 0
-					|| strncmp(cmd, "t", sizeof(buff)) == 0) {
-				state->options.cam_offset_y[state->active_cam] += calib_step;
-			}
-			if (strncmp(cmd, "d", sizeof(buff)) == 0
-					|| strncmp(cmd, "b", sizeof(buff)) == 0) {
-				state->options.cam_offset_y[state->active_cam] -= calib_step;
-			}
-			if (strncmp(cmd, "l", sizeof(buff)) == 0) {
-				state->options.cam_offset_x[state->active_cam] += calib_step;
-			}
-			if (strncmp(cmd, "r", sizeof(buff)) == 0) {
-				state->options.cam_offset_x[state->active_cam] -= calib_step;
-			}
-			if (strncmp(cmd, "s", sizeof(buff)) == 0) {
-				state->options.sharpness_gain += calib_step;
-			}
-			if (strncmp(cmd, "w", sizeof(buff)) == 0) {
-				state->options.sharpness_gain -= calib_step;
-			}
-		} else {
-			printf("unknown command : %s\n", buff);
+		}
+		if (!handled) {
+			_command_handler(buff);
 		}
 	}
+}
+
+static void init_plugins(PICAM360CAPTURE_T *state) {
+	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
+	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
+	state->plugins = (PLUGINS_T**) malloc(
+			sizeof(PLUGINS_T*) * (num_of_plugins + 1));
+	for (int i = 0; i < num_of_plugins; i++) {
+		create_plugin_funcs[i](&state->plugins[i]);
+	}
+	state->plugins[num_of_plugins] = NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -1257,6 +1206,9 @@ int main(int argc, char *argv[]) {
 
 	// initialise the OGLES texture(s)
 	init_textures(state);
+
+	// init plugin
+	init_plugins(state);
 
 	while (!terminate) {
 		command_handler();

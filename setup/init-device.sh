@@ -10,4 +10,4 @@
 sleep 3
 
 // driver
-socat -u udp-recv:9001 - | /home/pi/picam360/picam360-driver/picam360_driver.bin | /usr/bin/socat - UDP-DATAGRAM:192.168.4.2:9000 &
+socat -u udp-recv:9001 - | /home/pi/picam360/picam360-driver/picam360-driver.bin | /usr/bin/socat - UDP-DATAGRAM:192.168.4.2:9000 &
