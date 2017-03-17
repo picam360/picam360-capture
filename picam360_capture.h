@@ -33,6 +33,8 @@
 #include <pthread.h>
 #include "mrevent.h"
 
+#include "picam360_capture_plugin.h"
+
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
 

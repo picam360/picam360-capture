@@ -58,7 +58,7 @@
 #include "status_watcher.h"
 #include "view_coordinate_mpu9250.h"
 
-#include "picam360_capture_plugin.h"
+//these plugin should be got out to shared object
 #include "plugins/driver_agent.h"
 
 #include <mat4/type.h>
