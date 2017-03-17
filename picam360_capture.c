@@ -59,7 +59,7 @@
 #include "view_coordinate_mpu9250.h"
 
 //these plugin should be got out to shared object
-#include "plugins/driver_agent.h"
+#include "plugins/driver_agent/driver_agent.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -1074,7 +1074,7 @@ void command_handler() {
 			int name_len = strlen(state->plugins[i]->name);
 			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
 					&& buff[name_len] == '.') {
-				state->plugins[i]->command_handler(buff);
+				state->plugins[i]->command_handler(state->plugins[i]->user_data, buff);
 				handled = true;
 			}
 		}
@@ -1087,8 +1087,8 @@ void command_handler() {
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
-	state->plugins = (PLUGINS_T**) malloc(
-			sizeof(PLUGINS_T*) * (num_of_plugins + 1));
+	state->plugins = (PLUGIN_T**) malloc(
+			sizeof(PLUGIN_T*) * (num_of_plugins + 1));
 	for (int i = 0; i < num_of_plugins; i++) {
 		create_plugin_funcs[i](&state->plugins[i]);
 	}
