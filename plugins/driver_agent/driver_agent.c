@@ -32,6 +32,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "driver_agent.h"
 
@@ -89,8 +90,6 @@ static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 
 void *transmit_thread_func(void* arg) {
-	bool succeeded;
-
 	int xmp_len = 0;
 	int buff_size = 4096;
 	char buff[buff_size];
@@ -133,7 +132,7 @@ static void command_handler(void *user_data, char *_buff) {
 			float value = 0;
 			sscanf(param, "%d=%f", &id, &value);
 			if (id < MOTOR_NUM) {
-				lg_motor_value[id] = vlaue;
+				lg_motor_value[id] = value;
 			}
 		}
 	} else {
