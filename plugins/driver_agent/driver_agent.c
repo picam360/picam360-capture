@@ -123,7 +123,7 @@ static void command_handler(void *user_data, char *buff){
 }
 
 void create_driver_agent(PLUGIN_T **_plugin){
-	PLUGIN_T *plugin = (PLUGIN_T)malloc(sizeof(PLUGIN_T));
+	PLUGIN_T *plugin = (PLUGIN_T*)malloc(sizeof(PLUGIN_T));
 	strcpy(plugin->name, PLUGIN_NAME);
 	plugin->release = release;
 	plugin->command_handler = command_handler;

@@ -1019,7 +1019,8 @@ void _command_handler(char *buff) {
 		}
 	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
 		save_options(state);
-	} else if (state->frame->operation_mode == CALIBRATION) {
+	} else if (state->frame != NULL
+			&& state->frame->operation_mode == CALIBRATION) {
 		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
@@ -1070,7 +1071,7 @@ void command_handler() {
 			break;
 		}
 		bool handled = false;
-		for (int i = 0; state->plugins[0] != NULL; i++) {
+		for (int i = 0; state->plugins[i] != NULL; i++) {
 			int name_len = strlen(state->plugins[i]->name);
 			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
 					&& buff[name_len] == '.') {
