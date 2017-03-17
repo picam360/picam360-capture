@@ -90,21 +90,29 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
-static int lg_light_strength = 0; //0 to 100
-static int lg_thrust = 0; //-100 to 100
+static float lg_light_strength = 0; //0 to 100
+static float lg_thrust = 0; //-100 to 100
+static float lg_brake_ps = 0.1;
 static bool lowlevel_control = false;
 
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
 	int buff_size = 4096;
 	char buff[buff_size];
+	static struct timeval last_time = { };
+	gettimeofday(&last_time, NULL);
 	while (1) {
-
+		static struct timeval time = { };
+		gettimeofday(&time, NULL);
+		struct timeval diff;
+		timersub(&time, &lg_last_time, &diff);
+		int diff_usec = diff.tv_sec * 1000 + diff.tv_usec;
 		//cal
 		if (!lowlevel_control) {
 			lg_light_value[0] = lg_light_strength;
 			lg_light_value[1] = lg_light_strength;
 
+			lg_thrust *= 1.0 - lg_brake_ps * diff_usec / 1000;
 			lg_motor_value[0] = lg_thrust;
 			lg_motor_value[1] = lg_thrust;
 			lg_motor_value[2] = lg_thrust;
@@ -120,7 +128,8 @@ void *transmit_thread_func(void* arg) {
 			close(fd);
 		}
 
-		usleep(1000 * 1000); //less than 1Hz
+		last_time = time;
+		usleep(100 * 1000); //less than 10Hz
 	}
 }
 
@@ -160,8 +169,10 @@ static void command_handler(void *user_data, char *_buff) {
 }
 
 static struct timeval lg_last_time = { };
+static int lg_last_button = { };
+static int lg_func = 0;
 static void kokuyoseki_callback(struct timeval time, int button, int value) {
-	if (value == 0) {
+	if (value == 1) {
 		return;
 	}
 	struct timeval diff;
@@ -169,23 +180,29 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	int diff_usec = diff.tv_sec * 1000 + diff.tv_usec;
 	switch (button) {
 	case NEXT_BUTTON:
-		lg_thrust++;
+		lg_thrust += 1;
 		break;
 	case BACK_BUTTON:
-		lg_thrust--;
+		lg_thrust -= 1;
 		break;
 	case NEXT_BUTTON_LONG:
 		if (diff_usec < 500)
 			return;
-		lg_light_strength++;
+		lg_light_strength += 1;
 		break;
 	case BACK_BUTTON_LONG:
 		if (diff_usec < 500)
 			return;
-		lg_light_strength--;
+		lg_light_strength -= 1;
+		break;
+	case BLACKOUT_BUTTON_LONG:
+		if (diff_usec < 100)
+			return;
+		lg_func++;
 		break;
 	}
 	lg_last_time = time;
+	lg_last_button = button;
 }
 
 static bool is_init = false;
