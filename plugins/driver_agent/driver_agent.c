@@ -117,7 +117,7 @@ void *transmit_thread_func(void* arg) {
 			lg_light_value[0] = lg_light_strength;
 			lg_light_value[1] = lg_light_strength;
 
-			lg_thrust *= 1.0 - lg_brake_ps * diff_usec / 1000;
+			lg_thrust *= 1.0 - (lg_brake_ps / 100) * (diff_usec / 1000);
 			lg_motor_value[0] = lg_thrust;
 			lg_motor_value[1] = lg_thrust;
 			lg_motor_value[2] = lg_thrust;
