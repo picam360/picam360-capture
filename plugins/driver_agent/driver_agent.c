@@ -119,6 +119,8 @@ static void command_handler(void *user_data, char *buff){
 				close(fd);
 			}
 		}
+	} else {
+		printf(PLUGIN_NAME ":unknown command : %s\n", buff);
 	}
 }
 
