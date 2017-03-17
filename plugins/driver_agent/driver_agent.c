@@ -123,6 +123,7 @@ static void command_handler(void *user_data, char *_buff) {
 
 			lg_light_value[0] = value;
 			lg_light_value[1] = value;
+			printf("set_light_value : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff))
 			== 0) {
@@ -134,9 +135,10 @@ static void command_handler(void *user_data, char *_buff) {
 			if (id < MOTOR_NUM) {
 				lg_motor_value[id] = value;
 			}
+			printf(":unknown command : %s\n", buff);
 		}
 	} else {
-		printf(PLUGIN_NAME ":unknown command : %s\n", buff);
+		printf("set_motor_value : completed\n");
 	}
 }
 
@@ -148,4 +150,7 @@ void create_driver_agent(PLUGIN_T **_plugin) {
 	plugin->user_data = plugin;
 
 	*_plugin = plugin;
+
+	pthread_t transmit_thread;
+	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
 }
