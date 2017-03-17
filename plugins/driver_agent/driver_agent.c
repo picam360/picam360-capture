@@ -84,7 +84,9 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 	return xmp_len;
 }
 
-static void command_handler(void *user_data, char *buff){
+static void command_handler(void *user_data, char *_buff){
+	char buff[256];
+	strncpy(buff, _buff, sizeof(buff));
 	char *cmd;
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {

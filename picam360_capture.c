@@ -812,7 +812,9 @@ void frame_handler() {
 
 static double calib_step = 0.01;
 
-void _command_handler(char *buff) {
+void _command_handler(char *_buff) {
+	char buff[256];
+	strncpy(buff, _buff, sizeof(buff));
 	char *cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
