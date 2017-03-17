@@ -26,5 +26,3 @@
 
 void open_kokuyoseki();
 void close_kokuyoseki();
-
-#endif

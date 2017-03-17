@@ -4,10 +4,11 @@
 #include <errno.h>
 #include <math.h>
 #include <dirent.h>
+#include <stdbool.h>
 
 #include "kokuyoseki.h"
 
-static BOOLEAN is_kokuyoseki(const char *path);
+static bool is_kokuyoseki(const char *path);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Scan /dev looking for hidraw devices and then check to see if each is a kokuyoseki
@@ -30,7 +31,7 @@ void open_kokuyoseki() {
 		}
 	}
 	closedir(dir);
-	return dev;
+	return;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +43,7 @@ void close_kokuyoseki() {
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Open the device and check the vendor and product codes to see if it's a kokuyoseki
 /////////////////////////////////////////////////////////////////////////////////////////////
-BOOLEAN is_kokuyoseki(const char *path) {
+bool is_kokuyoseki(const char *path) {
 	int fd;
 	int res;
 	struct hidraw_devinfo info;
@@ -58,13 +59,13 @@ BOOLEAN is_kokuyoseki(const char *path) {
 	close(fd);
 	if (res < 0) {
 		perror("HIDIOCGRAWINFO");
-		return FALSE;
+		return false;
 	} else {
 		// Check to see if the vendor and product match
 		if (info.vendor == KOKUYOSEKI_VENDOR
 				&& info.product == KOKUYOSEKI_PRODUCT) {
-			return TRUE;
+			return true;
 		}
 	}
-	return FALSE;
+	return false;
 }
