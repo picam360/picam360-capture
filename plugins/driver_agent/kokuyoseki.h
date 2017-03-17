@@ -21,8 +21,8 @@
 #include <errno.h>
 
 
-#define KOKUYOSEKI_VENDOR 0x2833
-#define KOKUYOSEKI_PRODUCT 0x0001
+#define KOKUYOSEKI_VENDOR 0x062a
+#define KOKUYOSEKI_PRODUCT 0x412c
 
 void open_kokuyoseki();
 void close_kokuyoseki();

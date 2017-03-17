@@ -8,64 +8,36 @@
 
 #include "kokuyoseki.h"
 
-static bool is_kokuyoseki(const char *path);
+static bool stop_thread = false;
+static pthread_t lg_poling_thread;
+void *poling_thread_func(void* arg) {
+	char *kokuyoseki_event = "/dev/input/event0";
+	int fd = open(kokuyoseki_event, O_RDWR);
+	ioctl(fd, EVIOCGRAB, 1);
+	if (fd < 0) {
+		return;
+	}
+	while (!stop_thread) {
+		struct input_event event;
+
+		if (read(mousefd, &event, sizeof(event)) != sizeof(event)) {
+			perror("error : on read\n");
+			return;
+		}
+	}
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Scan /dev looking for hidraw devices and then check to see if each is a kokuyoseki
 /////////////////////////////////////////////////////////////////////////////////////////////
 void open_kokuyoseki() {
-	struct dirent *d;
-	DIR *dir;
-	char fileName[32];
-
-	// Open /dev directory
-	dir = opendir("/dev");
-
-	// Iterate over /dev files
-	while ((d = readdir(dir)) != 0) {
-		// Is this a hidraw device?
-		if (strstr(d->d_name, "hidraw")) {
-			sprintf(fileName, "/dev/%s", d->d_name);
-			if (is_kokuyoseki(fileName)) {
-			}
-		}
-	}
-	closedir(dir);
+	stop_thread = false;
+	pthread_create(&lg_poling_thread, NULL, transmit_thread_func, (void*) NULL);
 	return;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
 void close_kokuyoseki() {
-	// TODO - clean up device
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-// Open the device and check the vendor and product codes to see if it's a kokuyoseki
-/////////////////////////////////////////////////////////////////////////////////////////////
-bool is_kokuyoseki(const char *path) {
-	int fd;
-	int res;
-	struct hidraw_devinfo info;
-
-	// Open the device
-	fd = open(path, O_RDWR);
-	if (fd < 0) {
-		perror("Unable to open device");
-		return FALSE;
-	}
-	// Get USB info
-	res = ioctl(fd, HIDIOCGRAWINFO, &info);
-	close(fd);
-	if (res < 0) {
-		perror("HIDIOCGRAWINFO");
-		return false;
-	} else {
-		// Check to see if the vendor and product match
-		if (info.vendor == KOKUYOSEKI_VENDOR
-				&& info.product == KOKUYOSEKI_PRODUCT) {
-			return true;
-		}
-	}
-	return false;
+	stop_thread = true;
 }
