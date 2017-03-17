@@ -90,12 +90,28 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static int lg_light_strength = 0; //0 to 100
+static int lg_thrust = 0; //-100 to 100
+static bool lowlevel_control = false;
 
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
 	int buff_size = 4096;
 	char buff[buff_size];
 	while (1) {
+
+		//cal
+		if(!lowlevel_control){
+			lg_light_value[0] = lg_light_strength;
+			lg_light_value[1] = lg_light_strength;
+
+			lg_motor_value[0] = lg_thrust;
+			lg_motor_value[1] = lg_thrust;
+			lg_motor_value[2] = lg_thrust;
+			lg_motor_value[3] = lg_thrust;
+		}
+
+
 		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
 				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
 				lg_motor_value[2], lg_motor_value[3]);
@@ -144,11 +160,33 @@ static void command_handler(void *user_data, char *_buff) {
 	}
 }
 
+static timeval lg_last_time = {};
+static void kokuyoseki_callback(struct timeval time, int button, int value) {
+	switch(button){
+	case NEXT_BUTTON:
+		lg_thrust++;
+		break;
+	case BACK_BUTTON:
+		lg_thrust--;
+		break;
+	case NEXT_BUTTON_LONG:
+		if(time.tv_sec != lg_last_time.tv_sec)
+			lg_light_strength++;
+		break;
+	case BACK_BUTTON_LONG:
+		if(time.tv_sec != lg_last_time.tv_sec)
+			lg_light_strength--;
+		break;
+	}
+	lg_last_time = time;
+}
+
 static bool is_init = false;
 static void init() {
 	if (!is_init) {
 		is_init = true;
 
+		set_kokuyoseki_callback(kokuyoseki_callback);
 		open_kokuyoseki();
 
 		pthread_t transmit_thread;

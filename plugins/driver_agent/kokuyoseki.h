@@ -24,5 +24,17 @@
 #define KOKUYOSEKI_VENDOR 0x062a
 #define KOKUYOSEKI_PRODUCT 0x412c
 
+#define NEXT_BUTTON 109
+#define NEXT_BUTTON_LONG 63
+#define BACK_BUTTON 104
+#define BACK_BUTTON_LONG 1
+#define BLACKOUT 48
+
+#define BUTTON_RELEASE 0
+#define BUTTON_PUSH 1
+#define BUTTON_KEEP 0 2
+
+typedef void (*KOKUYOSEKI_CALLBACK)(struct timeval time, int button, int value);
+void set_kokuyoseki_callkback(KOKUYOSEKI_CALLBACK callback);
 void open_kokuyoseki();
 void close_kokuyoseki();
