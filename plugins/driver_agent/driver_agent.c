@@ -101,7 +101,7 @@ void *transmit_thread_func(void* arg) {
 	while (1) {
 
 		//cal
-		if(!lowlevel_control){
+		if (!lowlevel_control) {
 			lg_light_value[0] = lg_light_strength;
 			lg_light_value[1] = lg_light_strength;
 
@@ -110,7 +110,6 @@ void *transmit_thread_func(void* arg) {
 			lg_motor_value[2] = lg_thrust;
 			lg_motor_value[3] = lg_thrust;
 		}
-
 
 		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
 				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
@@ -160,9 +159,12 @@ static void command_handler(void *user_data, char *_buff) {
 	}
 }
 
-static timeval lg_last_time = {};
+static struct timeval lg_last_time = { };
 static void kokuyoseki_callback(struct timeval time, int button, int value) {
-	switch(button){
+	if (value == 0) {
+		return;
+	}
+	switch (button) {
 	case NEXT_BUTTON:
 		lg_thrust++;
 		break;
@@ -170,11 +172,11 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 		lg_thrust--;
 		break;
 	case NEXT_BUTTON_LONG:
-		if(time.tv_sec != lg_last_time.tv_sec)
+		if (time.tv_sec != lg_last_time.tv_sec)
 			lg_light_strength++;
 		break;
 	case BACK_BUTTON_LONG:
-		if(time.tv_sec != lg_last_time.tv_sec)
+		if (time.tv_sec != lg_last_time.tv_sec)
 			lg_light_strength--;
 		break;
 	}
