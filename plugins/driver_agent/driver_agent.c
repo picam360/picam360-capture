@@ -133,7 +133,7 @@ void *transmit_thread_func(void* arg) {
 					lg_light_strength = 0;
 					break;
 				case 2:
-					lg_motor_value = 0;
+					lg_thrust = 0;
 					break;
 				}
 				lg_func = -1;
