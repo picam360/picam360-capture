@@ -37,8 +37,7 @@
 
 #define PLUGIN_NAME "driver_agent"
 
-static void release(void *user_data)
-{
+static void release(void *user_data) {
 	free(user_data);
 }
 
@@ -84,43 +83,57 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 	return xmp_len;
 }
 
-static void command_handler(void *user_data, char *_buff){
+#define LIGHT_NUM 2
+#define MOTOR_NUM 4
+static int lg_light_value[LIGHT_NUM] = { 0, 0 };
+static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+
+void *transmit_thread_func(void* arg) {
+	bool succeeded;
+
+	int xmp_len = 0;
+	int buff_size = 4096;
+	char buff[buff_size];
+	while (1) {
+		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
+				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
+				lg_motor_value[2], lg_motor_value[3]);
+		int fd = open("driver", O_RDWR);
+		if (fd > 0) {
+			write(fd, buff, xmp_len);
+			close(fd);
+		}
+
+		usleep(1000 * 1000); //less than 1Hz
+	}
+}
+
+static void command_handler(void *user_data, char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd;
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
+			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
 			sscanf(param, "%f", &value);
 
-			char buff[1024];
-			int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
-					value, value, 0, 0, 0, 0);
-			int fd = open("driver", O_RDWR);
-			if (fd > 0) {
-				write(fd, buff, xmp_len);
-				close(fd);
-				printf("set_light_value completed\n");
-			}
+			lg_light_value[0] = value;
+			lg_light_value[1] = value;
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff))
+			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float value;
-			sscanf(param, "%f", &value);
-
-			char buff[1024];
-			int xmp_len = picam360_driver_xmp(buff, sizeof(buff),
-					0, 0, value, value, value, value);
-			int fd = open("driver", O_RDWR);
-			if (fd > 0) {
-				write(fd, buff, xmp_len);
-				close(fd);
-				printf("set_motor_value completed\n");
+			int id = 0;
+			float value = 0;
+			sscanf(param, "%d=%f", &id, &value);
+			if (id < MOTOR_NUM) {
+				lg_motor_value[id] = vlaue;
 			}
 		}
 	} else {
@@ -128,8 +141,8 @@ static void command_handler(void *user_data, char *_buff){
 	}
 }
 
-void create_driver_agent(PLUGIN_T **_plugin){
-	PLUGIN_T *plugin = (PLUGIN_T*)malloc(sizeof(PLUGIN_T));
+void create_driver_agent(PLUGIN_T **_plugin) {
+	PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
 	strcpy(plugin->name, PLUGIN_NAME);
 	plugin->release = release;
 	plugin->command_handler = command_handler;
