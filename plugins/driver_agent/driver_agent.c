@@ -38,6 +38,9 @@
 #include "driver_agent.h"
 #include "kokuyoseki.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define PLUGIN_NAME "driver_agent"
 
 static void release(void *user_data) {
@@ -92,7 +95,7 @@ static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
-static float lg_brake_ps = 0.1;
+static float lg_brake_ps = 5; // percent
 static bool lowlevel_control = false;
 
 //kokuyoseki
@@ -114,10 +117,12 @@ void *transmit_thread_func(void* arg) {
 		float diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
 		//cal
 		if (!lowlevel_control) {
+			lg_light_strength = MIN(MAX(lg_light_strength, 0), 100);
 			lg_light_value[0] = lg_light_strength;
 			lg_light_value[1] = lg_light_strength;
 
-			lg_thrust *= 1.0 - (lg_brake_ps / 100) * diff_sec;
+			lg_thrust = MIN(MAX(lg_thrust, -100), 100);
+			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 			lg_motor_value[0] = lg_thrust;
 			lg_motor_value[1] = lg_thrust;
 			lg_motor_value[2] = lg_thrust;
