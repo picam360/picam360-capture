@@ -57,7 +57,7 @@ THE SOFTWARE.
 #include <linux/i2c-dev.h>
 #include "I2Cdev.h"
 
-#define I2C_DEVFILE "/dev/i2c-1"
+#define I2C_DEVFILE "/dev/i2c-3"
 
 /** Default timeout value for read operations.
  * Set this to 0 to disable timeout detection.
