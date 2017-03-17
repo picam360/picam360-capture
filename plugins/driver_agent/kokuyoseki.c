@@ -14,16 +14,17 @@ void *poling_thread_func(void* arg) {
 	int fd = open(kokuyoseki_event, O_RDWR);
 	ioctl(fd, EVIOCGRAB, 1);
 	if (fd < 0) {
-		return;
+		return NULL;
 	}
 	while (!lg_stop_thread) {
 		struct input_event event;
 
-		if (read(mousefd, &event, sizeof(event)) != sizeof(event)) {
+		if (read(fd, &event, sizeof(event)) != sizeof(event)) {
 			perror("error : on read\n");
 			return;
 		}
 	}
+	return NULL;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
