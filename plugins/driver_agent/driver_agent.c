@@ -164,6 +164,9 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	if (value == 0) {
 		return;
 	}
+	struct timeval diff;
+	timersub(&time, &lg_last_time, &diff);
+	int diff_usec = diff.tv_sec * 1000 + diff.tv_usec;
 	switch (button) {
 	case NEXT_BUTTON:
 		lg_thrust++;
@@ -172,12 +175,14 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 		lg_thrust--;
 		break;
 	case NEXT_BUTTON_LONG:
-		if (time.tv_sec != lg_last_time.tv_sec)
-			lg_light_strength++;
+		if (diff_usec < 500)
+			return;
+		lg_light_strength++;
 		break;
 	case BACK_BUTTON_LONG:
-		if (time.tv_sec != lg_last_time.tv_sec)
-			lg_light_strength--;
+		if (diff_usec < 500)
+			return;
+		lg_light_strength--;
 		break;
 	}
 	lg_last_time = time;
