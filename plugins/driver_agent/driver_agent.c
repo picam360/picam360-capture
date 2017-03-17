@@ -111,13 +111,13 @@ void *transmit_thread_func(void* arg) {
 		gettimeofday(&time, NULL);
 		struct timeval diff;
 		timersub(&time, &last_time, &diff);
-		int diff_usec = diff.tv_sec * 1000000 + diff.tv_usec;
+		float diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
 		//cal
 		if (!lowlevel_control) {
 			lg_light_value[0] = lg_light_strength;
 			lg_light_value[1] = lg_light_strength;
 
-			lg_thrust *= 1.0 - (lg_brake_ps / 100) * (diff_usec / 1000000);
+			lg_thrust *= 1.0 - (lg_brake_ps / 100) * diff_sec;
 			lg_motor_value[0] = lg_thrust;
 			lg_motor_value[1] = lg_thrust;
 			lg_motor_value[2] = lg_thrust;
@@ -126,8 +126,8 @@ void *transmit_thread_func(void* arg) {
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
 			timersub(&time, &lg_last_kokuyoseki_time, &diff);
-			diff_usec = diff.tv_sec + diff.tv_usec;
-			if (diff_usec > 1000000) {
+			diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
+			if (diff_sec > 0.5) {
 				switch (lg_func) {
 				case 1:
 					lg_light_strength = 0;
@@ -195,7 +195,7 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	}
 	struct timeval diff;
 	timersub(&time, &lg_last_kokuyoseki_time, &diff);
-	int diff_usec = diff.tv_sec * 1000000 + diff.tv_usec;
+	float diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
 	switch (button) {
 	case NEXT_BUTTON:
 		lg_thrust += 1;
@@ -204,12 +204,12 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 		lg_thrust -= 1;
 		break;
 	case NEXT_BUTTON_LONG:
-		if (diff_usec < 500000)
+		if (diff_sec < 0.5)
 			return;
 		lg_light_strength += 1;
 		break;
 	case BACK_BUTTON_LONG:
-		if (diff_usec < 500000)
+		if (diff_sec < 0.5)
 			return;
 		lg_light_strength -= 1;
 		break;
