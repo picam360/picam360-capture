@@ -104,6 +104,7 @@ static void command_handler(void *user_data, char *_buff){
 			if (fd > 0) {
 				write(fd, buff, xmp_len);
 				close(fd);
+				printf("set_light_value completed\n");
 			}
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff)) == 0) {
@@ -119,6 +120,7 @@ static void command_handler(void *user_data, char *_buff){
 			if (fd > 0) {
 				write(fd, buff, xmp_len);
 				close(fd);
+				printf("set_motor_value completed\n");
 			}
 		}
 	} else {
