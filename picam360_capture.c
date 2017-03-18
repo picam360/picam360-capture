@@ -361,14 +361,6 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 			"shader/board.frag");
 }
 
-static void attitude_callback(float *q) {
-	state->camera_quatanion[0] = q[0];
-	state->camera_quatanion[1] = q[1];
-	state->camera_quatanion[2] = q[2];
-	state->camera_quatanion[3] = q[3];
-	state->camera_coordinate_from_device = true;
-}
-
 /***********************************************************
  * Name: init_textures
  *
@@ -1107,17 +1099,18 @@ static void set_view_quatanion(float *value) {
 	//TODO
 }
 static float *get_camera_quatanion() {
-	if (state->camera_coordinate_from_device) {
-		return state->camera_quatanion;
-	}
-	return NULL;
+	return state->camera_quatanion;
 }
 static void set_camera_quatanion(float *value) {
-	//TODO
+	state->camera_quatanion[0] = value[0];
+	state->camera_quatanion[1] = value[1];
+	state->camera_quatanion[2] = value[2];
+	state->camera_quatanion[3] = value[3];
+	state->camera_coordinate_from_device = true;
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
-	{//init host
+	{ //init host
 		state->plugin_host.get_view_quatanion = get_view_quatanion;
 		state->plugin_host.set_view_quatanion = set_view_quatanion;
 		state->plugin_host.get_camera_quatanion = get_camera_quatanion;

@@ -79,6 +79,131 @@ static struct timeval lg_last_kokuyoseki_time = { };
 static int lg_last_button = -1;
 static int lg_func = -1;
 
+static void *recieve_thread_func(void* arg) {
+	PICAM360CAPTURE_T *state = (PICAM360CAPTURE_T *) arg;
+
+	int buff_size = 4096;
+	unsigned char *buff = malloc(buff_size);
+	unsigned char *buff_trash = malloc(buff_size);
+	int data_len = 0;
+	int marker = 0;
+	int camd_fd = -1;
+	int file_fd = -1;
+	bool xmp = false;
+	char *buff_xmp = NULL;
+	int xmp_len = 0;
+	int xmp_idx = 0;
+
+	while (1) {
+		bool reset = false;
+		if (state->input_mode == INPUT_MODE_CAM) {
+			if (camd_fd < 0) {
+				char buff[256];
+				sprintf(buff, "status");
+				camd_fd = open(buff, O_RDONLY);
+				if (camd_fd == -1) {
+					printf("failed to open %s\n", buff);
+					exit(-1);
+				}
+				printf("%s ready\n", buff);
+			}
+			data_len = read(camd_fd, buff, buff_size);
+			if (data_len == 0) {
+				printf("camera input invalid\n");
+				break;
+			}
+		} else if (camd_fd >= 0) {
+			read(camd_fd, buff_trash, buff_size);
+		}
+		if (file_fd >= 0) {
+			if (state->input_mode != INPUT_MODE_FILE) { // end
+				close(file_fd);
+				file_fd = -1;
+				state->input_mode = INPUT_MODE_CAM;
+				reset = true;
+			} else { //read
+				if (state->input_file_cur
+						< state->input_file_size) {
+					data_len = read(file_fd, buff, buff_size);
+					state->input_file_cur += data_len;
+				}
+			}
+		} else if (state->input_mode == INPUT_MODE_FILE) { //start
+			char buff[256];
+			sprintf(buff, state->input_filepath, index);
+			file_fd = open(buff, O_RDONLY);
+			if (file_fd == -1) {
+				printf("failed to open %s\n", buff);
+				state->input_mode = INPUT_MODE_CAM;
+			}
+			struct stat st;
+			stat(buff, &st);
+			state->input_file_size = st.st_size;
+			state->input_file_cur = 0;
+
+			printf("open %s : %ldB\n", buff, (long int) st.st_size);
+
+			reset = true;
+		}
+		if (reset) {
+			marker = 0;
+			continue;
+		}
+		for (int i = 0; i < data_len; i++) {
+			if (xmp) {
+				if (xmp_idx == 0) {
+					xmp_len = ((unsigned char*) buff)[i] << 8;
+				} else if (xmp_idx == 1) {
+					xmp_len += ((unsigned char*) buff)[i];
+					buff_xmp = malloc(xmp_len);
+					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
+					buff_xmp[1] = (xmp_len) & 0xFF;
+				} else {
+					buff_xmp[xmp_idx] = buff[i];
+				}
+				xmp_idx++;
+				if (xmp_idx >= xmp_len) {
+					char *xml = buff_xmp + strlen(buff_xmp) + 1;
+
+					char *q_str = strstr(xml, "<quaternion");
+					if (q_str) {
+						float quat[4];
+						float quatanion[4];
+						sscanf(q_str,
+								"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+								&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+						//convert from mpu coodinate to opengl coodinate
+						quat[0] = quatanion[1];//x
+						quat[1] = quatanion[3];//y : swap y and z
+						quat[2] = -quatanion[2];//z : swap y and z
+						quat[3] = quatanion[0];//w
+
+						if (lg_attitude_callback) {
+							lg_attitude_callback(quat);
+						}
+					}
+
+					xmp = false;
+					free(buff_xmp);
+					buff_xmp = NULL;
+				}
+			}
+			if (marker) {
+				marker = 0;
+				if (buff[i] == 0xE1) { //APP1
+					xmp = true;
+					xmp_len = 0;
+					xmp_idx = 0;
+				}
+			} else if (buff[i] == 0xFF) {
+				marker = 1;
+			}
+		}
+	}
+
+	return NULL;
+}
+
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
 	int buff_size = 4096;
@@ -104,7 +229,7 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
 			//(RtRc-1Rt-1)*Rt*vtg, target coordinate will be converted into camera coordinate
-			float quat = lg_plugin_host->get_camera_quatanion();
+			float *quat = lg_plugin_host->get_camera_quatanion();
 			if (quat) {
 				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
 				float unif_matrix[16];
@@ -261,6 +386,10 @@ static void init() {
 
 		pthread_t transmit_thread;
 		pthread_create(&transmit_thread, NULL, transmit_thread_func,
+				(void*) NULL);
+
+		pthread_t recieve_thread;
+		pthread_create(&recieve_thread, NULL, recieve_thread_func,
 				(void*) NULL);
 	}
 }
