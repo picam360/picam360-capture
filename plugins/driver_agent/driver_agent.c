@@ -178,9 +178,7 @@ static void *recieve_thread_func(void* arg) {
 						quat[2] = -quatanion[2];//z : swap y and z
 						quat[3] = quatanion[0];//w
 
-						if (lg_attitude_callback) {
-							lg_attitude_callback(quat);
-						}
+						lg_plugin_host->set_camera_quatanion(quat);
 					}
 
 					xmp = false;

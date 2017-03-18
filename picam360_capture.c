@@ -55,7 +55,6 @@
 #include "gl_program.h"
 #include "device.h"
 #include "auto_calibration.h"
-#include "status_watcher.h"
 #include "view_coordinate_mpu9250.h"
 
 //these plugin should be got out to shared object
@@ -413,11 +412,6 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 		// Bind texture surface to current vertices
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
-	}
-
-	{ // init status watch
-		status_watch((void*) state);
-		set_attitude_callback(attitude_callback);
 	}
 }
 //------------------------------------------------------------------------------
