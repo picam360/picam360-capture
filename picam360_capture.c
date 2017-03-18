@@ -1090,7 +1090,7 @@ void command_handler() {
 
 //plugin host methods
 static float *get_view_quatanion() {
-	switch (frame->view_coordinate_mode) {
+	switch (state->default_view_coordinate_mode) {
 	case MPU9250:
 		return get_quatanion_mpu9250();
 		break;
@@ -1098,9 +1098,9 @@ static float *get_view_quatanion() {
 		return get_quatanion();
 		break;
 	case MANUAL:
-		return NULL;
 		break;
 	}
+	return NULL;
 }
 static void set_view_quatanion(float *value) {
 	//TODO
@@ -1108,9 +1108,8 @@ static void set_view_quatanion(float *value) {
 static float *get_camera_quatanion() {
 	if (state->camera_coordinate_from_device) {
 		return state->camera_quatanion;
-	} else {
-		return NULL;
 	}
+	return NULL;
 }
 static void set_camera_quatanion(float *value) {
 	//TODO
@@ -1118,10 +1117,10 @@ static void set_camera_quatanion(float *value) {
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{//init host
-		state->host.get_view_quatanion = get_view_quatanion;
-		state->host.set_view_quatanion = set_view_quatanion;
-		state->host.get_camera_quatanion = get_camera_quatanion;
-		state->host.set_camera_quatanion = set_camera_quatanion;
+		state->plugin_host.get_view_quatanion = get_view_quatanion;
+		state->plugin_host.set_view_quatanion = set_view_quatanion;
+		state->plugin_host.get_camera_quatanion = get_camera_quatanion;
+		state->plugin_host.set_camera_quatanion = set_camera_quatanion;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
