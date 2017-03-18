@@ -104,31 +104,33 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
 			//(RtRc-1Rt-1)*Rt*vtg, target coordinate will be converted into camera coordinate
-			float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
-			float unif_matrix[16];
-			float camera_matrix[16];
-			float target_matrix[16];
-			mat4_identity(unif_matrix);
-			mat4_identity(camera_matrix);
-			mat4_identity(target_matrix);
-			mat4_fromQuat(camera_matrix,
-					lg_plugin_host->get_camera_quatanion());
-			mat4_fromQuat(target_matrix, lg_target_quatanion);
-			mat4_invert(camera_matrix, camera_matrix);
-			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
-			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
+			float quat = lg_plugin_host->get_camera_quatanion();
+			if (quat) {
+				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
+				float unif_matrix[16];
+				float camera_matrix[16];
+				float target_matrix[16];
+				mat4_identity(unif_matrix);
+				mat4_identity(camera_matrix);
+				mat4_identity(target_matrix);
+				mat4_fromQuat(camera_matrix, quat);
+				mat4_fromQuat(target_matrix, lg_target_quatanion);
+				mat4_invert(camera_matrix, camera_matrix);
+				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
+				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
 
-			mat4_transpose(vtg, vtg);
-			mat4_multiply(vtg, unif_matrix, vtg);
-			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-			float yaw = atan2(vtg[2], vtg[0]);
-			float pitch = atan2(xz, -vtg[1]);
-			printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
+				mat4_transpose(vtg, vtg);
+				mat4_multiply(vtg, unif_matrix, vtg);
+				float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
+				float yaw = atan2(vtg[2], vtg[0]);
+				float pitch = atan2(xz, -vtg[1]);
+				printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
 
-			//lg_motor_value[0] = lg_thrust;
-			//lg_motor_value[1] = -lg_thrust;
-			//lg_motor_value[2] = -lg_thrust;
-			//lg_motor_value[3] = lg_thrust;
+				//lg_motor_value[0] = lg_thrust;
+				//lg_motor_value[1] = -lg_thrust;
+				//lg_motor_value[2] = -lg_thrust;
+				//lg_motor_value[3] = lg_thrust;
+			}
 		}
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
