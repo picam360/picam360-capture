@@ -81,15 +81,12 @@ static int lg_last_button = -1;
 static int lg_func = -1;
 
 static void *recieve_thread_func(void* arg) {
-	PICAM360CAPTURE_T *state = (PICAM360CAPTURE_T *) arg;
-
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
 	unsigned char *buff_trash = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
 	int camd_fd = -1;
-	int file_fd = -1;
 	bool xmp = false;
 	char *buff_xmp = NULL;
 	int xmp_len = 0;
@@ -97,53 +94,20 @@ static void *recieve_thread_func(void* arg) {
 
 	while (1) {
 		bool reset = false;
-		if (state->input_mode == INPUT_MODE_CAM) {
-			if (camd_fd < 0) {
-				char buff[256];
-				sprintf(buff, "status");
-				camd_fd = open(buff, O_RDONLY);
-				if (camd_fd == -1) {
-					printf("failed to open %s\n", buff);
-					exit(-1);
-				}
-				printf("%s ready\n", buff);
-			}
-			data_len = read(camd_fd, buff, buff_size);
-			if (data_len == 0) {
-				printf("camera input invalid\n");
-				break;
-			}
-		} else if (camd_fd >= 0) {
-			read(camd_fd, buff_trash, buff_size);
-		}
-		if (file_fd >= 0) {
-			if (state->input_mode != INPUT_MODE_FILE) { // end
-				close(file_fd);
-				file_fd = -1;
-				state->input_mode = INPUT_MODE_CAM;
-				reset = true;
-			} else { //read
-				if (state->input_file_cur < state->input_file_size) {
-					data_len = read(file_fd, buff, buff_size);
-					state->input_file_cur += data_len;
-				}
-			}
-		} else if (state->input_mode == INPUT_MODE_FILE) { //start
+		if (camd_fd < 0) {
 			char buff[256];
-			sprintf(buff, state->input_filepath, index);
-			file_fd = open(buff, O_RDONLY);
-			if (file_fd == -1) {
+			sprintf(buff, "status");
+			camd_fd = open(buff, O_RDONLY);
+			if (camd_fd == -1) {
 				printf("failed to open %s\n", buff);
-				state->input_mode = INPUT_MODE_CAM;
+				exit(-1);
 			}
-			struct stat st;
-			stat(buff, &st);
-			state->input_file_size = st.st_size;
-			state->input_file_cur = 0;
-
-			printf("open %s : %ldB\n", buff, (long int) st.st_size);
-
-			reset = true;
+			printf("%s ready\n", buff);
+		}
+		data_len = read(camd_fd, buff, buff_size);
+		if (data_len == 0) {
+			printf("camera input invalid\n");
+			break;
 		}
 		if (reset) {
 			marker = 0;
