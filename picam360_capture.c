@@ -1077,7 +1077,8 @@ void command_handler() {
 			int name_len = strlen(state->plugins[i]->name);
 			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
 					&& buff[name_len] == '.') {
-				state->plugins[i]->command_handler(state->plugins[i]->user_data, buff);
+				state->plugins[i]->command_handler(state->plugins[i]->user_data,
+						buff);
 				handled = true;
 			}
 		}
@@ -1087,13 +1088,48 @@ void command_handler() {
 	}
 }
 
+//plugin host methods
+static float *get_view_quatanion() {
+	switch (frame->view_coordinate_mode) {
+	case MPU9250:
+		return get_quatanion_mpu9250();
+		break;
+	case OCULUS_RIFT:
+		return get_quatanion();
+		break;
+	case MANUAL:
+		return NULL;
+		break;
+	}
+}
+static void set_view_quatanion(float *value) {
+	//TODO
+}
+static float *get_camera_quatanion() {
+	if (state->camera_coordinate_from_device) {
+		return state->camera_quatanion;
+	} else {
+		return NULL;
+	}
+}
+static void set_camera_quatanion(float *value) {
+	//TODO
+}
+
 static void init_plugins(PICAM360CAPTURE_T *state) {
+	{//init host
+		state->host.get_view_quatanion = get_view_quatanion;
+		state->host.set_view_quatanion = set_view_quatanion;
+		state->host.get_camera_quatanion = get_camera_quatanion;
+		state->host.set_camera_quatanion = set_camera_quatanion;
+	}
+
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
 	state->plugins = (PLUGIN_T**) malloc(
 			sizeof(PLUGIN_T*) * (num_of_plugins + 1));
 	for (int i = 0; i < num_of_plugins; i++) {
-		create_plugin_funcs[i](&state->plugins[i]);
+		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
 	}
 	state->plugins[num_of_plugins] = NULL;
 }

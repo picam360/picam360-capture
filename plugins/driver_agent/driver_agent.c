@@ -43,6 +43,8 @@
 
 #define PLUGIN_NAME "driver_agent"
 
+static PLUGIN_HOST_T *plugin_host = NULL;
+
 static void release(void *user_data) {
 	free(user_data);
 }
@@ -96,7 +98,8 @@ static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
-static bool lowlevel_control = false;
+static bool lg_lowlevel_control = false;
+static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
@@ -114,24 +117,49 @@ void *transmit_thread_func(void* arg) {
 		gettimeofday(&time, NULL);
 		struct timeval diff;
 		timersub(&time, &last_time, &diff);
-		float diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
+		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 		//cal
-		if (!lowlevel_control) {
+		if (!lg_lowlevel_control) {
+			//trancate min max
 			lg_light_strength = MIN(MAX(lg_light_strength, 0), 100);
 			lg_light_value[0] = lg_light_strength;
 			lg_light_value[1] = lg_light_strength;
 
+			//trancate min max
 			lg_thrust = MIN(MAX(lg_thrust, -100), 100);
+			//brake
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
-			lg_motor_value[0] = lg_thrust;
-			lg_motor_value[1] = -lg_thrust;
-			lg_motor_value[2] = -lg_thrust;
-			lg_motor_value[3] = lg_thrust;
+
+			//(RtRc-1Rt-1)*Rt*vtg, target coordinate will be converted into camera coordinate
+			float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
+			float unif_matrix[16];
+			float camera_matrix[16];
+			float target_matrix[16];
+			mat4_identity(unif_matrix);
+			mat4_identity(camera_matrix);
+			mat4_identity(target_matrix);
+			mat4_fromQuat(camera_matrix, plugin_host->get_camera_quatanion());
+			mat4_fromQuat(target_matrix, lg_target_quatanion);
+			mat4_invert(camera_matrix, camera_matrix);
+			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
+			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
+
+			mat4_transpose(vtg, vtg);
+			mat4_multiply(vtg, unif_matrix, vtg);
+			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
+			float yaw = atan2(vtg[2], vtg[0]);
+			float pitch = atan2(xy, -vtg[1]);
+			printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
+
+			//lg_motor_value[0] = lg_thrust;
+			//lg_motor_value[1] = -lg_thrust;
+			//lg_motor_value[2] = -lg_thrust;
+			//lg_motor_value[3] = lg_thrust;
 		}
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
 			timersub(&time, &lg_last_kokuyoseki_time, &diff);
-			diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
+			diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 			if (diff_sec > 0.5) {
 				printf("func %d: ", lg_func);
 				switch (lg_func) {
@@ -144,7 +172,7 @@ void *transmit_thread_func(void* arg) {
 					printf("thrust off\n");
 					break;
 				}
-				if(lg_func > 10){
+				if (lg_func > 10) {
 					exit(0);
 				}
 				lg_func = -1;
@@ -206,7 +234,7 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	}
 	struct timeval diff;
 	timersub(&time, &lg_last_kokuyoseki_time, &diff);
-	float diff_sec = (float)diff.tv_sec + (float)diff.tv_usec/1000000;
+	float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 	switch (button) {
 	case NEXT_BUTTON:
 		lg_thrust += 1;
@@ -232,6 +260,11 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 		lg_func++;
 		break;
 	}
+	switch (button) {
+	case NEXT_BUTTON:
+	case BACK_BUTTON:
+		lg_target_quatanion = plugin_host->get_view_quatanion();
+	}
 	lg_last_kokuyoseki_time = time;
 	lg_last_button = button;
 }
@@ -250,7 +283,7 @@ static void init() {
 	}
 }
 
-void create_driver_agent(PLUGIN_T **_plugin) {
+void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 
 	PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));

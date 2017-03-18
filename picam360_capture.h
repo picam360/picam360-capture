@@ -105,6 +105,7 @@ typedef struct {
 	GLuint vbo_nop;
 } MODEL_T;
 typedef struct _PICAM360CAPTURE_T {
+	PLUGIN_HOST_T plugin_host;
 	int split;
 	bool preview;
 	bool stereo;
