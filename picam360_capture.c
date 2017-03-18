@@ -72,6 +72,7 @@
 #include <mat4/transpose.h>
 #include <mat4/fromQuat.h>
 #include <mat4/perspective.h>
+#include <mat4/invert.h>
 
 //json parser
 #include <jansson.h>
