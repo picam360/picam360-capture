@@ -5,6 +5,7 @@
 #include <math.h>
 #include <dirent.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #include "kokuyoseki.h"
 
@@ -43,7 +44,6 @@ void *poling_thread_func(void* arg) {
 
 	// Iterate over /dev files
 	while ((d = readdir(dir)) != 0) {
-		int _fd;
 		int vendor = 0;
 		int product = 0;
 		{
@@ -64,7 +64,7 @@ void *poling_thread_func(void* arg) {
 		}
 	}
 	if (kokuyoseki_event == NULL) {
-		return;
+		return NULL;
 	}
 	int fd = open(kokuyoseki_event, O_RDWR);
 	if (fd < 0) {

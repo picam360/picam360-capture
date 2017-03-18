@@ -206,7 +206,9 @@ void *transmit_thread_func(void* arg) {
 			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
 
 			mat4_transpose(vtg, vtg);
-			mat4_multiply(vtg, unif_matrix, vtg);
+			mat4_multiply(vtg, vtg, unif_matrix);
+			mat4_transpose(vtg, vtg);
+
 			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
 			float yaw = atan2(vtg[2], vtg[0]);
 			float pitch = atan2(xz, -vtg[1]);
