@@ -72,6 +72,7 @@ static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
+static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
 //kokuyoseki
@@ -122,8 +123,7 @@ static void *recieve_thread_func(void* arg) {
 				state->input_mode = INPUT_MODE_CAM;
 				reset = true;
 			} else { //read
-				if (state->input_file_cur
-						< state->input_file_size) {
+				if (state->input_file_cur < state->input_file_size) {
 					data_len = read(file_fd, buff, buff_size);
 					state->input_file_cur += data_len;
 				}
@@ -167,18 +167,19 @@ static void *recieve_thread_func(void* arg) {
 
 					char *q_str = strstr(xml, "<quaternion");
 					if (q_str) {
-						float quat[4];
 						float quatanion[4];
 						sscanf(q_str,
 								"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-								&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+								&quatanion[0], &quatanion[1], &quatanion[2],
+								&quatanion[3]);
 						//convert from mpu coodinate to opengl coodinate
-						quat[0] = quatanion[1];//x
-						quat[1] = quatanion[3];//y : swap y and z
-						quat[2] = -quatanion[2];//z : swap y and z
-						quat[3] = quatanion[0];//w
+						lg_camera_quatanion[0] = quatanion[1]; //x
+						lg_camera_quatanion[1] = quatanion[3]; //y : swap y and z
+						lg_camera_quatanion[2] = -quatanion[2]; //z : swap y and z
+						lg_camera_quatanion[3] = quatanion[0]; //w
 
-						lg_plugin_host->set_camera_quatanion(quat);
+						lg_plugin_host->set_camera_quatanion(
+								lg_camera_quatanion);
 					}
 
 					xmp = false;
@@ -227,33 +228,30 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
 			//(RtRc-1Rt-1)*Rt*vtg, target coordinate will be converted into camera coordinate
-			float *quat = lg_plugin_host->get_camera_quatanion();
-			if (quat) {
-				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
-				float unif_matrix[16];
-				float camera_matrix[16];
-				float target_matrix[16];
-				mat4_identity(unif_matrix);
-				mat4_identity(camera_matrix);
-				mat4_identity(target_matrix);
-				mat4_fromQuat(camera_matrix, quat);
-				mat4_fromQuat(target_matrix, lg_target_quatanion);
-				mat4_invert(camera_matrix, camera_matrix);
-				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
-				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
+			float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
+			float unif_matrix[16];
+			float camera_matrix[16];
+			float target_matrix[16];
+			mat4_identity(unif_matrix);
+			mat4_identity(camera_matrix);
+			mat4_identity(target_matrix);
+			mat4_fromQuat(camera_matrix, lg_camera_quatanion);
+			mat4_fromQuat(target_matrix, lg_target_quatanion);
+			mat4_invert(camera_matrix, camera_matrix);
+			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
+			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
 
-				mat4_transpose(vtg, vtg);
-				mat4_multiply(vtg, unif_matrix, vtg);
-				float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-				float yaw = atan2(vtg[2], vtg[0]);
-				float pitch = atan2(xz, -vtg[1]);
-				printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
+			mat4_transpose(vtg, vtg);
+			mat4_multiply(vtg, unif_matrix, vtg);
+			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
+			float yaw = atan2(vtg[2], vtg[0]);
+			float pitch = atan2(xz, -vtg[1]);
+			printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
 
-				//lg_motor_value[0] = lg_thrust;
-				//lg_motor_value[1] = -lg_thrust;
-				//lg_motor_value[2] = -lg_thrust;
-				//lg_motor_value[3] = lg_thrust;
-			}
+			//lg_motor_value[0] = lg_thrust;
+			//lg_motor_value[1] = -lg_thrust;
+			//lg_motor_value[2] = -lg_thrust;
+			//lg_motor_value[3] = lg_thrust;
 		}
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
