@@ -43,7 +43,7 @@
 
 #define PLUGIN_NAME "driver_agent"
 
-static PLUGIN_HOST_T *plugin_host = NULL;
+static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -138,7 +138,8 @@ void *transmit_thread_func(void* arg) {
 			mat4_identity(unif_matrix);
 			mat4_identity(camera_matrix);
 			mat4_identity(target_matrix);
-			mat4_fromQuat(camera_matrix, plugin_host->get_camera_quatanion());
+			mat4_fromQuat(camera_matrix,
+					lg_plugin_host->get_camera_quatanion());
 			mat4_fromQuat(target_matrix, lg_target_quatanion);
 			mat4_invert(camera_matrix, camera_matrix);
 			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
@@ -263,7 +264,10 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	switch (button) {
 	case NEXT_BUTTON:
 	case BACK_BUTTON:
-		lg_target_quatanion = plugin_host->get_view_quatanion();
+		float *quat = lg_plugin_host->get_view_quatanion();
+		if (quat) {
+			memcpy(lg_target_quatanion, quat, sizeof(lg_target_quatanion));
+		}
 	}
 	lg_last_kokuyoseki_time = time;
 	lg_last_button = button;
@@ -285,6 +289,7 @@ static void init() {
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
+	lg_plugin_host = plugin_host;
 
 	PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
 	strcpy(plugin->name, PLUGIN_NAME);
