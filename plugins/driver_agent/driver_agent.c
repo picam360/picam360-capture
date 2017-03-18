@@ -1,32 +1,3 @@
-/*
- Copyright (c) 2012, Broadcom Europe Ltd
- Copyright (c) 2012, OtherCrashOverride
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
- * Redistributions of source code must retain the above copyright
- notice, this list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright
- notice, this list of conditions and the following disclaimer in the
- documentation and/or other materials provided with the distribution.
- * Neither the name of the copyright holder nor the
- names of its contributors may be used to endorse or promote products
- derived from this software without specific prior written permission.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-// Video decode demo using OpenMAX IL though the ilcient helper library
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,9 +5,24 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <math.h>
+#include <pthread.h>
 
 #include "driver_agent.h"
 #include "kokuyoseki.h"
+
+#include <mat4/type.h>
+#include <mat4/create.h>
+#include <mat4/identity.h>
+#include <mat4/rotateX.h>
+#include <mat4/rotateY.h>
+#include <mat4/rotateZ.h>
+#include <mat4/scale.h>
+#include <mat4/multiply.h>
+#include <mat4/transpose.h>
+#include <mat4/fromQuat.h>
+#include <mat4/perspective.h>
+#include <mat4/invert.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -149,7 +135,7 @@ void *transmit_thread_func(void* arg) {
 			mat4_multiply(vtg, unif_matrix, vtg);
 			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
 			float yaw = atan2(vtg[2], vtg[0]);
-			float pitch = atan2(xy, -vtg[1]);
+			float pitch = atan2(xz, -vtg[1]);
 			printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
 
 			//lg_motor_value[0] = lg_thrust;
@@ -261,12 +247,15 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 		lg_func++;
 		break;
 	}
-	switch (button) {
-	case NEXT_BUTTON:
-	case BACK_BUTTON:
-		float *quat = lg_plugin_host->get_view_quatanion();
-		if (quat) {
-			memcpy(lg_target_quatanion, quat, sizeof(lg_target_quatanion));
+	{
+		float *quat;
+		switch (button) {
+		case NEXT_BUTTON:
+		case BACK_BUTTON:
+			quat = lg_plugin_host->get_view_quatanion();
+			if (quat) {
+				memcpy(lg_target_quatanion, quat, sizeof(lg_target_quatanion));
+			}
 		}
 	}
 	lg_last_kokuyoseki_time = time;
