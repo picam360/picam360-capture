@@ -248,7 +248,7 @@ void *transmit_thread_func(void* arg) {
 				}
 				lg_motor_value[i] += diff;
 			}
-			printf("yaw=%f,\tpitch=%t", yaw, pitch);
+			printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
 			for (int i = 0; i < 4; i++) {
 				printf(", m%d=%f", i, lg_motor_value[i]);
 			}
