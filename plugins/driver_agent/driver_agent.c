@@ -83,7 +83,6 @@ static int lg_func = -1;
 static void *recieve_thread_func(void* arg) {
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
-	unsigned char *buff_trash = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
 	int camd_fd = -1;
@@ -221,16 +220,15 @@ void *transmit_thread_func(void* arg) {
 			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
 			float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
 			float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
-			printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
 
 			// 0 - 1
 			// |   |
 			// 3 - 2
 			float diff_angle[4];
-			float diff_angle[0] = abs(sub_angle(135, yaw));
-			float diff_angle[1] = abs(sub_angle(45, yaw));
-			float diff_angle[2] = abs(sub_angle(-45, yaw));
-			float diff_angle[3] = abs(sub_angle(-135, yaw));
+			diff_angle[0] = abs(sub_angle(135, yaw));
+			diff_angle[1] = abs(sub_angle(45, yaw));
+			diff_angle[2] = abs(sub_angle(-45, yaw));
+			diff_angle[3] = abs(sub_angle(-135, yaw));
 			float diff_sum = 0;
 			for (int i = 0; i < 4; i++) {
 				diff_sum += diff_angle[i];
@@ -239,7 +237,7 @@ void *transmit_thread_func(void* arg) {
 				diff_angle[i] /= diff_sum;
 			}
 			float dir[4] = { 1, -1, 1, -1 };
-			float gain = pitch / 90;
+			float gain = pitch / 180;
 			for (int i = 0; i < 4; i++) {
 				float k = gain * MOTOR_NUM * (1.0 - diff_angle[i])
 						+ (1.0 - gain);
@@ -250,6 +248,11 @@ void *transmit_thread_func(void* arg) {
 				}
 				lg_motor_value[i] += diff;
 			}
+			printf("yaw=%f,\tpitch=%t", yaw, pitch);
+			for (int i = 0; i < 4; i++) {
+				printf(", m%d=%f", i, lg_motor_value[i]);
+			}
+			printf("\n");
 		}
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
