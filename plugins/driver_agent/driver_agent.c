@@ -241,7 +241,7 @@ void *transmit_thread_func(void* arg) {
 			float dir[4] = { 1, -1, 1, -1 };
 			float gain = pitch / 90;
 			for (int i = 0; i < 4; i++) {
-				float k = gain * MOTOR_NUM * (1.0 - diff_angle[0])
+				float k = gain * MOTOR_NUM * (1.0 - diff_angle[i])
 						+ (1.0 - gain);
 				float value = dir[i] * lg_thrust * k;
 				float diff = value - lg_motor_value[i];
