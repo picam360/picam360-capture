@@ -167,6 +167,15 @@ static void *recieve_thread_func(void* arg) {
 	return NULL;
 }
 
+float sub_angle(float a, float b) {
+	float v = a - b;
+	v -= floor(v / 360) * 360;
+	if (v > 180.0) {
+		v -= 360.0;
+	}
+	return v;
+}
+
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
 	int buff_size = 4096;
@@ -191,7 +200,7 @@ void *transmit_thread_func(void* arg) {
 			//brake
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
-			//(RtRc-1Rt-1)*Rt*vtg, target coordinate will be converted into camera coordinate
+			//(Rt-1RcRt)*(Rt-1)*vtg, target coordinate will be converted into camera coordinate
 			float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
 			float unif_matrix[16];
 			float camera_matrix[16];
@@ -201,23 +210,46 @@ void *transmit_thread_func(void* arg) {
 			mat4_identity(target_matrix);
 			mat4_fromQuat(camera_matrix, lg_camera_quatanion);
 			mat4_fromQuat(target_matrix, lg_target_quatanion);
-			mat4_invert(camera_matrix, camera_matrix);
-			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc-1
-			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // RtRc-1
+			mat4_invert(target_matrix, target_matrix);
+			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc
+			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1Rc
 
 			mat4_transpose(vtg, vtg);
 			mat4_multiply(vtg, vtg, unif_matrix);
 			mat4_transpose(vtg, vtg);
 
 			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-			float yaw = atan2(vtg[2], vtg[0]);
-			float pitch = atan2(xz, -vtg[1]);
+			float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
+			float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
 			printf("yaw=%f,\tpitch=%f\n", yaw, pitch);
 
-			//lg_motor_value[0] = lg_thrust;
-			//lg_motor_value[1] = -lg_thrust;
-			//lg_motor_value[2] = -lg_thrust;
-			//lg_motor_value[3] = lg_thrust;
+			// 0 - 1
+			// |   |
+			// 3 - 2
+			float diff_angle[4];
+			float diff_angle[0] = abs(sub_angle(135, yaw));
+			float diff_angle[1] = abs(sub_angle(45, yaw));
+			float diff_angle[2] = abs(sub_angle(-45, yaw));
+			float diff_angle[3] = abs(sub_angle(-135, yaw));
+			float diff_sum = 0;
+			for (int i = 0; i < 4; i++) {
+				diff_sum += diff_angle[i];
+			}
+			for (int i = 0; i < 4; i++) {
+				diff_angle[i] /= diff_sum;
+			}
+			float dir[4] = { 1, -1, 1, -1 };
+			float gain = pitch / 90;
+			for (int i = 0; i < 4; i++) {
+				float k = gain * MOTOR_NUM * (1.0 - diff_angle[0])
+						+ (1.0 - gain);
+				float value = dir[i] * lg_thrust * k;
+				float diff = value - lg_motor_value[i];
+				if (abs(diff) > 10) {
+					diff = (diff > 0) ? 10 : -10;
+				}
+				lg_motor_value[i] += diff;
+			}
 		}
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
