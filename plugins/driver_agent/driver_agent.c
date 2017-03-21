@@ -234,15 +234,13 @@ void *transmit_thread_func(void* arg) {
 				delta_pitch[0] = pitch / 180.0;
 				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-				float diff1 = (delta_pitch[0] - delta_pitch[1])
-						/ MAX(MIN(diff_sec, 1.0), 0.01);
-				timersub(&delta_pitch_time[1], &delta_pitch_time[2], &diff);
-				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-				float diff2 = (delta_pitch[1] - delta_pitch[2])
-						/ MAX(MIN(diff_sec, 1.0), 0.01);
-				float diff_diff = diff1 - diff2;
-				float delta_value = lg_p_gain * diff1
-						+ lg_i_gain * delta_pitch[0] + lg_d_gain * diff_diff;
+				diff_sec = MAX(MIN(diff_sec, 1.0), 0.01);
+				float p_value = lg_p_gain * (delta_pitch[0] - delta_pitch[1]);
+				float i_value = lg_i_gain * delta_pitch[0] * diff_sec;
+				float d_value = lg_d_gain
+						* (delta_pitch[0] - 2 * delta_pitch[1] + delta_pitch[2])
+						/ diff_sec;
+				float delta_value = p_value + i_value + d_value;
 				delta_value = MIN(delta_value, 50);
 				for (int j = 3 - 1; j >= 1; j--) {
 					delta_pitch[j] = delta_pitch[j - 1];
