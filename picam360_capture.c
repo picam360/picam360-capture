@@ -460,6 +460,12 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				state->options.cam_horizon_r[i] = 0.8;
 			}
 		}
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]->init_options) {
+				state->plugins[i]->init_options(state->plugins[i]->user_data,
+						options);
+			}
+		}
 
 		json_decref(options);
 	}
@@ -502,6 +508,12 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		sprintf(buff, "cam%d_horizon_r", i);
 		json_object_set_new(options, buff,
 				json_real(state->options.cam_horizon_r[i]));
+	}
+	for (int i = 0; state->plugins[i] != NULL; i++) {
+		if (state->plugins[i]->save_options) {
+			state->plugins[i]->save_options(state->plugins[i]->user_data,
+					options);
+		}
 	}
 
 	json_dump_file(options, CONFIG_FILE, 0);

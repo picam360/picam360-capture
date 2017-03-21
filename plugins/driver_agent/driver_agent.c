@@ -77,6 +77,10 @@ static bool lg_pid_enabled = false;
 static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
+static float p_gain = 1.0;
+static float i_gain = 1.0;
+static float d_gain = 1.0;
+
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
 static int lg_last_button = -1;
@@ -224,9 +228,6 @@ void *transmit_thread_func(void* arg) {
 				float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
 				float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
 
-				float gain_p = 1;
-				float gain_i = 1;
-				float gain_d = 1;
 				static struct timeval delta_pitch_time[3] = { };
 				static float delta_pitch[3] = { 0, 0, 0 };
 				delta_pitch_time[0] = time;
@@ -240,8 +241,8 @@ void *transmit_thread_func(void* arg) {
 				float diff2 = (delta_pitch[1] - delta_pitch[2])
 						/ MAX(MIN(diff_sec, 1.0), 0.01);
 				float diff_diff = diff1 - diff2;
-				float delta_value = gain_p * diff1 + gain_i * delta_pitch[0]
-						+ gain_d * diff_diff;
+				float delta_value = p_gain * diff1 + i_gain * delta_pitch[0]
+						+ d_gain * diff_diff;
 				delta_value = MIN(delta_value, 50);
 				for (int j = 1; j < 3; j++) {
 					delta_pitch[j] = delta_pitch[j - 1];
@@ -255,12 +256,16 @@ void *transmit_thread_func(void* arg) {
 				diff_angle[1] = abs(sub_angle(45, yaw));
 				diff_angle[2] = abs(sub_angle(-45, yaw));
 				diff_angle[3] = abs(sub_angle(-135, yaw));
-				float diff_sum = 0;
+				float _e = 0;
+				float _s = 0;
 				for (int i = 0; i < 4; i++) {
-					diff_sum += diff_angle[i];
+					_e += diff_angle[i];
+					_s += diff_angle[i] * diff_angle[i];
 				}
+				_e /= 4;
+				_s = sqrt(_s / 4 - _e * _e);
 				for (int i = 0; i < 4; i++) {
-					diff_angle[i] = diff_angle[i] / diff_sum - 1.0 / 4;
+					diff_angle[i] = (diff_angle[i] - _e) / _s;
 				}
 				for (int i = 0; i < 4; i++) {
 					float _delta_value = delta_value * diff_angle[i];
@@ -416,6 +421,21 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	lg_last_button = button;
 }
 
+static void init_options(void *user_data, json_t *options) {
+	lg_p_gain = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".p_gain"));
+	lg_i_gain = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".i_gain"));
+	lg_d_gain = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".d_gain"));
+}
+
+static void save_options(void *user_data, json_t *options) {
+	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
+	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
+	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
+}
+
 static bool is_init = false;
 static void init() {
 	if (!is_init) {
@@ -442,6 +462,8 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	strcpy(plugin->name, PLUGIN_NAME);
 	plugin->release = release;
 	plugin->command_handler = command_handler;
+	plugin->init_options = init_options;
+	plugin->save_options = save_options;
 	plugin->user_data = plugin;
 
 	*_plugin = plugin;
