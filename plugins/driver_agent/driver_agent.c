@@ -241,8 +241,8 @@ void *transmit_thread_func(void* arg) {
 						* (delta_pitch[0] - 2 * delta_pitch[1] + delta_pitch[2])
 						/ diff_sec;
 				float delta_value = p_value + i_value + d_value;
-				delta_value = MIN(delta_value, 50);
 				lg_pid_value += delta_value;
+				lg_pid_value = MIN(lg_pid_value, 50);
 				for (int j = 3 - 1; j >= 1; j--) {
 					delta_pitch[j] = delta_pitch[j - 1];
 					delta_pitch_time[j] = delta_pitch_time[j - 1];
@@ -276,7 +276,8 @@ void *transmit_thread_func(void* arg) {
 					lg_motor_value[i] += diff;
 				}
 				if (1) {
-					printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
+					printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f",
+							yaw, pitch, lg_pid_value, delta_value);
 					for (int i = 0; i < MOTOR_NUM; i++) {
 						printf(", m%d=%d", i, lg_motor_value[i]);
 					}
