@@ -77,9 +77,9 @@ static bool lg_pid_enabled = false;
 static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
-static float p_gain = 1.0;
-static float i_gain = 1.0;
-static float d_gain = 1.0;
+static float lg_p_gain = 1.0;
+static float lg_i_gain = 1.0;
+static float lg_d_gain = 1.0;
 
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
@@ -241,8 +241,8 @@ void *transmit_thread_func(void* arg) {
 				float diff2 = (delta_pitch[1] - delta_pitch[2])
 						/ MAX(MIN(diff_sec, 1.0), 0.01);
 				float diff_diff = diff1 - diff2;
-				float delta_value = p_gain * diff1 + i_gain * delta_pitch[0]
-						+ d_gain * diff_diff;
+				float delta_value = lg_p_gain * diff1 + lg_i_gain * delta_pitch[0]
+						+ lg_d_gain * diff_diff;
 				delta_value = MIN(delta_value, 50);
 				for (int j = 1; j < 3; j++) {
 					delta_pitch[j] = delta_pitch[j - 1];
