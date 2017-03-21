@@ -269,7 +269,7 @@ void *transmit_thread_func(void* arg) {
 				}
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust + lg_pid_value * diff_angle[i];
-					float diff = lg_motor_value[i] - value;
+					float diff = value - lg_motor_value[i];
 					if (abs(diff) > 2) {
 						diff = (diff > 0) ? 2 : -2;
 					}
@@ -286,7 +286,7 @@ void *transmit_thread_func(void* arg) {
 			} else {
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust;
-					float diff = lg_motor_value[i] - value;
+					float diff = value - lg_motor_value[i];
 					if (abs(diff) > 2) {
 						diff = (diff > 0) ? 2 : -2;
 					}
