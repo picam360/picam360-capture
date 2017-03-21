@@ -281,7 +281,10 @@ void *transmit_thread_func(void* arg) {
 					}
 					float max_motor_pid_value = 25;
 					if (abs(lg_motor_pid_value[i]) > max_motor_pid_value) {
-						lg_motor_pid_value[i] = (lg_motor_pid_value[i] > 0) ? max_motor_pid_value : -max_motor_pid_value;
+						lg_motor_pid_value[i] =
+								(lg_motor_pid_value[i] > 0) ?
+										max_motor_pid_value :
+										-max_motor_pid_value;
 					}
 					lg_motor_value[i] = lg_thrust + lg_motor_pid_value[i];
 				}
@@ -294,8 +297,11 @@ void *transmit_thread_func(void* arg) {
 				}
 			} else {
 				for (int i = 0; i < MOTOR_NUM; i++) {
-					lg_motor_value[i] = lg_thrust;
+					lg_motor_pid_value[i] = 0;
 				}
+			}
+			for (int i = 0; i < MOTOR_NUM; i++) {
+				lg_motor_value[i] = lg_thrust;
 			}
 		}
 		//kokuyoseki func
