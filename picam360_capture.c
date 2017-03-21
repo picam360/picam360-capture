@@ -460,10 +460,12 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				state->options.cam_horizon_r[i] = 0.8;
 			}
 		}
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			if (state->plugins[i]->init_options) {
-				state->plugins[i]->init_options(state->plugins[i]->user_data,
-						options);
+		if (state->plugins) {
+			for (int i = 0; state->plugins[i] != NULL; i++) {
+				if (state->plugins[i]->init_options) {
+					state->plugins[i]->init_options(
+							state->plugins[i]->user_data, options);
+				}
 			}
 		}
 
@@ -509,10 +511,12 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, buff,
 				json_real(state->options.cam_horizon_r[i]));
 	}
-	for (int i = 0; state->plugins[i] != NULL; i++) {
-		if (state->plugins[i]->save_options) {
-			state->plugins[i]->save_options(state->plugins[i]->user_data,
-					options);
+	if (state->plugins) {
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]->save_options) {
+				state->plugins[i]->save_options(state->plugins[i]->user_data,
+						options);
+			}
 		}
 	}
 
@@ -1152,9 +1156,6 @@ int main(int argc, char *argv[]) {
 
 	umask(0000);
 
-	//init options
-	init_options(state);
-
 	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'c':
@@ -1250,6 +1251,9 @@ int main(int argc, char *argv[]) {
 
 	// init plugin
 	init_plugins(state);
+
+	//init options
+	init_options(state);
 
 	while (!terminate) {
 		command_handler();
