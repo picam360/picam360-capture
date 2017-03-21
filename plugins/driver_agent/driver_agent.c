@@ -68,7 +68,7 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
-static int lg_motor_pid_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static float lg_motor_pid_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
@@ -226,7 +226,7 @@ void *transmit_thread_func(void* arg) {
 
 				float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
 				float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
-				float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
+				float pitch = atan2(xz, vtg[1]) * 180 / M_PI;
 
 				static struct timeval delta_pitch_time[3] = { };
 				static float delta_pitch[3] = { 0, 0, 0 };
@@ -244,8 +244,9 @@ void *transmit_thread_func(void* arg) {
 				float delta_value = lg_p_gain * diff1
 						+ lg_i_gain * delta_pitch[0] + lg_d_gain * diff_diff;
 				delta_value = MIN(delta_value, 50);
-				for (int j = 1; j < 3; j++) {
+				for (int j = 3 - 1; j >= 1; j--) {
 					delta_pitch[j] = delta_pitch[j - 1];
+					delta_pitch_time[j] = delta_pitch_time[j - 1];
 				}
 
 				// 0 - 1
@@ -277,6 +278,10 @@ void *transmit_thread_func(void* arg) {
 						lg_motor_pid_value[i] = 0;
 					} else {
 						lg_motor_pid_value[i] = value;
+					}
+					float max_motor_pid_value = 25;
+					if (abs(lg_motor_pid_value[i]) > max_motor_pid_value) {
+						lg_motor_pid_value[i] = (lg_motor_pid_value[i] > 0) ? max_motor_pid_value : -max_motor_pid_value;
 					}
 					lg_motor_value[i] = lg_thrust + lg_motor_pid_value[i];
 				}
