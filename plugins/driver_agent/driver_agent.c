@@ -286,7 +286,6 @@ void *transmit_thread_func(void* arg) {
 										max_motor_pid_value :
 										-max_motor_pid_value;
 					}
-					lg_motor_value[i] = lg_thrust + lg_motor_pid_value[i];
 				}
 				if (1) {
 					printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
@@ -301,7 +300,7 @@ void *transmit_thread_func(void* arg) {
 				}
 			}
 			for (int i = 0; i < MOTOR_NUM; i++) {
-				lg_motor_value[i] = lg_thrust;
+				lg_motor_value[i] = lg_thrust + lg_motor_pid_value[i];
 			}
 		}
 		//kokuyoseki func
