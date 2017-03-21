@@ -241,8 +241,8 @@ void *transmit_thread_func(void* arg) {
 				float diff2 = (delta_pitch[1] - delta_pitch[2])
 						/ MAX(MIN(diff_sec, 1.0), 0.01);
 				float diff_diff = diff1 - diff2;
-				float delta_value = lg_p_gain * diff1 + lg_i_gain * delta_pitch[0]
-						+ lg_d_gain * diff_diff;
+				float delta_value = lg_p_gain * diff1
+						+ lg_i_gain * delta_pitch[0] + lg_d_gain * diff_diff;
 				delta_value = MIN(delta_value, 50);
 				for (int j = 1; j < 3; j++) {
 					delta_pitch[j] = delta_pitch[j - 1];
@@ -251,23 +251,23 @@ void *transmit_thread_func(void* arg) {
 				// 0 - 1
 				// |   |
 				// 3 - 2
-				float diff_angle[4];
+				float diff_angle[MOTOR_NUM];
 				diff_angle[0] = abs(sub_angle(135, yaw));
 				diff_angle[1] = abs(sub_angle(45, yaw));
 				diff_angle[2] = abs(sub_angle(-45, yaw));
 				diff_angle[3] = abs(sub_angle(-135, yaw));
 				float _e = 0;
 				float _s = 0;
-				for (int i = 0; i < 4; i++) {
+				for (int i = 0; i < MOTOR_NUM; i++) {
 					_e += diff_angle[i];
 					_s += diff_angle[i] * diff_angle[i];
 				}
-				_e /= 4;
-				_s = sqrt(_s / 4 - _e * _e);
-				for (int i = 0; i < 4; i++) {
-					diff_angle[i] = (diff_angle[i] - _e) / _s;
+				_e /= MOTOR_NUM;
+				_s = sqrt(_s / MOTOR_NUM - _e * _e);
+				for (int i = 0; i < MOTOR_NUM; i++) {
+					diff_angle[i] = (diff_angle[i] - _e) / (_s * MOTOR_NUM);
 				}
-				for (int i = 0; i < 4; i++) {
+				for (int i = 0; i < MOTOR_NUM; i++) {
 					float _delta_value = delta_value * diff_angle[i];
 					if (abs(_delta_value) > 2) {
 						_delta_value = (_delta_value > 0) ? 2 : -2;
@@ -282,13 +282,13 @@ void *transmit_thread_func(void* arg) {
 				}
 				if (1) {
 					printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
-					for (int i = 0; i < 4; i++) {
+					for (int i = 0; i < MOTOR_NUM; i++) {
 						printf(", m%d=%d", i, lg_motor_value[i]);
 					}
 					printf("\n");
 				}
 			} else {
-				for (int i = 0; i < 4; i++) {
+				for (int i = 0; i < MOTOR_NUM; i++) {
 					lg_motor_value[i] = lg_thrust;
 				}
 			}
