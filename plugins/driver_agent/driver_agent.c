@@ -68,7 +68,6 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
-static float lg_motor_pid_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
@@ -80,6 +79,7 @@ static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
+static float lg_pid_value = 0.0;
 
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
@@ -242,6 +242,7 @@ void *transmit_thread_func(void* arg) {
 						/ diff_sec;
 				float delta_value = p_value + i_value + d_value;
 				delta_value = MIN(delta_value, 50);
+				lg_pid_value += delta_value;
 				for (int j = 3 - 1; j >= 1; j--) {
 					delta_pitch[j] = delta_pitch[j - 1];
 					delta_pitch_time[j] = delta_pitch_time[j - 1];
@@ -267,23 +268,12 @@ void *transmit_thread_func(void* arg) {
 					diff_angle[i] = (diff_angle[i] - _e) / (_s * MOTOR_NUM);
 				}
 				for (int i = 0; i < MOTOR_NUM; i++) {
-					float _delta_value = delta_value * diff_angle[i];
-					if (abs(_delta_value) > 2) {
-						_delta_value = (_delta_value > 0) ? 2 : -2;
+					float value = lg_thrust + lg_pid_value * diff_angle[i];
+					float diff = lg_motor_value[i] - value;
+					if (abs(diff) > 2) {
+						diff = (diff > 0) ? 2 : -2;
 					}
-					float value = lg_motor_pid_value[i] + _delta_value;
-					if (lg_motor_pid_value[i] * value < 0) {
-						lg_motor_pid_value[i] = 0;
-					} else {
-						lg_motor_pid_value[i] = value;
-					}
-					float max_motor_pid_value = 25;
-					if (abs(lg_motor_pid_value[i]) > max_motor_pid_value) {
-						lg_motor_pid_value[i] =
-								(lg_motor_pid_value[i] > 0) ?
-										max_motor_pid_value :
-										-max_motor_pid_value;
-					}
+					lg_motor_value[i] += diff;
 				}
 				if (1) {
 					printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
@@ -294,11 +284,13 @@ void *transmit_thread_func(void* arg) {
 				}
 			} else {
 				for (int i = 0; i < MOTOR_NUM; i++) {
-					lg_motor_pid_value[i] = 0;
+					float value = lg_thrust;
+					float diff = lg_motor_value[i] - value;
+					if (abs(diff) > 2) {
+						diff = (diff > 0) ? 2 : -2;
+					}
+					lg_motor_value[i] += diff;
 				}
-			}
-			for (int i = 0; i < MOTOR_NUM; i++) {
-				lg_motor_value[i] = lg_thrust + lg_motor_pid_value[i];
 			}
 		}
 		//kokuyoseki func
