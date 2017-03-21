@@ -231,7 +231,7 @@ void *transmit_thread_func(void* arg) {
 				static struct timeval delta_pitch_time[3] = { };
 				static float delta_pitch[3] = { 0, 0, 0 };
 				delta_pitch_time[0] = time;
-				delata_pitch[0] = pitch / 180.0;
+				delta_pitch[0] = pitch / 180.0;
 				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				float diff1 = (delta_pitch[0] - delta_pitch[1])
@@ -277,17 +277,17 @@ void *transmit_thread_func(void* arg) {
 					lg_motor_value[i] = dir[i]
 							* (lg_thrust + lg_motor_pid_value[i]);
 				}
+				if (1) {
+					printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
+					for (int i = 0; i < 4; i++) {
+						printf(", m%d=%d", i, lg_motor_value[i]);
+					}
+					printf("\n");
+				}
 			} else {
 				for (int i = 0; i < 4; i++) {
 					lg_motor_value[i] = dir[i] * lg_thrust;
 				}
-			}
-			if (1) {
-				printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
-				for (int i = 0; i < 4; i++) {
-					printf(", m%d=%d", i, lg_motor_value[i]);
-				}
-				printf("\n");
 			}
 		}
 		//kokuyoseki func
