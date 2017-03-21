@@ -242,7 +242,7 @@ void *transmit_thread_func(void* arg) {
 						/ diff_sec;
 				float delta_value = p_value + i_value + d_value;
 				lg_pid_value += delta_value;
-				lg_pid_value = MIN(lg_pid_value, 50);
+				lg_pid_value = MIN(lg_pid_value, 50*MOTOR_NUM);
 				for (int j = 3 - 1; j >= 1; j--) {
 					delta_pitch[j] = delta_pitch[j - 1];
 					delta_pitch_time[j] = delta_pitch_time[j - 1];
@@ -270,10 +270,15 @@ void *transmit_thread_func(void* arg) {
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust + lg_pid_value * diff_angle[i];
 					float diff = value - lg_motor_value[i];
-					if (abs(diff) > 2) {
-						diff = (diff > 0) ? 2 : -2;
+					int max_diff = 10;
+					if (abs(diff) > max_diff) {
+						diff = (diff > 0) ? max_diff : -max_diff;
 					}
-					lg_motor_value[i] += diff;
+					value = lg_motor_value[i] + diff;
+					if (value * lg_motor_value[i] < 0) {
+						value = 0;
+					}
+					lg_motor_value[i] = value;
 				}
 				if (1) {
 					printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f",
@@ -287,10 +292,15 @@ void *transmit_thread_func(void* arg) {
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust;
 					float diff = value - lg_motor_value[i];
-					if (abs(diff) > 2) {
-						diff = (diff > 0) ? 2 : -2;
+					int max_diff = 10;
+					if (abs(diff) > max_diff) {
+						diff = (diff > 0) ? max_diff : -max_diff;
 					}
-					lg_motor_value[i] += diff;
+					value = lg_motor_value[i] + diff;
+					if (value * lg_motor_value[i] < 0) {
+						value = 0;
+					}
+					lg_motor_value[i] = value;
 				}
 			}
 		}
