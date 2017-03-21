@@ -224,7 +224,6 @@ void *transmit_thread_func(void* arg) {
 				float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
 				float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
 
-				float dir[4] = { -1, 1, -1, 1 };
 				float gain_p = 1;
 				float gain_i = 1;
 				float gain_d = 1;
@@ -274,8 +273,7 @@ void *transmit_thread_func(void* arg) {
 					} else {
 						lg_motor_pid_value[i] = value;
 					}
-					lg_motor_value[i] = dir[i]
-							* (lg_thrust + lg_motor_pid_value[i]);
+					lg_motor_value[i] = lg_thrust + lg_motor_pid_value[i];
 				}
 				if (1) {
 					printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
@@ -286,7 +284,7 @@ void *transmit_thread_func(void* arg) {
 				}
 			} else {
 				for (int i = 0; i < 4; i++) {
-					lg_motor_value[i] = dir[i] * lg_thrust;
+					lg_motor_value[i] = lg_thrust;
 				}
 			}
 		}
