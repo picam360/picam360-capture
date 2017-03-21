@@ -68,10 +68,12 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static int lg_motor_pid_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
+static bool lg_pid_enabled = false;
 static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
@@ -199,60 +201,94 @@ void *transmit_thread_func(void* arg) {
 			//brake
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
-			//(Rt-1RcRt)*(Rt-1)*vtg, target coordinate will be converted into camera coordinate
-			float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
-			float unif_matrix[16];
-			float camera_matrix[16];
-			float target_matrix[16];
-			mat4_identity(unif_matrix);
-			mat4_identity(camera_matrix);
-			mat4_identity(target_matrix);
-			mat4_fromQuat(camera_matrix, lg_camera_quatanion);
-			mat4_fromQuat(target_matrix, lg_target_quatanion);
-			mat4_invert(target_matrix, target_matrix);
-			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc
-			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1Rc
+			if (lg_pid_enabled) {
+				//(Rt-1RcRt)*(Rt-1)*vtg, target coordinate will be converted into camera coordinate
+				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
+				float unif_matrix[16];
+				float camera_matrix[16];
+				float target_matrix[16];
+				mat4_identity(unif_matrix);
+				mat4_identity(camera_matrix);
+				mat4_identity(target_matrix);
+				mat4_fromQuat(camera_matrix, lg_camera_quatanion);
+				mat4_fromQuat(target_matrix, lg_target_quatanion);
+				mat4_invert(target_matrix, target_matrix);
+				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc
+				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1Rc
 
-			mat4_transpose(vtg, vtg);
-			mat4_multiply(vtg, vtg, unif_matrix);
-			mat4_transpose(vtg, vtg);
+				mat4_transpose(vtg, vtg);
+				mat4_multiply(vtg, vtg, unif_matrix);
+				mat4_transpose(vtg, vtg);
 
-			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-			float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
-			float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
+				float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
+				float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
+				float pitch = atan2(xz, -vtg[1]) * 180 / M_PI;
 
-			// 0 - 1
-			// |   |
-			// 3 - 2
-			float diff_angle[4];
-			diff_angle[0] = abs(sub_angle(135, yaw));
-			diff_angle[1] = abs(sub_angle(45, yaw));
-			diff_angle[2] = abs(sub_angle(-45, yaw));
-			diff_angle[3] = abs(sub_angle(-135, yaw));
-			float diff_sum = 0;
-			for (int i = 0; i < 4; i++) {
-				diff_sum += diff_angle[i];
-			}
-			for (int i = 0; i < 4; i++) {
-				diff_angle[i] /= diff_sum;
-			}
-			float dir[4] = { 1, -1, 1, -1 };
-			float gain = pitch / 180;
-			for (int i = 0; i < 4; i++) {
-				float k = gain * MOTOR_NUM * (1.0 - diff_angle[i])
-						+ (1.0 - gain);
-				float value = dir[i] * lg_thrust * k;
-				float diff = value - lg_motor_value[i];
-				if (abs(diff) > 10) {
-					diff = (diff > 0) ? 10 : -10;
+				float dir[4] = { -1, 1, -1, 1 };
+				float gain_p = 1;
+				float gain_i = 1;
+				float gain_d = 1;
+				static struct timeval delta_pitch_time[3] = { };
+				static float delta_pitch[3] = { 0, 0, 0 };
+				delta_pitch_time[0] = time;
+				delata_pitch[0] = pitch / 180.0;
+				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
+				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+				float diff1 = (delta_pitch[0] - delta_pitch[1])
+						/ MAX(MIN(diff_sec, 1.0), 0.01);
+				timersub(&delta_pitch_time[1], &delta_pitch_time[2], &diff);
+				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+				float diff2 = (delta_pitch[1] - delta_pitch[2])
+						/ MAX(MIN(diff_sec, 1.0), 0.01);
+				float diff_diff = diff1 - diff2;
+				float delta_value = gain_p * diff1 + gain_i * delta_pitch[0]
+						+ gain_d * diff_diff;
+				delta_value = MIN(delta_value, 50);
+				for (int j = 1; j < 3; j++) {
+					delta_pitch[j] = delta_pitch[j - 1];
 				}
-				lg_motor_value[i] += diff;
+
+				// 0 - 1
+				// |   |
+				// 3 - 2
+				float diff_angle[4];
+				diff_angle[0] = abs(sub_angle(135, yaw));
+				diff_angle[1] = abs(sub_angle(45, yaw));
+				diff_angle[2] = abs(sub_angle(-45, yaw));
+				diff_angle[3] = abs(sub_angle(-135, yaw));
+				float diff_sum = 0;
+				for (int i = 0; i < 4; i++) {
+					diff_sum += diff_angle[i];
+				}
+				for (int i = 0; i < 4; i++) {
+					diff_angle[i] = diff_angle[i] / diff_sum - 1.0 / 4;
+				}
+				for (int i = 0; i < 4; i++) {
+					float _delta_value = delta_value * diff_angle[i];
+					if (abs(_delta_value) > 2) {
+						_delta_value = (_delta_value > 0) ? 2 : -2;
+					}
+					float value = lg_motor_pid_value[i] + _delta_value;
+					if (lg_motor_pid_value[i] * value < 0) {
+						lg_motor_pid_value[i] = 0;
+					} else {
+						lg_motor_pid_value[i] = value;
+					}
+					lg_motor_value[i] = dir[i]
+							* (lg_thrust + lg_motor_pid_value[i]);
+				}
+			} else {
+				for (int i = 0; i < 4; i++) {
+					lg_motor_value[i] = dir[i] * lg_thrust;
+				}
 			}
-			printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
-			for (int i = 0; i < 4; i++) {
-				printf(", m%d=%f", i, lg_motor_value[i]);
+			if (1) {
+				printf("yaw=%f,\tpitch=%f\t", yaw, pitch);
+				for (int i = 0; i < 4; i++) {
+					printf(", m%d=%d", i, lg_motor_value[i]);
+				}
+				printf("\n");
 			}
-			printf("\n");
 		}
 		//kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
@@ -268,6 +304,15 @@ void *transmit_thread_func(void* arg) {
 				case 2:
 					lg_thrust = 0;
 					printf("thrust off\n");
+					break;
+				case 3:
+					if (lg_pid_enabled) {
+						lg_pid_enabled = false;
+						printf("pid off\n");
+					} else {
+						lg_pid_enabled = true;
+						printf("pid on\n");
+					}
 					break;
 				}
 				if (lg_func > 10) {
