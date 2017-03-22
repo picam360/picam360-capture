@@ -80,8 +80,8 @@ static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
 static float lg_pid_value[3] = { }; //x, z, delta yaw
-static float delta_pid_taget[3][3] = { }; //x, z, delta yaw
-static struct timeval delta_pid_time[3] = { };
+static float lg_delta_pid_target[3][3] = { }; //x, z, delta yaw
+static struct timeval lg_delta_pid_time[3] = { };
 
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
@@ -231,10 +231,12 @@ void *transmit_thread_func(void* arg) {
 				float pitch = atan2(xz, vtg[1]) * 180 / M_PI;
 
 				static float last_yaw = 0;
-				delta_pid_time[0] = time;
-				delta_pid_target[0][0] = cos(yaw * M_PI / 180) * (pitch / 180); // x
-				delta_pid_target[1][0] = sin(yaw * M_PI / 180) * (pitch / 180); // z
-				delta_pid_target[2][0] = sub_angle(yaw, last_yaw); // delta yaw
+				lg_delta_pid_time[0] = time;
+				lg_delta_pid_target[0][0] = cos(yaw * M_PI / 180)
+						* (pitch / 180); // x
+				lg_delta_pid_target[1][0] = sin(yaw * M_PI / 180)
+						* (pitch / 180); // z
+				lg_delta_pid_target[2][0] = sub_angle(yaw, last_yaw); // delta yaw
 
 				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
@@ -242,12 +244,13 @@ void *transmit_thread_func(void* arg) {
 
 				for (int k = 0; k < 3; k++) {
 					float p_value = lg_p_gain
-							* (delta_pid_target[k][0] - delta_pid_target[k][1]);
-					float i_value = lg_i_gain * delta_pitch[0] * diff_sec;
+							* (lg_delta_pid_target[k][0]
+									- lg_delta_pid_target[k][1]);
+					float i_value = lg_i_gain * lg_delta_pid_target[k][0] * diff_sec;
 					float d_value = lg_d_gain
-							* (delta_pid_target[k][0]
-									- 2 * delta_pid_target[k][1]
-									+ delta_pid_target[k][2]) / diff_sec;
+							* (lg_delta_pid_target[k][0]
+									- 2 * lg_delta_pid_target[k][1]
+									+ lg_delta_pid_target[k][2]) / diff_sec;
 					float delta_value = p_value + i_value + d_value;
 					lg_pid_value[k] += delta_value;
 					lg_pid_value[k] = MIN(lg_pid_value[k], 100);
@@ -256,9 +259,10 @@ void *transmit_thread_func(void* arg) {
 				//increment
 				for (int j = 3 - 1; j >= 1; j--) {
 					for (int k = 0; k < 3; k++) {
-						delta_pid_target[k][j] = delta_pid_target[k][j - 1];
+						lg_delta_pid_target[k][j] =
+								lg_delta_pid_target[k][j - 1];
 					}
-					delta_pid_time[j] = delta_pid_time[j - 1];
+					lg_delta_pid_time[j] = lg_delta_pid_time[j - 1];
 				}
 				last_yaw = yaw;
 
@@ -267,15 +271,15 @@ void *transmit_thread_func(void* arg) {
 				// 3 - 2
 				float motor_pid_gain[3][MOTOR_NUM] = { //
 						//
-								-1, 1, 1, -1,				// x
-								1, 1, -1, -1,				// z
-								-1, 1, -1, 1				// delta yaw
+								{ -1, 1, 1, -1 },				// x
+								{ 1, 1, -1, -1 },				// z
+								{ -1, 1, -1, 1 }				// delta yaw
 						};
 				float motor_pid_value[MOTOR_NUM] = { };
 				for (int k = 0; k < 3; k++) {
 					for (int i = 0; i < MOTOR_NUM; i++) {
 						motor_pid_value[i] += lg_pid_value[k]
-								* motor_gain[k][i];
+								* motor_pid_gain[k][i];
 					}
 				}
 				for (int i = 0; i < MOTOR_NUM; i++) {
@@ -294,7 +298,7 @@ void *transmit_thread_func(void* arg) {
 			}
 			if (1) {
 				printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f", yaw,
-						pitch, lg_pid_value, delta_value);
+						pitch, lg_pid_value[0], delta_pid_value[0]);
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					printf(", m%d=%d", i, lg_motor_value[i]);
 				}
