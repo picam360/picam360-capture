@@ -254,7 +254,7 @@ void *transmit_thread_func(void* arg) {
 									+ lg_delta_pid_target[k][2]) / diff_sec;
 					float delta_value = p_value + i_value + d_value;
 					lg_pid_value[k] += delta_value;
-					lg_pid_value[k] = MIN(lg_pid_value[k], 100);
+					lg_pid_value[k] = MIN(MAX((lg_pid_value[k], -50), 50);
 				}
 
 				//increment
@@ -306,6 +306,9 @@ void *transmit_thread_func(void* arg) {
 					printf("\n");
 				} // end of pid control
 			} else {
+				for (int k = 0; k < 3; k++) {
+					lg_pid_value[k] = 0;
+				}
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust;
 					float diff = value - lg_motor_value[i];
@@ -317,11 +320,11 @@ void *transmit_thread_func(void* arg) {
 					if (value * lg_motor_value[i] < 0) {
 						value = 0;
 					}
-					lg_motor_value[i] = value;
+					lg_motor_value[i] = MIN(MAX(value, -100), 100);
 				}
 			}
 		} // end of !low_motor_control
-		//kokuyoseki func
+		  //kokuyoseki func
 		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
 			timersub(&time, &lg_last_kokuyoseki_time, &diff);
 			diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
