@@ -232,8 +232,8 @@ void *transmit_thread_func(void* arg) {
 
 				static float last_yaw = 0;
 				delta_pid_time[0] = time;
-				delta_pid_target[0][0] = sin(yaw * M_PI / 180) * (pitch / 180); // x
-				delta_pid_target[1][0] = cos(yaw * M_PI / 180) * (pitch / 180); // z
+				delta_pid_target[0][0] = cos(yaw * M_PI / 180) * (pitch / 180); // x
+				delta_pid_target[1][0] = sin(yaw * M_PI / 180) * (pitch / 180); // z
 				delta_pid_target[2][0] = sub_angle(yaw, last_yaw); // delta yaw
 
 				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
