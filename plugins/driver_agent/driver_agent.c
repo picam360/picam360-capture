@@ -72,14 +72,16 @@ static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
-static bool lg_pid_enabled = false;
 static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
+static bool lg_pid_enabled = false;
 static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
-static float lg_pid_value = 0.0;
+static float lg_pid_value[3] = { }; //x, z, delta yaw
+static float delta_pid_taget[3][3] = { }; //x, z, delta yaw
+static struct timeval delta_pid_time[3] = { };
 
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
@@ -228,69 +230,56 @@ void *transmit_thread_func(void* arg) {
 				float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
 				float pitch = atan2(xz, vtg[1]) * 180 / M_PI;
 
-				static struct timeval delta_pitch_time[3] = { };
-				static float delta_pitch[3] = { 0, 0, 0 };
-				delta_pitch_time[0] = time;
-				delta_pitch[0] = pitch / 180.0;
+				static float last_yaw = 0;
+				delta_pid_time[0] = time;
+				delta_pid_target[0][0] = sin(yaw * M_PI / 180) * (pitch / 180); // x
+				delta_pid_target[1][0] = cos(yaw * M_PI / 180) * (pitch / 180); // z
+				delta_pid_target[2][0] = sub_angle(yaw, last_yaw); // delta yaw
+
 				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-				diff_sec = MAX(MIN(diff_sec, 1.0), 0.01);
-				float p_value = lg_p_gain * (delta_pitch[0] - delta_pitch[1]);
-				float i_value = lg_i_gain * delta_pitch[0] * diff_sec;
-				float d_value = lg_d_gain
-						* (delta_pitch[0] - 2 * delta_pitch[1] + delta_pitch[2])
-						/ diff_sec;
-				float delta_value = p_value + i_value + d_value;
-				lg_pid_value += delta_value;
-				lg_pid_value = MIN(lg_pid_value, 50*MOTOR_NUM);
-				for (int j = 3 - 1; j >= 1; j--) {
-					delta_pitch[j] = delta_pitch[j - 1];
-					delta_pitch_time[j] = delta_pitch_time[j - 1];
+				diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
+
+				for (int k = 0; k < 3; k++) {
+					float p_value = lg_p_gain
+							* (delta_pid_target[k][0] - delta_pid_target[k][1]);
+					float i_value = lg_i_gain * delta_pitch[0] * diff_sec;
+					float d_value = lg_d_gain
+							* (delta_pid_target[k][0]
+									- 2 * delta_pid_target[k][1]
+									+ delta_pid_target[k][2]) / diff_sec;
+					float delta_value = p_value + i_value + d_value;
+					lg_pid_value[k] += delta_value;
+					lg_pid_value[k] = MIN(lg_pid_value[k], 100);
 				}
+
+				//increment
+				for (int j = 3 - 1; j >= 1; j--) {
+					for (int k = 0; k < 3; k++) {
+						delta_pid_target[k][j] = delta_pid_target[k][j - 1];
+					}
+					delta_pid_time[j] = delta_pid_time[j - 1];
+				}
+				last_yaw = yaw;
 
 				// 0 - 1
 				// |   |
 				// 3 - 2
-				float diff_angle[MOTOR_NUM];
-				diff_angle[0] = abs(sub_angle(135, yaw));
-				diff_angle[1] = abs(sub_angle(45, yaw));
-				diff_angle[2] = abs(sub_angle(-45, yaw));
-				diff_angle[3] = abs(sub_angle(-135, yaw));
-				float _e = 0;
-				float _s = 0;
-				for (int i = 0; i < MOTOR_NUM; i++) {
-					_e += diff_angle[i];
-					_s += diff_angle[i] * diff_angle[i];
-				}
-				_e /= MOTOR_NUM;
-				_s = sqrt(_s / MOTOR_NUM - _e * _e);
-				for (int i = 0; i < MOTOR_NUM; i++) {
-					diff_angle[i] = (diff_angle[i] - _e) / (_s * MOTOR_NUM);
-				}
-				for (int i = 0; i < MOTOR_NUM; i++) {
-					float value = lg_thrust + lg_pid_value * diff_angle[i];
-					float diff = value - lg_motor_value[i];
-					int max_diff = 10;
-					if (abs(diff) > max_diff) {
-						diff = (diff > 0) ? max_diff : -max_diff;
-					}
-					value = lg_motor_value[i] + diff;
-					if (value * lg_motor_value[i] < 0) {
-						value = 0;
-					}
-					lg_motor_value[i] = value;
-				}
-				if (1) {
-					printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f",
-							yaw, pitch, lg_pid_value, delta_value);
+				float motor_pid_gain[3][MOTOR_NUM] = { //
+						//
+								-1, 1, 1, -1,				// x
+								1, 1, -1, -1,				// z
+								-1, 1, -1, 1				// delta yaw
+						};
+				float motor_pid_value[MOTOR_NUM] = { };
+				for (int k = 0; k < 3; k++) {
 					for (int i = 0; i < MOTOR_NUM; i++) {
-						printf(", m%d=%d", i, lg_motor_value[i]);
+						motor_pid_value[i] += lg_pid_value[k]
+								* motor_gain[k][i];
 					}
-					printf("\n");
 				}
-			} else {
 				for (int i = 0; i < MOTOR_NUM; i++) {
-					float value = lg_thrust;
+					float value = lg_thrust + motor_pid_value[i];
 					float diff = value - lg_motor_value[i];
 					int max_diff = 10;
 					if (abs(diff) > max_diff) {
@@ -303,179 +292,195 @@ void *transmit_thread_func(void* arg) {
 					lg_motor_value[i] = value;
 				}
 			}
-		}
-		//kokuyoseki func
-		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
-			timersub(&time, &lg_last_kokuyoseki_time, &diff);
-			diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-			if (diff_sec > 0.5) {
-				printf("func %d: ", lg_func);
-				switch (lg_func) {
-				case 1:
-					lg_light_strength = 0;
-					printf("light off\n");
-					break;
-				case 2:
-					lg_thrust = 0;
-					printf("thrust off\n");
-					break;
-				case 3:
-					if (lg_pid_enabled) {
-						lg_pid_enabled = false;
-						printf("pid off\n");
-					} else {
-						lg_pid_enabled = true;
-						printf("pid on\n");
-					}
-					break;
+			if (1) {
+				printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f", yaw,
+						pitch, lg_pid_value, delta_value);
+				for (int i = 0; i < MOTOR_NUM; i++) {
+					printf(", m%d=%d", i, lg_motor_value[i]);
 				}
-				if (lg_func > 10) {
-					exit(0);
+				printf("\n");
+			}
+		} else {
+			for (int i = 0; i < MOTOR_NUM; i++) {
+				float value = lg_thrust;
+				float diff = value - lg_motor_value[i];
+				int max_diff = 10;
+				if (abs(diff) > max_diff) {
+					diff = (diff > 0) ? max_diff : -max_diff;
 				}
-				lg_func = -1;
+				value = lg_motor_value[i] + diff;
+				if (value * lg_motor_value[i] < 0) {
+					value = 0;
+				}
+				lg_motor_value[i] = value;
 			}
 		}
-
-		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
-				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
-				lg_motor_value[2], lg_motor_value[3]);
-		int fd = open("driver", O_RDWR);
-		if (fd > 0) {
-			write(fd, buff, xmp_len);
-			close(fd);
-		}
-
-		last_time = time;
-		usleep(100 * 1000); //less than 10Hz
 	}
+	//kokuyoseki func
+	if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
+		timersub(&time, &lg_last_kokuyoseki_time, &diff);
+		diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+		if (diff_sec > 0.5) {
+			printf("func %d: ", lg_func);
+			switch (lg_func) {
+			case 1:
+				lg_light_strength = 0;
+				printf("light off\n");
+				break;
+			case 2:
+				lg_thrust = 0;
+				printf("thrust off\n");
+				break;
+			case 3:
+				if (lg_pid_enabled) {
+					lg_pid_enabled = false;
+					printf("pid off\n");
+				} else {
+					lg_pid_enabled = true;
+					printf("pid on\n");
+				}
+				break;
+			}
+			if (lg_func > 10) {
+				exit(0);
+			}
+			lg_func = -1;
+		}
+	}
+
+	xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
+			lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
+			lg_motor_value[2], lg_motor_value[3]);
+	int fd = open("driver", O_RDWR);
+	if (fd > 0) {
+		write(fd, buff, xmp_len);
+		close(fd);
+	}
+
+	last_time = time;
+	usleep(100 * 1000); //less than 10Hz
+}
 }
 
 static void command_handler(void *user_data, char *_buff) {
-	char buff[256];
-	strncpy(buff, _buff, sizeof(buff));
-	char *cmd;
-	cmd = strtok(buff, " \n");
-	if (cmd == NULL) {
-		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			float value;
-			sscanf(param, "%f", &value);
+char buff[256];
+strncpy(buff, _buff, sizeof(buff));
+char *cmd;
+cmd = strtok(buff, " \n");
+if (cmd == NULL) {
+	//do nothing
+} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff)) == 0) {
+	char *param = strtok(NULL, " \n");
+	if (param != NULL) {
+		float value;
+		sscanf(param, "%f", &value);
 
-			lg_light_value[0] = value;
-			lg_light_value[1] = value;
-			printf("set_light_value : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int id = 0;
-			float value = 0;
-			sscanf(param, "%d=%f", &id, &value);
-			if (id < MOTOR_NUM) {
-				lg_motor_value[id] = value;
-			}
-			printf("set_motor_value : completed\n");
-		}
-	} else {
-		printf(":unknown command : %s\n", buff);
+		lg_light_value[0] = value;
+		lg_light_value[1] = value;
+		printf("set_light_value : completed\n");
 	}
+} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff)) == 0) {
+	char *param = strtok(NULL, " \n");
+	if (param != NULL) {
+		int id = 0;
+		float value = 0;
+		sscanf(param, "%d=%f", &id, &value);
+		if (id < MOTOR_NUM) {
+			lg_motor_value[id] = value;
+		}
+		printf("set_motor_value : completed\n");
+	}
+} else {
+	printf(":unknown command : %s\n", buff);
+}
 }
 
 static void kokuyoseki_callback(struct timeval time, int button, int value) {
-	if (value == 1) {
+if (value == 1) {
+	return;
+}
+struct timeval diff;
+timersub(&time, &lg_last_kokuyoseki_time, &diff);
+float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+switch (button) {
+case NEXT_BUTTON:
+	lg_thrust += 1;
+	printf("thrust %f\n", lg_thrust);
+	break;
+case BACK_BUTTON:
+	lg_thrust -= 1;
+	printf("thrust %f\n", lg_thrust);
+	break;
+case NEXT_BUTTON_LONG:
+	if (diff_sec < 0.25)
 		return;
-	}
-	struct timeval diff;
-	timersub(&time, &lg_last_kokuyoseki_time, &diff);
-	float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+	lg_light_strength += 1;
+	printf("light %f\n", lg_light_strength);
+	break;
+case BACK_BUTTON_LONG:
+	if (diff_sec < 0.25)
+		return;
+	lg_light_strength -= 1;
+	printf("light %f\n", lg_light_strength);
+	break;
+case BLACKOUT_BUTTON:
+	lg_func++;
+	break;
+}
+{
+	float *quat;
 	switch (button) {
 	case NEXT_BUTTON:
-		lg_thrust += 1;
-		printf("thrust %f\n", lg_thrust);
-		break;
 	case BACK_BUTTON:
-		lg_thrust -= 1;
-		printf("thrust %f\n", lg_thrust);
-		break;
-	case NEXT_BUTTON_LONG:
-		if (diff_sec < 0.25)
-			return;
-		lg_light_strength += 1;
-		printf("light %f\n", lg_light_strength);
-		break;
-	case BACK_BUTTON_LONG:
-		if (diff_sec < 0.25)
-			return;
-		lg_light_strength -= 1;
-		printf("light %f\n", lg_light_strength);
-		break;
-	case BLACKOUT_BUTTON:
-		lg_func++;
-		break;
-	}
-	{
-		float *quat;
-		switch (button) {
-		case NEXT_BUTTON:
-		case BACK_BUTTON:
-			quat = lg_plugin_host->get_view_quatanion();
-			if (quat) {
-				memcpy(lg_target_quatanion, quat, sizeof(lg_target_quatanion));
-			}
+		quat = lg_plugin_host->get_view_quatanion();
+		if (quat) {
+			memcpy(lg_target_quatanion, quat, sizeof(lg_target_quatanion));
 		}
 	}
-	lg_last_kokuyoseki_time = time;
-	lg_last_button = button;
+}
+lg_last_kokuyoseki_time = time;
+lg_last_button = button;
 }
 
 static void init_options(void *user_data, json_t *options) {
-	lg_p_gain = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".p_gain"));
-	lg_i_gain = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".i_gain"));
-	lg_d_gain = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".d_gain"));
+lg_p_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".p_gain"));
+lg_i_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".i_gain"));
+lg_d_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".d_gain"));
 }
 
 static void save_options(void *user_data, json_t *options) {
-	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
-	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
-	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
+json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
+json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
+json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
 }
 
 static bool is_init = false;
 static void init() {
-	if (!is_init) {
-		is_init = true;
+if (!is_init) {
+	is_init = true;
 
-		set_kokuyoseki_callback(kokuyoseki_callback);
-		open_kokuyoseki();
+	set_kokuyoseki_callback(kokuyoseki_callback);
+	open_kokuyoseki();
 
-		pthread_t transmit_thread;
-		pthread_create(&transmit_thread, NULL, transmit_thread_func,
-				(void*) NULL);
+	pthread_t transmit_thread;
+	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
 
-		pthread_t recieve_thread;
-		pthread_create(&recieve_thread, NULL, recieve_thread_func,
-				(void*) NULL);
-	}
+	pthread_t recieve_thread;
+	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
+}
 }
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
-	init();
-	lg_plugin_host = plugin_host;
+init();
+lg_plugin_host = plugin_host;
 
-	PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
-	strcpy(plugin->name, PLUGIN_NAME);
-	plugin->release = release;
-	plugin->command_handler = command_handler;
-	plugin->init_options = init_options;
-	plugin->save_options = save_options;
-	plugin->user_data = plugin;
+PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
+strcpy(plugin->name, PLUGIN_NAME);
+plugin->release = release;
+plugin->command_handler = command_handler;
+plugin->init_options = init_options;
+plugin->save_options = save_options;
+plugin->user_data = plugin;
 
-	*_plugin = plugin;
+*_plugin = plugin;
 }
