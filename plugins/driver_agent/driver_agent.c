@@ -238,7 +238,7 @@ void *transmit_thread_func(void* arg) {
 						* (pitch / 180); // z
 				lg_delta_pid_target[2][0] = sub_angle(yaw, last_yaw); // delta yaw
 
-				timersub(&delta_pitch_time[0], &delta_pitch_time[1], &diff);
+				timersub(&lg_delta_pid_time[0], &lg_delta_pid_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
 
@@ -246,7 +246,8 @@ void *transmit_thread_func(void* arg) {
 					float p_value = lg_p_gain
 							* (lg_delta_pid_target[k][0]
 									- lg_delta_pid_target[k][1]);
-					float i_value = lg_i_gain * lg_delta_pid_target[k][0] * diff_sec;
+					float i_value = lg_i_gain * lg_delta_pid_target[k][0]
+							* diff_sec;
 					float d_value = lg_d_gain
 							* (lg_delta_pid_target[k][0]
 									- 2 * lg_delta_pid_target[k][1]
@@ -295,30 +296,30 @@ void *transmit_thread_func(void* arg) {
 					}
 					lg_motor_value[i] = value;
 				}
-			}
-			if (1) {
-				printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f", yaw,
-						pitch, lg_pid_value[0], delta_pid_value[0]);
+				if (1) {
+					printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f",
+							yaw, pitch, lg_pid_value[0], delta_pid_value[0]);
+					for (int i = 0; i < MOTOR_NUM; i++) {
+						printf(", m%d=%d", i, lg_motor_value[i]);
+					}
+					printf("\n");
+				} // end of pid control
+			} else {
 				for (int i = 0; i < MOTOR_NUM; i++) {
-					printf(", m%d=%d", i, lg_motor_value[i]);
+					float value = lg_thrust;
+					float diff = value - lg_motor_value[i];
+					int max_diff = 10;
+					if (abs(diff) > max_diff) {
+						diff = (diff > 0) ? max_diff : -max_diff;
+					}
+					value = lg_motor_value[i] + diff;
+					if (value * lg_motor_value[i] < 0) {
+						value = 0;
+					}
+					lg_motor_value[i] = value;
 				}
-				printf("\n");
 			}
-		} else {
-			for (int i = 0; i < MOTOR_NUM; i++) {
-				float value = lg_thrust;
-				float diff = value - lg_motor_value[i];
-				int max_diff = 10;
-				if (abs(diff) > max_diff) {
-					diff = (diff > 0) ? max_diff : -max_diff;
-				}
-				value = lg_motor_value[i] + diff;
-				if (value * lg_motor_value[i] < 0) {
-					value = 0;
-				}
-				lg_motor_value[i] = value;
-			}
-		}
+		} // end of !low_motor_control
 	}
 	//kokuyoseki func
 	if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
