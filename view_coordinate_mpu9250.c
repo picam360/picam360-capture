@@ -4,6 +4,9 @@
 
 #include "MotionSensor.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 static float lg_compass_min[3] = { };
 static float lg_compass_max[3] = { };
 static float lg_compass[3];
@@ -13,6 +16,19 @@ void *threadFunc(void *data) {
 
 	do {
 		ms_update();
+
+		{//calibration
+			float bias[3];
+			float gain[3];
+			for (int i = 0; i < 3; i++) {
+				lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+				bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
+				gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
+				lg_compass[i] = (compass[i] + bias[i])
+						/ (gain[i] == 0 ? 1 : gain[i]);
+			}
+		}
 
 		usleep(5000);
 	} while (1);
@@ -48,15 +64,6 @@ float *get_quatanion_mpu9250() {
 }
 
 float *get_compass_mpu9250() {
-	float bias[3];
-	float gain[3];
-	for (int i = 0; i < 3; i++) {
-		lg_compass_min[i] = MIN(lg_compass_min[i]);
-		lg_compass_max[i] = MAX(lg_compass_max[i]);
-		bias = (lg_compass_min[i] + lg_compass_max[i]) / 2;
-		gain = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-		lg_compass[i] = (compass[i] + bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
-	}
 	return lg_compass;
 }
 
