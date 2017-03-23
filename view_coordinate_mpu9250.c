@@ -1,14 +1,17 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <limits.h>
 
 #include "MotionSensor.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static float lg_compass_min[3] = { };
-static float lg_compass_max[3] = { };
+static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
+//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
+static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
+//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[3];
 static float lg_quat[4];
 
@@ -17,7 +20,8 @@ void *threadFunc(void *data) {
 	do {
 		ms_update();
 
-		{//calibration
+		{ //calibration
+			float calib[3];
 			float bias[3];
 			float gain[3];
 			for (int i = 0; i < 3; i++) {
@@ -25,9 +29,18 @@ void *threadFunc(void *data) {
 				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
 				bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
 				gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-				lg_compass[i] = (compass[i] + bias[i])
+				calib[i] = (compass[i] + bias[i])
 						/ (gain[i] == 0 ? 1 : gain[i]);
 			}
+			float norm = sqrt(
+					calib[0] * calib[0] + calib[1] * calib[1]
+							+ calib[2] * calib[2]);
+			for (int i = 0; i < 3; i++) {
+				calib[i] /= norm;
+			}
+			lg_compass[0] = calib[1];
+			lg_compass[1] = calib[0];
+			lg_compass[2] = calib[2];
 		}
 
 		usleep(5000);
