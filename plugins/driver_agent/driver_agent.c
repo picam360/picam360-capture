@@ -203,10 +203,9 @@ static void *recieve_thread_func(void* arg) {
 					if (q_str) {
 						float temperature;
 						sscanf(q_str, "<temperature v=\"%f\" />", &temperature);
-						lg_camera_temperature = temperature;
 
 						lg_plugin_host->set_camera_temperature(
-								lg_camera_temperature);
+								temperature);
 					}
 
 					xmp = false;
