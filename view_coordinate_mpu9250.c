@@ -15,7 +15,8 @@ static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[4] = { };
 static float lg_quat[4] = { };
-static float lg_north = INT_MAX;
+static float lg_north = 0;
+static int lg_north_count = 0;
 
 void *threadFunc(void *data) {
 
@@ -67,11 +68,12 @@ void *threadFunc(void *data) {
 
 			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
 
-			if (lg_north == INT_MAX) {
-				lg_north = north;
+			lg_north = (lg_north * lg_north_count + north)
+					/ (lg_north_count + 1);
+			lg_north_count++;
+			if (lg_north_count > 100) {
+				lg_north_count = 100;
 			}
-			float gain = 0.01;
-			lg_north = lg_north * (1.0 - gain) + north * gain;
 		}
 
 		usleep(5000);
