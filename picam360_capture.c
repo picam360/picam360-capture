@@ -1411,11 +1411,13 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
 	float view_matrix[16];
+	float view_north_matrix[16];
 	float world_matrix[16];
 	mat4_identity(unif_matrix);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
 	mat4_identity(view_matrix);
+	mat4_identity(view_north_matrix);
 	mat4_identity(world_matrix);
 
 	// Rc : camera orientation
@@ -1456,7 +1458,10 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
 		break;
 	}
-	float yaw_view_north = state->plugin_host.get_view_north();
+
+	// Rvn
+	mat4_rotateY(view_north_matrix, view_north_matrix,
+			state->plugin_host.get_view_north() * M_PI / 180);
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially
 	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
@@ -1465,6 +1470,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	//RcRv(Rc^-1)RcRw
 	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
 	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
+	mat4_multiply(unif_matrix, unif_matrix, view_north_matrix); // RvnRvRw
 	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRvRw
 
 	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
