@@ -208,7 +208,7 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
 			if (lg_pid_enabled) {
-				//(Rt-1RcRt)*(Rt-1)*vtg, target coordinate will be converted into camera coordinate
+				//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
 				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
 				float unif_matrix[16];
 				float camera_matrix[16];
@@ -219,8 +219,8 @@ void *transmit_thread_func(void* arg) {
 				mat4_fromQuat(camera_matrix, lg_camera_quatanion);
 				mat4_fromQuat(target_matrix, lg_target_quatanion);
 				mat4_invert(target_matrix, target_matrix);
-				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // Rc
-				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1Rc
+				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1
+				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRt-1
 
 				mat4_transpose(vtg, vtg);
 				mat4_multiply(vtg, vtg, unif_matrix);

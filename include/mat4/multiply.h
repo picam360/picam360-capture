@@ -10,7 +10,7 @@
  * @param {mat4} out the receiving matrix
  * @param {mat4} a the first operand
  * @param {mat4} b the second operand
- * @returns {mat4} out
+ * @returns {mat4} out=ba
  */
 mat4 mat4_multiply(mat4 out, mat4 a, mat4 b) {
     float a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
