@@ -67,7 +67,7 @@ int ms_open() {
 		return -1;
 	}
 	printf("Setting MPU sensors...\n");
-	if (mpu_set_sensors(INV_XYZ_GYRO|INV_XYZ_ACCEL)!=0) {
+	if (mpu_set_sensors(INV_XYZ_GYRO|INV_XYZ_ACCEL|INV_XYZ_COMPASS)!=0) {
 		printf("Failed to set sensors!\n");
 		return -1;
 	}
@@ -84,7 +84,7 @@ int ms_open() {
 	// verify connection
 	printf("Powering up MPU...\n");
 	mpu_get_power_state(&devStatus);
-	printf(devStatus ? "MPU6050 connection successful\n" : "MPU6050 connection failed %u\n",devStatus);
+	printf(devStatus ? "MPU9250 connection successful\n" : "MPU9250 connection failed %u\n",devStatus);
 
 	//fifo config
 	printf("Setting MPU fifo...\n");

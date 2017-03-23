@@ -2,7 +2,7 @@ CC=gcc
 CXX=g++
 AR=ar
 CFLAGS=-Wall -g -O2
-CXX_OPTS=-c -DMPU6500 -DMPU_DEBUGOFF -I../libs/
+CXX_OPTS=-c -DMPU9250 -DMPU_DEBUGOFF -I../libs/
 
 OBJECTS=sensor.o inv_mpu_lib/inv_mpu.o inv_mpu_lib/inv_mpu_dmp_motion_driver.o
 
