@@ -1418,11 +1418,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	switch (frame->view_coordinate_mode) {
 	case MPU9250:
 		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
-		mat4_transpose(view_matrix, view_matrix);
+		mat4_invert(view_matrix, view_matrix);
 		break;
 	case OCULUS_RIFT:
 		mat4_fromQuat(view_matrix, get_quatanion());
-		mat4_transpose(view_matrix, view_matrix);
+		mat4_invert(view_matrix, view_matrix);
 		break;
 	case MANUAL:
 		//euler Y(yaw)X(pitch)Z(roll)
@@ -1430,6 +1430,19 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateX(view_matrix, view_matrix, frame->view_pitch);
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
 		break;
+	}
+	float yaw_view_north = 0;
+	{
+		float *compass = state->get_view_compass();
+		float compass_mat[16] = { }; // looking at ground
+		if (compass) {
+			memcpy(compass_mat, compass, sizeof(float) * 4);
+			mat4_transpose(compass_mat, compass_mat);
+			mat4_multiply(compass_mat, compass_mat, view_matrix);
+			mat4_transpose(compass_mat, compass_mat);
+			yaw_view_north =
+					-atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+		}
 	}
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially
