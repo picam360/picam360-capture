@@ -15,6 +15,7 @@ static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[4] = { };
 static float lg_quat[4] = { };
+static float lg_north = INT_MAX;
 
 void *threadFunc(void *data) {
 
@@ -49,6 +50,28 @@ void *threadFunc(void *data) {
 			lg_quat[1] = quatanion[3];	//y : swap y and z
 			lg_quat[2] = -quatanion[2];	//z : swap y and z
 			lg_quat[3] = quatanion[0];	//w
+		}
+		{ //north
+			float north = 0;
+
+			float view_matrix[16];
+			mat4_fromQuat(view_matrix, lg_quat);
+			mat4_invert(view_matrix, view_matrix);
+
+			float compass_mat[16] = { };
+			memcpy(compass_mat, lg_compass, sizeof(float) * 4);
+
+			mat4_transpose(compass_mat, compass_mat);
+			mat4_multiply(compass_mat, compass_mat, view_matrix);
+			mat4_transpose(compass_mat, compass_mat);
+
+			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+
+			if (lg_north == INT_MAX) {
+				lg_north = north;
+			}
+			float gain = 0.01;
+			lg_north = lg_north * (1.0 - gain) + north * gain;
 		}
 
 		usleep(5000);
