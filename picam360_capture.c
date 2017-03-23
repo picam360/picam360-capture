@@ -1456,7 +1456,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
 		break;
 	}
-	float yaw_view_north = tate->plugin_host.get_view_north();
+	float yaw_view_north = state->plugin_host.get_view_north();
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially
 	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
