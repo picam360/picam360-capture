@@ -39,8 +39,8 @@ void *threadFunc(void *data) {
 				calib[i] /= norm;
 			}
 			lg_compass[0] = calib[1];
-			lg_compass[1] = calib[0];
-			lg_compass[2] = calib[2];
+			lg_compass[1] = -calib[0];
+			lg_compass[2] = -calib[2];
 			lg_compass[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
@@ -84,4 +84,15 @@ float *get_compass_mpu9250() {
 
 float get_temperature_c_mpu9250() {
 	return (temp - 32) * 5 / 9;
+}
+
+float get_north_mpu9250() {
+	float yaw = 0;
+	float compass_mat[16] = { }; // looking at ground
+	memcpy(compass_mat, lg_compass, sizeof(float) * 4);
+	mat4_transpose(compass_mat, compass_mat);
+	mat4_multiply(compass_mat, compass_mat, view_matrix);
+	mat4_transpose(compass_mat, compass_mat);
+	yaw = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+	return yaw;
 }

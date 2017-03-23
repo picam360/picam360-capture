@@ -1138,6 +1138,21 @@ static float get_view_temperature() {
 static void set_view_temperature(float *value) {
 	//TODO
 }
+static float get_view_north() {
+	switch (state->default_view_coordinate_mode) {
+	case MPU9250:
+		return get_north_mpu9250();
+		break;
+	case OCULUS_RIFT:
+		break;
+	case MANUAL:
+		break;
+	}
+	return 0;
+}
+static void set_view_north(float *value) {
+	//TODO
+}
 
 static float *get_camera_quatanion() {
 	return state->camera_quatanion;
@@ -1161,6 +1176,12 @@ static float get_camera_temperature() {
 static void set_camera_temperature(float *value) {
 	//TODO
 }
+static float get_camera_north() {
+	return 0;
+}
+static void set_camera_north(float *value) {
+	//TODO
+}
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
@@ -1170,6 +1191,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_view_compass = set_view_compass;
 		state->plugin_host.get_view_temperature = get_view_temperature;
 		state->plugin_host.set_view_temperature = set_view_temperature;
+		state->plugin_host.get_view_north = get_view_north;
+		state->plugin_host.set_view_north = set_view_north;
 
 		state->plugin_host.get_camera_quatanion = get_camera_quatanion;
 		state->plugin_host.set_camera_quatanion = set_camera_quatanion;
@@ -1177,6 +1200,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_camera_compass = set_camera_compass;
 		state->plugin_host.get_camera_temperature = get_camera_temperature;
 		state->plugin_host.set_camera_temperature = set_camera_temperature;
+		state->plugin_host.get_camera_north = get_camera_north;
+		state->plugin_host.set_camera_north = set_camera_north;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
@@ -1431,19 +1456,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
 		break;
 	}
-	float yaw_view_north = 0;
-	{
-		float *compass = state->get_view_compass();
-		float compass_mat[16] = { }; // looking at ground
-		if (compass) {
-			memcpy(compass_mat, compass, sizeof(float) * 4);
-			mat4_transpose(compass_mat, compass_mat);
-			mat4_multiply(compass_mat, compass_mat, view_matrix);
-			mat4_transpose(compass_mat, compass_mat);
-			yaw_view_north =
-					-atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
-		}
-	}
+	float yaw_view_north = tate->plugin_host.get_view_north();
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially
 	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
