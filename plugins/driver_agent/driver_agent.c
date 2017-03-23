@@ -233,10 +233,10 @@ void *transmit_thread_func(void* arg) {
 				static float last_yaw = 0;
 				lg_delta_pid_time[0] = time;
 				lg_delta_pid_target[0][0] = cos(yaw * M_PI / 180)
-						* (pitch / 180); // x
+						* (pitch / 180); // x [-1:1]
 				lg_delta_pid_target[1][0] = sin(yaw * M_PI / 180)
-						* (pitch / 180); // z
-				lg_delta_pid_target[2][0] = sub_angle(yaw, last_yaw); // delta yaw
+						* (pitch / 180); // z [-1:1]
+				lg_delta_pid_target[2][0] = sub_angle(yaw, last_yaw) / 180; // delta yaw [-1:1]
 
 				timersub(&lg_delta_pid_time[0], &lg_delta_pid_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
@@ -254,7 +254,7 @@ void *transmit_thread_func(void* arg) {
 									+ lg_delta_pid_target[k][2]) / diff_sec;
 					float delta_value = p_value + i_value + d_value;
 					lg_pid_value[k] += delta_value;
-					lg_pid_value[k] = MIN(MAX((lg_pid_value[k], -50), 50);
+					lg_pid_value[k] = MIN(MAX(lg_pid_value[k], -2500), 2500);
 				}
 
 				//increment
@@ -272,14 +272,16 @@ void *transmit_thread_func(void* arg) {
 				// 3 - 2
 				float motor_pid_gain[3][MOTOR_NUM] = { //
 						//
-								{ -1, 1, 1, -1 },				// x
-								{ 1, 1, -1, -1 },				// z
+								{ 1, -1, -1, 1 },				// x
+								{ -1, -1, 1, 1 },				// z
 								{ -1, 1, -1, 1 }				// delta yaw
 						};
 				float motor_pid_value[MOTOR_NUM] = { };
 				for (int k = 0; k < 3; k++) {
 					for (int i = 0; i < MOTOR_NUM; i++) {
-						motor_pid_value[i] += lg_pid_value[k]
+						float power_calib = (lg_pid_value[k] > 0 ? 1 : -1)
+								* sqrt(abs(lg_pid_value[k]));
+						motor_pid_value[i] += power_calib
 								* motor_pid_gain[k][i];
 					}
 				}
@@ -299,16 +301,13 @@ void *transmit_thread_func(void* arg) {
 				if (1) {
 					printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f",
 							yaw, pitch, lg_pid_value[0],
-							lg_delta_pid_target[0]);
+							lg_delta_pid_target[0][0]);
 					for (int i = 0; i < MOTOR_NUM; i++) {
 						printf(", m%d=%d", i, lg_motor_value[i]);
 					}
 					printf("\n");
 				} // end of pid control
 			} else {
-				for (int k = 0; k < 3; k++) {
-					lg_pid_value[k] = 0;
-				}
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust;
 					float diff = value - lg_motor_value[i];
@@ -340,6 +339,10 @@ void *transmit_thread_func(void* arg) {
 					printf("thrust off\n");
 					break;
 				case 3:
+					lg_thrust = 0;
+					for (int k = 0; k < 3; k++) {
+						lg_pid_value[k] = 0;
+					}
 					if (lg_pid_enabled) {
 						lg_pid_enabled = false;
 						printf("pid off\n");
