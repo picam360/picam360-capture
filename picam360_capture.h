@@ -154,6 +154,9 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_yaw; // y axis
 	float camera_roll; // z axis
 	float camera_quatanion[4];
+	float camera_compass[4];
+	float camera_temperature;
+	float camera_north;
 	bool camera_coordinate_from_device;
 	enum VIEW_COODINATE_MODE default_view_coordinate_mode;
 

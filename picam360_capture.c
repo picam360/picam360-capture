@@ -1135,7 +1135,7 @@ static float get_view_temperature() {
 	}
 	return 0;
 }
-static void set_view_temperature(float *value) {
+static void set_view_temperature(float value) {
 	//TODO
 }
 static float get_view_north() {
@@ -1150,7 +1150,7 @@ static float get_view_north() {
 	}
 	return 0;
 }
-static void set_view_north(float *value) {
+static void set_view_north(float value) {
 	//TODO
 }
 
@@ -1158,29 +1158,30 @@ static float *get_camera_quatanion() {
 	return state->camera_quatanion;
 }
 static void set_camera_quatanion(float *value) {
-	state->camera_quatanion[0] = value[0];
-	state->camera_quatanion[1] = value[1];
-	state->camera_quatanion[2] = value[2];
-	state->camera_quatanion[3] = value[3];
+	for (int i = 0; i < 4; i++) {
+		state->camera_quatanion[i] = value[i];
+	}
 	state->camera_coordinate_from_device = true;
 }
 static float *get_camera_compass() {
-	return NULL;
+	return state->camera_compass;
 }
 static void set_camera_compass(float *value) {
-	//TODO
+	for (int i = 0; i < 4; i++) {
+		state->camera_compass[i] = value[i];
+	}
 }
 static float get_camera_temperature() {
-	return 0;
+	return state->camera_temperature;
 }
-static void set_camera_temperature(float *value) {
-	//TODO
+static void set_camera_temperature(float value) {
+	return state->camera_temperature;
 }
 static float get_camera_north() {
-	return 0;
+	return state->camera_north;
 }
-static void set_camera_north(float *value) {
-	//TODO
+static void set_camera_north(float value) {
+	state->camera_north = value;
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
@@ -1410,12 +1411,14 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	float unif_matrix[16];
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
+	float camera_north_matrix[16];
 	float view_matrix[16];
 	float view_north_matrix[16];
 	float world_matrix[16];
 	mat4_identity(unif_matrix);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
+	mat4_identity(camera_north_matrix);
 	mat4_identity(view_matrix);
 	mat4_identity(view_north_matrix);
 	mat4_identity(world_matrix);
@@ -1463,6 +1466,10 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_rotateY(view_north_matrix, view_north_matrix,
 			state->plugin_host.get_view_north() * M_PI / 180);
 
+	// Rcn
+	mat4_rotateY(view_north_matrix, view_north_matrix,
+			state->plugin_host.get_camera_north() * M_PI / 180);
+
 	// Rw : view coodinate to world coodinate and view heading to ground initially
 	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
 
@@ -1471,7 +1478,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
 	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
 	mat4_multiply(unif_matrix, unif_matrix, view_north_matrix); // RvnRvRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRvRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRvnRvRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_north_matrix); // RcnRcRvnRvRw
 
 	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
 

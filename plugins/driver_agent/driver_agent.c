@@ -73,6 +73,9 @@ static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
 static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
+static float lg_camera_compass[4] = { 0, 0, 0, 1 };
+static float lg_camera_north = 0;
+static float lg_camera_north_count = 0;
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
 static bool lg_pid_enabled = false;
@@ -136,7 +139,8 @@ static void *recieve_thread_func(void* arg) {
 				if (xmp_idx >= xmp_len) {
 					char *xml = buff_xmp + strlen(buff_xmp) + 1;
 
-					char *q_str = strstr(xml, "<quaternion");
+					char *q_str = NULL;
+					q_str = strstr(xml, "<quaternion");
 					if (q_str) {
 						float quatanion[4];
 						sscanf(q_str,
@@ -151,6 +155,58 @@ static void *recieve_thread_func(void* arg) {
 
 						lg_plugin_host->set_camera_quatanion(
 								lg_camera_quatanion);
+					}
+					q_str = strstr(xml, "<compass");
+					if (q_str) {
+						float compass[4];
+						sscanf(q_str,
+								"<compass w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+								&compass[0], &compass[1], &compass[2],
+								&compass[3]);
+						//convert from mpu coodinate to opengl coodinate
+						lg_camera_compass[0] = compass[1]; //x
+						lg_camera_compass[1] = compass[3]; //y : swap y and z
+						lg_camera_compass[2] = -compass[2]; //z : swap y and z
+						lg_camera_compass[3] = compass[0]; //w
+
+						lg_plugin_host->set_camera_compass(lg_camera_compass);
+
+						{ //north
+							float north = 0;
+
+							float matrix[16];
+							mat4_fromQuat(matrix, lg_camera_quatanion);
+							mat4_invert(matrix, matrix);
+
+							float compass_mat[16] = { };
+							memcpy(compass_mat, lg_camera_compass,
+									sizeof(float) * 4);
+
+							mat4_transpose(compass_mat, compass_mat);
+							mat4_multiply(compass_mat, compass_mat, matrix);
+							mat4_transpose(compass_mat, compass_mat);
+
+							north = -atan2(compass_mat[2], compass_mat[0]) * 180
+									/ M_PI;
+
+							lg_camera_north = (lg_camera_north
+									* lg_camera_north_count + north)
+									/ (lg_camera_north_count + 1);
+							lg_camera_north_count++;
+							if (lg_camera_north_count > 1000) {
+								lg_camera_north_count = 1000;
+							}
+							lg_plugin_host->set_camera_north(lg_camera_north);
+						}
+					}
+					q_str = strstr(xml, "<temperature");
+					if (q_str) {
+						float temperature;
+						sscanf(q_str, "<temperature v=\"%f\" />", &temperature);
+						lg_camera_temperature = temperature;
+
+						lg_plugin_host->set_camera_temperature(
+								lg_camera_temperature);
 					}
 
 					xmp = false;

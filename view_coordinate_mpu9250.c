@@ -71,8 +71,8 @@ void *threadFunc(void *data) {
 			lg_north = (lg_north * lg_north_count + north)
 					/ (lg_north_count + 1);
 			lg_north_count++;
-			if (lg_north_count > 100) {
-				lg_north_count = 100;
+			if (lg_north_count > 1000) {
+				lg_north_count = 1000;
 			}
 		}
 
