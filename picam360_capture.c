@@ -1108,6 +1108,37 @@ static float *get_view_quatanion() {
 static void set_view_quatanion(float *value) {
 	//TODO
 }
+static float *get_view_compass() {
+	switch (state->default_view_coordinate_mode) {
+	case MPU9250:
+		return get_compass_mpu9250();
+		break;
+	case OCULUS_RIFT:
+		break;
+	case MANUAL:
+		break;
+	}
+	return NULL;
+}
+static void set_view_compass(float *value) {
+	//TODO
+}
+static float get_view_temperature() {
+	switch (state->default_view_coordinate_mode) {
+	case MPU9250:
+		return get_temperature_c_mpu9250();
+		break;
+	case OCULUS_RIFT:
+		break;
+	case MANUAL:
+		break;
+	}
+	return 0;
+}
+static void set_view_temperature(float *value) {
+	//TODO
+}
+
 static float *get_camera_quatanion() {
 	return state->camera_quatanion;
 }
@@ -1118,13 +1149,34 @@ static void set_camera_quatanion(float *value) {
 	state->camera_quatanion[3] = value[3];
 	state->camera_coordinate_from_device = true;
 }
+static float *get_camera_compass() {
+	return NULL;
+}
+static void set_camera_compass(float *value) {
+	//TODO
+}
+static float get_camera_temperature() {
+	return 0;
+}
+static void set_camera_temperature(float *value) {
+	//TODO
+}
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
 		state->plugin_host.get_view_quatanion = get_view_quatanion;
 		state->plugin_host.set_view_quatanion = set_view_quatanion;
+		state->plugin_host.get_view_compass = get_view_compass;
+		state->plugin_host.set_view_compass = set_view_compass;
+		state->plugin_host.get_view_temperature = get_view_temperature;
+		state->plugin_host.set_view_temperature = set_view_temperature;
+
 		state->plugin_host.get_camera_quatanion = get_camera_quatanion;
 		state->plugin_host.set_camera_quatanion = set_camera_quatanion;
+		state->plugin_host.get_camera_compass = get_camera_compass;
+		state->plugin_host.set_camera_compass = set_camera_compass;
+		state->plugin_host.get_camera_temperature = get_camera_temperature;
+		state->plugin_host.set_camera_temperature = set_camera_temperature;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };

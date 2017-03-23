@@ -4,7 +4,10 @@
 
 #include "MotionSensor.h"
 
-static float quat[4];
+static float lg_compass_min[3] = { };
+static float lg_compass_max[3] = { };
+static float lg_compass[3];
+static float lg_quat[4];
 
 void *threadFunc(void *data) {
 
@@ -37,9 +40,26 @@ void init_mpu9250() {
 
 float *get_quatanion_mpu9250() {
 	//convert from mpu coodinate to opengl coodinate
-	quat[0] = quatanion[1];//x
-	quat[1] = quatanion[3];//y : swap y and z
-	quat[2] = -quatanion[2];//z : swap y and z
-	quat[3] = quatanion[0];//w
-	return quat;
+	lg_quat[0] = quatanion[1];	//x
+	lg_quat[1] = quatanion[3];	//y : swap y and z
+	lg_quat[2] = -quatanion[2];	//z : swap y and z
+	lg_quat[3] = quatanion[0];	//w
+	return lg_quat;
+}
+
+float *get_compass_mpu9250() {
+	float bias[3];
+	float gain[3];
+	for (int i = 0; i < 3; i++) {
+		lg_compass_min[i] = MIN(lg_compass_min[i]);
+		lg_compass_max[i] = MAX(lg_compass_max[i]);
+		bias = (lg_compass_min[i] + lg_compass_max[i]) / 2;
+		gain = (lg_compass_max[i] - lg_compass_min[i]) / 2;
+		lg_compass[i] = (compass[i] + bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
+	}
+	return lg_compass;
+}
+
+float get_temperature_c_mpu9250() {
+	return (temp - 32) * 5 / 9;
 }
