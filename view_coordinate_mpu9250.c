@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <math.h>
 
 #include "MotionSensor.h"
 
@@ -88,11 +89,19 @@ float get_temperature_c_mpu9250() {
 
 float get_north_mpu9250() {
 	float yaw = 0;
-	float compass_mat[16] = { }; // looking at ground
+
+	float view_matrix[16];
+	mat4_fromQuat(view_matrix, lg_quat);
+	mat4_invert(view_matrix, view_matrix);
+
+	float compass_mat[16] = { };
 	memcpy(compass_mat, lg_compass, sizeof(float) * 4);
+
 	mat4_transpose(compass_mat, compass_mat);
 	mat4_multiply(compass_mat, compass_mat, view_matrix);
 	mat4_transpose(compass_mat, compass_mat);
+
 	yaw = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+
 	return yaw;
 }
