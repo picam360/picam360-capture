@@ -1204,6 +1204,17 @@ int main(int argc, char *argv[]) {
 			} else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
 				state->default_view_coordinate_mode = OCULUS_RIFT;
 			}
+			switch (state->default_view_coordinate_mode) {
+			case MPU9250:
+				init_mpu9250();
+				break;
+			case OCULUS_RIFT:
+				init_device();
+				break;
+			case MANUAL:
+			default:
+				break;
+			}
 			break;
 		default:
 			/* '?' */
