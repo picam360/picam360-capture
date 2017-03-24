@@ -159,15 +159,14 @@ static void *recieve_thread_func(void* arg) {
 					q_str = strstr(xml, "<compass");
 					if (q_str) {
 						float compass[4];
-						sscanf(q_str,
-								"<compass w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+						sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
 								&compass[0], &compass[1], &compass[2],
 								&compass[3]);
 						//convert from mpu coodinate to opengl coodinate
-						lg_camera_compass[0] = compass[1]; //x
-						lg_camera_compass[1] = compass[3]; //y : swap y and z
-						lg_camera_compass[2] = -compass[2]; //z : swap y and z
-						lg_camera_compass[3] = compass[0]; //w
+						lg_camera_compass[0] = compass[1];
+						lg_camera_compass[1] = -compass[0];
+						lg_camera_compass[2] = -compass[2];
+						lg_camera_compass[3] = 1.0;
 
 						lg_plugin_host->set_camera_compass(lg_camera_compass);
 
@@ -205,7 +204,7 @@ static void *recieve_thread_func(void* arg) {
 						sscanf(q_str, "<temperature v=\"%f\" />", &temperature);
 
 						lg_plugin_host->set_camera_temperature(
-								temperature);
+								(temperature - 32) * 5 / 9);
 					}
 
 					xmp = false;
