@@ -182,27 +182,27 @@ static void init_text() {
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
 	vHandle = glCreateShader(GL_VERTEX_SHADER);
-	length = strlen(vert);
-	glShaderSource(vHandle, 1, (const char **) &vert, &length);
+	length = strlen(freetype_vert);
+	glShaderSource(vHandle, 1, (const char **) &freetype_vert, &length);
 	glCompileShader(vHandle);
 	glGetShaderiv(vHandle, GL_COMPILE_STATUS, &compile_ok);
 	if (compile_ok == GL_FALSE) {
 		fprintf(stderr, "vert:");
 		print_log(vHandle);
 		glDeleteShader(vHandle);
-		return 0;
+		return;
 	}
 
 	fHandle = glCreateShader(GL_FRAGMENT_SHADER);
-	length = strlen(frag);
-	glShaderSource(fHandle, 1, (const char **) &frag, &length);
+	length = strlen(freetype_frag);
+	glShaderSource(fHandle, 1, (const char **) &freetype_frag, &length);
 	glCompileShader(fHandle);
 	glGetShaderiv(fHandle, GL_COMPILE_STATUS, &compile_ok);
 	if (compile_ok == GL_FALSE) {
 		fprintf(stderr, "frag:");
 		print_log(fHandle);
 		glDeleteShader(fHandle);
-		return 0;
+		return;
 	}
 
 	programHandle = glCreateProgram();
