@@ -1126,7 +1126,7 @@ static void set_view_compass(float *value) {
 static float get_view_temperature() {
 	switch (state->default_view_coordinate_mode) {
 	case MPU9250:
-		return get_temperature_c_mpu9250();
+		return get_temperature_mpu9250();
 		break;
 	case OCULUS_RIFT:
 		break;

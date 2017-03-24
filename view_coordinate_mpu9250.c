@@ -108,8 +108,8 @@ float *get_compass_mpu9250() {
 	return lg_compass;
 }
 
-float get_temperature_c_mpu9250() {
-	return (temp - 32) * 5 / 9;
+float get_temperature_mpu9250() {
+	return temp;
 }
 
 float get_north_mpu9250() {
