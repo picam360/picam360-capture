@@ -55,7 +55,7 @@ build/%.o: test/%.c
 	@echo " CC $<"; $(CC) $(CFLAGS) -MD -MF $(@:.o=.deps) -c -o $@ $<
 
 clean:
-	@echo " Cleaning..."; $(RM) -r build $(TARGET)
+	@echo " Cleaning..."; $(RM) -r build $(TARGET) $(LIB)
 
 -include $(DEPS)
 
