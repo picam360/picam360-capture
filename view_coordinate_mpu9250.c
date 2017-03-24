@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <math.h>
+#include <string.h>
 
 #include "MotionSensor.h"
 
