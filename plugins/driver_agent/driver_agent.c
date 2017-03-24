@@ -158,10 +158,9 @@ static void *recieve_thread_func(void* arg) {
 					}
 					q_str = strstr(xml, "<compass");
 					if (q_str) {
-						float compass[4];
+						float compass[3];
 						sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-								&compass[0], &compass[1], &compass[2],
-								&compass[3]);
+								&compass[0], &compass[1], &compass[2]);
 						//convert from mpu coodinate to opengl coodinate
 						lg_camera_compass[0] = compass[1];
 						lg_camera_compass[1] = -compass[0];
