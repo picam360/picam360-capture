@@ -166,6 +166,11 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 }
 static void init_text() {
 	int vHandle, fHandle, length, compile_ok;
+
+	// all the shaders have at least texture unit 0 active so
+	// activate it now and leave it active
+	glActiveTexture(GL_TEXTURE0);
+
 	/* Texture atlas to store individual glyphs */
 	atlas = texture_atlas_new(1024, 1024, 1);
 
@@ -188,7 +193,7 @@ static void init_text() {
 	glGetShaderiv(vHandle, GL_COMPILE_STATUS, &compile_ok);
 	if (compile_ok == GL_FALSE) {
 		fprintf(stderr, "vert:");
-		print_log(vHandle);
+		//print_log(vHandle);
 		glDeleteShader(vHandle);
 		return;
 	}
@@ -200,7 +205,7 @@ static void init_text() {
 	glGetShaderiv(fHandle, GL_COMPILE_STATUS, &compile_ok);
 	if (compile_ok == GL_FALSE) {
 		fprintf(stderr, "frag:");
-		print_log(fHandle);
+		//print_log(fHandle);
 		glDeleteShader(fHandle);
 		return;
 	}
@@ -215,7 +220,7 @@ static void init_text() {
 	glGetProgramiv(programHandle, GL_LINK_STATUS, &compile_ok);
 	if (!compile_ok) {
 		printf("glLinkProgram:");
-		print_log(programHandle);
+		//print_log(programHandle);
 		printf("\n");
 	}
 
@@ -1715,6 +1720,50 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		glViewport(offset_x, offset_y, (GLsizei) frame->width,
 				(GLsizei) frame->height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+	}
+
+	{
+		vector_t * vVector = vector_new(sizeof(GLfloat));
+
+		vec2 pen = { -400, 150 };
+		vec4 color = { .2, 0.2, 0.2, 1 };
+
+		add_text(vVector, font1, L"freetypeGlesRpi", &color, &pen);
+
+		// Use the program object
+		glUseProgram(programHandle);
+		GLfloat mvp[] = { //
+				//
+						1.0, 0, 0, 0, //
+						0, 1.0, 0, 0, //
+						0, 0, 1.0, 0, //
+						0, 0, 0, 1.0 //
+				};
+		glUniformMatrix4fv(mvpHandle, 1, GL_FALSE, (GLfloat *) mvp);
+
+		// Load the vertex data
+		glVertexAttribPointer(vertexHandle, 3, GL_FLOAT, GL_FALSE,
+				9 * sizeof(GLfloat), vVector->items);
+		glEnableVertexAttribArray(vertexHandle);
+		glVertexAttribPointer(texHandle, 2, GL_FLOAT, GL_FALSE,
+				9 * sizeof(GLfloat), (GLfloat*) vVector->items + 3);
+		glEnableVertexAttribArray(texHandle);
+		glVertexAttribPointer(colorHandle, 4, GL_FLOAT, GL_FALSE,
+				9 * sizeof(GLfloat), (GLfloat*) vVector->items + 5);
+		glEnableVertexAttribArray(colorHandle);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, atlas->id);
+
+		glUniform1i(samplerHandle, 0);
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_CULL_FACE);
+
+		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
+
+		vector_delete(vVector);
 	}
 
 	eglSwapBuffers(state->display, state->surface);
