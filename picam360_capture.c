@@ -174,8 +174,10 @@ static void init_freetypeGles() {
 	/* Texture atlas to store individual glyphs */
 	atlas = texture_atlas_new(1024, 1024, 1);
 
-	font1 = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf", 50);
-	font2 = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/ObelixPro.ttf", 70);
+	font1 = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf",
+			50);
+	font2 = texture_font_new(atlas,
+			"./libs/freetypeGlesRpi/fonts/ObelixPro.ttf", 70);
 
 	/* Cache some glyphs to speed things up */
 	texture_font_load_glyphs(font1, L" !\"#$%&'()*+,-./0123456789:;<=>?"
@@ -1731,14 +1733,22 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		vec2 pen = { -400, 150 };
 		vec4 color = { .2, 0.2, 0.2, 1 };
 
-		add_text(vVector, font1, L"freetypeGlesRpi", &color, &pen);
+		wchar_t disp[256];
+		swprintf(disp, 60, L"Temp %.1f degC",
+				state->plugin_host.get_view_temperature());
+
+		add_text(vVector, font1, disp, &color, &pen);
 
 		// Use the program object
 		glUseProgram(programHandle);
+
+		float a = 1.0f / state->screen_width;
+		float b = 1.0f / state->screen_height;
+
 		GLfloat mvp[] = { //
 				//
-						1.0, 0, 0, 0, //
-						0, 1.0, 0, 0, //
+						a, 0, 0, 0, //
+						0, b, 0, 0, //
 						0, 0, 1.0, 0, //
 						0, 0, 0, 1.0 //
 				};
