@@ -45,9 +45,6 @@ $(LIB): $(OBJ)
         
 #$(TARGET): $(OBJ) $(TESTOBJ)
 #	@echo " Linking...";  $(CC) $^ -o $(TARGET) $(LIBS)
-
-$(LIB): $(OBJ)
-	$(AR) rcs $(LIB) $(OBJ)
 	
 build/%.o: src/%.c
 	@mkdir -p build
