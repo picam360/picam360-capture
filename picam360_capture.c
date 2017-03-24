@@ -164,7 +164,7 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 		}
 	}
 }
-static void init_text() {
+static void init_freetypeGles() {
 	int vHandle, fHandle, length, compile_ok;
 
 	// all the shaders have at least texture unit 0 active so
@@ -174,8 +174,8 @@ static void init_text() {
 	/* Texture atlas to store individual glyphs */
 	atlas = texture_atlas_new(1024, 1024, 1);
 
-	font1 = texture_font_new(atlas, "./fonts/custom.ttf", 50);
-	font2 = texture_font_new(atlas, "./fonts/ObelixPro.ttf", 70);
+	font1 = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf", 50);
+	font2 = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/ObelixPro.ttf", 70);
 
 	/* Cache some glyphs to speed things up */
 	texture_font_load_glyphs(font1, L" !\"#$%&'()*+,-./0123456789:;<=>?"
@@ -1448,6 +1448,9 @@ int main(int argc, char *argv[]) {
 
 	// Start OGLES
 	init_ogl(state);
+
+	//freetypeGles
+	init_freetypeGles();
 
 	//frame id=0
 	if (frame_param[0]) {
