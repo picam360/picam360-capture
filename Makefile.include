@@ -14,7 +14,8 @@ LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/ -lstdc++ \
 
 INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads \
 		-I$(SDKSTAGE)/opt/vc/include/interface/vmcs_host/linux -I./ -I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient \
-		-I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont -I./include
+		-I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont -I./include \
+		-I./libs/freetypeGlesRpi/src
 
 all: $(BIN) $(LIB)
 
@@ -25,6 +26,9 @@ MotionSensor/libMotionSensor.a:
 libs/libI2Cdev.a:
 	$(MAKE) -C libs/I2Cdev
 
+libs/freetypeGlesRpi/libFreetypeGlesRpi.a:
+	$(MAKE) -C libs/freetypeGlesRpi
+	
 %.o: %.c
 	@rm -f $@ 
 	$(CC) -std=gnu11 $(CFLAGS) $(INCLUDES) -g -c $< -o $@ -Wno-deprecated-declarations

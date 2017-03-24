@@ -12,6 +12,9 @@ PLATFORM=rpi_noX
 
 ####
 
+CC=gcc
+AR=ar
+
 ifeq ($(PLATFORM),xorg)
     FLAGS= -D__FOR_XORG__ -ggdb -c  `pkg-config libpng --cflags` `pkg-config freetype2 --cflags` -Isrc -Itest
     LIBS=-lX11 -lEGL -lGLESv2 `pkg-config libpng --libs` `pkg-config freetype2 --libs` -lm
@@ -29,7 +32,7 @@ ifeq ($(PLATFORM),rpi_noX)
     LIBS=-lGLESv2 -lEGL -lm -lbcm_host -lfreetype -L/opt/vc/lib `pkg-config libpng --libs`
 endif
 
-LIB=freetypeGlesRpi.a
+LIB=libFreetypeGlesRpi.a
 TARGET=testFreetypeGlesPi
 
 CFLAGS += $(FLAGS)
@@ -37,8 +40,11 @@ CFLAGS += $(FLAGS)
 OBJ=$(shell find src/*.c | sed 's/\(.*\.\)c/\1o/g' | sed 's/src\//build\//g')  
 TESTOBJ=$(shell find test/*.c | sed 's/\(.*\.\)c/\1o/g' | sed 's/test\//build\//g')  
 
-$(TARGET): $(OBJ) $(TESTOBJ)
-	@echo " Linking...";  $(CC) $^ -o $(TARGET) $(LIBS)
+$(LIB): $(OBJ)
+        @echo " Linking...a";  $(AR) rcs $(LIB) $(OBJ)
+        
+#$(TARGET): $(OBJ) $(TESTOBJ)
+#	@echo " Linking...";  $(CC) $^ -o $(TARGET) $(LIBS)
 
 $(LIB): $(OBJ)
 	$(AR) rcs $(LIB) $(OBJ)
