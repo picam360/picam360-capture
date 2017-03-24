@@ -14,7 +14,7 @@
  * @param {number} far Far bound of the frustum
  * @returns {mat4} out
  */
-mat4 mat4_perspective(mat4 out, float fovy, float aspect, float near, float far) {
+static mat4 mat4_perspective(mat4 out, float fovy, float aspect, float near, float far) {
     float f = 1.0 / tanf(fovy / 2),
         nf = 1 / (near - far);
     out[0] = f / aspect;

@@ -12,7 +12,7 @@
  * @param {vec3} v vector to translate by
  * @returns {mat4} out
  */
-mat4 mat4_translate(mat4 out, mat4 a, float v[3]) {
+static mat4 mat4_translate(mat4 out, mat4 a, float v[3]) {
     float x = v[0], y = v[1], z = v[2],
         a00, a01, a02, a03,
         a10, a11, a12, a13,

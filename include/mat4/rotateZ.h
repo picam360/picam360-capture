@@ -12,7 +12,7 @@
  * @param {Number} rad the angle to rotate the matrix by
  * @returns {mat4} out
  */
-mat4 mat4_rotateZ(mat4 out, mat4 a, float rad) {
+static mat4 mat4_rotateZ(mat4 out, mat4 a, float rad) {
     float s = sinf(rad),
         c = cosf(rad),
         a00 = a[0],

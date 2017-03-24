@@ -14,7 +14,7 @@
  * @param {vec3} up vec3 pointing up
  * @returns {mat4} out
  */
-mat4 mat4_lookAtf(mat4 out, float eye[3], float center[3], float up[3]) {
+static mat4 mat4_lookAtf(mat4 out, float eye[3], float center[3], float up[3]) {
     float x0, x1, x2, y0, y1, y2, z0, z1, z2, len,
         eyex = eye[0],
         eyey = eye[1],

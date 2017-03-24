@@ -11,7 +11,7 @@
  * @param {mat4} a the source matrix
  * @returns {mat4} out
  */
-mat4 mat4_copy(mat4 out, mat4 a) {
+static mat4 mat4_copy(mat4 out, mat4 a) {
     out[0] = a[0];
     out[1] = a[1];
     out[2] = a[2];

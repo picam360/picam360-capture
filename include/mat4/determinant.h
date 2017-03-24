@@ -10,7 +10,7 @@
  * @param {mat4} a the source matrix
  * @returns {Number} determinant of a
  */
-float mat4_determinant(mat4 a) {
+static float mat4_determinant(mat4 a) {
     float a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
         a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
         a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
