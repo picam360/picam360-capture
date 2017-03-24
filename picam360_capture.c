@@ -129,7 +129,6 @@ static char *freetype_frag = //
 				"    gl_FragColor = vec4(v_color.xyz, v_color.a * texture2D(texture_uniform, v_frag_uv).a);\n"
 				"}\n";
 static int programHandle;
-static int vertexHandle, texHandle, samplerHandle, colorHandle, mvpHandle;
 // --------------------------------------------------------------- add_text ---
 void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 		vec4 * color, vec2 * pen) {
@@ -226,13 +225,6 @@ static void init_freetypeGles() {
 		printf("\n");
 	}
 
-	// Bind vPosition to attribute 0
-	vertexHandle = glGetAttribLocation(programHandle, "a_position");
-	texHandle = glGetAttribLocation(programHandle, "a_st");
-	colorHandle = glGetAttribLocation(programHandle, "a_color");
-	samplerHandle = glGetUniformLocation(programHandle, "texture_uniform");
-
-	mvpHandle = glGetUniformLocation(programHandle, "u_mvp");
 	texture_atlas_upload(atlas);
 }
 /***********************************************************
@@ -1741,6 +1733,15 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 		// Use the program object
 		glUseProgram(programHandle);
+
+		int vertexHandle, texHandle, samplerHandle, colorHandle, mvpHandle;
+		// Bind vPosition to attribute 0
+		vertexHandle = glGetAttribLocation(programHandle, "a_position");
+		texHandle = glGetAttribLocation(programHandle, "a_st");
+		colorHandle = glGetAttribLocation(programHandle, "a_color");
+		samplerHandle = glGetUniformLocation(programHandle, "texture_uniform");
+
+		mvpHandle = glGetUniformLocation(programHandle, "u_mvp");
 
 		float a = 1.0f / state->screen_width;
 		float b = 1.0f / state->screen_height;
