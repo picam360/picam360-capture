@@ -1678,13 +1678,18 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 
 	vec2 pen = { };
 	vec4 color = { 1, 1, 1, 1 };
+	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 
 	wchar_t disp[256];
 	swprintf(disp, 256, L"Temp %.1f degC",
 			state->plugin_host.get_camera_temperature());
 
-	pen.x = -(float) state->screen_width / 2;
-	pen.y = (float) state->screen_height / 2 - font->size;
+	pen.x = -((float) state->screen_width / 2 - font->size / 8);
+	pen.y = ((float) state->screen_height / 2 - font->size / 8) - font->size;
+	add_text(vVector, font, disp, &back_color, &pen);
+
+	pen.x = -((float) state->screen_width / 2);
+	pen.y = ((float) state->screen_height / 2) - font->size;
 	add_text(vVector, font, disp, &color, &pen);
 
 	// Use the program object
