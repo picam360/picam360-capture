@@ -1674,6 +1674,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 
+	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1719,14 +1720,18 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	}
 
-	{
+	glDisableVertexAttribArray(loc);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	{//text
 		vector_t * vVector = vector_new(sizeof(GLfloat));
 
 		vec2 pen = { -400, 150 };
 		vec4 color = { .2, 0.2, 0.2, 1 };
 
 		wchar_t disp[256];
-		swprintf(disp, 60, L"Temp %.1f degC",
+		swprintf(disp, 256, L"Temp %.1f degC",
 				state->plugin_host.get_view_temperature());
 
 		add_text(vVector, font1, disp, &color, &pen);
@@ -1777,12 +1782,15 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 
+		glDisableVertexAttribArray(vertexHandle);
+		glDisableVertexAttribArray(texHandle);
+		glDisableVertexAttribArray(colorHandle);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
 		vector_delete(vVector);
 	}
 
 	eglSwapBuffers(state->display, state->surface);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
