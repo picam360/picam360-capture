@@ -106,7 +106,7 @@ static PICAM360CAPTURE_T _state, *state = &_state;
 
 static texture_font_t *font1, *font2;
 static texture_atlas_t *atlas;
-static char *texture_vert = //
+static char *freetype_vert = //
 		"uniform mat4		u_mvp;\n"
 				"attribute vec3		a_position;\n"
 				"attribute vec4		a_color;\n"
@@ -119,7 +119,7 @@ static char *texture_vert = //
 				"       v_color = a_color;\n"
 				"}\n";
 
-static char *texture_frag = //
+static char *freetype_frag = //
 		"precision mediump float;\n"
 				"uniform sampler2D		texture_uniform;\n"
 				"varying vec2 v_frag_uv;\n"
@@ -165,6 +165,7 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 	}
 }
 static void init_text() {
+	int vHandle, fHandle, length, compile_ok;
 	/* Texture atlas to store individual glyphs */
 	atlas = texture_atlas_new(1024, 1024, 1);
 
