@@ -1175,7 +1175,7 @@ static float get_camera_temperature() {
 	return state->camera_temperature;
 }
 static void set_camera_temperature(float value) {
-	return state->camera_temperature;
+	state->camera_temperature = value;
 }
 static float get_camera_north() {
 	return state->camera_north;
@@ -1411,16 +1411,14 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	float unif_matrix[16];
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
-	float camera_north_matrix[16];
 	float view_matrix[16];
-	float view_north_matrix[16];
+	float north_matrix[16];
 	float world_matrix[16];
 	mat4_identity(unif_matrix);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
-	mat4_identity(camera_north_matrix);
 	mat4_identity(view_matrix);
-	mat4_identity(view_north_matrix);
+	mat4_identity(north_matrix);
 	mat4_identity(world_matrix);
 
 	// Rc : camera orientation
@@ -1462,13 +1460,12 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		break;
 	}
 
-	// Rvn
-	mat4_rotateY(view_north_matrix, view_north_matrix,
-			state->plugin_host.get_view_north() * M_PI / 180);
-
-	// Rcn
-	mat4_rotateY(view_north_matrix, view_north_matrix,
-			state->plugin_host.get_camera_north() * M_PI / 180);
+	// Rn
+	{
+		float north_diff = state->plugin_host.get_view_north()
+				- state->plugin_host.get_camera_north();
+		mat4_rotateY(north_matrix, north_matrix, north_diff * M_PI / 180);
+	}
 
 	// Rw : view coodinate to world coodinate and view heading to ground initially
 	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
@@ -1477,9 +1474,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	//RcRv(Rc^-1)RcRw
 	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
 	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
-	mat4_multiply(unif_matrix, unif_matrix, view_north_matrix); // RvnRvRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRvnRvRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_north_matrix); // RcnRcRvnRvRw
+	mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
+	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRnRvRw
 
 	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
 
