@@ -1679,6 +1679,74 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+static void redraw_info(PICAM360CAPTURE_T *state) {
+	vector_t * vVector = vector_new(sizeof(GLfloat));
+
+	vec2 pen = { };
+	vec4 color = { 1, 1, 1, 1 };
+
+	wchar_t disp[256];
+	swprintf(disp, 256, L"Temp %.1f degC",
+			state->plugin_host.get_camera_temperature());
+
+	pen.x = -50;
+	pen.y = 50;
+	add_text(vVector, font1, disp, &color, &pen);
+
+	// Use the program object
+	glUseProgram(programHandle);
+
+	int vertexHandle, texHandle, samplerHandle, colorHandle, mvpHandle;
+	// Bind vPosition to attribute 0
+	vertexHandle = glGetAttribLocation(programHandle, "a_position");
+	texHandle = glGetAttribLocation(programHandle, "a_st");
+	colorHandle = glGetAttribLocation(programHandle, "a_color");
+	samplerHandle = glGetUniformLocation(programHandle, "texture_uniform");
+
+	mvpHandle = glGetUniformLocation(programHandle, "u_mvp");
+
+	float a = 1.0f / state->screen_width;
+	float b = 1.0f / state->screen_height;
+
+	GLfloat mvp[] = { //
+			//
+					a, 0, 0, 0, //
+					0, b, 0, 0, //
+					0, 0, 1.0, 0, //
+					0, 0, 0, 1.0 //
+			};
+	glUniformMatrix4fv(mvpHandle, 1, GL_FALSE, (GLfloat *) mvp);
+
+	// Load the vertex data
+	glVertexAttribPointer(vertexHandle, 3, GL_FLOAT, GL_FALSE,
+			9 * sizeof(GLfloat), vVector->items);
+	glEnableVertexAttribArray(vertexHandle);
+	glVertexAttribPointer(texHandle, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(GLfloat),
+			(GLfloat*) vVector->items + 3);
+	glEnableVertexAttribArray(texHandle);
+	glVertexAttribPointer(colorHandle, 4, GL_FLOAT, GL_FALSE,
+			9 * sizeof(GLfloat), (GLfloat*) vVector->items + 5);
+	glEnableVertexAttribArray(colorHandle);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, atlas->id);
+
+	glUniform1i(samplerHandle, 0);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_CULL_FACE);
+
+	glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
+
+	glDisableVertexAttribArray(vertexHandle);
+	glDisableVertexAttribArray(texHandle);
+	glDisableVertexAttribArray(colorHandle);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	vector_delete(vVector);
+}
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model) {
@@ -1724,72 +1792,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	{//text
-		vector_t * vVector = vector_new(sizeof(GLfloat));
-
-		vec2 pen = { -400, 150 };
-		vec4 color = { .2, 0.2, 0.2, 1 };
-
-		wchar_t disp[256];
-		swprintf(disp, 256, L"Temp %.1f degC",
-				state->plugin_host.get_view_temperature());
-
-		add_text(vVector, font1, disp, &color, &pen);
-
-		// Use the program object
-		glUseProgram(programHandle);
-
-		int vertexHandle, texHandle, samplerHandle, colorHandle, mvpHandle;
-		// Bind vPosition to attribute 0
-		vertexHandle = glGetAttribLocation(programHandle, "a_position");
-		texHandle = glGetAttribLocation(programHandle, "a_st");
-		colorHandle = glGetAttribLocation(programHandle, "a_color");
-		samplerHandle = glGetUniformLocation(programHandle, "texture_uniform");
-
-		mvpHandle = glGetUniformLocation(programHandle, "u_mvp");
-
-		float a = 1.0f / state->screen_width;
-		float b = 1.0f / state->screen_height;
-
-		GLfloat mvp[] = { //
-				//
-						a, 0, 0, 0, //
-						0, b, 0, 0, //
-						0, 0, 1.0, 0, //
-						0, 0, 0, 1.0 //
-				};
-		glUniformMatrix4fv(mvpHandle, 1, GL_FALSE, (GLfloat *) mvp);
-
-		// Load the vertex data
-		glVertexAttribPointer(vertexHandle, 3, GL_FLOAT, GL_FALSE,
-				9 * sizeof(GLfloat), vVector->items);
-		glEnableVertexAttribArray(vertexHandle);
-		glVertexAttribPointer(texHandle, 2, GL_FLOAT, GL_FALSE,
-				9 * sizeof(GLfloat), (GLfloat*) vVector->items + 3);
-		glEnableVertexAttribArray(texHandle);
-		glVertexAttribPointer(colorHandle, 4, GL_FLOAT, GL_FALSE,
-				9 * sizeof(GLfloat), (GLfloat*) vVector->items + 5);
-		glEnableVertexAttribArray(colorHandle);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, atlas->id);
-
-		glUniform1i(samplerHandle, 0);
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glDisable(GL_CULL_FACE);
-
-		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
-
-		glDisableVertexAttribArray(vertexHandle);
-		glDisableVertexAttribArray(texHandle);
-		glDisableVertexAttribArray(colorHandle);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-
-		vector_delete(vVector);
-	}
+	redraw_info(state);
 
 	eglSwapBuffers(state->display, state->surface);
 }
