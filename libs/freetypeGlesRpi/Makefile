@@ -29,6 +29,7 @@ ifeq ($(PLATFORM),rpi_noX)
     LIBS=-lGLESv2 -lEGL -lm -lbcm_host -lfreetype -L/opt/vc/lib `pkg-config libpng --libs`
 endif
 
+LIB=freetypeGlesRpi.a
 TARGET=testFreetypeGlesPi
 
 CFLAGS += $(FLAGS)
@@ -39,6 +40,9 @@ TESTOBJ=$(shell find test/*.c | sed 's/\(.*\.\)c/\1o/g' | sed 's/test\//build\//
 $(TARGET): $(OBJ) $(TESTOBJ)
 	@echo " Linking...";  $(CC) $^ -o $(TARGET) $(LIBS)
 
+$(LIB): $(OBJ)
+	$(AR) rcs $(LIB) $(OBJ)
+	
 build/%.o: src/%.c
 	@mkdir -p build
 	@echo " CC $<"; $(CC) $(CFLAGS) -MD -MF $(@:.o=.deps) -c -o $@ $<
