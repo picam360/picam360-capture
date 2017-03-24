@@ -11,6 +11,13 @@
 #include "driver_agent.h"
 #include "kokuyoseki.h"
 
+#include <mat4/identity.h>
+#include <mat4/rotateY.h>
+#include <mat4/multiply.h>
+#include <mat4/transpose.h>
+#include <mat4/fromQuat.h>
+#include <mat4/invert.h>
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
