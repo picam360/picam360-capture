@@ -104,7 +104,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
 
-static texture_font_t *font1, *font2;
+static texture_font_t *font;
 static texture_atlas_t *atlas;
 static char *freetype_vert = //
 		"uniform mat4		u_mvp;\n"
@@ -173,17 +173,11 @@ static void init_freetypeGles() {
 	/* Texture atlas to store individual glyphs */
 	atlas = texture_atlas_new(1024, 1024, 1);
 
-	font1 = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf",
-			50);
-	font2 = texture_font_new(atlas,
-			"./libs/freetypeGlesRpi/fonts/ObelixPro.ttf", 70);
+	font = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf",
+			10);
 
 	/* Cache some glyphs to speed things up */
-	texture_font_load_glyphs(font1, L" !\"#$%&'()*+,-./0123456789:;<=>?"
-			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
-			L"`abcdefghijklmnopqrstuvwxyz{|}~");
-
-	texture_font_load_glyphs(font2, L" !\"#$%&'()*+,-./0123456789:;<=>?"
+	texture_font_load_glyphs(font, L" !\"#$%&'()*+,-./0123456789:;<=>?"
 			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
@@ -1689,9 +1683,9 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 	swprintf(disp, 256, L"Temp %.1f degC",
 			state->plugin_host.get_camera_temperature());
 
-	pen.x = -50;
-	pen.y = 50;
-	add_text(vVector, font1, disp, &color, &pen);
+	pen.x = -(float) state->screen_width / 2;
+	pen.y = (float) state->screen_height / 2 - font->size;
+	add_text(vVector, font, disp, &color, &pen);
 
 	// Use the program object
 	glUseProgram(programHandle);
@@ -1705,8 +1699,8 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 
 	mvpHandle = glGetUniformLocation(programHandle, "u_mvp");
 
-	float a = 1.0f / state->screen_width;
-	float b = 1.0f / state->screen_height;
+	float a = 1.0f / (state->screen_width / 2);
+	float b = 1.0f / (state->screen_height / 2);
 
 	GLfloat mvp[] = { //
 			//
