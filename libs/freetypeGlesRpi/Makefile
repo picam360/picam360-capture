@@ -41,7 +41,7 @@ OBJ=$(shell find src/*.c | sed 's/\(.*\.\)c/\1o/g' | sed 's/src\//build\//g')
 TESTOBJ=$(shell find test/*.c | sed 's/\(.*\.\)c/\1o/g' | sed 's/test\//build\//g')  
 
 $(LIB): $(OBJ)
-        @echo " Linking...a";  $(AR) rcs $(LIB) $(OBJ)
+	@echo " Linking...a";  $(AR) rcs $(LIB) $(OBJ)
         
 #$(TARGET): $(OBJ) $(TESTOBJ)
 #	@echo " Linking...";  $(CC) $^ -o $(TARGET) $(LIBS)
