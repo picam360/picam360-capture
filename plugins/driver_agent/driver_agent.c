@@ -265,13 +265,22 @@ void *transmit_thread_func(void* arg) {
 				float unif_matrix[16];
 				float camera_matrix[16];
 				float target_matrix[16];
+				float north_matrix[16];
 				mat4_identity(unif_matrix);
 				mat4_identity(camera_matrix);
 				mat4_identity(target_matrix);
+				mat4_identity(north_matrix);
 				mat4_fromQuat(camera_matrix, lg_camera_quatanion);
 				mat4_fromQuat(target_matrix, lg_target_quatanion);
 				mat4_invert(target_matrix, target_matrix);
+				// Rn
+				{
+					float north_diff = state->plugin_host.get_view_north()
+							- state->plugin_host.get_camera_north();
+					mat4_rotateY(north_matrix, north_matrix, north_diff * M_PI / 180);
+				}
 				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1
+				mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRt-1Rw
 				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRt-1
 
 				mat4_transpose(vtg, vtg);
