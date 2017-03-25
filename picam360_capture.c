@@ -152,8 +152,8 @@ static void init_freetypeGles(PICAM360CAPTURE_T *state) {
 					L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 					L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
-	state->freetypegles.model.program = GLProgram_new("shader/freetypegles.vert",
-			"shader/freetypegles.frag");
+	state->freetypegles.model.program = GLProgram_new(
+			"shader/freetypegles.vert", "shader/freetypegles.frag");
 
 	texture_atlas_upload(state->freetypegles.atlas);
 }
@@ -1680,6 +1680,11 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
+
+	int offset_x = (state->screen_width - frame->width) / 2;
+	int offset_y = (state->screen_height - frame->height) / 2;
+	glViewport(offset_x, offset_y, (GLsizei) frame->width / 2,
+			(GLsizei) frame->height / 2);
 
 	glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 
