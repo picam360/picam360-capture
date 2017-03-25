@@ -58,9 +58,6 @@
 #include "auto_calibration.h"
 #include "view_coordinate_mpu9250.h"
 
-#include "texture-atlas.h"
-#include "texture-font.h"
-
 //these plugin should be got out to shared object
 #include "plugins/driver_agent/driver_agent.h"
 
@@ -104,31 +101,6 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
 
-static texture_font_t *font;
-static texture_atlas_t *atlas;
-static char *freetype_vert = //
-		"uniform mat4		u_mvp;\n"
-				"attribute vec3		a_position;\n"
-				"attribute vec4		a_color;\n"
-				"attribute vec2		a_st;\n"
-				"varying vec2		        v_frag_uv;\n"
-				"varying vec4		        v_color;\n"
-				"void main(void) {\n"
-				"       v_frag_uv = a_st;\n"
-				"       gl_Position = u_mvp * vec4(a_position,1);\n"
-				"       v_color = a_color;\n"
-				"}\n";
-
-static char *freetype_frag = //
-		"precision mediump float;\n"
-				"uniform sampler2D		texture_uniform;\n"
-				"varying vec2 v_frag_uv;\n"
-				"varying vec4		        v_color;\n"
-				"void main()\n"
-				"{\n"
-				"    gl_FragColor = vec4(v_color.xyz, v_color.a * texture2D(texture_uniform, v_frag_uv).a);\n"
-				"}\n";
-static int programHandle;
 // --------------------------------------------------------------- add_text ---
 void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 		vec4 * color, vec2 * pen) {
@@ -163,7 +135,7 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 		}
 	}
 }
-static void init_freetypeGles() {
+static void init_freetypeGles(PICAM360CAPTURE_T *state) {
 	int vHandle, fHandle, length, compile_ok;
 
 	// all the shaders have at least texture unit 0 active so
@@ -171,53 +143,19 @@ static void init_freetypeGles() {
 	glActiveTexture(GL_TEXTURE0);
 
 	/* Texture atlas to store individual glyphs */
-	atlas = texture_atlas_new(1024, 1024, 1);
+	state->freetypegles.atlas = texture_atlas_new(1024, 1024, 1);
 
-	font = texture_font_new(atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf",
-			10);
+	state->freetypegles.font = texture_font_new(state->freetypegles.atlas,
+			"./libs/freetypeGlesRpi/fonts/custom.ttf", 10);
 
 	/* Cache some glyphs to speed things up */
-	texture_font_load_glyphs(font, L" !\"#$%&'()*+,-./0123456789:;<=>?"
-			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
-			L"`abcdefghijklmnopqrstuvwxyz{|}~");
+	texture_font_load_glyphs(state->freetypegles.font,
+			L" !\"#$%&'()*+,-./0123456789:;<=>?"
+					L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
+					L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
-	vHandle = glCreateShader(GL_VERTEX_SHADER);
-	length = strlen(freetype_vert);
-	glShaderSource(vHandle, 1, (const char **) &freetype_vert, &length);
-	glCompileShader(vHandle);
-	glGetShaderiv(vHandle, GL_COMPILE_STATUS, &compile_ok);
-	if (compile_ok == GL_FALSE) {
-		fprintf(stderr, "vert:");
-		//print_log(vHandle);
-		glDeleteShader(vHandle);
-		return;
-	}
-
-	fHandle = glCreateShader(GL_FRAGMENT_SHADER);
-	length = strlen(freetype_frag);
-	glShaderSource(fHandle, 1, (const char **) &freetype_frag, &length);
-	glCompileShader(fHandle);
-	glGetShaderiv(fHandle, GL_COMPILE_STATUS, &compile_ok);
-	if (compile_ok == GL_FALSE) {
-		fprintf(stderr, "frag:");
-		//print_log(fHandle);
-		glDeleteShader(fHandle);
-		return;
-	}
-
-	programHandle = glCreateProgram();
-
-	glAttachShader(programHandle, vHandle);
-	glAttachShader(programHandle, fHandle);
-
-	glLinkProgram(programHandle);
-
-	glGetProgramiv(programHandle, GL_LINK_STATUS, &compile_ok);
-	if (!compile_ok) {
-		printf("glLinkProgram:");
-		//print_log(programHandle);
-		printf("\n");
-	}
+	state->freetypegles.model = GLProgram_new("shader/freetypegles.vert",
+			"shader/freetypegles.frag");
 
 	texture_atlas_upload(atlas);
 }
@@ -1674,6 +1612,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 static void redraw_info(PICAM360CAPTURE_T *state) {
+	int program = GLProgram_GetId(state->freetypegles.model->program);
+	glUseProgram(program);
+
 	vector_t * vVector = vector_new(sizeof(GLfloat));
 
 	vec2 pen = { };
@@ -1684,25 +1625,28 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 	swprintf(disp, 256, L"Temp %.1f degC",
 			state->plugin_host.get_camera_temperature());
 
-	pen.x = -((float) state->screen_width / 2 - font->size / 8);
-	pen.y = ((float) state->screen_height / 2 - font->size / 8) - font->size;
+	pen.x = -((float) state->screen_width / 2
+			- state->freetypegles.font->size / 8);
+	pen.y = ((float) state->screen_height / 2
+			- state->freetypegles.font->size / 8)
+			- state->freetypegles.font->size;
 	add_text(vVector, font, disp, &back_color, &pen);
 
 	pen.x = -((float) state->screen_width / 2);
-	pen.y = ((float) state->screen_height / 2) - font->size;
-	add_text(vVector, font, disp, &color, &pen);
+	pen.y = ((float) state->screen_height / 2) - state->freetypegles.font->size;
+	add_text(vVector, state->freetypegles.font, disp, &color, &pen);
 
 	// Use the program object
-	glUseProgram(programHandle);
+	glUseProgram(program);
 
 	int vertexHandle, texHandle, samplerHandle, colorHandle, mvpHandle;
 	// Bind vPosition to attribute 0
-	vertexHandle = glGetAttribLocation(programHandle, "a_position");
-	texHandle = glGetAttribLocation(programHandle, "a_st");
-	colorHandle = glGetAttribLocation(programHandle, "a_color");
-	samplerHandle = glGetUniformLocation(programHandle, "texture_uniform");
+	vertexHandle = glGetAttribLocation(program, "a_position");
+	texHandle = glGetAttribLocation(program, "a_st");
+	colorHandle = glGetAttribLocation(program, "a_color");
+	samplerHandle = glGetUniformLocation(program, "texture_uniform");
 
-	mvpHandle = glGetUniformLocation(programHandle, "u_mvp");
+	mvpHandle = glGetUniformLocation(program, "u_mvp");
 
 	float a = 1.0f / (state->screen_width / 2);
 	float b = 1.0f / (state->screen_height / 2);
@@ -1728,7 +1672,7 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 	glEnableVertexAttribArray(colorHandle);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, atlas->id);
+	glBindTexture(GL_TEXTURE_2D, state->freetypegles.atlas->id);
 
 	glUniform1i(samplerHandle, 0);
 

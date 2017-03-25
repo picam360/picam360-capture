@@ -35,6 +35,9 @@
 
 #include "picam360_capture_plugin.h"
 
+#include "texture-atlas.h"
+#include "texture-font.h"
+
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
 
@@ -56,7 +59,7 @@ enum VIEW_COODINATE_MODE {
 
 struct _PICAM360CAPTURE_T;
 
-typedef struct _OPTIONS_T{
+typedef struct _OPTIONS_T {
 	float sharpness_gain;
 	float cam_offset_pitch[MAX_CAM_NUM]; // x axis
 	float cam_offset_yaw[MAX_CAM_NUM]; // y axis
@@ -94,8 +97,10 @@ typedef struct _FRAME_T {
 
 	void *custom_data;
 	//event
-	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
-	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *,
+			struct _FRAME_T *);
+	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *,
+			struct _FRAME_T *);
 
 	struct _FRAME_T *next;
 } FRAME_T;
@@ -162,6 +167,12 @@ typedef struct _PICAM360CAPTURE_T {
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
+
+	struct {
+		texture_font_t *font;
+		texture_atlas_t *atlas;
+		MODEL_T model;
+	} freetypegles;
 
 	PLUGIN_T **plugins;
 	struct _OPTIONS_T options;
