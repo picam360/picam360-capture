@@ -1602,6 +1602,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
 
+	glDisable(GL_BLEND);
+	glEnable(GL_CULL_FACE);
+
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 
 	glDisableVertexAttribArray(loc);
@@ -1707,6 +1710,9 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
+
+	glDisable(GL_BLEND);
+	glEnable(GL_CULL_FACE);
 
 	if (frame->operation_mode == CALIBRATION) {
 		glViewport((state->screen_width - state->screen_height) / 2, 0,
