@@ -1683,8 +1683,8 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
 	int offset_x = (state->screen_width - frame->width) / 2;
 	int offset_y = (state->screen_height - frame->height) / 2;
-	glViewport(offset_x, offset_y, (GLsizei) frame->width / 2,
-			(GLsizei) frame->height / 2);
+	glViewport(offset_x, offset_y, (GLsizei) frame->width,
+			(GLsizei) frame->height);
 
 	glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 
