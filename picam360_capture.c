@@ -100,6 +100,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
+static float lg_fps = 0;
 
 // --------------------------------------------------------------- add_text ---
 void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
@@ -1291,7 +1292,18 @@ int main(int argc, char *argv[]) {
 
 	umask(0000);
 
+	static struct timeval last_time = { };
+	gettimeofday(&last_time, NULL);
+
 	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
+		struct timeval time = { };
+		gettimeofday(&time, NULL);
+		struct timeval diff;
+		timersub(&time, &last_time, &diff);
+		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+		float frame_sec = ((1.0 / lg_fps) * 0.9 + diff_sec * 0.1);
+		lg_fps = (frame_sec != 0) ? 1.0 / frame_sec : 0;
+
 		switch (opt) {
 		case 'c':
 			if (strcmp(optarg, "MJPEG") == 0) {
@@ -1622,20 +1634,24 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	vec4 color = { 1, 1, 1, 1 };
 	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 
-	wchar_t disp[256];
-	swprintf(disp, 256, L"Temp %.1f degC",
+	wchar_t disp[2][64];
+	swprintf(disp[0], 64, L"Temp %.1f degC",
 			state->plugin_host.get_camera_temperature());
+	swprintf(disp[1], 64, L"fps %.1f", lg_fps);
 
-	pen.x = -((float) state->screen_width / 2
-			- state->freetypegles.font->size / 8);
-	pen.y = ((float) state->screen_height / 2
-			- state->freetypegles.font->size / 8)
-			- state->freetypegles.font->size;
-	add_text(vVector, state->freetypegles.font, disp, &back_color, &pen);
+	for (int i = 0; i < 2; i++) {
+		pen.x = -((float) state->screen_width / 2
+				- state->freetypegles.font->size / 8);
+		pen.y = ((float) state->screen_height / 2
+				- state->freetypegles.font->size / 8)
+				- state->freetypegles.font->size * (i + 1);
+		add_text(vVector, state->freetypegles.font, disp, &back_color, &pen);
 
-	pen.x = -((float) state->screen_width / 2);
-	pen.y = ((float) state->screen_height / 2) - state->freetypegles.font->size;
-	add_text(vVector, state->freetypegles.font, disp, &color, &pen);
+		pen.x = -((float) state->screen_width / 2);
+		pen.y = ((float) state->screen_height / 2)
+				- state->freetypegles.font->size * (i + 1);
+		add_text(vVector, state->freetypegles.font, disp[i], &color, &pen);
+	}
 
 	// Use the program object
 	glUseProgram(program);
