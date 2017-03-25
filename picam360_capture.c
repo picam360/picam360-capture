@@ -136,8 +136,6 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 	}
 }
 static void init_freetypeGles(PICAM360CAPTURE_T *state) {
-	int vHandle, fHandle, length, compile_ok;
-
 	// all the shaders have at least texture unit 0 active so
 	// activate it now and leave it active
 	glActiveTexture(GL_TEXTURE0);
@@ -154,10 +152,10 @@ static void init_freetypeGles(PICAM360CAPTURE_T *state) {
 					L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 					L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
-	state->freetypegles.model = GLProgram_new("shader/freetypegles.vert",
+	state->freetypegles.model.program = GLProgram_new("shader/freetypegles.vert",
 			"shader/freetypegles.frag");
 
-	texture_atlas_upload(atlas);
+	texture_atlas_upload(state->freetypegles.atlas);
 }
 /***********************************************************
  * Name: init_ogl
@@ -1376,7 +1374,7 @@ int main(int argc, char *argv[]) {
 	init_ogl(state);
 
 	//freetypeGles
-	init_freetypeGles();
+	init_freetypeGles(state);
 
 	//frame id=0
 	if (frame_param[0]) {
@@ -1612,7 +1610,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 static void redraw_info(PICAM360CAPTURE_T *state) {
-	int program = GLProgram_GetId(state->freetypegles.model->program);
+	int program = GLProgram_GetId(state->freetypegles.model.program);
 	glUseProgram(program);
 
 	vector_t * vVector = vector_new(sizeof(GLfloat));
@@ -1630,7 +1628,7 @@ static void redraw_info(PICAM360CAPTURE_T *state) {
 	pen.y = ((float) state->screen_height / 2
 			- state->freetypegles.font->size / 8)
 			- state->freetypegles.font->size;
-	add_text(vVector, font, disp, &back_color, &pen);
+	add_text(vVector, state->freetypegles.font, disp, &back_color, &pen);
 
 	pen.x = -((float) state->screen_width / 2);
 	pen.y = ((float) state->screen_height / 2) - state->freetypegles.font->size;
