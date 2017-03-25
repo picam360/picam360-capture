@@ -1292,9 +1292,6 @@ int main(int argc, char *argv[]) {
 
 	umask(0000);
 
-	static struct timeval last_time = { };
-	gettimeofday(&last_time, NULL);
-
 	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'c':
@@ -1408,15 +1405,12 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options(state);
 
+	static struct timeval last_time = { };
+	gettimeofday(&last_time, NULL);
+
 	while (!terminate) {
 		struct timeval time = { };
 		gettimeofday(&time, NULL);
-		struct timeval diff;
-		timersub(&time, &last_time, &diff);
-		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-		float frame_sec = (((lg_fps != 0) ? 1.0 / lg_fps : 0) * 0.9
-				+ diff_sec * 0.1);
-		lg_fps = (frame_sec != 0) ? 1.0 / frame_sec : 0;
 
 		command_handler();
 		if (state->frame_sync) {
@@ -1442,6 +1436,14 @@ int main(int argc, char *argv[]) {
 				&& state->input_file_cur == state->input_file_size) {
 			terminate = true;
 		}
+
+		struct timeval diff;
+		timersub(&time, &last_time, &diff);
+		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+		float frame_sec = (((lg_fps != 0) ? 1.0 / lg_fps : 0) * 0.9
+				+ diff_sec * 0.1);
+		lg_fps = (frame_sec != 0) ? 1.0 / frame_sec : 0;
+		last_time = time;
 	}
 	exit_func();
 	return 0;
