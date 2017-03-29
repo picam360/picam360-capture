@@ -22,6 +22,7 @@
 #include "rtpsessionparams.h"
 #include "rtperrors.h"
 #include "rtplibraryversion.h"
+#include "rtppacket.h"
 
 #include "rtp.h"
 
@@ -48,7 +49,7 @@ static void checkerror(int rtperr) {
 	}
 }
 
-int rtp_sendpacket(char *buff, int buff_len, int pt) {
+int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 	int status;
 	pthread_mutex_lock(&lg_mlock);
 	{
@@ -61,7 +62,7 @@ int rtp_sendpacket(char *buff, int buff_len, int pt) {
 		if (diff_nsec == 0) {
 			diff_nsec = 1;
 		}
-		status = lg_sess.SendPacket(buff, buff_len, pt, false, diff_nsec);
+		status = lg_sess.SendPacket(data, data_len, pt, false, diff_nsec);
 		checkerror (status);
 		last_time = time;
 	}
@@ -103,7 +104,7 @@ static void *receive_thread_func(void* arg) {
 static bool is_init = false;
 int init_rtp() {
 	if (is_init) {
-		return;
+		return -1;
 	}
 	is_init = true;
 
@@ -150,7 +151,7 @@ int init_rtp() {
 
 int deinit_rtp() {
 	if (!is_init) {
-		return;
+		return -1;
 	}
 	lg_receive_run = false;
 	pthread_join(lg_receive_thread, NULL);

@@ -8,10 +8,10 @@ extern "C" {
 
 int init_rtp();
 int deinit_rtp();
-int rtp_sendpacket(char *data, int data_len, int pt);
+int rtp_sendpacket(unsigned char *data, int data_len, int pt);
 
-typedef void (*RTP_CALLBACK)(char *data, int data_len, int pt);
-void rtp_set_callkback(RTP_CALLBACK callback);
+typedef void (*RTP_CALLBACK)(unsigned char *data, int data_len, int pt);
+void rtp_set_callback(RTP_CALLBACK callback);
 
 #ifdef __cplusplus
 }
