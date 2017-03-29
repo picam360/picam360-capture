@@ -32,6 +32,7 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 int lg_status_fd = -1;
 int lg_cam0_fd = -1;
 int lg_cam1_fd = -1;
+bool lg_recording = false;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -107,7 +108,7 @@ static int lg_last_button = -1;
 static int lg_func = -1;
 
 static void *recieve_thread_func(void* arg) {
-	int buff_size = 4096;
+	int buff_size = RTP_MAXPAYLOADSIZE;
 	unsigned char *buff = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
@@ -238,6 +239,8 @@ static void *recieve_thread_func(void* arg) {
 		}
 	}
 
+	free(buff);
+
 	return NULL;
 }
 
@@ -257,7 +260,7 @@ void *transmit_thread_func(void* arg) {
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
 	while (1) {
-		static struct timeval time = { };
+		struct timeval time = { };
 		gettimeofday(&time, NULL);
 		struct timeval diff;
 		timersub(&time, &last_time, &diff);
@@ -428,6 +431,26 @@ void *transmit_thread_func(void* arg) {
 						printf("pid on\n");
 					}
 					break;
+				case 4:
+					if (lg_recording) {
+						rtp_stop_recording();
+						printf("stop recording\n");
+						lg_recording = false;
+					} else {
+						struct tm *tmptr = NULL;
+						tmptr = localtime(&time.tv_sec);
+
+						char filename[256];
+						sprintf(filename,
+								"/media/%04d_%02d_%02d-%02d_%02d_%02d.rtp",
+								tmptr->tm_year + 1900, tmptr->tm_mon + 1,
+								tmptr->tm_mday, tmptr->tm_hour, tmptr->tm_min,
+								tmptr->tm_sec);
+						rtp_start_recording(filename);
+						printf("start recording\n");
+						lg_recording = true;
+					}
+					break;
 				}
 				if (lg_func > 10) {
 					exit(0);
@@ -440,7 +463,7 @@ void *transmit_thread_func(void* arg) {
 				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
 				lg_motor_value[2], lg_motor_value[3]);
 
-		rtp_sendpacket((unsigned char*)buff, xmp_len, PT_CMD);
+		rtp_sendpacket((unsigned char*) buff, xmp_len, PT_CMD);
 
 		last_time = time;
 		usleep(100 * 1000); //less than 10Hz
@@ -577,9 +600,9 @@ static void init() {
 	is_init = true;
 
 	init_rtp(9002, "192.168.4.1", 9004);
-	rtp_set_callback((RTP_CALLBACK)rtp_callback);
+	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
-	set_kokuyoseki_callback((KOKUYOSEKI_CALLBACK)kokuyoseki_callback);
+	set_kokuyoseki_callback((KOKUYOSEKI_CALLBACK) kokuyoseki_callback);
 	open_kokuyoseki();
 
 	pthread_t transmit_thread;

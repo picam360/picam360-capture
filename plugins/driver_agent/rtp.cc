@@ -31,9 +31,38 @@ using namespace jrtplib;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+class RTPUDPv4RecordableTransmitter: public RTPUDPv4Transmitter {
+public:
+	RTPUDPv4RecordableTransmitter(RTPMemoryManager *mgr) :
+	RTPUDPv4Transmitter(mgr) {
+		m_fd = -1;
+	}
+
+	void StartRecording(char *path) {
+		m_fd = open(path, O_WRONLY);
+	}
+
+	void StopRecording() {
+		if (m_fd > 0) {
+			close(m_fd);
+			m_fd = -1;
+		}
+	}
+
+	int SendRTPData(const void *data, size_t len) {
+		RTPUDPv4Transmitter::SendRTPData(data, len);
+		if (m_fd > 0) {
+			write(m_fd, data, len);
+		}
+	}
+private:
+	int m_fd;
+}
+
 static bool lg_receive_run = false;
 pthread_t lg_receive_thread;
 static RTPSession lg_sess;
+static RTPUDPv4RecordableTransmitter lg_trans(lg_sess.GetMemoryManager());
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
 
 static RTP_CALLBACK lg_callback = NULL;
@@ -63,7 +92,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			diff_nsec = 1;
 		}
 		status = lg_sess.SendPacket(data, data_len, pt, false, diff_nsec);
-		checkerror (status);
+		checkerror(status);
 		last_time = time;
 	}
 	pthread_mutex_unlock(&lg_mlock);
@@ -83,7 +112,8 @@ static void *receive_thread_func(void* arg) {
 				while ((pack = lg_sess.GetNextPacket()) != NULL) {
 					if (lg_callback) {
 						lg_callback(pack->GetPayloadData(),
-								pack->GetPayloadLength(), pack->GetPayloadType());
+								pack->GetPayloadLength(),
+								pack->GetPayloadType());
 					}
 
 					lg_sess.DeletePacket(pack);
@@ -95,14 +125,15 @@ static void *receive_thread_func(void* arg) {
 
 #ifndef RTP_SUPPORT_THREAD
 		status = lg_sess.Poll();
-		checkerror (status);
+		checkerror(status);
 #endif // RTP_SUPPORT_THREAD
 	}
 	return NULL;
 }
 
 static bool is_init = false;
-int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport) {
+int init_rtp(unsigned short portbase, char *destip_str,
+		unsigned short destport) {
 	if (is_init) {
 		return -1;
 	}
@@ -126,10 +157,16 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport)
 	RTPSessionParams sessparams;
 
 	sessparams.SetOwnTimestampUnit(1.0 / 1E6);	//micro sec
-
+	sessparams.SetMaximumPacketSize(RTP_MAXPAYLOADSIZE + 32);
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
-	status = lg_sess.Create(sessparams, &transparams);
+
+	status = lg_trans.init(sessparams.NeedThreadSafety());
+	checkerror(status);
+	status = lg_trans.create(sessparams.GetMaximumPacketSize(), transparams);
+	checkerror(status);
+
+	status = lg_sess.Create(sessparams, &lg_trans);
 	checkerror(status);
 
 	RTPIPv4Address addr(destip, destport);
@@ -152,4 +189,11 @@ int deinit_rtp() {
 	lg_sess.BYEDestroy(RTPTime(10, 0), 0, 0);
 	is_init = false;
 	return 0;
+}
+
+void rtp_start_recording(char *path) {
+	lg_trans.StartRecording(path);
+}
+void rtp_stop_recording() {
+	lg_trans.StopRecording();
 }
