@@ -31,10 +31,11 @@ using namespace jrtplib;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+namespace jrtplib {
 class RTPUDPv4RecordableTransmitter: public RTPUDPv4Transmitter {
 public:
-	RTPUDPv4RecordableTransmitter(RTPMemoryManager *mgr) :
-	RTPUDPv4Transmitter(mgr) {
+	RTPUDPv4RecordableTransmitter(RTPMemoryManager *mgr = 0) :
+			RTPUDPv4Transmitter(mgr) {
 		m_fd = -1;
 	}
 
@@ -50,19 +51,20 @@ public:
 	}
 
 	int SendRTPData(const void *data, size_t len) {
-		RTPUDPv4Transmitter::SendRTPData(data, len);
 		if (m_fd > 0) {
 			write(m_fd, data, len);
 		}
+		return RTPUDPv4Transmitter::SendRTPData(data, len);
 	}
 private:
 	int m_fd;
+};
 }
 
 static bool lg_receive_run = false;
 pthread_t lg_receive_thread;
 static RTPSession lg_sess;
-static RTPUDPv4RecordableTransmitter lg_trans(lg_sess.GetMemoryManager());
+static RTPUDPv4RecordableTransmitter lg_trans;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
 
 static RTP_CALLBACK lg_callback = NULL;
@@ -153,6 +155,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	// ntohl
 	destip = ntohl(destip);
 
+	RTPUDPv4Transmitter *trans = (RTPUDPv4Transmitter*)lg_trans;
 	RTPUDPv4TransmissionParams transparams;
 	RTPSessionParams sessparams;
 
@@ -161,12 +164,12 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
 
-	status = lg_trans.init(sessparams.NeedThreadSafety());
+	status = trans->Init(sessparams.NeedThreadSafety());
 	checkerror(status);
-	status = lg_trans.create(sessparams.GetMaximumPacketSize(), transparams);
+	status = trans->Create(sessparams.GetMaximumPacketSize(), transparams);
 	checkerror(status);
 
-	status = lg_sess.Create(sessparams, &lg_trans);
+	status = lg_sess.Create(sessparams, trans);
 	checkerror(status);
 
 	RTPIPv4Address addr(destip, destport);
