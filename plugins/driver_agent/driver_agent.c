@@ -23,7 +23,14 @@
 
 #define PLUGIN_NAME "driver_agent"
 
+#define PT_STATUS 100
+#define PT_CMD 101
+#define PT_CAM_BASE 110
+
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
+int lg_status_fd = -1;
+int lg_cam0_fd = -1;
+int lg_cam1_fd = -1;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -539,10 +546,32 @@ static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
 }
 
+static int rtp_callback(char *data, int data_len, int pt) {
+	int fd = -1;
+	if (pt == PT_STATUS) {
+		fd = lg_status_fd;
+	} else if (pt == PT_CAM_BASE + 0) {
+		fd = lg_cam0_fd;
+	} else if (pt == PT_CAM_BASE + 1) {
+		fd = lg_cam1_fd;
+	}
+	if (fd < 0) {
+		return;
+	}
+	write(fd, data, data_len);
+}
+
 static bool is_init = false;
 static void init() {
 	if (!is_init) {
 		is_init = true;
+
+		lg_status_fd = open("status", O_WDONLY);
+		lg_cam0_fd = open("cam0", O_WDONLY);
+		lg_cam1_fd = open("cam1", O_WDONLY);
+
+		init_rtp();
+		rtp_set_callback(rtp_callback);
 
 		set_kokuyoseki_callback(kokuyoseki_callback);
 		open_kokuyoseki();
