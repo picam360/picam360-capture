@@ -112,8 +112,8 @@ chmod 0666 driver
 
 if [ $REMOTE = true ]; then
 	sudo killall socat
-	socat PIPE:driver UDP-DATAGRAM:192.168.4.1:9001 &
-	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
+#	socat PIPE:driver UDP-DATAGRAM:192.168.4.1:9001 &
+#	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
 	sudo killall raspivid
 	if [ $CODEC = "MJPEG" ]; then

@@ -566,9 +566,9 @@ static void init() {
 	if (!is_init) {
 		is_init = true;
 
-		lg_status_fd = open("status", O_WDONLY);
-		lg_cam0_fd = open("cam0", O_WDONLY);
-		lg_cam1_fd = open("cam1", O_WDONLY);
+		lg_status_fd = open("status", O_WRONLY);
+		lg_cam0_fd = open("cam0", O_WRONLY);
+		lg_cam1_fd = open("cam1", O_WRONLY);
 
 		init_rtp();
 		rtp_set_callback(rtp_callback);

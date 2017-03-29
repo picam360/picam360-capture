@@ -49,6 +49,7 @@ static void checkerror(int rtperr) {
 }
 
 int rtp_sendpacket(char *buff, int buff_len, int pt) {
+	int status;
 	pthread_mutex_lock(&lg_mlock);
 	{
 		static struct timeval last_time = { };
@@ -65,9 +66,11 @@ int rtp_sendpacket(char *buff, int buff_len, int pt) {
 		last_time = time;
 	}
 	pthread_mutex_unlock(&lg_mlock);
+	return 0;
 }
 
 static void *receive_thread_func(void* arg) {
+	int status;
 	while (lg_receive_run) {
 		lg_sess.BeginDataAccess();
 
@@ -78,8 +81,8 @@ static void *receive_thread_func(void* arg) {
 
 				while ((pack = lg_sess.GetNextPacket()) != NULL) {
 					if (lg_callback) {
-						lg_callback(pack.GetPayloadData(),
-								pack.GetPayloadLength(), pack.GetPayloadType());
+						lg_callback(pack->GetPayloadData(),
+								pack->GetPayloadLength(), pack->GetPayloadType());
 					}
 
 					lg_sess.DeletePacket(pack);
@@ -94,6 +97,7 @@ static void *receive_thread_func(void* arg) {
 		checkerror (status);
 #endif // RTP_SUPPORT_THREAD
 	}
+	return NULL;
 }
 
 static bool is_init = false;
@@ -109,7 +113,7 @@ int init_rtp() {
 	int status, i, num;
 
 	portbase = 9004;
-	destport = 9002
+	destport = 9002;
 
 	ipstr = "192.168.4.2";
 	destip = inet_addr(ipstr.c_str());
