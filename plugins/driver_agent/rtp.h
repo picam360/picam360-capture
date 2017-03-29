@@ -1,6 +1,6 @@
 #pragma once
 
-#define RTP_MAXPACKETSIZE 1400
+#define RTP_MAXPACKETSIZE 1024
 
 #ifdef __cplusplus
 extern "C" {

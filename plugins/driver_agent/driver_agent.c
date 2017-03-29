@@ -439,11 +439,8 @@ void *transmit_thread_func(void* arg) {
 		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
 				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
 				lg_motor_value[2], lg_motor_value[3]);
-		int fd = open("driver", O_RDWR);
-		if (fd > 0) {
-			write(fd, buff, xmp_len);
-			close(fd);
-		}
+
+		rtp_sendpacket((unsigned char*)buff, xmp_len, PT_CMD);
 
 		last_time = time;
 		usleep(100 * 1000); //less than 10Hz
