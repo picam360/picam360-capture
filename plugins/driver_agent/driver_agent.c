@@ -557,9 +557,10 @@ static int rtp_callback(char *data, int data_len, int pt) {
 		fd = lg_cam1_fd;
 	}
 	if (fd < 0) {
-		return;
+		return -1;
 	}
 	write(fd, data, data_len);
+	return 0;
 }
 
 static bool is_init = false;

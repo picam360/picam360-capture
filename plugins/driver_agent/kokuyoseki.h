@@ -35,6 +35,6 @@
 #define BUTTON_KEEP 0 2
 
 typedef void (*KOKUYOSEKI_CALLBACK)(struct timeval time, int button, int value);
-void set_kokuyoseki_callkback(KOKUYOSEKI_CALLBACK callback);
+void set_kokuyoseki_callback(KOKUYOSEKI_CALLBACK callback);
 void open_kokuyoseki();
 void close_kokuyoseki();
