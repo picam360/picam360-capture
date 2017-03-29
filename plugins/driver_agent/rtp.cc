@@ -102,22 +102,16 @@ static void *receive_thread_func(void* arg) {
 }
 
 static bool is_init = false;
-int init_rtp() {
+int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport) {
 	if (is_init) {
 		return -1;
 	}
 	is_init = true;
 
-	uint16_t portbase, destport;
 	uint32_t destip;
-	std::string ipstr;
-	int status, i, num;
+	int status;
 
-	portbase = 9004;
-	destport = 9002;
-
-	ipstr = "192.168.4.2";
-	destip = inet_addr(ipstr.c_str());
+	destip = inet_addr(destip_str);
 	if (destip == INADDR_NONE) {
 		std::cerr << "Bad IP address specified" << std::endl;
 		return -1;

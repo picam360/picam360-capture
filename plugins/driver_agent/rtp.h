@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-int init_rtp();
+int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport);
 int deinit_rtp();
 int rtp_sendpacket(unsigned char *data, int data_len, int pt);
 

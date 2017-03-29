@@ -563,27 +563,26 @@ static int rtp_callback(char *data, int data_len, int pt) {
 
 static bool is_init = false;
 static void init() {
-	if (!is_init) {
-		is_init = true;
-
-		lg_status_fd = open("status", O_WRONLY);
-		lg_cam0_fd = open("cam0", O_WRONLY);
-		lg_cam1_fd = open("cam1", O_WRONLY);
-
-		init_rtp();
-		rtp_set_callback(rtp_callback);
-
-		set_kokuyoseki_callback(kokuyoseki_callback);
-		open_kokuyoseki();
-
-		pthread_t transmit_thread;
-		pthread_create(&transmit_thread, NULL, transmit_thread_func,
-				(void*) NULL);
-
-		pthread_t recieve_thread;
-		pthread_create(&recieve_thread, NULL, recieve_thread_func,
-				(void*) NULL);
+	if (is_init) {
+		return;
 	}
+	is_init = true;
+
+	lg_status_fd = open("status", O_WRONLY);
+	lg_cam0_fd = open("cam0", O_WRONLY);
+	lg_cam1_fd = open("cam1", O_WRONLY);
+
+	init_rtp(9002, "192.168.4.1", 9004);
+	rtp_set_callback(rtp_callback);
+
+	set_kokuyoseki_callback(kokuyoseki_callback);
+	open_kokuyoseki();
+
+	pthread_t transmit_thread;
+	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
+
+	pthread_t recieve_thread;
+	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
 }
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
