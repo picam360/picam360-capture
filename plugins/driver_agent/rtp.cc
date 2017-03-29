@@ -151,4 +151,5 @@ int deinit_rtp() {
 	pthread_join(lg_receive_thread, NULL);
 	lg_sess.BYEDestroy(RTPTime(10, 0), 0, 0);
 	is_init = false;
+	return 0;
 }

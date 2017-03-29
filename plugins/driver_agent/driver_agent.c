@@ -10,6 +10,7 @@
 
 #include "driver_agent.h"
 #include "kokuyoseki.h"
+#include "rtp.h"
 
 #include <mat4/identity.h>
 #include <mat4/rotateY.h>
@@ -573,9 +574,9 @@ static void init() {
 	lg_cam1_fd = open("cam1", O_WRONLY);
 
 	init_rtp(9002, "192.168.4.1", 9004);
-	rtp_set_callback(rtp_callback);
+	rtp_set_callback((RTP_CALLBACK)rtp_callback);
 
-	set_kokuyoseki_callback(kokuyoseki_callback);
+	set_kokuyoseki_callback((KOKUYOSEKI_CALLBACK)kokuyoseki_callback);
 	open_kokuyoseki();
 
 	pthread_t transmit_thread;
