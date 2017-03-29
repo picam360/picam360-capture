@@ -550,10 +550,19 @@ static void save_options(void *user_data, json_t *options) {
 static int rtp_callback(char *data, int data_len, int pt) {
 	int fd = -1;
 	if (pt == PT_STATUS) {
+		if (lg_status_fd < 0) {
+			lg_status_fd = open("status", O_WRONLY | O_NONBLOCK);
+		}
 		fd = lg_status_fd;
 	} else if (pt == PT_CAM_BASE + 0) {
+		if (lg_cam0_fd < 0) {
+			lg_cam0_fd = open("cam0", O_WRONLY | O_NONBLOCK);
+		}
 		fd = lg_cam0_fd;
 	} else if (pt == PT_CAM_BASE + 1) {
+		if (lg_cam1_fd < 0) {
+			lg_cam1_fd = open("cam1", O_WRONLY | O_NONBLOCK);
+		}
 		fd = lg_cam1_fd;
 	}
 	if (fd < 0) {
@@ -569,10 +578,6 @@ static void init() {
 		return;
 	}
 	is_init = true;
-
-	lg_status_fd = open("status", O_WRONLY);
-	lg_cam0_fd = open("cam0", O_WRONLY);
-	lg_cam1_fd = open("cam1", O_WRONLY);
 
 	init_rtp(9002, "192.168.4.1", 9004);
 	rtp_set_callback((RTP_CALLBACK)rtp_callback);
