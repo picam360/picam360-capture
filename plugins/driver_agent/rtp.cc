@@ -137,7 +137,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
 
-	status = lg_sess.Create(sessparams, transparams);
+	status = lg_sess.Create(sessparams, &transparams);
 	checkerror(status);
 
 	RTPIPv4Address addr(destip, destport);
