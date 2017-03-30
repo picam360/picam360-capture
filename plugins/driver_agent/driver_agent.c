@@ -80,7 +80,6 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 	return xmp_len;
 }
 
-#define MAX_DELAY_COUNT 256
 #define LIGHT_NUM 2
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
@@ -89,13 +88,16 @@ static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
-static int lg_delay = 0;
-static int lg_delay_cur = 0;
-static float lg_camera_quatanion[MAX_DELAY_COUNT][4] = { { 0, 0, 0, 1 } };
+static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
 static float lg_camera_compass[4] = { 0, 0, 0, 1 };
 static float lg_camera_north = 0;
 static float lg_camera_north_count = 0;
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
+
+#define MAX_DELAY_COUNT 256
+static int lg_delay = 0;
+static int lg_delay_cur = 0;
+static float lg_camera_quatanion_queue[MAX_DELAY_COUNT][4] = { };
 
 static bool lg_pid_enabled = false;
 static float lg_p_gain = 1.0;
@@ -170,13 +172,15 @@ static void *recieve_thread_func(void* arg) {
 								&quatanion[0], &quatanion[1], &quatanion[2],
 								&quatanion[3]);
 						//convert from mpu coodinate to opengl coodinate
-						lg_camera_quatanion[cur][0] = quatanion[1]; //x
-						lg_camera_quatanion[cur][1] = quatanion[3]; //y : swap y and z
-						lg_camera_quatanion[cur][2] = -quatanion[2]; //z : swap y and z
-						lg_camera_quatanion[cur][3] = quatanion[0]; //w
-
+						lg_camera_quatanion_queue[cur][0] = quatanion[1]; //x
+						lg_camera_quatanion_queue[cur][1] = quatanion[3]; //y : swap y and z
+						lg_camera_quatanion_queue[cur][2] = -quatanion[2]; //z : swap y and z
+						lg_camera_quatanion_queue[cur][3] = quatanion[0]; //w
+						memcpy(lg_camera_quatanion,
+								lg_camera_quatanion_queue[delay_cur],
+								sizeof(float) * 4);
 						lg_plugin_host->set_camera_quatanion(
-								lg_camera_quatanion[delay_cur]);
+								lg_camera_quatanion);
 
 						lg_delay_cur++;
 					}
@@ -362,7 +366,7 @@ void *transmit_thread_func(void* arg) {
 						//
 								{ 1, -1, -1, 1 },				// x
 								{ -1, -1, 1, 1 },				// z
-								{ -1, 1, -1, 1 }				// delta yaw
+								{ -1, 1, -1, 1 }			// delta yaw
 						};
 				float motor_pid_value[MOTOR_NUM] = { };
 				for (int k = 0; k < 3; k++) {
@@ -576,7 +580,7 @@ static void init_options(void *user_data, json_t *options) {
 			json_object_get(options, PLUGIN_NAME ".i_gain"));
 	lg_d_gain = json_number_value(
 			json_object_get(options, PLUGIN_NAME ".d_gain"));
-	lg_delay = (int)json_number_value(
+	lg_delay = (int) json_number_value(
 			json_object_get(options, PLUGIN_NAME ".delay"));
 }
 
@@ -584,7 +588,8 @@ static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
 	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
 	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
-	json_object_set_new(options, PLUGIN_NAME "..delay", json_real((float)lg_delay));
+	json_object_set_new(options, PLUGIN_NAME "..delay",
+			json_real((float) lg_delay));
 }
 
 static int rtp_callback(char *data, int data_len, int pt) {
