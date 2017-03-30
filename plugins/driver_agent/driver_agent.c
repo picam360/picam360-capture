@@ -527,7 +527,7 @@ static void command_handler(void *user_data, char *_buff) {
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
-		rtp_stop_loading(param);
+		rtp_stop_loading();
 		printf("stop_loading : completed\n");
 	} else {
 		printf(":unknown command : %s\n", buff);

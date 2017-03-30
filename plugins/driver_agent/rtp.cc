@@ -115,7 +115,6 @@ static void *receive_thread_func(void* arg) {
 }
 
 static void *load_thread_func(void* arg) {
-	int status;
 	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
 	while (lg_load_fd >= 0) {
 		int read_len;
@@ -125,8 +124,10 @@ static void *load_thread_func(void* arg) {
 			//error
 			break;
 		}
-		unsigned short len = (unsigned short) buff[0]
-				+ ((unsigned short) buff[1] >> 8);
+		unsigned short len = 0;
+		for (int i = 0; i < 2; i++) {
+			len += (buff[i] << (8 * i));
+		}
 		if (len > sizeof(buff)) {
 			//error
 			break;
@@ -218,7 +219,7 @@ void rtp_stop_recording() {
 void rtp_start_loading(char *path) {
 	rtp_stop_loading();
 	lg_load_fd = open(path, O_RDONLY);
-	pthread_create(&lg_load_thread, NULL, receive_load_func, (void*) NULL);
+	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) NULL);
 }
 
 void rtp_stop_loading() {
