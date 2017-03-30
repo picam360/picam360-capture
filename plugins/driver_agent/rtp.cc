@@ -31,41 +31,11 @@ using namespace jrtplib;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-namespace jrtplib {
-class RTPUDPv4RecordableTransmitter: public RTPUDPv4Transmitter {
-public:
-	RTPUDPv4RecordableTransmitter(RTPMemoryManager *mgr = 0) :
-			RTPUDPv4Transmitter(mgr) {
-		m_fd = -1;
-	}
-
-	void StartRecording(char *path) {
-		m_fd = open(path, O_WRONLY);
-	}
-
-	void StopRecording() {
-		if (m_fd > 0) {
-			close(m_fd);
-			m_fd = -1;
-		}
-	}
-
-	int SendRTPData(const void *data, size_t len) {
-		if (m_fd > 0) {
-			write(m_fd, data, len);
-		}
-		return RTPUDPv4Transmitter::SendRTPData(data, len);
-	}
-private:
-	int m_fd;
-};
-}
-
 static bool lg_receive_run = false;
 pthread_t lg_receive_thread;
 static RTPSession lg_sess;
-static RTPUDPv4RecordableTransmitter lg_trans;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
+static int lg_record_fd = -1;
 
 static RTP_CALLBACK lg_callback = NULL;
 
@@ -117,6 +87,10 @@ static void *receive_thread_func(void* arg) {
 								pack->GetPayloadLength(),
 								pack->GetPayloadType());
 					}
+					if (lg_record_fd > 0) {
+						write(lg_record_fd, pack->GetPacketData(),
+								pack->GetPacketLength());
+					}
 
 					lg_sess.DeletePacket(pack);
 				}
@@ -155,7 +129,6 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	// ntohl
 	destip = ntohl(destip);
 
-	RTPUDPv4Transmitter *trans = (RTPUDPv4Transmitter*)lg_trans;
 	RTPUDPv4TransmissionParams transparams;
 	RTPSessionParams sessparams;
 
@@ -164,12 +137,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
 
-	status = trans->Init(sessparams.NeedThreadSafety());
-	checkerror(status);
-	status = trans->Create(sessparams.GetMaximumPacketSize(), transparams);
-	checkerror(status);
-
-	status = lg_sess.Create(sessparams, trans);
+	status = lg_sess.Create(sessparams, transparams);
 	checkerror(status);
 
 	RTPIPv4Address addr(destip, destport);
@@ -193,10 +161,13 @@ int deinit_rtp() {
 	is_init = false;
 	return 0;
 }
-
 void rtp_start_recording(char *path) {
-	lg_trans.StartRecording(path);
+	rtp_stop_recording();
+	lg_record_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
 }
 void rtp_stop_recording() {
-	lg_trans.StopRecording();
+	if (lg_record_fd > 0) {
+		close (lg_record_fd);
+		lg_record_fd = -1;
+	}
 }

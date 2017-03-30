@@ -442,12 +442,12 @@ void *transmit_thread_func(void* arg) {
 
 						char filename[256];
 						sprintf(filename,
-								"/media/%04d_%02d_%02d-%02d_%02d_%02d.rtp",
+								"/media/usbdisk/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
 								tmptr->tm_year + 1900, tmptr->tm_mon + 1,
 								tmptr->tm_mday, tmptr->tm_hour, tmptr->tm_min,
 								tmptr->tm_sec);
 						rtp_start_recording(filename);
-						printf("start recording\n");
+						printf("start recording %s\n", filename);
 						lg_recording = true;
 					}
 					break;
