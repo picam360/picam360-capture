@@ -528,7 +528,7 @@ static void command_handler(void *user_data, char *_buff) {
 			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(param);
+			rtp_start_recording(param);
 			printf("start_recording : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_recording", sizeof(buff)) == 0) {
