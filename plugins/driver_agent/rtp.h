@@ -11,6 +11,8 @@ int deinit_rtp();
 int rtp_sendpacket(unsigned char *data, int data_len, int pt);
 void rtp_start_recording(char *path);
 void rtp_stop_recording();
+void rtp_start_loading(char *path);
+void rtp_stop_loading();
 
 typedef void (*RTP_CALLBACK)(unsigned char *data, int data_len, int pt);
 void rtp_set_callback(RTP_CALLBACK callback);

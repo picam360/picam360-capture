@@ -36,6 +36,8 @@ pthread_t lg_receive_thread;
 static RTPSession lg_sess;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
 static int lg_record_fd = -1;
+static int lg_load_fd = -1;
+pthread_t lg_load_thread;
 
 static RTP_CALLBACK lg_callback = NULL;
 
@@ -82,14 +84,19 @@ static void *receive_thread_func(void* arg) {
 				RTPPacket *pack;
 
 				while ((pack = lg_sess.GetNextPacket()) != NULL) {
-					if (lg_callback) {
+					if (lg_callback && lg_load_fd < 0) {
 						lg_callback(pack->GetPayloadData(),
 								pack->GetPayloadLength(),
 								pack->GetPayloadType());
 					}
 					if (lg_record_fd > 0) {
-						write(lg_record_fd, pack->GetPacketData(),
-								pack->GetPacketLength());
+						unsigned short len = pack->GetPacketLength();
+						unsigned char len_bytes[2];
+						for (int i = 0; i < 2; i++) {
+							len_bytes[i] = (len >> (8 * i)) & 0xFF;
+						}
+						write(lg_record_fd, len_bytes, 2);
+						write(lg_record_fd, pack->GetPacketData(), len);
 					}
 
 					lg_sess.DeletePacket(pack);
@@ -103,6 +110,39 @@ static void *receive_thread_func(void* arg) {
 		status = lg_sess.Poll();
 		checkerror(status);
 #endif // RTP_SUPPORT_THREAD
+	}
+	return NULL;
+}
+
+static void *load_thread_func(void* arg) {
+	int status;
+	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
+	while (lg_load_fd >= 0) {
+		int read_len;
+		struct RTPHeader *header = (struct RTPHeader *) buff;
+		read_len = read(lg_load_fd, buff, 2);
+		if (read_len != 2) {
+			//error
+			break;
+		}
+		unsigned short len = (unsigned short) buff[0]
+				+ ((unsigned short) buff[1] >> 8);
+		if (len > sizeof(buff)) {
+			//error
+			break;
+		}
+		read_len = read(lg_load_fd, buff, len);
+		if (read_len != len) {
+			//error
+			break;
+		}
+
+		if (lg_callback) {
+			lg_callback(buff + sizeof(struct RTPHeader),
+					len - sizeof(struct RTPHeader), header->payloadtype);
+		}
+
+		//lg_sess.DeletePacket(pack);
 	}
 	return NULL;
 }
@@ -133,7 +173,8 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	RTPSessionParams sessparams;
 
 	sessparams.SetOwnTimestampUnit(1.0 / 1E6);	//micro sec
-	sessparams.SetMaximumPacketSize(RTP_MAXPAYLOADSIZE + 32);
+	sessparams.SetMaximumPacketSize(
+	RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader));
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
 
@@ -161,13 +202,29 @@ int deinit_rtp() {
 	is_init = false;
 	return 0;
 }
+
 void rtp_start_recording(char *path) {
 	rtp_stop_recording();
 	lg_record_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
 }
+
 void rtp_stop_recording() {
 	if (lg_record_fd > 0) {
-		close (lg_record_fd);
+		close(lg_record_fd);
 		lg_record_fd = -1;
+	}
+}
+
+void rtp_start_loading(char *path) {
+	rtp_stop_loading();
+	lg_load_fd = open(path, O_RDONLY);
+	pthread_create(&lg_load_thread, NULL, receive_load_func, (void*) NULL);
+}
+
+void rtp_stop_loading() {
+	if (lg_load_fd > 0) {
+		close(lg_load_fd);
+		lg_load_fd = -1;
+		pthread_join(lg_load_thread, NULL);
 	}
 }

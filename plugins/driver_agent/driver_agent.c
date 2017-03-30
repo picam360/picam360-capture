@@ -512,8 +512,7 @@ static void command_handler(void *user_data, char *_buff) {
 			}
 			printf("set_motor_value : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_delay", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_delay", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value = 0;
@@ -521,6 +520,15 @@ static void command_handler(void *user_data, char *_buff) {
 			lg_delay = MAX(MIN((int) value,MAX_DELAY_COUNT), 0);
 			printf("set_delay : completed\n");
 		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			rtp_start_loading(param);
+			printf("start_loading : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
+		rtp_stop_loading(param);
+		printf("stop_loading : completed\n");
 	} else {
 		printf(":unknown command : %s\n", buff);
 	}
