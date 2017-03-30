@@ -512,14 +512,14 @@ static void command_handler(void *user_data, char *_buff) {
 			}
 			printf("set_motor_value : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_delay_value", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_delay", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value = 0;
 			sscanf(param, "%f", &value);
 			lg_delay = MAX(MIN((int) value,MAX_DELAY_COUNT), 0);
-			printf("set_delay_value : completed\n");
+			printf("set_delay : completed\n");
 		}
 	} else {
 		printf(":unknown command : %s\n", buff);
@@ -588,7 +588,7 @@ static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
 	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
 	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
-	json_object_set_new(options, PLUGIN_NAME "..delay",
+	json_object_set_new(options, PLUGIN_NAME ".delay",
 			json_real((float) lg_delay));
 }
 
