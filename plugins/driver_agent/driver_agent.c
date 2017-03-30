@@ -527,7 +527,7 @@ static void command_handler(void *user_data, char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(paramm, (RTP_LOADING_CALLBACK) loading_callback);
+			rtp_start_loading(param, (RTP_LOADING_CALLBACK) loading_callback);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {

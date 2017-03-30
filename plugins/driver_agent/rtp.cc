@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <string>
+#include <list>
 
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
@@ -131,7 +132,8 @@ static void *record_thread_func(void* arg) {
 		}
 
 		pthread_mutex_lock(&lg_record_packet_queue_mlock);
-		pack = lg_record_packet_queue.pop_front();
+		pack = *(lg_record_packet_queue.begin());
+		lg_record_packet_queue.pop_front();
 		if (lg_record_packet_queue.empty()) {
 			mrevent_reset(&lg_record_packet_ready);
 		}
@@ -148,7 +150,8 @@ static void *record_thread_func(void* arg) {
 	}
 	pthread_mutex_lock(&lg_record_packet_queue_mlock);
 	while (!lg_record_packet_queue.empty()) {
-		pack = lg_record_packet_queue.pop_front();
+		pack = *(lg_record_packet_queue.begin());
+		lg_record_packet_queue.pop_front();
 		lg_sess.DeletePacket(pack);
 	}
 	mrevent_reset(&lg_record_packet_ready);
@@ -284,8 +287,7 @@ int deinit_rtp() {
 void rtp_start_recording(char *path) {
 	rtp_stop_recording();
 	lg_record_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
-	pthread_create(&lg_record_thread, NULL, record_thread_func,
-			(void*) callback);
+	pthread_create(&lg_record_thread, NULL, record_thread_func, (void*) NULL);
 }
 
 void rtp_stop_recording() {
