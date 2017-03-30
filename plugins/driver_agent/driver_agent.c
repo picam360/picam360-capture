@@ -482,6 +482,10 @@ void *transmit_thread_func(void* arg) {
 	} // end of while
 }
 
+static void loading_callback(int ret) {
+	printf("end of loading\n");
+}
+
 static void command_handler(void *user_data, char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
@@ -523,7 +527,7 @@ static void command_handler(void *user_data, char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(param);
+			rtp_start_loading(paramm, (RTP_LOADING_CALLBACK) loading_callback);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {

@@ -25,6 +25,7 @@
 #include "rtppacket.h"
 
 #include "rtp.h"
+#include "mrevent.h"
 
 using namespace jrtplib;
 
@@ -35,7 +36,13 @@ static bool lg_receive_run = false;
 pthread_t lg_receive_thread;
 static RTPSession lg_sess;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
+
 static int lg_record_fd = -1;
+pthread_t lg_record_thread;
+static MREVENT_T lg_record_packet_ready;
+static pthread_mutex_t lg_record_packet_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
+static std::list<RTPPacket*> lg_record_packet_queue;
+
 static int lg_load_fd = -1;
 pthread_t lg_load_thread;
 
@@ -90,16 +97,13 @@ static void *receive_thread_func(void* arg) {
 								pack->GetPayloadType());
 					}
 					if (lg_record_fd > 0) {
-						unsigned short len = pack->GetPacketLength();
-						unsigned char len_bytes[2];
-						for (int i = 0; i < 2; i++) {
-							len_bytes[i] = (len >> (8 * i)) & 0xFF;
-						}
-						write(lg_record_fd, len_bytes, 2);
-						write(lg_record_fd, pack->GetPacketData(), len);
+						pthread_mutex_lock(&lg_record_packet_queue_mlock);
+						lg_record_packet_queue.push_back(pack);
+						mrevent_trigger(&lg_record_packet_ready);
+						pthread_mutex_unlock(&lg_record_packet_queue_mlock);
+					} else {
+						lg_sess.DeletePacket(pack);
 					}
-
-					lg_sess.DeletePacket(pack);
 				}
 			} while (lg_sess.GotoNextSourceWithData());
 		}
@@ -114,11 +118,51 @@ static void *receive_thread_func(void* arg) {
 	return NULL;
 }
 
+static void *record_thread_func(void* arg) {
+	RTPPacket *pack;
+	while (lg_record_fd >= 0) {
+		int res = mrevent_wait(&lg_record_packet_ready, 1000);
+		if (res != 0) {
+			continue;
+		}
+		int fd = lg_record_fd;
+		if (fd < 0) { //for thread safe
+			continue;
+		}
+
+		pthread_mutex_lock(&lg_record_packet_queue_mlock);
+		pack = lg_record_packet_queue.pop_front();
+		if (lg_record_packet_queue.empty()) {
+			mrevent_reset(&lg_record_packet_ready);
+		}
+		pthread_mutex_unlock(&lg_record_packet_queue_mlock);
+
+		unsigned short len = pack->GetPacketLength();
+		unsigned char len_bytes[2];
+		for (int i = 0; i < 2; i++) {
+			len_bytes[i] = (len >> (8 * i)) & 0xFF;
+		}
+		write(fd, len_bytes, 2);
+		write(fd, pack->GetPacketData(), len);
+		lg_sess.DeletePacket(pack);
+	}
+	pthread_mutex_lock(&lg_record_packet_queue_mlock);
+	while (!lg_record_packet_queue.empty()) {
+		pack = lg_record_packet_queue.pop_front();
+		lg_sess.DeletePacket(pack);
+	}
+	mrevent_reset(&lg_record_packet_ready);
+	pthread_mutex_unlock(&lg_record_packet_queue_mlock);
+	return NULL;
+}
+
 static void *load_thread_func(void* arg) {
+	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) arg;
 	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
 	unsigned int last_timestanp = 0;
 	struct timeval last_time = { };
 	bool is_first = true;
+	int ret = 0;
 	while (lg_load_fd >= 0) {
 		int read_len;
 		struct RTPHeader *header = (struct RTPHeader *) buff;
@@ -133,11 +177,13 @@ static void *load_thread_func(void* arg) {
 		}
 		if (len > sizeof(buff)) {
 			//error
+			ret = -1;
 			break;
 		}
 		read_len = read(lg_load_fd, buff, len);
 		if (read_len != len) {
 			//error
+			ret = -1;
 			break;
 		}
 
@@ -170,6 +216,9 @@ static void *load_thread_func(void* arg) {
 			last_time = time;
 			last_timestanp = timestamp;
 		}
+	}
+	if (callback) {
+		callback(ret);
 	}
 	return NULL;
 }
@@ -216,6 +265,8 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	lg_receive_run = true;
 	pthread_create(&lg_receive_thread, NULL, receive_thread_func, (void*) NULL);
 
+	mrevent_init(&lg_record_packet_ready);
+
 	return 0;
 }
 
@@ -233,25 +284,30 @@ int deinit_rtp() {
 void rtp_start_recording(char *path) {
 	rtp_stop_recording();
 	lg_record_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
+	pthread_create(&lg_record_thread, NULL, record_thread_func,
+			(void*) callback);
 }
 
 void rtp_stop_recording() {
 	if (lg_record_fd > 0) {
-		close(lg_record_fd);
+		int fd = lg_record_fd;
 		lg_record_fd = -1;
+		pthread_join(lg_record_thread, NULL);
+		close(fd);
 	}
 }
 
-void rtp_start_loading(char *path) {
+void rtp_start_loading(char *path, RTP_LOADING_CALLBACK callback) {
 	rtp_stop_loading();
 	lg_load_fd = open(path, O_RDONLY);
-	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) NULL);
+	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) callback);
 }
 
 void rtp_stop_loading() {
 	if (lg_load_fd > 0) {
-		close(lg_load_fd);
+		int fd = lg_load_fd;
 		lg_load_fd = -1;
 		pthread_join(lg_load_thread, NULL);
+		close(fd);
 	}
 }
