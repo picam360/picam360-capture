@@ -26,7 +26,17 @@
 #include "rtppacket.h"
 
 #include "rtp.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "mrevent.h"
+
+#ifdef __cplusplus
+}
+#endif
+
 
 using namespace jrtplib;
 

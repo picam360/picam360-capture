@@ -524,6 +524,16 @@ static void command_handler(void *user_data, char *_buff) {
 			lg_delay = MAX(MIN((int) value,MAX_DELAY_COUNT), 0);
 			printf("set_delay : completed\n");
 		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff))
+			== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			rtp_start_loading(param);
+			printf("start_recording : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".stop_recording", sizeof(buff)) == 0) {
+		rtp_stop_recording();
+		printf("stop_recording : completed\n");
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
