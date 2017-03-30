@@ -116,6 +116,9 @@ static void *receive_thread_func(void* arg) {
 
 static void *load_thread_func(void* arg) {
 	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
+	unsigned int last_timestanp = 0;
+	struct timeval last_time = { };
+	bool is_first = true;
 	while (lg_load_fd >= 0) {
 		int read_len;
 		struct RTPHeader *header = (struct RTPHeader *) buff;
@@ -142,8 +145,30 @@ static void *load_thread_func(void* arg) {
 			lg_callback(buff + sizeof(struct RTPHeader),
 					len - sizeof(struct RTPHeader), header->payloadtype);
 		}
+		{ //wait
+			struct timeval time = { };
+			gettimeofday(&time, NULL);
+			if (is_first) {
+				is_first = false;
+				last_timestanp = header->timestamp;
+				gettimeofday(&last_time, NULL);
+			}
+			int elapsed_nsec;
+			if (header->timestamp < last_timestanp) {
+				elapsed_nsec = header->timestamp + (UINT_MAX - last_timestanp);
+			} else {
+				elapsed_nsec = header->timestamp - last_timestanp;
+			}
+			struct timeval diff;
+			timersub(&time, &last_time, &diff);
+			int diff_nsec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
 
-		//lg_sess.DeletePacket(pack);
+			if (diff_nsec < elapsed_nsec) {
+
+				usleep(MIN(elapsed_nsec - diff_nsec, 1000000));
+			}
+			last_time = time;
+		}
 	}
 	return NULL;
 }
