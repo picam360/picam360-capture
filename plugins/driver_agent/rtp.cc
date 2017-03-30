@@ -61,11 +61,11 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 		gettimeofday(&time, NULL);
 		struct timeval diff;
 		timersub(&time, &last_time, &diff);
-		int diff_nsec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
-		if (diff_nsec == 0) {
-			diff_nsec = 1;
+		int diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
+		if (diff_usec == 0) {
+			diff_usec = 1;
 		}
-		status = lg_sess.SendPacket(data, data_len, pt, false, diff_nsec);
+		status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
 		last_time = time;
 	}
@@ -146,28 +146,29 @@ static void *load_thread_func(void* arg) {
 					len - sizeof(struct RTPHeader), header->payloadtype);
 		}
 		{ //wait
+			unsigned int timestamp = ntohl(header->timestamp);
 			struct timeval time = { };
 			gettimeofday(&time, NULL);
 			if (is_first) {
 				is_first = false;
-				last_timestanp = header->timestamp;
+				last_timestanp = timestamp;
 				gettimeofday(&last_time, NULL);
 			}
 			int elapsed_nsec;
-			if (header->timestamp < last_timestanp) {
-				elapsed_nsec = header->timestamp + (UINT_MAX - last_timestanp);
+			if (timestamp < last_timestanp) {
+				elapsed_nsec = timestamp + (UINT_MAX - last_timestanp);
 			} else {
-				elapsed_nsec = header->timestamp - last_timestanp;
+				elapsed_nsec = timestamp - last_timestanp;
 			}
 			struct timeval diff;
 			timersub(&time, &last_time, &diff);
 			int diff_nsec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
 
 			if (diff_nsec < elapsed_nsec) {
-
 				usleep(MIN(elapsed_nsec - diff_nsec, 1000000));
 			}
 			last_time = time;
+			last_timestanp = timestamp;
 		}
 	}
 	return NULL;
