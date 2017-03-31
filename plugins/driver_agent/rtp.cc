@@ -43,16 +43,18 @@ using namespace jrtplib;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static bool lg_receive_run = false;
-pthread_t lg_receive_thread;
+static pthread_t lg_receive_thread;
 static RTPSession lg_sess;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
 
+static char lg_record_path[256];
 static int lg_record_fd = -1;
-pthread_t lg_record_thread;
+static pthread_t lg_record_thread;
 static MREVENT_T lg_record_packet_ready;
 static pthread_mutex_t lg_record_packet_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
 static std::list<RTPPacket*> lg_record_packet_queue;
 
+static char lg_load_path[256];
 static int lg_load_fd = -1;
 static pthread_t lg_load_thread;
 
@@ -310,7 +312,8 @@ int deinit_rtp() {
 
 void rtp_start_recording(char *path) {
 	rtp_stop_recording();
-	lg_record_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
+	strcpy(lg_record_path, path);
+	lg_record_fd = open(lg_record_path, O_CREAT | O_WRONLY | O_TRUNC);
 	pthread_create(&lg_record_thread, NULL, record_thread_func, (void*) NULL);
 }
 
@@ -323,9 +326,17 @@ void rtp_stop_recording() {
 	}
 }
 
+bool rtp_is_recording(char **path) {
+	if (path) {
+		*path = lg_record_path;
+	}
+	return (lg_record_fd > 0);
+}
+
 void rtp_start_loading(char *path, RTP_LOADING_CALLBACK callback) {
 	rtp_stop_loading();
-	lg_load_fd = open(path, O_RDONLY);
+	strcpy(lg_load_path, path);
+	lg_load_fd = open(lg_load_path, O_RDONLY);
 	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) callback);
 }
 
@@ -336,4 +347,11 @@ void rtp_stop_loading() {
 		pthread_join(lg_load_thread, NULL);
 		close(fd);
 	}
+}
+
+bool rtp_is_loading(char **path) {
+	if (path) {
+		*path = lg_load_path;
+	}
+	return (lg_load_fd > 0);
 }

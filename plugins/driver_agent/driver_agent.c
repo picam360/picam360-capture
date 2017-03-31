@@ -695,9 +695,20 @@ static void init() {
 #define MAX_INFO_LEN 1024
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
-	swprintf(lg_info, MAX_INFO_LEN, L"rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
-			lg_bandwidth, lg_fps[0], lg_fps[1], lg_frameskip[0],
-			lg_frameskip[1]);
+	int cur = 0;
+	cur += swprintf(lg_info, MAX_INFO_LEN,
+			L"rx %.1f Mbps, fps %.1f:%.1f skip %d:%d", lg_bandwidth, lg_fps[0],
+			lg_fps[1], lg_frameskip[0], lg_frameskip[1]);
+	if (rtp_is_recording(NULL)) {
+		char *path;
+		rtp_is_recording(&path);
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", to %hs", path);
+	}
+	if (rtp_is_loading(NULL)) {
+		char *path;
+		rtp_is_loading(&path);
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", from %hs", path);
+	}
 	return lg_info;
 }
 
