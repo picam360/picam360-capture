@@ -29,6 +29,7 @@ typedef struct _PLUGIN_T{
 	void (*command_handler)(void *user_data, char *cmd);
 	void (*init_options)(void *user_data, json_t *options);
 	void (*save_options)(void *user_data, json_t *options);
+	wchar_t *(*get_info)(void *user_data);
 	void *user_data;
 } PLUGIN_T;
 

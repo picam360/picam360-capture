@@ -1,6 +1,6 @@
 #pragma once
 
-#define RTP_MAXPAYLOADSIZE (16*1024-12)
+#define RTP_MAXPAYLOADSIZE (8*1024-12)
 
 #ifdef __cplusplus
 extern "C" {

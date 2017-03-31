@@ -29,10 +29,12 @@
 #define PT_CAM_BASE 110
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
-int lg_status_fd = -1;
-int lg_cam0_fd = -1;
-int lg_cam1_fd = -1;
-bool lg_recording = false;
+static int lg_status_fd = -1;
+static int lg_cam0_fd = -1;
+static int lg_cam1_fd = -1;
+static bool lg_recording = false;
+
+static float lg_bandwidth = 0.0;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -236,6 +238,7 @@ static void *recieve_thread_func(void* arg) {
 					if (q_str) {
 						float bandwidth;
 						sscanf(q_str, "<bandwidth v=\"%f\" />", &bandwidth);
+						lg_bandwidth = bandwidth;
 					}
 
 					xmp = false;
@@ -664,6 +667,13 @@ static void init() {
 	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
 }
 
+#define MAX_INFO_LEN 1024
+static wchar_t lg_info[MAX_INFO_LEN];
+static wchar_t *get_info(void *user_data) {
+	swprintf(lg_info, MAX_INFO_LEN, L"rx %.1f Mbps", lg_bandwidth);
+	return lg_info;
+}
+
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
@@ -674,6 +684,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	plugin->command_handler = command_handler;
 	plugin->init_options = init_options;
 	plugin->save_options = save_options;
+	plugin->get_info = get_info;
 	plugin->user_data = plugin;
 
 	*_plugin = plugin;
