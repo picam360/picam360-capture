@@ -90,7 +90,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			diff_usec = 1;
 		}
 		{ //bandwidth
-			float tmp = 8 * last_data_len / diff_usec; //Mbps
+			float tmp = 8.0f * last_data_len / diff_usec; //Mbps
 			float w = (float) diff_usec / 1000000 / 10;
 			lg_bandwidth = lg_bandwidth * (1.0 - w) + tmp * w;
 		}
