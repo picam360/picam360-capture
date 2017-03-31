@@ -115,6 +115,10 @@ static struct timeval lg_last_kokuyoseki_time = { };
 static int lg_last_button = -1;
 static int lg_func = -1;
 
+#define NUM_OF_CAM 2
+static float lg_fps[NUM_OF_CAM] = { };
+static int lg_frameskip[NUM_OF_CAM] = { };
+
 static void *recieve_thread_func(void* arg) {
 	int buff_size = RTP_MAXPAYLOADSIZE;
 	unsigned char *buff = malloc(buff_size);
@@ -240,6 +244,26 @@ static void *recieve_thread_func(void* arg) {
 						float bandwidth;
 						sscanf(q_str, "<bandwidth v=\"%f\" />", &bandwidth);
 						lg_bandwidth = bandwidth;
+					}
+					{
+						int offset = 0;
+						do {
+							q_str = strstr(xml + offset, "<video_info");
+							offset = (unsigned long) q_str
+									- (unsigned long) xml;
+							if (q_str) {
+								int id;
+								float fps;
+								int frameskip;
+								sscanf(q_str,
+										"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />",
+										&id, &fps, &frameskip);
+								if (id >= 0 && id < NUM_OF_CAM) {
+									lg_fps[id] = fps;
+									lg_frameskip[id] = frameskip;
+								}
+							}
+						} while (q_str);
 					}
 
 					xmp = false;
@@ -671,7 +695,9 @@ static void init() {
 #define MAX_INFO_LEN 1024
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
-	swprintf(lg_info, MAX_INFO_LEN, L"rx %.1f Mbps", lg_bandwidth);
+	swprintf(lg_info, MAX_INFO_LEN, L"rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
+			lg_bandwidth, lg_fps[0], lg_fps[1], lg_frameskip[0],
+			lg_frameskip[1]);
 	return lg_info;
 }
 
