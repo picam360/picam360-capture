@@ -249,8 +249,8 @@ static void *recieve_thread_func(void* arg) {
 						int offset = 0;
 						do {
 							q_str = strstr(xml + offset, "<video_info");
-							offset = (unsigned long) q_str
-									- (unsigned long) xml;
+							offset = (unsigned long) q_str - (unsigned long) xml
+									+ 1;
 							if (q_str) {
 								int id;
 								float fps;
