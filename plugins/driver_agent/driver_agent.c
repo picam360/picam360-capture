@@ -232,6 +232,11 @@ static void *recieve_thread_func(void* arg) {
 
 						lg_plugin_host->set_camera_temperature(temperature);
 					}
+					q_str = strstr(xml, "<bandwidth");
+					if (q_str) {
+						float bandwidth;
+						sscanf(q_str, "<bandwidth v=\"%f\" />", &bandwidth);
+					}
 
 					xmp = false;
 					free(buff_xmp);

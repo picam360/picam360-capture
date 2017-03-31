@@ -37,7 +37,6 @@ extern "C" {
 }
 #endif
 
-
 using namespace jrtplib;
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -55,9 +54,11 @@ static pthread_mutex_t lg_record_packet_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
 static std::list<RTPPacket*> lg_record_packet_queue;
 
 static int lg_load_fd = -1;
-pthread_t lg_load_thread;
+static pthread_t lg_load_thread;
 
 static RTP_CALLBACK lg_callback = NULL;
+
+static float lg_bandwidth = 0;
 
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
@@ -70,10 +71,15 @@ static void checkerror(int rtperr) {
 	}
 }
 
+float rtp_get_bandwidth() {
+	return lg_bandwidth;
+}
+
 int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 	int status;
 	pthread_mutex_lock(&lg_mlock);
 	{
+		static int last_data_len = 0;
 		static struct timeval last_time = { };
 		struct timeval time = { };
 		gettimeofday(&time, NULL);
@@ -83,9 +89,17 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 		if (diff_usec == 0) {
 			diff_usec = 1;
 		}
+		{ //bandwidth
+			float tmp = 8 * last_data_len / diff_usec; //Mbps
+			float w = (float) diff_usec / 1000000 / 10;
+			lg_bandwidth = lg_bandwidth * (1.0 - w) + tmp * w;
+		}
+
 		status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
+
 		last_time = time;
+		last_data_len = data_len;
 	}
 	pthread_mutex_unlock(&lg_mlock);
 	return 0;
