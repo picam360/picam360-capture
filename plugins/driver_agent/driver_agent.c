@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <pthread.h>
+#include <wchar.h>
 
 #include "driver_agent.h"
 #include "kokuyoseki.h"

@@ -1659,7 +1659,8 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	}
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]->get_info) {
-			wchar_t *info = state->plugins[i]->get_info();
+			wchar_t *info = state->plugins[i]->get_info(
+					state->plugins[i]->user_data);
 			pen.x = -((float) state->screen_width / 2
 					- state->freetypegles.font->size / 8);
 			pen.y = ((float) state->screen_height / 2
