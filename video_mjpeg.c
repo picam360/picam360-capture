@@ -370,6 +370,7 @@ void *video_mjpeg_decode(void* arg) {
 				release_image(image_data);
 			}
 			image_data = data.image_data;
+			data.image_data = NULL;
 			addref_image(image_data);
 			pthread_mutex_unlock(&mlock);
 
