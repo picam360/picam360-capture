@@ -50,7 +50,7 @@
 
 #include "picam360_capture.h"
 #include "video.h"
-#include "video_mjpeg.h"
+#include "mjpeg_decoder.h"
 #include "video_direct.h"
 #include "picam360_tools.h"
 #include "gl_program.h"
@@ -459,14 +459,17 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		}
 
 		// Start rendering
-		void **args = malloc(sizeof(void*) * 3);
-		args[0] = (void*) i;
-		args[1] = (void*) state->egl_image[i];
-		args[2] = (void*) state;
-		pthread_create(&state->thread[i], NULL,
-				(state->video_direct) ? video_direct :
-				(state->codec_type == H264) ?
-						video_decode_test : video_mjpeg_decode, args);
+		if (state->codec_type == MJPEG) {
+			init_mjpeg_decoder(i, state->egl_image[i]);
+		} else {
+			void **args = malloc(sizeof(void*) * 3);
+			args[0] = (void*) i;
+			args[1] = (void*) state->egl_image[i];
+			args[2] = (void*) state;
+			pthread_create(&state->thread[i], NULL,
+					(state->video_direct) ? video_direct : video_decode_test,
+					args);
+		}
 
 		// Bind texture surface to current vertices
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
@@ -1240,6 +1243,11 @@ static float get_camera_north() {
 }
 static void set_camera_north(float value) {
 	state->camera_north = value;
+}
+static void decode_video(int cam_num, unsigned char *data, int data_len) {
+	if (state->codec_type == MJPEG) {
+		mjpeg_decode(cam_num, data, data_len);
+	}
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {

@@ -124,31 +124,27 @@ static void parse_xml(char *xml) {
 	q_str = strstr(xml, "<quaternion");
 	if (q_str) {
 		int cur = (lg_delay_cur) % MAX_DELAY_COUNT;
-		int delay_cur = (lg_delay_cur - lg_delay
-				+ MAX_DELAY_COUNT) % MAX_DELAY_COUNT;
+		int delay_cur = (lg_delay_cur - lg_delay + MAX_DELAY_COUNT)
+				% MAX_DELAY_COUNT;
 		float quatanion[4];
-		sscanf(q_str,
-				"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&quatanion[0], &quatanion[1], &quatanion[2],
-				&quatanion[3]);
+		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
 		//convert from mpu coodinate to opengl coodinate
 		lg_camera_quatanion_queue[cur][0] = quatanion[1]; //x
 		lg_camera_quatanion_queue[cur][1] = quatanion[3]; //y : swap y and z
 		lg_camera_quatanion_queue[cur][2] = -quatanion[2]; //z : swap y and z
 		lg_camera_quatanion_queue[cur][3] = quatanion[0]; //w
-		memcpy(lg_camera_quatanion,
-				lg_camera_quatanion_queue[delay_cur],
+		memcpy(lg_camera_quatanion, lg_camera_quatanion_queue[delay_cur],
 				sizeof(float) * 4);
-		lg_plugin_host->set_camera_quatanion(
-				lg_camera_quatanion);
+		lg_plugin_host->set_camera_quatanion(lg_camera_quatanion);
 
 		lg_delay_cur++;
 	}
 	q_str = strstr(xml, "<compass");
 	if (q_str) {
 		float compass[3];
-		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&compass[0], &compass[1], &compass[2]);
+		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &compass[0],
+				&compass[1], &compass[2]);
 		//convert from mpu coodinate to opengl coodinate
 		lg_camera_compass[0] = compass[1];
 		lg_camera_compass[1] = -compass[0];
@@ -165,18 +161,15 @@ static void parse_xml(char *xml) {
 			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
-			memcpy(compass_mat, lg_camera_compass,
-					sizeof(float) * 4);
+			memcpy(compass_mat, lg_camera_compass, sizeof(float) * 4);
 
 			mat4_transpose(compass_mat, compass_mat);
 			mat4_multiply(compass_mat, compass_mat, matrix);
 			mat4_transpose(compass_mat, compass_mat);
 
-			north = -atan2(compass_mat[2], compass_mat[0]) * 180
-					/ M_PI;
+			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
 
-			lg_camera_north = (lg_camera_north
-					* lg_camera_north_count + north)
+			lg_camera_north = (lg_camera_north * lg_camera_north_count + north)
 					/ (lg_camera_north_count + 1);
 			lg_camera_north_count++;
 			if (lg_camera_north_count > 1000) {
@@ -202,8 +195,7 @@ static void parse_xml(char *xml) {
 		int offset = 0;
 		do {
 			q_str = strstr(xml + offset, "<video_info");
-			offset = (unsigned long) q_str - (unsigned long) xml
-					+ 1;
+			offset = (unsigned long) q_str - (unsigned long) xml + 1;
 			if (q_str) {
 				int id;
 				float fps;
@@ -655,27 +647,21 @@ static void save_options(void *user_data, json_t *options) {
 }
 
 static int rtp_callback(char *data, int data_len, int pt) {
-	int fd = -1;
 	if (pt == PT_STATUS) {
+		int fd = -1;
 		if (lg_status_fd < 0) {
 			lg_status_fd = open("status", O_WRONLY | O_NONBLOCK);
 		}
 		fd = lg_status_fd;
+		if (fd < 0) {
+			return -1;
+		}
+		write(fd, data, data_len);
 	} else if (pt == PT_CAM_BASE + 0) {
-		if (lg_cam0_fd < 0) {
-			lg_cam0_fd = open("cam0", O_WRONLY | O_NONBLOCK);
-		}
-		fd = lg_cam0_fd;
+		lg_plugin_host->decode_video(0, (unsigned char*) data, data_len);
 	} else if (pt == PT_CAM_BASE + 1) {
-		if (lg_cam1_fd < 0) {
-			lg_cam1_fd = open("cam1", O_WRONLY | O_NONBLOCK);
-		}
-		fd = lg_cam1_fd;
+		lg_plugin_host->decode_video(1, (unsigned char*) data, data_len);
 	}
-	if (fd < 0) {
-		return -1;
-	}
-	write(fd, data, data_len);
 	return 0;
 }
 

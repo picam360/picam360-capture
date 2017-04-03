@@ -21,6 +21,8 @@ typedef struct _PLUGIN_HOST_T{
 	void (*set_camera_temperature)(float value);
 	float (*get_camera_north)();
 	void (*set_camera_north)(float value);
+
+	void (*decode_video)(int cam_num, unsigned char *data, int data_len);
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T{

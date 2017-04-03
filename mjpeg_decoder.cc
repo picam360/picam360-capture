@@ -18,7 +18,7 @@
 #include "bcm_host.h"
 #include "ilclient.h"
 
-#include "video_mjpeg.h"
+#include "mjpeg_decoder.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -210,9 +210,8 @@ static void *sendframe_thread_func(void* arg) {
 						float tmp = (float) (send_frame_arg->framecount
 								- last_framecount) / diff_sec;
 						float w = diff_sec / 10;
-						send_frame_arg->fps =
-								send_frame_arg->fps * (1.0 - w)
-										+ tmp * w;
+						send_frame_arg->fps = send_frame_arg->fps * (1.0 - w)
+								+ tmp * w;
 
 						last_framecount = send_frame_arg->framecount;
 						last_time = time;
@@ -240,10 +239,8 @@ static void *sendframe_thread_func(void* arg) {
 
 				buf = ilclient_get_input_buffer(video_decode, 130, 1);
 
-				data_len = MIN(buf->nAllocLen,
-						packet->len);
-				memcpy(buf->pBuffer, packet->data,
-						data_len);
+				data_len = MIN(buf->nAllocLen, packet->len);
+				memcpy(buf->pBuffer, packet->data, data_len);
 
 				if (port_settings_changed == 0
 						&& ((data_len > 0
@@ -278,8 +275,8 @@ static void *sendframe_thread_func(void* arg) {
 					}
 
 					if (OMX_UseEGLImage(ILC_GET_HANDLE(lg_egl_render[index]),
-							&lg_egl_buffer[index], 221, NULL, send_frame_arg->user_data)
-							!= OMX_ErrorNone) {
+							&lg_egl_buffer[index], 221, NULL,
+							send_frame_arg->user_data) != OMX_ErrorNone) {
 						printf("OMX_UseEGLImage failed.\n");
 						exit(1);
 					}
@@ -335,7 +332,7 @@ static void *sendframe_thread_func(void* arg) {
 				!= OMX_ErrorNone)
 			status = -20;
 
-// need to flush the renderer to allow video_decode to disable its input port
+		// need to flush the renderer to allow video_decode to disable its input port
 		ilclient_flush_tunnels(tunnel, 0);
 
 		ilclient_disable_port_buffers(video_decode, 130, NULL, NULL, NULL);
@@ -355,105 +352,46 @@ static void *sendframe_thread_func(void* arg) {
 	return (void *) status;
 }
 
-static void *camx_thread_func(void* arg) {
-	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
-	char buff[RTP_MAXPAYLOADSIZE];
-	int buff_size = RTP_MAXPAYLOADSIZE;
-	sprintf(buff, "cam%d", send_frame_arg->cam_num);
-	int camd_fd = open(buff, O_RDONLY);
-	if (camd_fd < 0) {
-		return NULL;
-	}
+void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
+	if (active_frame == NULL) {
+		if (data[0] == 0xD8 && data[1] == 0xD8) { //SOI
+			active_frame = new _FRAME_T;
 
-	pthread_t sendframe_thread;
-	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
-			(void*) send_frame_arg);
-
-	int marker = 0;
-	int soicount = 0;
-	_FRAME_T *active_frame = NULL;
-	while (send_frame_arg->cam_run) {
-		int soi_pos = INT_MIN;
-		int data_len = read(camd_fd, buff, buff_size);
-
-		for (int i = 0; i < data_len; i++) {
-			if (marker) {
-				marker = 0;
-				if (buff[i] == 0xD8) { //SOI
-					if (soicount == 0) {
-						soi_pos = (i - 1);
-						active_frame = new _FRAME_T;
-
-						pthread_mutex_lock(&send_frame_arg->frames_mlock);
-						send_frame_arg->frames.push_back(active_frame);
-						pthread_mutex_unlock(&send_frame_arg->frames_mlock);
-						mrevent_trigger(&send_frame_arg->frame_ready);
-					}
-					soicount++;
-				}
-				if (buff[i] == 0xD9 && active_frame != NULL) { //EOI
-					soicount--;
-					if (soicount == 0) {
-						_PACKET_T *packet = new _PACKET_T;
-						packet->eof = true;
-						if (soi_pos >= 0) { //soi
-							packet->len = (i + 1) - soi_pos;
-							if (packet->len > RTP_MAXPAYLOADSIZE) {
-								fprintf(stderr, "packet length exceeded. %d\n",
-										packet->len);
-								packet->len = RTP_MAXPAYLOADSIZE;
-							}
-							memcpy(packet->data, buff + soi_pos, packet->len);
-						} else {
-							packet->len = i + 1;
-							if (packet->len > RTP_MAXPAYLOADSIZE) {
-								fprintf(stderr, "packet length exceeded. %d\n",
-										packet->len);
-								packet->len = RTP_MAXPAYLOADSIZE;
-							}
-							memcpy(packet->data, buff, packet->len);
-						}
-						pthread_mutex_lock(&active_frame->packets_mlock);
-						active_frame->packets.push_back(packet);
-						mrevent_trigger(&active_frame->packet_ready);
-						pthread_mutex_unlock(&active_frame->packets_mlock);
-
-						active_frame = NULL;
-					}
-				}
-			} else if (buff[i] == 0xFF) {
-				marker = 1;
-			}
+			pthread_mutex_lock(&send_frame_arg->frames_mlock);
+			send_frame_arg->frames.push_back(active_frame);
+			pthread_mutex_unlock(&send_frame_arg->frames_mlock);
+			mrevent_trigger(&send_frame_arg->frame_ready);
 		}
-		if (active_frame != NULL) {
-			_PACKET_T *packet = new _PACKET_T;
-			if (soi_pos >= 0) { //soi
-				packet->len = data_len - soi_pos;
-				if (packet->len > RTP_MAXPAYLOADSIZE) {
-					fprintf(stderr, "packet length exceeded. %d\n",
-							packet->len);
-					packet->len = RTP_MAXPAYLOADSIZE;
-				}
-				memcpy(packet->data, buff + soi_pos, packet->len);
-			} else {
-				packet->len = data_len;
-				if (packet->len > RTP_MAXPAYLOADSIZE) {
-					fprintf(stderr, "packet length exceeded. %d\n",
-							packet->len);
-					packet->len = RTP_MAXPAYLOADSIZE;
-				}
-				memcpy(packet->data, buff, packet->len);
+	}
+	if (active_frame != NULL) {
+		_PACKET_T *packet = new _PACKET_T;
+		{
+			packet->len = data_len;
+			if (packet->len > RTP_MAXPAYLOADSIZE) {
+				fprintf(stderr, "packet length exceeded. %d\n", packet->len);
+				packet->len = RTP_MAXPAYLOADSIZE;
 			}
+			memcpy(packet->data, data, packet->len);
+		}
+		if (data[data_len - 2] == 0xD8 && && data[data_len - 1] == 0xD9) { //EOI
+			packet->eof = true;
+
+			pthread_mutex_lock(&active_frame->packets_mlock);
+			active_frame->packets.push_back(packet);
+			mrevent_trigger(&active_frame->packet_ready);
+			pthread_mutex_unlock(&active_frame->packets_mlock);
+
+			active_frame = NULL;
+		} else {
 			pthread_mutex_lock(&active_frame->packets_mlock);
 			active_frame->packets.push_back(packet);
 			pthread_mutex_unlock(&active_frame->packets_mlock);
 			mrevent_trigger(&active_frame->packet_ready);
 		}
 	}
-	close(camd_fd);
-	return NULL;
+
 }
-void init_video_mjpeg(int cam_num, void *user_data) {
+void init_mjpeg_decoder(int cam_num, void *user_data) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
 	if (lg_send_frame_arg[cam_num]) {
 		return;
@@ -464,9 +402,9 @@ void init_video_mjpeg(int cam_num, void *user_data) {
 
 	lg_send_frame_arg[cam_num]->cam_run = true;
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
-			camx_thread_func, (void*) lg_send_frame_arg[cam_num]);
+			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
-void deinit_video_mjpeg(int cam_num) {
+void deinit_mjpeg_decoder(int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
@@ -479,14 +417,14 @@ void deinit_video_mjpeg(int cam_num) {
 	lg_send_frame_arg[cam_num] = NULL;
 }
 
-float video_mjpeg_get_fps(int cam_num) {
+float mjpeg_decoder_get_fps(int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->fps;
 }
-int video_mjpeg_get_frameskip(int cam_num) {
+int mjpeg_decoder_get_frameskip(int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
