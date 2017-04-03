@@ -119,6 +119,107 @@ static int lg_func = -1;
 static float lg_fps[NUM_OF_CAM] = { };
 static int lg_frameskip[NUM_OF_CAM] = { };
 
+static void parse_xml(char *xml) {
+	char *q_str = NULL;
+	q_str = strstr(xml, "<quaternion");
+	if (q_str) {
+		int cur = (lg_delay_cur) % MAX_DELAY_COUNT;
+		int delay_cur = (lg_delay_cur - lg_delay
+				+ MAX_DELAY_COUNT) % MAX_DELAY_COUNT;
+		float quatanion[4];
+		sscanf(q_str,
+				"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+				&quatanion[0], &quatanion[1], &quatanion[2],
+				&quatanion[3]);
+		//convert from mpu coodinate to opengl coodinate
+		lg_camera_quatanion_queue[cur][0] = quatanion[1]; //x
+		lg_camera_quatanion_queue[cur][1] = quatanion[3]; //y : swap y and z
+		lg_camera_quatanion_queue[cur][2] = -quatanion[2]; //z : swap y and z
+		lg_camera_quatanion_queue[cur][3] = quatanion[0]; //w
+		memcpy(lg_camera_quatanion,
+				lg_camera_quatanion_queue[delay_cur],
+				sizeof(float) * 4);
+		lg_plugin_host->set_camera_quatanion(
+				lg_camera_quatanion);
+
+		lg_delay_cur++;
+	}
+	q_str = strstr(xml, "<compass");
+	if (q_str) {
+		float compass[3];
+		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
+				&compass[0], &compass[1], &compass[2]);
+		//convert from mpu coodinate to opengl coodinate
+		lg_camera_compass[0] = compass[1];
+		lg_camera_compass[1] = -compass[0];
+		lg_camera_compass[2] = -compass[2];
+		lg_camera_compass[3] = 1.0;
+
+		lg_plugin_host->set_camera_compass(lg_camera_compass);
+
+		{ //north
+			float north = 0;
+
+			float matrix[16];
+			mat4_fromQuat(matrix, lg_camera_quatanion);
+			mat4_invert(matrix, matrix);
+
+			float compass_mat[16] = { };
+			memcpy(compass_mat, lg_camera_compass,
+					sizeof(float) * 4);
+
+			mat4_transpose(compass_mat, compass_mat);
+			mat4_multiply(compass_mat, compass_mat, matrix);
+			mat4_transpose(compass_mat, compass_mat);
+
+			north = -atan2(compass_mat[2], compass_mat[0]) * 180
+					/ M_PI;
+
+			lg_camera_north = (lg_camera_north
+					* lg_camera_north_count + north)
+					/ (lg_camera_north_count + 1);
+			lg_camera_north_count++;
+			if (lg_camera_north_count > 1000) {
+				lg_camera_north_count = 1000;
+			}
+			lg_plugin_host->set_camera_north(lg_camera_north);
+		}
+	}
+	q_str = strstr(xml, "<temperature");
+	if (q_str) {
+		float temperature;
+		sscanf(q_str, "<temperature v=\"%f\" />", &temperature);
+
+		lg_plugin_host->set_camera_temperature(temperature);
+	}
+	q_str = strstr(xml, "<bandwidth");
+	if (q_str) {
+		float bandwidth;
+		sscanf(q_str, "<bandwidth v=\"%f\" />", &bandwidth);
+		lg_bandwidth = bandwidth;
+	}
+	{
+		int offset = 0;
+		do {
+			q_str = strstr(xml + offset, "<video_info");
+			offset = (unsigned long) q_str - (unsigned long) xml
+					+ 1;
+			if (q_str) {
+				int id;
+				float fps;
+				int frameskip;
+				sscanf(q_str,
+						"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />",
+						&id, &fps, &frameskip);
+				if (id >= 0 && id < NUM_OF_CAM) {
+					lg_fps[id] = fps;
+					lg_frameskip[id] = frameskip;
+				}
+			}
+		} while (q_str);
+	}
+}
+
 static void *recieve_thread_func(void* arg) {
 	int buff_size = RTP_MAXPAYLOADSIZE;
 	unsigned char *buff = malloc(buff_size);
@@ -126,7 +227,8 @@ static void *recieve_thread_func(void* arg) {
 	int marker = 0;
 	int camd_fd = -1;
 	bool xmp = false;
-	char *buff_xmp = NULL;
+	int buff_xmp_size = 4096;
+	char *buff_xmp = malloc(buff_xmp_size);
 	int xmp_len = 0;
 	int xmp_idx = 0;
 
@@ -157,7 +259,11 @@ static void *recieve_thread_func(void* arg) {
 					xmp_len = ((unsigned char*) buff)[i] << 8;
 				} else if (xmp_idx == 1) {
 					xmp_len += ((unsigned char*) buff)[i];
-					buff_xmp = malloc(xmp_len);
+					if (xmp_len > buff_xmp_size) {
+						free(buff_xmp);
+						buff_xmp_size = xmp_len;
+						buff_xmp = malloc(buff_xmp_size);
+					}
 					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
 					buff_xmp[1] = (xmp_len) & 0xFF;
 				} else {
@@ -167,108 +273,8 @@ static void *recieve_thread_func(void* arg) {
 				if (xmp_idx >= xmp_len) {
 					char *xml = buff_xmp + strlen(buff_xmp) + 1;
 
-					char *q_str = NULL;
-					q_str = strstr(xml, "<quaternion");
-					if (q_str) {
-						int cur = (lg_delay_cur) % MAX_DELAY_COUNT;
-						int delay_cur = (lg_delay_cur - lg_delay
-								+ MAX_DELAY_COUNT) % MAX_DELAY_COUNT;
-						float quatanion[4];
-						sscanf(q_str,
-								"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-								&quatanion[0], &quatanion[1], &quatanion[2],
-								&quatanion[3]);
-						//convert from mpu coodinate to opengl coodinate
-						lg_camera_quatanion_queue[cur][0] = quatanion[1]; //x
-						lg_camera_quatanion_queue[cur][1] = quatanion[3]; //y : swap y and z
-						lg_camera_quatanion_queue[cur][2] = -quatanion[2]; //z : swap y and z
-						lg_camera_quatanion_queue[cur][3] = quatanion[0]; //w
-						memcpy(lg_camera_quatanion,
-								lg_camera_quatanion_queue[delay_cur],
-								sizeof(float) * 4);
-						lg_plugin_host->set_camera_quatanion(
-								lg_camera_quatanion);
-
-						lg_delay_cur++;
-					}
-					q_str = strstr(xml, "<compass");
-					if (q_str) {
-						float compass[3];
-						sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-								&compass[0], &compass[1], &compass[2]);
-						//convert from mpu coodinate to opengl coodinate
-						lg_camera_compass[0] = compass[1];
-						lg_camera_compass[1] = -compass[0];
-						lg_camera_compass[2] = -compass[2];
-						lg_camera_compass[3] = 1.0;
-
-						lg_plugin_host->set_camera_compass(lg_camera_compass);
-
-						{ //north
-							float north = 0;
-
-							float matrix[16];
-							mat4_fromQuat(matrix, lg_camera_quatanion);
-							mat4_invert(matrix, matrix);
-
-							float compass_mat[16] = { };
-							memcpy(compass_mat, lg_camera_compass,
-									sizeof(float) * 4);
-
-							mat4_transpose(compass_mat, compass_mat);
-							mat4_multiply(compass_mat, compass_mat, matrix);
-							mat4_transpose(compass_mat, compass_mat);
-
-							north = -atan2(compass_mat[2], compass_mat[0]) * 180
-									/ M_PI;
-
-							lg_camera_north = (lg_camera_north
-									* lg_camera_north_count + north)
-									/ (lg_camera_north_count + 1);
-							lg_camera_north_count++;
-							if (lg_camera_north_count > 1000) {
-								lg_camera_north_count = 1000;
-							}
-							lg_plugin_host->set_camera_north(lg_camera_north);
-						}
-					}
-					q_str = strstr(xml, "<temperature");
-					if (q_str) {
-						float temperature;
-						sscanf(q_str, "<temperature v=\"%f\" />", &temperature);
-
-						lg_plugin_host->set_camera_temperature(temperature);
-					}
-					q_str = strstr(xml, "<bandwidth");
-					if (q_str) {
-						float bandwidth;
-						sscanf(q_str, "<bandwidth v=\"%f\" />", &bandwidth);
-						lg_bandwidth = bandwidth;
-					}
-					{
-						int offset = 0;
-						do {
-							q_str = strstr(xml + offset, "<video_info");
-							offset = (unsigned long) q_str - (unsigned long) xml
-									+ 1;
-							if (q_str) {
-								int id;
-								float fps;
-								int frameskip;
-								sscanf(q_str,
-										"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />",
-										&id, &fps, &frameskip);
-								if (id >= 0 && id < NUM_OF_CAM) {
-									lg_fps[id] = fps;
-									lg_frameskip[id] = frameskip;
-								}
-							}
-						} while (q_str);
-					}
-
+					parse_xml(xml);
 					xmp = false;
-					free(buff_xmp);
-					buff_xmp = NULL;
 				}
 			}
 			if (marker) {
@@ -285,6 +291,7 @@ static void *recieve_thread_func(void* arg) {
 	}
 
 	free(buff);
+	free(buff_xmp);
 
 	return NULL;
 }

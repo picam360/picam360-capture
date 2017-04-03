@@ -110,52 +110,6 @@ typedef struct _IMAGE_RECEIVER_DATA {
 	IMAGE_DATA *image_data;
 } IMAGE_RECEIVER_DATA;
 
-static void *image_dumper(void* arg) {
-	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
-	IMAGE_DATA *image_data = NULL;
-	int descriptor = -1;
-	while (1) {
-
-		//wait untill image arived
-		if (data->image_data == NULL || data->image_data == image_data) {
-			usleep(1000);
-			continue;
-		}
-
-		pthread_mutex_lock(data->mlock_p);
-		if (image_data != NULL) { // release memory
-			release_image(image_data);
-		}
-		image_data = data->image_data;
-		addref_image(image_data);
-		pthread_mutex_unlock(data->mlock_p);
-
-		if (descriptor >= 0) {
-			if (!data->state->output_raw) { //end
-				close(descriptor);
-				descriptor = -1;
-				continue;
-			} else { // write
-				write(descriptor, image_data->image_buff,
-						image_data->image_size);
-			}
-		} else if (data->state->output_raw) { // start
-			char buff[256];
-			sprintf(buff, data->state->output_raw_filepath, data->index);
-			descriptor = open(buff, O_WRONLY | O_CREAT, 0666);
-			if (descriptor == -1) {
-				printf("failed to open %s\n", buff);
-				data->state->output_raw = false;
-				continue;
-			}
-		} else {
-			usleep(1000);
-		}
-	}
-
-	return NULL;
-}
-
 static void *image_receiver(void* arg) {
 	IMAGE_RECEIVER_DATA *data = (IMAGE_RECEIVER_DATA*) arg;
 	int buff_size = 4096;
@@ -400,9 +354,6 @@ void *video_mjpeg_decode(void* arg) {
 		pthread_t image_receiver_thread;
 		pthread_create(&image_receiver_thread, NULL, image_receiver,
 				(void*) &data);
-
-		pthread_t image_dumper_thread;
-		pthread_create(&image_dumper_thread, NULL, image_dumper, (void*) &data);
 
 		IMAGE_DATA *image_data = NULL;
 		while (1) {
