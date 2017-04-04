@@ -94,11 +94,6 @@ static float lg_camera_north = 0;
 static float lg_camera_north_count = 0;
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
-#define MAX_DELAY_COUNT 256
-static int lg_delay = 0;
-static int lg_delay_cur = 0;
-static float lg_camera_quatanion_queue[MAX_DELAY_COUNT][4] = { };
-
 static bool lg_pid_enabled = false;
 static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
@@ -120,25 +115,6 @@ static char lg_last_recorded_filename[256] = { };
 
 static void parse_xml(char *xml) {
 	char *q_str = NULL;
-	q_str = strstr(xml, "<quaternion");
-	if (q_str) {
-		int cur = (lg_delay_cur) % MAX_DELAY_COUNT;
-		int delay_cur = (lg_delay_cur - lg_delay + MAX_DELAY_COUNT)
-				% MAX_DELAY_COUNT;
-		float quatanion[4];
-		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
-		//convert from mpu coodinate to opengl coodinate
-		lg_camera_quatanion_queue[cur][0] = quatanion[1]; //x
-		lg_camera_quatanion_queue[cur][1] = quatanion[3]; //y : swap y and z
-		lg_camera_quatanion_queue[cur][2] = -quatanion[2]; //z : swap y and z
-		lg_camera_quatanion_queue[cur][3] = quatanion[0]; //w
-		memcpy(lg_camera_quatanion, lg_camera_quatanion_queue[delay_cur],
-				sizeof(float) * 4);
-		lg_plugin_host->set_camera_quatanion(lg_camera_quatanion);
-
-		lg_delay_cur++;
-	}
 	q_str = strstr(xml, "<compass");
 	if (q_str) {
 		float compass[3];

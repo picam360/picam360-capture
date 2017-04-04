@@ -51,6 +51,8 @@ public:
 	_FRAME_T() {
 		pthread_mutex_init(&packets_mlock, NULL);
 		mrevent_init(&packet_ready);
+		xmp_info = false;
+		memset(quatanion, 0, sizeof(quatanion));
 	}
 	~_FRAME_T() {
 		_FRAME_T *frame = this;
@@ -69,6 +71,8 @@ public:
 	std::list<_PACKET_T *> packets;
 	pthread_mutex_t packets_mlock;
 	MREVENT_T packet_ready;
+	bool xmp_info;
+	float quatanion[4];
 };
 class _SENDFRAME_ARG_T {
 public:
@@ -95,7 +99,8 @@ public:
 	void *user_data;
 };
 
-_SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
+static PLUGIN_HOST_T *lg_plugin_host = NULL;
+static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 
 static OMX_BUFFERHEADERTYPE* lg_egl_buffer[2] = { };
 static COMPONENT_T* lg_egl_render[2] = { };
@@ -143,7 +148,7 @@ static void *sendframe_thread_func(void* arg) {
 			(void*) index);
 
 	// create video_decode
-	if (ilclient_create_component(client, &video_decode, (char*)"video_decode",
+	if (ilclient_create_component(client, &video_decode, (char*) "video_decode",
 			(ILCLIENT_CREATE_FLAGS_T)(
 					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS))
 			!= 0)
@@ -153,7 +158,7 @@ static void *sendframe_thread_func(void* arg) {
 	// create lg_egl_render
 	if (status == 0
 			&& ilclient_create_component(client, &lg_egl_render[index],
-					(char*)"egl_render",
+					(char*) "egl_render",
 					(ILCLIENT_CREATE_FLAGS_T)(
 							ILCLIENT_DISABLE_ALL_PORTS
 									| ILCLIENT_ENABLE_OUTPUT_BUFFERS)) != 0)
@@ -245,7 +250,7 @@ static void *sendframe_thread_func(void* arg) {
 
 				buf = ilclient_get_input_buffer(video_decode, 130, 1);
 
-				data_len = MIN((int)buf->nAllocLen, packet->len);
+				data_len = MIN((int )buf->nAllocLen, packet->len);
 				memcpy(buf->pBuffer, packet->data, data_len);
 
 				if (port_settings_changed == 0
@@ -323,6 +328,9 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					delete packet;
+					if (frame->xmp_info && index == 0 && lg_plugin_host) {
+						lg_plugin_host->set_camera_quatanion(frame->quatanion);
+					}
 					break;
 				} else {
 					delete packet;
@@ -358,6 +366,23 @@ static void *sendframe_thread_func(void* arg) {
 	return (void *) status;
 }
 
+static void parse_xml(char *xml, _FRAME_T *frame) {
+	frame->xmp_info = true;
+
+	char *q_str = NULL;
+	q_str = strstr(xml, "<quaternion");
+	if (q_str) {
+		float quatanion[4];
+		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+		//convert from mpu coodinate to opengl coodinate
+		frame->quatanion[0] = quatanion[1]; //x
+		frame->quatanion[1] = quatanion[3]; //y : swap y and z
+		frame->quatanion[2] = -quatanion[2]; //z : swap y and z
+		frame->quatanion[3] = quatanion[0]; //w
+	}
+}
+
 void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
@@ -372,6 +397,15 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 			send_frame_arg->frames.push_back(send_frame_arg->active_frame);
 			pthread_mutex_unlock(&send_frame_arg->frames_mlock);
 			mrevent_trigger(&send_frame_arg->frame_ready);
+
+			if (data[2] == 0xFF && data[3] == 0xE1) { //xmp
+				int xmp_len = 0;
+				xmp_len = ((unsigned char*) buff)[4] << 8;
+				xmp_len += ((unsigned char*) buff)[5];
+
+				char *xml = buff + strlen(buff) + 1;
+				parse_xml(xml, send_frame_arg->active_frame);
+			}
 		}
 	}
 	if (send_frame_arg->active_frame != NULL) {
@@ -441,4 +475,8 @@ int mjpeg_decoder_get_frameskip(int cam_num) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->frameskip;
+}
+
+void mjpeg_decoder_set_plugin_host(PLUGIN_HOST_T *plugin_host) {
+	lg_plugin_host = plugin_host;
 }
