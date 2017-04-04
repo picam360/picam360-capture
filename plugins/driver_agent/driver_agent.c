@@ -645,6 +645,9 @@ static void save_options(void *user_data, json_t *options) {
 }
 
 static int rtp_callback(char *data, int data_len, int pt) {
+	if (data_len <= 0) {
+		return -1;
+	}
 	if (pt == PT_STATUS) {
 		int fd = -1;
 		if (lg_status_fd < 0) {
