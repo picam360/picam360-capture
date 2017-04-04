@@ -460,6 +460,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 		// Start rendering
 		if (state->codec_type == MJPEG) {
+			mjpeg_decoder_set_plugin_host(&state->plugin_host);
 			init_mjpeg_decoder(i, state->egl_image[i]);
 		} else {
 			void **args = malloc(sizeof(void*) * 3);

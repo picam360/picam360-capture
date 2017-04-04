@@ -32,7 +32,8 @@
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_status_fd = -1;
 
-static int lg_delay = 0;
+#define MAX_DELAY_COUNT 256
+static float lg_video_delay = 0.0;
 static float lg_bandwidth = 0.0;
 
 static void release(void *user_data) {
@@ -68,8 +69,9 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 					"<picam360_driver"
 							" light0_value=\"%f\" light1_value=\"%f\""
 							" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\""
+							" video_delay=\"%f\""
 							" />", light0_value, light1_value, motor0_value,
-					motor1_value, motor2_value, motor3_value);
+					motor1_value, motor2_value, motor3_value, lg_video_delay);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -481,7 +483,8 @@ void *transmit_thread_func(void* arg) {
 							rtp_stop_loading();
 							printf("stop loading\n");
 						} else if (lg_last_recorded_filename[0] != '\0') {
-							rtp_start_loading(lg_last_recorded_filename, (RTP_LOADING_CALLBACK) loading_callback);
+							rtp_start_loading(lg_last_recorded_filename,
+									(RTP_LOADING_CALLBACK) loading_callback);
 							printf("start loading %s\n",
 									lg_last_recorded_filename);
 						}
@@ -536,13 +539,14 @@ static void command_handler(void *user_data, char *_buff) {
 			}
 			printf("set_motor_value : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_delay", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff))
+			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value = 0;
 			sscanf(param, "%f", &value);
-			lg_delay = MAX(MIN((int) value,MAX_DELAY_COUNT), 0);
-			printf("set_delay : completed\n");
+			lg_video_delay = MAX(MIN(value,MAX_DELAY_COUNT), 0);
+			printf("set_video_delay : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff))
 			== 0) {
@@ -622,16 +626,16 @@ static void init_options(void *user_data, json_t *options) {
 			json_object_get(options, PLUGIN_NAME ".i_gain"));
 	lg_d_gain = json_number_value(
 			json_object_get(options, PLUGIN_NAME ".d_gain"));
-	lg_delay = (int) json_number_value(
-			json_object_get(options, PLUGIN_NAME ".delay"));
+	lg_video_delay = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".video_delay"));
 }
 
 static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
 	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
 	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
-	json_object_set_new(options, PLUGIN_NAME ".delay",
-			json_real((float) lg_delay));
+	json_object_set_new(options, PLUGIN_NAME ".video_delay",
+			json_real(lg_video_delay));
 }
 
 static int rtp_callback(char *data, int data_len, int pt) {
