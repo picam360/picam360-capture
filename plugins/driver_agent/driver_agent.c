@@ -296,6 +296,10 @@ float sub_angle(float a, float b) {
 	return v;
 }
 
+static void loading_callback(int ret) {
+	printf("end of loading\n");
+}
+
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
 	int buff_size = 4096;
@@ -522,10 +526,6 @@ void *transmit_thread_func(void* arg) {
 		last_time = time;
 		usleep(100 * 1000); //less than 10Hz
 	} // end of while
-}
-
-static void loading_callback(int ret) {
-	printf("end of loading\n");
 }
 
 static void command_handler(void *user_data, char *_buff) {
