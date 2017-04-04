@@ -143,7 +143,7 @@ static void *sendframe_thread_func(void* arg) {
 			(void*) index);
 
 	// create video_decode
-	if (ilclient_create_component(client, &video_decode, "video_decode",
+	if (ilclient_create_component(client, &video_decode, (char*)"video_decode",
 			(ILCLIENT_CREATE_FLAGS_T)(
 					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS))
 			!= 0)
@@ -153,7 +153,7 @@ static void *sendframe_thread_func(void* arg) {
 	// create lg_egl_render
 	if (status == 0
 			&& ilclient_create_component(client, &lg_egl_render[index],
-					"lg_egl_render",
+					(char*)"lg_egl_render",
 					(ILCLIENT_CREATE_FLAGS_T)(
 							ILCLIENT_DISABLE_ALL_PORTS
 									| ILCLIENT_ENABLE_OUTPUT_BUFFERS)) != 0)
