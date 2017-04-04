@@ -31,8 +31,6 @@
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_status_fd = -1;
-static int lg_cam0_fd = -1;
-static int lg_cam1_fd = -1;
 static bool lg_recording = false;
 
 static float lg_bandwidth = 0.0;
