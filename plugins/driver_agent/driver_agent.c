@@ -497,6 +497,7 @@ void *transmit_thread_func(void* arg) {
 									lg_last_recorded_filename);
 						}
 					}
+					brak;
 				case 5:
 					if (!rtp_is_recording(NULL)) {
 						if (rtp_is_loading(NULL)) {
