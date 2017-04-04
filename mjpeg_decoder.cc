@@ -400,10 +400,10 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 
 			if (data[2] == 0xFF && data[3] == 0xE1) { //xmp
 				int xmp_len = 0;
-				xmp_len = ((unsigned char*) buff)[4] << 8;
-				xmp_len += ((unsigned char*) buff)[5];
+				xmp_len = ((unsigned char*) data)[4] << 8;
+				xmp_len += ((unsigned char*) data)[5];
 
-				char *xml = buff + strlen(buff) + 1;
+				char *xml = (char*)data + strlen((char*)data) + 1;
 				parse_xml(xml, send_frame_arg->active_frame);
 			}
 		}

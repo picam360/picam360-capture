@@ -32,6 +32,7 @@
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_status_fd = -1;
 
+static int lg_delay = 0;
 static float lg_bandwidth = 0.0;
 
 static void release(void *user_data) {
