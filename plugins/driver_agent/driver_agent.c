@@ -31,7 +31,6 @@
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_status_fd = -1;
-static bool lg_recording = false;
 
 static float lg_bandwidth = 0.0;
 
@@ -500,7 +499,7 @@ void *transmit_thread_func(void* arg) {
 							rtp_stop_loading();
 							printf("stop loading\n");
 						} else if (lg_last_recorded_filename[0] != '\0') {
-							rtp_start_loading(lg_last_recorded_filename);
+							rtp_start_loading(lg_last_recorded_filename, (RTP_LOADING_CALLBACK) loading_callback);
 							printf("start loading %s\n",
 									lg_last_recorded_filename);
 						}
