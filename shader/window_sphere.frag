@@ -68,6 +68,11 @@ void main(void) {
 			fc0 = fc;
 		}
 	}
+	
+	pos = unif_matrix_1 * position;
+	pitch = asin(pos.y);
+	yaw = atan(pos.x, pos.z);
+	r = (M_PI / 2.0 - pitch) / M_PI;
 	if (r > 0.5 - overlap) {
 		float r2 = 1.0 - r;
 		if (r2 >= 0.40) {
