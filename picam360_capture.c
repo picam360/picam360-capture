@@ -1230,12 +1230,12 @@ static void set_view_north(float value) {
 	//TODO
 }
 
-static float *get_camera_quatanion() {
+static float *get_camera_quatanion(int cam_num) {
 	return state->camera_quatanion;
 }
-static void set_camera_quatanion(float *value) {
+static void set_camera_quatanion(int cam_num, float *value) {
 	for (int i = 0; i < 4; i++) {
-		state->camera_quatanion[i] = value[i];
+		state->camera_quatanion[cam_num][i] = value[i];
 	}
 	state->camera_coordinate_from_device = true;
 }
@@ -1509,15 +1509,19 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	//depth axis is z, vertical asis is y
 	float unif_matrix[16];
+	float unif_matrix_1[16];
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
+	float camera_matrix_1[16];
 	float view_offset_matrix[16];
 	float view_matrix[16];
 	float north_matrix[16];
 	float world_matrix[16];
 	mat4_identity(unif_matrix);
+	mat4_identity(unif_matrix_1);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
+	mat4_identity(camera_matrix_1);
 	mat4_identity(view_offset_matrix);
 	mat4_identity(view_matrix);
 	mat4_identity(north_matrix);
@@ -1526,12 +1530,17 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	// Rc : camera orientation
 
 	if (state->camera_coordinate_from_device) {
-		mat4_fromQuat(camera_matrix, state->camera_quatanion);
+		mat4_fromQuat(camera_matrix, state->camera_quatanion[0]);
+		mat4_fromQuat(camera_matrix_1, state->camera_quatanion[1]);
 	} else {
 		//euler Y(yaw)X(pitch)Z(roll)
 		mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
 		mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
 		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
+
+		mat4_rotateZ(camera_matrix, camera_matrix_1, state->camera_roll);
+		mat4_rotateX(camera_matrix, camera_matrix_1, state->camera_pitch);
+		mat4_rotateY(camera_matrix, camera_matrix_1, state->camera_yaw);
 	}
 
 //	// Rco : camera offset
@@ -1592,6 +1601,13 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
 
+	mat4_multiply(unif_matrix_1, unif_matrix_1, world_matrix); // Rw
+	mat4_multiply(unif_matrix_1, unif_matrix_1, view_matrix); // RvRw
+	mat4_multiply(unif_matrix_1, unif_matrix_1, north_matrix); // RnRvRw
+	mat4_multiply(unif_matrix_1, unif_matrix_1, camera_matrix_1); // RcRnRvRw
+
+	mat4_transpose(unif_matrix_1, unif_matrix_1); // this mat4 library is row primary, opengl is column primary
+
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"),
@@ -1650,6 +1666,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
 			GL_FALSE, (GLfloat*) unif_matrix);
+	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1,
+			GL_FALSE, (GLfloat*) unif_matrix_1);
 
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);

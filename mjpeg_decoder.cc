@@ -118,8 +118,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
-	if (send_frame_arg->xmp_info && index == 0 && lg_plugin_host) {
-		lg_plugin_host->set_camera_quatanion(send_frame_arg->quatanion);
+	if (send_frame_arg->xmp_info && lg_plugin_host) {
+		lg_plugin_host->set_camera_quatanion(index, send_frame_arg->quatanion);
 	}
 }
 
@@ -335,7 +335,7 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
-					send_frame_arg->xmp_info = rame->xmp_info;
+					send_frame_arg->xmp_info = frame->xmp_info;
 					memcpy(send_frame_arg->quatanion, frame->quatanion,
 							sizeof(send_frame_arg->quatanion));
 					delete packet;

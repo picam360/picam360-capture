@@ -13,8 +13,8 @@ typedef struct _PLUGIN_HOST_T{
 	float (*get_view_north)();
 	void (*set_view_north)(float value);
 
-	float *(*get_camera_quatanion)();
-	void (*set_camera_quatanion)(float *value);
+	float *(*get_camera_quatanion)(int cam_num);
+	void (*set_camera_quatanion)(int cam_num, float *value);
 	float *(*get_camera_compass)();
 	void (*set_camera_compass)(float *value);
 	float (*get_camera_temperature)();
