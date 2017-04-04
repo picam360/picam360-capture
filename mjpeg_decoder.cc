@@ -153,7 +153,7 @@ static void *sendframe_thread_func(void* arg) {
 	// create lg_egl_render
 	if (status == 0
 			&& ilclient_create_component(client, &lg_egl_render[index],
-					(char*)"lg_egl_render",
+					(char*)"egl_render",
 					(ILCLIENT_CREATE_FLAGS_T)(
 							ILCLIENT_DISABLE_ALL_PORTS
 									| ILCLIENT_ENABLE_OUTPUT_BUFFERS)) != 0)
@@ -365,7 +365,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 	}
 	_SENDFRAME_ARG_T *send_frame_arg = lg_send_frame_arg[cam_num];
 	if (send_frame_arg->active_frame == NULL) {
-		if (data[0] == 0xD8 && data[1] == 0xD8) { //SOI
+		if (data[0] == 0xFF && data[1] == 0xD8) { //SOI
 			send_frame_arg->active_frame = new _FRAME_T;
 
 			pthread_mutex_lock(&send_frame_arg->frames_mlock);
@@ -384,7 +384,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 			}
 			memcpy(packet->data, data, packet->len);
 		}
-		if (data[data_len - 2] == 0xD8 && data[data_len - 1] == 0xD9) { //EOI
+		if (data[data_len - 2] == 0xFF && data[data_len - 1] == 0xD9) { //EOI
 			packet->eof = true;
 
 			pthread_mutex_lock(&send_frame_arg->active_frame->packets_mlock);
