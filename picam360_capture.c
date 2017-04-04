@@ -521,6 +521,13 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				state->options.cam_horizon_r[i] = 0.8;
 			}
 		}
+		state->options.view_offset_pitch = json_number_value(
+				json_object_get(options, "view_offset_pitch"));
+		state->options.view_offset_yaw = json_number_value(
+				json_object_get(options, "view_offset_yaw"));
+		state->options.view_offset_roll = json_number_value(
+				json_object_get(options, "view_offset_roll"));
+
 		if (state->plugins) {
 			for (int i = 0; state->plugins[i] != NULL; i++) {
 				if (state->plugins[i]->init_options) {
@@ -572,6 +579,13 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, buff,
 				json_real(state->options.cam_horizon_r[i]));
 	}
+	json_object_set_new(options, "view_offset_pitch",
+			json_real(state->options.view_offset_pitch));
+	json_object_set_new(options, "view_offset_yaw",
+			json_real(state->options.view_offset_yaw));
+	json_object_set_new(options, "view_offset_roll",
+			json_real(state->options.view_offset_roll));
+
 	if (state->plugins) {
 		for (int i = 0; state->plugins[i] != NULL; i++) {
 			if (state->plugins[i]->save_options) {
@@ -1496,12 +1510,14 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	float unif_matrix[16];
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
+	float view_offset_matrix[16];
 	float view_matrix[16];
 	float north_matrix[16];
 	float world_matrix[16];
 	mat4_identity(unif_matrix);
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
+	mat4_identity(view_offset_matrix);
 	mat4_identity(view_matrix);
 	mat4_identity(north_matrix);
 	mat4_identity(world_matrix);
@@ -1528,6 +1544,16 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 //
 //	mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
 
+	// Rvo : view offset
+	//euler Y(yaw)X(pitch)Z(roll)
+	mat4_rotateZ(view_offset_matrix, view_offset_matrix,
+			state->options.cam_offset_roll);
+	mat4_rotateX(view_offset_matrix, view_offset_matrix,
+			state->options.cam_offset_pitch);
+	mat4_rotateY(view_offset_matrix, view_offset_matrix,
+			state->options.cam_offset_yaw);
+
+	// Rv : view
 	switch (frame->view_coordinate_mode) {
 	case MPU9250:
 		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
@@ -1544,6 +1570,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
 		break;
 	}
+	mat4_multiply(view_matrix, view_offset_matrix, view_matrix); // Rv=RvRvo
 
 	// Rn
 	{

@@ -67,6 +67,10 @@ typedef struct _OPTIONS_T {
 	float cam_offset_x[MAX_CAM_NUM];
 	float cam_offset_y[MAX_CAM_NUM];
 	float cam_horizon_r[MAX_CAM_NUM];
+
+	float view_offset_pitch; // x axis
+	float view_offset_yaw; // y axis
+	float view_offset_roll; // z axis
 } OPTIONS_T;
 
 typedef struct _FRAME_T {
