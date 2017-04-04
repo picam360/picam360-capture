@@ -117,6 +117,8 @@ static int lg_func = -1;
 static float lg_fps[NUM_OF_CAM] = { };
 static int lg_frameskip[NUM_OF_CAM] = { };
 
+static char lg_last_recorded_filename[256] = { };
+
 static void parse_xml(char *xml) {
 	char *q_str = NULL;
 	q_str = strstr(xml, "<quaternion");
@@ -474,23 +476,34 @@ void *transmit_thread_func(void* arg) {
 					}
 					break;
 				case 4:
-					if (lg_recording) {
-						rtp_stop_recording();
-						printf("stop recording\n");
-						lg_recording = false;
-					} else {
-						struct tm *tmptr = NULL;
-						tmptr = localtime(&time.tv_sec);
+					if (!rtp_is_loading(NULL)) {
+						if (rtp_is_recording(NULL)) {
+							rtp_stop_recording();
+							printf("stop recording\n");
+						} else {
+							struct tm *tmptr = NULL;
+							tmptr = localtime(&time.tv_sec);
 
-						char filename[256];
-						sprintf(filename,
-								"/media/usbdisk/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
-								tmptr->tm_year + 1900, tmptr->tm_mon + 1,
-								tmptr->tm_mday, tmptr->tm_hour, tmptr->tm_min,
-								tmptr->tm_sec);
-						rtp_start_recording(filename);
-						printf("start recording %s\n", filename);
-						lg_recording = true;
+							sprintf(lg_last_recorded_filename,
+									"/media/usbdisk/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
+									tmptr->tm_year + 1900, tmptr->tm_mon + 1,
+									tmptr->tm_mday, tmptr->tm_hour,
+									tmptr->tm_min, tmptr->tm_sec);
+							rtp_start_recording(lg_last_recorded_filename);
+							printf("start recording %s\n",
+									lg_last_recorded_filename);
+						}
+					}
+				case 5:
+					if (!rtp_is_recording(NULL)) {
+						if (rtp_is_loading(NULL)) {
+							rtp_stop_loading();
+							printf("stop loading\n");
+						} else if (lg_last_recorded_filename[0] != '\0') {
+							rtp_start_loading(lg_last_recorded_filename);
+							printf("start loading %s\n",
+									lg_last_recorded_filename);
+						}
 					}
 					break;
 				}
