@@ -85,6 +85,8 @@ public:
 		pthread_mutex_init(&frames_mlock, NULL);
 		mrevent_init(&frame_ready);
 		active_frame = NULL;
+		xmp_info = false;
+		memset(quatanion, 0, sizeof(quatanion));
 	}
 	bool cam_run;
 	int cam_num;
@@ -96,6 +98,8 @@ public:
 	MREVENT_T frame_ready;
 	pthread_t cam_thread;
 	_FRAME_T *active_frame;
+	bool xmp_info;
+	float quatanion[4];
 	void *user_data;
 };
 
@@ -106,12 +110,16 @@ static OMX_BUFFERHEADERTYPE* lg_egl_buffer[2] = { };
 static COMPONENT_T* lg_egl_render[2] = { };
 
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
-	int index = (int) data;
+	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
+	int index = send_frame_arg->cam_num;
 
 	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[index]),
 			lg_egl_buffer[index]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
+	}
+	if (send_frame_arg->xmp_info && index == 0 && lg_plugin_host) {
+		lg_plugin_host->set_camera_quatanion(send_frame_arg->quatanion);
 	}
 }
 
@@ -145,7 +153,7 @@ static void *sendframe_thread_func(void* arg) {
 
 	// callback
 	ilclient_set_fill_buffer_done_callback(client, my_fill_buffer_done,
-			(void*) index);
+			(void*) send_frame_arg);
 
 	// create video_decode
 	if (ilclient_create_component(client, &video_decode, (char*) "video_decode",
@@ -327,10 +335,10 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
+					send_frame_arg->xmp_info = rame->xmp_info;
+					memcpy(send_frame_arg->quatanion, frame->quatanion,
+							sizeof(send_frame_arg->quatanion));
 					delete packet;
-					if (frame->xmp_info && index == 0 && lg_plugin_host) {
-						lg_plugin_host->set_camera_quatanion(frame->quatanion);
-					}
 					break;
 				} else {
 					delete packet;
@@ -403,7 +411,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 				xmp_len = ((unsigned char*) data)[4] << 8;
 				xmp_len += ((unsigned char*) data)[5];
 
-				char *xml = (char*)data + strlen((char*)data) + 1;
+				char *xml = (char*) data + strlen((char*) data) + 1;
 				parse_xml(xml, send_frame_arg->active_frame);
 			}
 		}
