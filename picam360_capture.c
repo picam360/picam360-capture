@@ -1269,6 +1269,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_camera_temperature = set_camera_temperature;
 		state->plugin_host.get_camera_north = get_camera_north;
 		state->plugin_host.set_camera_north = set_camera_north;
+
+		state->plugin_host.decode_video = decode_video;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };

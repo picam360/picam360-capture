@@ -656,9 +656,13 @@ static int rtp_callback(char *data, int data_len, int pt) {
 		}
 		write(fd, data, data_len);
 	} else if (pt == PT_CAM_BASE + 0) {
-		lg_plugin_host->decode_video(0, (unsigned char*) data, data_len);
+		if (lg_plugin_host && lg_plugin_host->decode_video) {
+			lg_plugin_host->decode_video(0, (unsigned char*) data, data_len);
+		}
 	} else if (pt == PT_CAM_BASE + 1) {
-		lg_plugin_host->decode_video(1, (unsigned char*) data, data_len);
+		if (lg_plugin_host && lg_plugin_host->decode_video) {
+			lg_plugin_host->decode_video(1, (unsigned char*) data, data_len);
+		}
 	}
 	return 0;
 }
