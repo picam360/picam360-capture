@@ -362,7 +362,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 			send_frame_arg->active_frame = new _FRAME_T;
 
 			pthread_mutex_lock(&send_frame_arg->frames_mlock);
-			send_frame_arg->frames.push_back(active_frame);
+			send_frame_arg->frames.push_back(send_frame_arg->active_frame);
 			pthread_mutex_unlock(&send_frame_arg->frames_mlock);
 			mrevent_trigger(&send_frame_arg->frame_ready);
 		}
@@ -377,20 +377,20 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 			}
 			memcpy(packet->data, data, packet->len);
 		}
-		if (data[data_len - 2] == 0xD8 && && data[data_len - 1] == 0xD9) { //EOI
+		if (data[data_len - 2] == 0xD8 && data[data_len - 1] == 0xD9) { //EOI
 			packet->eof = true;
 
-			pthread_mutex_lock(&active_frame->packets_mlock);
-			active_frame->packets.push_back(packet);
-			mrevent_trigger(&active_frame->packet_ready);
-			pthread_mutex_unlock(&active_frame->packets_mlock);
+			pthread_mutex_lock(&send_frame_arg->active_frame->packets_mlock);
+			send_frame_arg->active_frame->packets.push_back(packet);
+			mrevent_trigger(&send_frame_arg->active_frame->packet_ready);
+			pthread_mutex_unlock(&send_frame_arg->active_frame->packets_mlock);
 
 			active_frame = NULL;
 		} else {
-			pthread_mutex_lock(&active_frame->packets_mlock);
-			active_frame->packets.push_back(packet);
-			pthread_mutex_unlock(&active_frame->packets_mlock);
-			mrevent_trigger(&active_frame->packet_ready);
+			pthread_mutex_lock(&send_frame_arg->active_frame->packets_mlock);
+			send_frame_arg->active_frame->packets.push_back(packet);
+			pthread_mutex_unlock(&send_frame_arg->active_frame->packets_mlock);
+			mrevent_trigger(&send_frame_arg->active_frame->packet_ready);
 		}
 	}
 
