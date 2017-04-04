@@ -245,7 +245,7 @@ static void *sendframe_thread_func(void* arg) {
 
 				buf = ilclient_get_input_buffer(video_decode, 130, 1);
 
-				data_len = MIN(buf->nAllocLen, packet->len);
+				data_len = MIN((int)buf->nAllocLen, packet->len);
 				memcpy(buf->pBuffer, packet->data, data_len);
 
 				if (port_settings_changed == 0
@@ -360,6 +360,9 @@ static void *sendframe_thread_func(void* arg) {
 
 void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
+	if (!lg_send_frame_arg[cam_num]) {
+		return;
+	}
 	_SENDFRAME_ARG_T *send_frame_arg = lg_send_frame_arg[cam_num];
 	if (send_frame_arg->active_frame == NULL) {
 		if (data[0] == 0xD8 && data[1] == 0xD8) { //SOI
