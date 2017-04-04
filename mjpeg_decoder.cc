@@ -15,15 +15,16 @@
 #include <sys/time.h>
 #include <list>
 
-#include "bcm_host.h"
-#include "ilclient.h"
-
 #include "mjpeg_decoder.h"
+
+#define RTP_MAXPAYLOADSIZE (8*1024-12)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include "bcm_host.h"
+#include "ilclient.h"
 #include "mrevent.h"
 
 #ifdef __cplusplus
@@ -396,7 +397,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 
 }
 void init_mjpeg_decoder(int cam_num, void *user_data) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -409,7 +410,7 @@ void init_mjpeg_decoder(int cam_num, void *user_data) {
 			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
 void deinit_mjpeg_decoder(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -422,14 +423,14 @@ void deinit_mjpeg_decoder(int cam_num) {
 }
 
 float mjpeg_decoder_get_fps(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->fps;
 }
 int mjpeg_decoder_get_frameskip(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
