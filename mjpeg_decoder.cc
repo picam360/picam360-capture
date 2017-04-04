@@ -79,6 +79,7 @@ public:
 		frameskip = 0;
 		pthread_mutex_init(&frames_mlock, NULL);
 		mrevent_init(&frame_ready);
+		active_frame = NULL;
 	}
 	bool cam_run;
 	int cam_num;
@@ -89,6 +90,7 @@ public:
 	pthread_mutex_t frames_mlock;
 	MREVENT_T frame_ready;
 	pthread_t cam_thread;
+	_FRAME_T *active_frame;
 	void *user_data;
 };
 
@@ -353,9 +355,11 @@ static void *sendframe_thread_func(void* arg) {
 }
 
 void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
-	if (active_frame == NULL) {
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	_SENDFRAME_ARG_T *send_frame_arg = lg_send_frame_arg[cam_num];
+	if (send_frame_arg->active_frame == NULL) {
 		if (data[0] == 0xD8 && data[1] == 0xD8) { //SOI
-			active_frame = new _FRAME_T;
+			send_frame_arg->active_frame = new _FRAME_T;
 
 			pthread_mutex_lock(&send_frame_arg->frames_mlock);
 			send_frame_arg->frames.push_back(active_frame);
@@ -363,7 +367,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 			mrevent_trigger(&send_frame_arg->frame_ready);
 		}
 	}
-	if (active_frame != NULL) {
+	if (send_frame_arg->active_frame != NULL) {
 		_PACKET_T *packet = new _PACKET_T;
 		{
 			packet->len = data_len;
