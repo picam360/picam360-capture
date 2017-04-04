@@ -1547,11 +1547,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	// Rvo : view offset
 	//euler Y(yaw)X(pitch)Z(roll)
 	mat4_rotateZ(view_offset_matrix, view_offset_matrix,
-			state->options.cam_offset_roll);
+			state->options.view_offset_roll);
 	mat4_rotateX(view_offset_matrix, view_offset_matrix,
-			state->options.cam_offset_pitch);
+			state->options.view_offset_pitch);
 	mat4_rotateY(view_offset_matrix, view_offset_matrix,
-			state->options.cam_offset_yaw);
+			state->options.view_offset_yaw);
 
 	// Rv : view
 	switch (frame->view_coordinate_mode) {
