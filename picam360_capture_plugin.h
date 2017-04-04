@@ -1,5 +1,6 @@
 #pragma once
 
+#include <pthread.h>
 //json parser
 #include <jansson.h>
 
@@ -23,6 +24,8 @@ typedef struct _PLUGIN_HOST_T{
 	void (*set_camera_north)(float value);
 
 	void (*decode_video)(int cam_num, unsigned char *data, int data_len);
+	void (*lock_texture)();
+	void (*unlock_texture)();
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T{

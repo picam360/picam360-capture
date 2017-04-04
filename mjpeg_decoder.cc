@@ -113,6 +113,9 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 	int index = send_frame_arg->cam_num;
 
+	if (lg_plugin_host) {
+		lg_plugin_host->lock_texture();
+	}
 	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[index]),
 			lg_egl_buffer[index]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
@@ -120,6 +123,9 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	}
 	if (send_frame_arg->xmp_info && lg_plugin_host) {
 		lg_plugin_host->set_camera_quatanion(index, send_frame_arg->quatanion);
+	}
+	if (lg_plugin_host) {
+		lg_plugin_host->unlock_texture();
 	}
 }
 

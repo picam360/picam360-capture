@@ -171,6 +171,7 @@ typedef struct _PICAM360CAPTURE_T {
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
+	pthread_mutex_t texture_mutex;
 
 	struct {
 		texture_font_t *font;

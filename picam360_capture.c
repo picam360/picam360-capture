@@ -1264,6 +1264,12 @@ static void decode_video(int cam_num, unsigned char *data, int data_len) {
 		mjpeg_decode(cam_num, data, data_len);
 	}
 }
+static void lock_texture() {
+	pthread_mutex_lock(&state->texture_mutex);
+}
+static void unlock_texture() {
+	pthread_mutex_unlock(&state->texture_mutex);
+}
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
@@ -1286,6 +1292,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_camera_north = set_camera_north;
 
 		state->plugin_host.decode_video = decode_video;
+		state->plugin_host.lock_texture = lock_texture;
+		state->plugin_host.unlock_texture = unlock_texture;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
@@ -1392,6 +1400,9 @@ int main(int argc, char *argv[]) {
 		mrevent_init(&state->arrived_frame_event[i]);
 		mrevent_reset(&state->arrived_frame_event[i]);
 	}
+
+	//texture mutex init
+	pthread_mutex_init(&state->texture_mutex, 0);
 
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
@@ -1676,7 +1687,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
+	state->plugin_host.lock_texture();
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+	state->plugin_host.unlock_texture();
 
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
