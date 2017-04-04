@@ -165,13 +165,19 @@ static void *record_thread_func(void* arg) {
 		}
 		pthread_mutex_unlock(&lg_record_packet_queue_mlock);
 
-		unsigned short len = pack->GetPacketLength();
-		unsigned char len_bytes[2];
+		unsigned char header[8];
+		header[0] = 0xFF;
+		header[1] = 0xE1;
+		unsigned short len = pack->GetPacketLength() + sizeof(header);
 		for (int i = 0; i < 2; i++) {
-			len_bytes[i] = (len >> (8 * i)) & 0xFF;
+			header[2 + i] = (len >> (8 * i)) & 0xFF;
 		}
-		write(fd, len_bytes, 2);
-		write(fd, pack->GetPacketData(), len);
+		header[4] = (unsigned char) 'r';
+		header[5] = (unsigned char) 't';
+		header[6] = (unsigned char) 'p';
+		header[7] = (unsigned char) '\0';
+		write(fd, header, sizeof(header));
+		write(fd, pack->GetPacketData(), pack->GetPacketLength());
 		lg_sess.DeletePacket(pack);
 	}
 	pthread_mutex_lock(&lg_record_packet_queue_mlock);
@@ -193,17 +199,21 @@ static void *load_thread_func(void* arg) {
 	bool is_first = true;
 	int ret = 0;
 	while (lg_load_fd >= 0) {
+		int raw_header_size = 8;
 		int read_len;
 		struct RTPHeader *header = (struct RTPHeader *) buff;
-		read_len = read(lg_load_fd, buff, 2);
-		if (read_len != 2) {
+		read_len = read(lg_load_fd, buff, raw_header_size);
+		if (read_len != 8 || buff[0] != 0xFF || buff[1] != 0xE1
+				|| buff[4] != 'r' || buff[5] != 't' || buff[6] != 'p'
+				|| buff[7] != '\0') {
 			//error
 			break;
 		}
 		unsigned short len = 0;
 		for (int i = 0; i < 2; i++) {
-			len += (buff[i] << (8 * i));
+			len += (buff[i + 2] << (8 * i));
 		}
+		len -= raw_header_size;
 		if (len > sizeof(buff)) {
 			//error
 			ret = -1;
