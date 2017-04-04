@@ -1,6 +1,7 @@
 varying vec4 position;
 
 uniform mat4 unif_matrix;
+uniform mat4 unif_matrix_1;
 uniform sampler2D cam0_texture;
 uniform sampler2D cam1_texture;
 uniform float pixel_size;
