@@ -210,7 +210,10 @@ static void *load_thread_func(void* arg) {
 			break;
 		}
 		read_len = read(lg_load_fd, buff, len);
-		if (read_len != len) {
+		if (read_len < 0 && eof(lg_load_fd)) {
+			lseek(lg_load_fd, 0, SEEK_SET);
+			continue;
+		} else if (read_len != len) {
 			//error
 			ret = -1;
 			break;
