@@ -144,7 +144,9 @@ static void *sendframe_thread_func(void* arg) {
 
 	// create video_decode
 	if (ilclient_create_component(client, &video_decode, "video_decode",
-			ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS) != 0)
+			(ILCLIENT_CREATE_FLAGS_T)(
+					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS))
+			!= 0)
 		status = -14;
 	list[0] = video_decode;
 
@@ -152,8 +154,9 @@ static void *sendframe_thread_func(void* arg) {
 	if (status == 0
 			&& ilclient_create_component(client, &lg_egl_render[index],
 					"lg_egl_render",
-					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_OUTPUT_BUFFERS)
-					!= 0)
+					(ILCLIENT_CREATE_FLAGS_T)(
+							ILCLIENT_DISABLE_ALL_PORTS
+									| ILCLIENT_ENABLE_OUTPUT_BUFFERS)) != 0)
 		status = -14;
 	list[1] = lg_egl_render[index];
 
@@ -356,7 +359,7 @@ static void *sendframe_thread_func(void* arg) {
 }
 
 void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	_SENDFRAME_ARG_T *send_frame_arg = lg_send_frame_arg[cam_num];
 	if (send_frame_arg->active_frame == NULL) {
 		if (data[0] == 0xD8 && data[1] == 0xD8) { //SOI
@@ -386,7 +389,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 			mrevent_trigger(&send_frame_arg->active_frame->packet_ready);
 			pthread_mutex_unlock(&send_frame_arg->active_frame->packets_mlock);
 
-			active_frame = NULL;
+			send_frame_arg->active_frame = NULL;
 		} else {
 			pthread_mutex_lock(&send_frame_arg->active_frame->packets_mlock);
 			send_frame_arg->active_frame->packets.push_back(packet);
@@ -397,7 +400,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 
 }
 void init_mjpeg_decoder(int cam_num, void *user_data) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -410,7 +413,7 @@ void init_mjpeg_decoder(int cam_num, void *user_data) {
 			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
 void deinit_mjpeg_decoder(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -423,14 +426,14 @@ void deinit_mjpeg_decoder(int cam_num) {
 }
 
 float mjpeg_decoder_get_fps(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->fps;
 }
 int mjpeg_decoder_get_frameskip(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
