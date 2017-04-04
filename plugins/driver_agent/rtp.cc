@@ -203,10 +203,15 @@ static void *load_thread_func(void* arg) {
 		int read_len;
 		struct RTPHeader *header = (struct RTPHeader *) buff;
 		read_len = read(lg_load_fd, buff, raw_header_size);
+		if (read_len == 0) { //eof
+			lseek(lg_load_fd, 0, SEEK_SET);
+			continue;
+		}
 		if (read_len != 8 || buff[0] != 0xFF || buff[1] != 0xE1
 				|| buff[4] != 'r' || buff[5] != 't' || buff[6] != 'p'
 				|| buff[7] != '\0') {
 			//error
+			ret = -1;
 			break;
 		}
 		unsigned short len = 0;
@@ -220,10 +225,7 @@ static void *load_thread_func(void* arg) {
 			break;
 		}
 		read_len = read(lg_load_fd, buff, len);
-		if (read_len < 0 && eof(lg_load_fd)) {
-			lseek(lg_load_fd, 0, SEEK_SET);
-			continue;
-		} else if (read_len != len) {
+		if (read_len != len) {
 			//error
 			ret = -1;
 			break;
