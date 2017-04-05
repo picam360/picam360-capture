@@ -220,54 +220,6 @@ static void *sendframe_thread_func(void* arg) {
 			}
 			pthread_mutex_unlock(&send_frame_arg->frames_mlock);
 			while (send_frame_arg->cam_run) {
-				if (port_settings_changed == 0
-						&& (ilclient_remove_event(video_decode,
-								OMX_EventPortSettingsChanged, 131, 0, 0, 1) == 0
-								|| ilclient_wait_for_event(video_decode,
-										OMX_EventPortSettingsChanged, 131, 0, 0,
-										1,
-										ILCLIENT_EVENT_ERROR
-												| ILCLIENT_PARAMETER_CHANGED,
-										10000) == 0)) {
-					port_settings_changed = 1;
-
-					if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
-						status = -7;
-						break;
-					}
-
-					// Set lg_egl_render to idle
-					ilclient_change_component_state(lg_egl_render[cam_num],
-							OMX_StateIdle);
-
-					// Enable the output port and tell lg_egl_render to use the texture as a buffer
-					//ilclient_enable_port(lg_egl_render, 221); THIS BLOCKS SO CAN'T BE USED
-					if (OMX_SendCommand(ILC_GET_HANDLE(lg_egl_render[cam_num]),
-							OMX_CommandPortEnable, 221, NULL)
-							!= OMX_ErrorNone) {
-						printf("OMX_CommandPortEnable failed.\n");
-						exit(1);
-					}
-
-					if (OMX_UseEGLImage(ILC_GET_HANDLE(lg_egl_render[cam_num]),
-							&lg_egl_buffer[cam_num], 221, NULL,
-							send_frame_arg->user_data) != OMX_ErrorNone) {
-						printf("OMX_UseEGLImage failed.\n");
-						exit(1);
-					}
-
-					// Set lg_egl_render to executing
-					ilclient_change_component_state(lg_egl_render[cam_num],
-							OMX_StateExecuting);
-
-					// Request lg_egl_render to write data to the texture buffer
-					if (OMX_FillThisBuffer(
-							ILC_GET_HANDLE(lg_egl_render[cam_num]),
-							lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
-						printf("OMX_FillThisBuffer failed.\n");
-						exit(1);
-					}
-				}
 				{ //fps
 					struct timeval time = { };
 					gettimeofday(&time, NULL);
@@ -312,6 +264,56 @@ static void *sendframe_thread_func(void* arg) {
 				data_len = MIN((int )buf->nAllocLen, packet->len);
 				memcpy(buf->pBuffer, packet->data, data_len);
 
+				if (port_settings_changed == 0
+						&& ((data_len > 0
+								&& ilclient_remove_event(video_decode,
+										OMX_EventPortSettingsChanged, 131, 0, 0,
+										1) == 0)
+								|| (data_len == 0
+										&& ilclient_wait_for_event(video_decode,
+												OMX_EventPortSettingsChanged,
+												131, 0, 0, 1,
+												ILCLIENT_EVENT_ERROR
+														| ILCLIENT_PARAMETER_CHANGED,
+												10000) == 0))) {
+					port_settings_changed = 1;
+
+					if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
+						status = -7;
+						break;
+					}
+
+					// Set lg_egl_render to idle
+					ilclient_change_component_state(lg_egl_render[index],
+							OMX_StateIdle);
+
+					// Enable the output port and tell lg_egl_render to use the texture as a buffer
+					//ilclient_enable_port(lg_egl_render, 221); THIS BLOCKS SO CAN'T BE USED
+					if (OMX_SendCommand(ILC_GET_HANDLE(lg_egl_render[index]),
+							OMX_CommandPortEnable, 221, NULL)
+							!= OMX_ErrorNone) {
+						printf("OMX_CommandPortEnable failed.\n");
+						exit(1);
+					}
+
+					if (OMX_UseEGLImage(ILC_GET_HANDLE(lg_egl_render[index]),
+							&lg_egl_buffer[index], 221, NULL,
+							send_frame_arg->user_data) != OMX_ErrorNone) {
+						printf("OMX_UseEGLImage failed.\n");
+						exit(1);
+					}
+
+					// Set lg_egl_render to executing
+					ilclient_change_component_state(lg_egl_render[index],
+							OMX_StateExecuting);
+
+					// Request lg_egl_render to write data to the texture buffer
+					if (OMX_FillThisBuffer(ILC_GET_HANDLE(lg_egl_render[index]),
+							lg_egl_buffer[index]) != OMX_ErrorNone) {
+						printf("OMX_FillThisBuffer failed.\n");
+						exit(1);
+					}
+				}
 				if (!data_len) {
 					break;
 				}
