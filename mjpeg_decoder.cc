@@ -317,15 +317,6 @@ static void *sendframe_thread_func(void* arg) {
 				if (packet->eof) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
-					//int cam_num = send_frame_arg->cam_num;
-					if (port_settings_changed
-							&& OMX_FillThisBuffer(
-									ilclient_get_handle(lg_egl_render[cam_num]),
-									lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
-						printf("test  OMX_FillThisBuffer failed in callback\n");
-						exit(1);
-					}
-
 					if (lg_plugin_host) {
 						lg_plugin_host->lock_texture();
 					}
@@ -354,7 +345,7 @@ static void *sendframe_thread_func(void* arg) {
 
 						if (send_frame_arg->decodereqcount
 								!= send_frame_arg->decodedcount) {
-							send_frame_arg->decodedcount++
+							send_frame_arg->decodedcount++;
 							printf("frame lost\n");
 						} else {
 							printf("frame sync\n");
@@ -370,6 +361,14 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
+					//int cam_num = send_frame_arg->cam_num;
+					if (port_settings_changed
+							&& OMX_FillThisBuffer(
+									ilclient_get_handle(lg_egl_render[cam_num]),
+									lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
+						printf("test  OMX_FillThisBuffer failed in callback\n");
+						exit(1);
+					}
 					send_frame_arg->decodereqcount++;
 					if (frame->xmp_info && lg_plugin_host) {
 						lg_plugin_host->set_camera_quatanion(cam_num,
