@@ -501,7 +501,7 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 		return;
 	}
 	int res = mrevent_wait(&lg_send_frame_arg[cam_num]->buffer_ready,
-			100 * 1000);
+			1000 * 1000);
 	if (res != 0) {
 		mrevent_trigger(&lg_send_frame_arg[cam_num]->buffer_ready);
 	}
