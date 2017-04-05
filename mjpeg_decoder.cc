@@ -489,13 +489,14 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 	if (!lg_send_frame_arg[cam_num]->is_buffer_ready) {
 		return;
 	}
+	lg_send_frame_arg[cam_num]->is_buffer_ready = false;
 	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
 			lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
 	if (lg_send_frame_arg[cam_num]->xmp_info && lg_plugin_host) {
-		lg_plugin_host->set_camera_quatanion(index,
+		lg_plugin_host->set_camera_quatanion(cam_num,
 				lg_send_frame_arg[cam_num]->quatanion);
 	}
 }
