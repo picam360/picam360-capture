@@ -118,8 +118,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	send_frame_arg->decodedcount++;
 	if (0) {
 		printf("timeout %d, decode req %d, decoded %d\n",
-				send_frame_arg->cam_num,
-				send_frame_arg->decodereqcount,
+				send_frame_arg->cam_num, send_frame_arg->decodereqcount,
 				send_frame_arg->decodedcount);
 	}
 	mrevent_trigger(&send_frame_arg->buffer_ready);
@@ -271,20 +270,11 @@ static void *sendframe_thread_func(void* arg) {
 				memcpy(buf->pBuffer, packet->data, data_len);
 
 				if (port_settings_changed == 0
-						&& ((data_len > 0
-								&& ilclient_remove_event(video_decode,
-										OMX_EventPortSettingsChanged, 131, 0, 0,
-										1) == 0)
-								|| (data_len == 0
-										&& ilclient_wait_for_event(video_decode,
-												OMX_EventPortSettingsChanged,
-												131, 0, 0, 1,
-												ILCLIENT_EVENT_ERROR
-														| ILCLIENT_PARAMETER_CHANGED,
-												10000) == 0))) {
+						&& ilclient_remove_event(video_decode,
+								OMX_EventPortSettingsChanged, 131, 0, 0, 1)
+								== 0) {
 					port_settings_changed = 1;
-					send_frame_arg->decodereqcount = 1;
-					printf("port changed %d\n",  cam_num);
+					printf("port changed %d\n", cam_num);
 
 					if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
 						status = -7;
@@ -316,7 +306,8 @@ static void *sendframe_thread_func(void* arg) {
 							OMX_StateExecuting);
 
 					// Request lg_egl_render to write data to the texture buffer
-					if (OMX_FillThisBuffer(ILC_GET_HANDLE(lg_egl_render[cam_num]),
+					if (OMX_FillThisBuffer(
+							ILC_GET_HANDLE(lg_egl_render[cam_num]),
 							lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
 						printf("OMX_FillThisBuffer failed.\n");
 						exit(1);
@@ -340,6 +331,10 @@ static void *sendframe_thread_func(void* arg) {
 
 					if (lg_plugin_host) {
 						lg_plugin_host->lock_texture();
+					}
+					if (send_frame_arg->decodereqcount
+							!= send_frame_arg->decodedcount) {
+						usleep(10 * 1000);
 					}
 					mrevent_reset(&send_frame_arg->buffer_ready);
 				}
