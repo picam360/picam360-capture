@@ -77,6 +77,7 @@ public:
 class _SENDFRAME_ARG_T {
 public:
 	_SENDFRAME_ARG_T() {
+		user_data = NULL;
 		cam_run = false;
 		cam_num = 0;
 		framecount = 0;
@@ -86,9 +87,8 @@ public:
 		mrevent_init(&frame_ready);
 		mrevent_init(&buffer_ready);
 		active_frame = NULL;
-		xmp_info = false;
-		memset(quatanion, 0, sizeof(quatanion));
 	}
+	void *user_data;
 	bool cam_run;
 	int cam_num;
 	int framecount;
@@ -100,9 +100,6 @@ public:
 	MREVENT_T buffer_ready;
 	pthread_t cam_thread;
 	_FRAME_T *active_frame;
-	bool xmp_info;
-	float quatanion[4];
-	void *user_data;
 };
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
@@ -121,10 +118,6 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 			lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
-	}
-	if (send_frame_arg->xmp_info && lg_plugin_host) {
-		lg_plugin_host->set_camera_quatanion(cam_num,
-				send_frame_arg->quatanion);
 	}
 }
 
@@ -341,9 +334,10 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					mrevent_reset(&send_frame_arg->buffer_ready);
-					send_frame_arg->xmp_info = frame->xmp_info;
-					memcpy(send_frame_arg->quatanion, frame->quatanion,
-							sizeof(send_frame_arg->quatanion));
+					if (frame->xmp_info && lg_plugin_host) {
+						lg_plugin_host->set_camera_quatanion(cam_num,
+								frame->quatanion);
+					}
 					delete packet;
 					break;
 				} else {
@@ -498,5 +492,8 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
-	mrevent_wait(&send_frame_arg->buffer_ready, 100 * 1000);
+	int res = mrevent_wait(&lg_send_frame_arg[cam_num]->buffer_ready, 100 * 1000);
+	if (res != 0) {
+		mrevent_trigger(&lg_send_frame_arg[cam_num]->buffer_ready);
+	}
 }
