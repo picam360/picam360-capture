@@ -277,6 +277,8 @@ static void *sendframe_thread_func(void* arg) {
 														| ILCLIENT_PARAMETER_CHANGED,
 												10000) == 0))) {
 					port_settings_changed = 1;
+					send_frame_arg->decodereqcount = 1;
+					printf("port changed %d\n",  cam_num);
 
 					if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
 						status = -7;
@@ -330,10 +332,8 @@ static void *sendframe_thread_func(void* arg) {
 				if (packet->eof) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
-					int res = mrevent_wait(&send_frame_arg->buffer_ready,
-							1000 * 1000);
-					if (res != 0) {
-						printf("timeout %d, decode req %d, decoded %d¥n",
+					if (0) {
+						printf("timeout %d, decode req %d, decoded %d\n",
 								send_frame_arg->cam_num,
 								send_frame_arg->decodereqcount,
 								send_frame_arg->decodedcount);
@@ -341,6 +341,7 @@ static void *sendframe_thread_func(void* arg) {
 					if (lg_plugin_host) {
 						lg_plugin_host->lock_texture();
 					}
+					mrevent_reset(&send_frame_arg->buffer_ready);
 				}
 
 				if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf)
@@ -351,7 +352,6 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					send_frame_arg->decodereqcount++;
-					mrevent_reset(&send_frame_arg->buffer_ready);
 					if (frame->xmp_info && lg_plugin_host) {
 						lg_plugin_host->set_camera_quatanion(cam_num,
 								frame->quatanion);
