@@ -117,13 +117,6 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 
 	send_frame_arg->decodedcount++;
 	mrevent_trigger(&send_frame_arg->buffer_ready);
-
-	int cam_num = send_frame_arg->cam_num;
-	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
-			lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
-		printf("test  OMX_FillThisBuffer failed in callback\n");
-		exit(1);
-	}
 }
 
 static void *sendframe_thread_func(void* arg) {
@@ -323,6 +316,13 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+
+					//int cam_num = send_frame_arg->cam_num;
+					if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
+							lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
+						printf("test  OMX_FillThisBuffer failed in callback\n");
+						exit(1);
+					}
 
 					if (lg_plugin_host) {
 						lg_plugin_host->lock_texture();
