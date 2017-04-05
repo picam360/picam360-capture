@@ -334,6 +334,9 @@ static void *sendframe_thread_func(void* arg) {
 					}
 					if (send_frame_arg->decodereqcount
 							!= send_frame_arg->decodedcount) {
+						printf("delay %d, decode req %d, decoded %d\n",
+								send_frame_arg->cam_num, send_frame_arg->decodereqcount,
+								send_frame_arg->decodedcount);
 						usleep(10 * 1000);
 					}
 					mrevent_reset(&send_frame_arg->buffer_ready);
