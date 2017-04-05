@@ -331,7 +331,7 @@ static void *sendframe_thread_func(void* arg) {
 					}
 					if (send_frame_arg->decodereqcount > 10
 							&& send_frame_arg->decodereqcount
-									!= send_frame_arg->decodedcount) {
+									> send_frame_arg->decodedcount) {
 						printf("delay %d, decode req %d, decoded %d\n",
 								send_frame_arg->cam_num,
 								send_frame_arg->decodereqcount,
@@ -354,8 +354,7 @@ static void *sendframe_thread_func(void* arg) {
 
 						if (send_frame_arg->decodereqcount
 								!= send_frame_arg->decodedcount) {
-							send_frame_arg->decodereqcount =
-									send_frame_arg->decodedcount;
+							send_frame_arg->decodedcount++
 							printf("frame lost\n");
 						} else {
 							printf("frame sync\n");
