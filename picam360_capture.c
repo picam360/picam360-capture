@@ -1513,6 +1513,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 	}
 	for (int i = 0; i < state->num_of_cam; i++) {
+		if (state->codec_type == MJPEG) {
+			mjpeg_decoder_switch_buffer(i);
+		}
 		glActiveTexture(GL_TEXTURE1 + i);
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
@@ -1686,10 +1689,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
-	if (state->codec_type == MJPEG) {
-		mjpeg_decoder_switch_buffer(0);
-		mjpeg_decoder_switch_buffer(1);
-	}
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 
 	glDisableVertexAttribArray(loc);
