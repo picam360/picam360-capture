@@ -116,6 +116,12 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
 	send_frame_arg->decodedcount++;
+	if (0) {
+		printf("timeout %d, decode req %d, decoded %d\n",
+				send_frame_arg->cam_num,
+				send_frame_arg->decodereqcount,
+				send_frame_arg->decodedcount);
+	}
 	mrevent_trigger(&send_frame_arg->buffer_ready);
 
 	int cam_num = send_frame_arg->cam_num;
@@ -332,12 +338,6 @@ static void *sendframe_thread_func(void* arg) {
 				if (packet->eof) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
-					if (0) {
-						printf("timeout %d, decode req %d, decoded %d\n",
-								send_frame_arg->cam_num,
-								send_frame_arg->decodereqcount,
-								send_frame_arg->decodedcount);
-					}
 					if (lg_plugin_host) {
 						lg_plugin_host->lock_texture();
 					}
