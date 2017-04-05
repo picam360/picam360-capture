@@ -87,6 +87,7 @@ public:
 		active_frame = NULL;
 		xmp_info = false;
 		memset(quatanion, 0, sizeof(quatanion));
+		is_buffer_ready = false;
 	}
 	bool cam_run;
 	int cam_num;
@@ -100,6 +101,7 @@ public:
 	_FRAME_T *active_frame;
 	bool xmp_info;
 	float quatanion[4];
+	bool is_buffer_ready;
 	void *user_data;
 };
 
@@ -111,22 +113,8 @@ static COMPONENT_T* lg_egl_render[2] = { };
 
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
-	int index = send_frame_arg->cam_num;
 
-	if (lg_plugin_host) {
-		lg_plugin_host->lock_texture();
-	}
-	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[index]),
-			lg_egl_buffer[index]) != OMX_ErrorNone) {
-		printf("test  OMX_FillThisBuffer failed in callback\n");
-		exit(1);
-	}
-	if (send_frame_arg->xmp_info && lg_plugin_host) {
-		lg_plugin_host->set_camera_quatanion(index, send_frame_arg->quatanion);
-	}
-	if (lg_plugin_host) {
-		lg_plugin_host->unlock_texture();
-	}
+	send_frame_arg->is_buffer_ready = true;
 }
 
 static void *sendframe_thread_func(void* arg) {
@@ -450,7 +438,10 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 	}
 
 }
-void init_mjpeg_decoder(int cam_num, void *user_data) {
+void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
+		void *user_data) {
+	lg_plugin_host = plugin_host;
+
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
@@ -491,6 +482,20 @@ int mjpeg_decoder_get_frameskip(int cam_num) {
 	return lg_send_frame_arg[cam_num]->frameskip;
 }
 
-void mjpeg_decoder_set_plugin_host(PLUGIN_HOST_T *plugin_host) {
-	lg_plugin_host = plugin_host;
+void mjpeg_decoder_switch_buffer(int cam_num) {
+	if (!lg_send_frame_arg[cam_num]) {
+		return;
+	}
+	if (!lg_send_frame_arg[cam_num]->is_buffer_ready) {
+		return;
+	}
+	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
+			lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
+		printf("test  OMX_FillThisBuffer failed in callback\n");
+		exit(1);
+	}
+	if (lg_send_frame_arg[cam_num]->xmp_info && lg_plugin_host) {
+		lg_plugin_host->set_camera_quatanion(index,
+				lg_send_frame_arg[cam_num]->quatanion);
+	}
 }

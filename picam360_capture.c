@@ -460,8 +460,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 		// Start rendering
 		if (state->codec_type == MJPEG) {
-			mjpeg_decoder_set_plugin_host(&state->plugin_host);
-			init_mjpeg_decoder(i, state->egl_image[i]);
+			init_mjpeg_decoder(&state->plugin_host, i, state->egl_image[i]);
 		} else {
 			void **args = malloc(sizeof(void*) * 3);
 			args[0] = (void*) i;
@@ -1687,9 +1686,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
-	state->plugin_host.lock_texture();
+	if (state->codec_type == MJPEG) {
+		mjpeg_decoder_switch_buffer(0);
+		mjpeg_decoder_switch_buffer(1);
+	}
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
-	state->plugin_host.unlock_texture();
 
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
