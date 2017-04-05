@@ -84,10 +84,10 @@ public:
 		frameskip = 0;
 		pthread_mutex_init(&frames_mlock, NULL);
 		mrevent_init(&frame_ready);
+		mrevent_init(&buffer_ready);
 		active_frame = NULL;
 		xmp_info = false;
 		memset(quatanion, 0, sizeof(quatanion));
-		is_buffer_ready = false;
 	}
 	bool cam_run;
 	int cam_num;
@@ -97,11 +97,11 @@ public:
 	std::list<_FRAME_T *> frames;
 	pthread_mutex_t frames_mlock;
 	MREVENT_T frame_ready;
+	MREVENT_T buffer_ready;
 	pthread_t cam_thread;
 	_FRAME_T *active_frame;
 	bool xmp_info;
 	float quatanion[4];
-	bool is_buffer_ready;
 	void *user_data;
 };
 
@@ -114,7 +114,18 @@ static COMPONENT_T* lg_egl_render[2] = { };
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
-	send_frame_arg->is_buffer_ready = true;
+	mrevent_trigger(&send_frame_arg->buffer_ready);
+
+	int cam_num = send_frame_arg->cam_num;
+	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
+			lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
+		printf("test  OMX_FillThisBuffer failed in callback\n");
+		exit(1);
+	}
+	if (send_frame_arg->xmp_info && lg_plugin_host) {
+		lg_plugin_host->set_camera_quatanion(cam_num,
+				send_frame_arg->quatanion);
+	}
 }
 
 static void *sendframe_thread_func(void* arg) {
@@ -329,6 +340,7 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
+					mrevent_reset(&send_frame_arg->buffer_ready);
 					send_frame_arg->xmp_info = frame->xmp_info;
 					memcpy(send_frame_arg->quatanion, frame->quatanion,
 							sizeof(send_frame_arg->quatanion));
@@ -486,17 +498,5 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
-	if (!lg_send_frame_arg[cam_num]->is_buffer_ready) {
-		return;
-	}
-	lg_send_frame_arg[cam_num]->is_buffer_ready = false;
-	if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
-			lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
-		printf("test  OMX_FillThisBuffer failed in callback\n");
-		exit(1);
-	}
-	if (lg_send_frame_arg[cam_num]->xmp_info && lg_plugin_host) {
-		lg_plugin_host->set_camera_quatanion(cam_num,
-				lg_send_frame_arg[cam_num]->quatanion);
-	}
+	mrevent_wait(&send_frame_arg->buffer_ready, 100 * 1000);
 }
