@@ -303,7 +303,8 @@ static void *sendframe_thread_func(void* arg) {
 							OMX_StateExecuting);
 
 					// Request lg_egl_render to write data to the texture buffer
-					if (OMX_FillThisBuffer(ILC_GET_HANDLE(lg_egl_render[cam_num]),
+					if (OMX_FillThisBuffer(
+							ILC_GET_HANDLE(lg_egl_render[cam_num]),
 							lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
 						printf("OMX_FillThisBuffer failed.\n");
 						exit(1);
@@ -324,6 +325,10 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+
+					if (lg_plugin_host) {
+						lg_plugin_host->lock_texture();
+					}
 				}
 
 				if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf)
@@ -337,6 +342,9 @@ static void *sendframe_thread_func(void* arg) {
 					if (frame->xmp_info && lg_plugin_host) {
 						lg_plugin_host->set_camera_quatanion(cam_num,
 								frame->quatanion);
+					}
+					if (lg_plugin_host) {
+						lg_plugin_host->unlock_texture();
 					}
 					delete packet;
 					break;
@@ -492,7 +500,8 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
-	int res = mrevent_wait(&lg_send_frame_arg[cam_num]->buffer_ready, 100 * 1000);
+	int res = mrevent_wait(&lg_send_frame_arg[cam_num]->buffer_ready,
+			100 * 1000);
 	if (res != 0) {
 		mrevent_trigger(&lg_send_frame_arg[cam_num]->buffer_ready);
 	}

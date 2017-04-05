@@ -1498,6 +1498,8 @@ int main(int argc, char *argv[]) {
  ***********************************************************/
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model) {
+	state->plugin_host.lock_texture();
+
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
 
@@ -1695,6 +1697,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	state->plugin_host.unlock_texture();
 }
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	int program = GLProgram_GetId(state->freetypegles.model.program);
