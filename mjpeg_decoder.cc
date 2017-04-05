@@ -318,8 +318,10 @@ static void *sendframe_thread_func(void* arg) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
 					//int cam_num = send_frame_arg->cam_num;
-					if (OMX_FillThisBuffer(ilclient_get_handle(lg_egl_render[cam_num]),
-							lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
+					if (port_settings_changed
+							&& OMX_FillThisBuffer(
+									ilclient_get_handle(lg_egl_render[cam_num]),
+									lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
 						printf("test  OMX_FillThisBuffer failed in callback\n");
 						exit(1);
 					}
@@ -335,8 +337,29 @@ static void *sendframe_thread_func(void* arg) {
 								send_frame_arg->decodereqcount,
 								send_frame_arg->decodedcount);
 						usleep(1000 * 1000);
-						send_frame_arg->decodereqcount =
-								send_frame_arg->decodedcount;
+						if (send_frame_arg->decodereqcount
+								> send_frame_arg->decodedcount) {
+							if (port_settings_changed
+									&& OMX_FillThisBuffer(
+											ilclient_get_handle(
+													lg_egl_render[cam_num]),
+											lg_egl_buffer[cam_num])
+											!= OMX_ErrorNone) {
+								printf(
+										"test  OMX_FillThisBuffer failed in callback\n");
+								exit(1);
+							}
+							usleep(1000 * 1000);
+						}
+
+						if (send_frame_arg->decodereqcount
+								!= send_frame_arg->decodedcount) {
+							send_frame_arg->decodereqcount =
+									send_frame_arg->decodedcount;
+							printf("frame lost\n");
+						} else {
+							printf("frame sync\n");
+						}
 					}
 					mrevent_reset(&send_frame_arg->buffer_ready);
 				}
@@ -511,7 +534,7 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 		return;
 	}
 	int res = mrevent_wait(&lg_send_frame_arg[cam_num]->buffer_ready,
-			200 * 1000);
+			1000 * 1000);
 	if (res != 0) {
 		mrevent_trigger(&lg_send_frame_arg[cam_num]->buffer_ready);
 	}
