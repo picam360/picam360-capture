@@ -572,10 +572,17 @@ static void save_options(void *user_data, json_t *options) {
 			json_real(lg_video_delay));
 }
 
-static int rtp_callback(char *data, int data_len, int pt) {
-	if (data_len <= 0) {
+static int rtp_callback(unsigned char *data, unsigned int data_len,
+		unsigned char pt, unsigned int seq_num) {
+	if (data_len == 0) {
 		return -1;
 	}
+	static unsigned int last_seq_num = 0;
+	if (seq_num != last_seq_num + 1) {
+		printf("packet lost : from %d to %d\n", last_seq_num, seq_num)
+	}
+	last_seq_num = seq_num;
+
 	if (pt == PT_STATUS) {
 		status_handler((unsigned char*) data, data_len);
 	} else if (pt == PT_CAM_BASE + 0) {

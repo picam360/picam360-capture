@@ -19,7 +19,7 @@ void rtp_stop_loading();
 bool rtp_is_loading(char **path);
 float rtp_get_bandwidth();
 
-typedef void (*RTP_CALLBACK)(unsigned char *data, int data_len, int pt);
+typedef void (*RTP_CALLBACK)(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int  seq_num);
 void rtp_set_callback(RTP_CALLBACK callback);
 
 #ifdef __cplusplus

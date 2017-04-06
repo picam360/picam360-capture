@@ -121,7 +121,8 @@ static void *receive_thread_func(void* arg) {
 					if (lg_callback && lg_load_fd < 0) {
 						lg_callback(pack->GetPayloadData(),
 								pack->GetPayloadLength(),
-								pack->GetPayloadType());
+								pack->GetPayloadType(),
+								pack->GetSequenceNumber());
 					}
 					if (lg_record_fd > 0) {
 						pthread_mutex_lock(&lg_record_packet_queue_mlock);
