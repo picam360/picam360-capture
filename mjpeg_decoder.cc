@@ -369,7 +369,7 @@ static void *sendframe_thread_func(void* arg) {
 					// Request lg_egl_render to write data to the texture buffer
 					if (OMX_FillThisBuffer(
 							ILC_GET_HANDLE(send_frame_arg->egl_render),
-							send_frame_arg->egl_buffer[i][0])
+							send_frame_arg->egl_buffer[0])
 							!= OMX_ErrorNone) {
 						printf("OMX_FillThisBuffer failed.\n");
 						exit(1);
