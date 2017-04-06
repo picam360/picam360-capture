@@ -303,6 +303,18 @@ static void *sendframe_thread_func(void* arg) {
 					}
 
 					for (int i = 0; i < 2; i++) {
+						OMX_STATETYPE state;
+						OMX_GetState(ILC_GET_HANDLE(send_frame_arg->egl_render),
+								&state);
+						if (state != OMX_StateIdle) {
+							if (state != OMX_StateLoaded) {
+								ilclient_change_component_state(
+										send_frame_arg->egl_render,
+										OMX_StateLoaded);
+							}
+							ilclient_change_component_state(
+									send_frame_arg->egl_render, OMX_StateIdle);
+						}
 						if (OMX_UseEGLImage(
 								ILC_GET_HANDLE(send_frame_arg->egl_render),
 								&send_frame_arg->egl_buffer[i], 221, (void*) i,
