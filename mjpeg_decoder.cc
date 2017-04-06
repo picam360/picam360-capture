@@ -146,6 +146,7 @@ static void *sendframe_thread_func(void* arg) {
 
 	int cam_num = send_frame_arg->cam_num;
 
+	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format;
 	COMPONENT_T *video_decode = NULL;
 	COMPONENT_T *list[3];
@@ -315,12 +316,12 @@ static void *sendframe_thread_func(void* arg) {
 							ilclient_change_component_state(
 									send_frame_arg->egl_render, OMX_StateIdle);
 						}
-						if (OMX_UseEGLImage(
+						omx_err = OMX_UseEGLImage(
 								ILC_GET_HANDLE(send_frame_arg->egl_render),
 								&send_frame_arg->egl_buffer[i], 221, (void*) i,
-								((void**) send_frame_arg->user_data)[i])
-								!= OMX_ErrorNone) {
-							printf("OMX_UseEGLImage failed.\n");
+								((void**) send_frame_arg->user_data)[i]);
+						if (omx_err != OMX_ErrorNone) {
+							printf("OMX_UseEGLImage failed. 0x%x\n", omx_err);
 							exit(1);
 						}
 					}
