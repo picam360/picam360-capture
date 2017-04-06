@@ -34,6 +34,15 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define OMX_INIT_STRUCTURE(a) \
+    memset(&(a), 0, sizeof(a)); \
+    (a).nSize = sizeof(a); \
+    (a).nVersion.nVersion = OMX_VERSION; \
+    (a).nVersion.s.nVersionMajor = OMX_VERSION_MAJOR; \
+    (a).nVersion.s.nVersionMinor = OMX_VERSION_MINOR; \
+    (a).nVersion.s.nRevision = OMX_VERSION_REVISION; \
+    (a).nVersion.s.nStep = OMX_VERSION_STEP
+
 #define NUM_OF_CAM 2
 
 class _PACKET_T {
@@ -297,21 +306,21 @@ static void *sendframe_thread_func(void* arg) {
 					OMX_PARAM_PORTDEFINITIONTYPE port_format;
 					OMX_INIT_STRUCTURE(port_format);
 					port_format.nPortIndex = 221;
-					omx_err = OMX_GetParameter(ILC_GET_HANDLE(video_decode),
+					omx_err = OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->egl_render),
 							OMX_IndexParamPortDefinition, &port_format);
 					if (omx_err != OMX_ErrorNone) {
 						printf(
-								"%s - m_omx_egl_render.GetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
+								"%s - OMX_GetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
 								__func__, omx_err);
 						exit(1);
 					}
 
 					port_format.nBufferCountActual = 2;
-					omx_err = OMX_SetParameter(ILC_GET_HANDLE(video_decode),
+					omx_err = OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->egl_render),
 							OMX_IndexParamPortDefinition, &port_format);
 					if (omx_err != OMX_ErrorNone) {
 						printf(
-								"%s - m_omx_egl_render.SetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
+								"%s - OMX_SetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
 								__func__, omx_err);
 						exit(1);
 					}
