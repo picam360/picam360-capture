@@ -30,7 +30,6 @@
 #define PT_CAM_BASE 110
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
-static int lg_status_fd = -1;
 
 #define MAX_DELAY_COUNT 256
 static float lg_video_delay = 0.0;
@@ -580,7 +579,7 @@ static int rtp_callback(char *data, int data_len, int pt) {
 		return -1;
 	}
 	if (pt == PT_STATUS) {
-		status_handler(data, data_len);
+		status_handler((unsigned char*) data, data_len);
 	} else if (pt == PT_CAM_BASE + 0) {
 		if (lg_plugin_host && lg_plugin_host->decode_video) {
 			lg_plugin_host->decode_video(0, (unsigned char*) data, data_len);
