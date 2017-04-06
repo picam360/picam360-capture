@@ -293,6 +293,29 @@ static void *sendframe_thread_func(void* arg) {
 					ilclient_change_component_state(send_frame_arg->egl_render,
 							OMX_StateIdle);
 
+					// Obtain the information about the output port.
+					OMX_PARAM_PORTDEFINITIONTYPE port_format;
+					OMX_INIT_STRUCTURE(port_format);
+					port_format.nPortIndex = 221;
+					omx_err = OMX_GetParameter(ILC_GET_HANDLE(video_decode),
+							OMX_IndexParamPortDefinition, &port_format);
+					if (omx_err != OMX_ErrorNone) {
+						printf(
+								"%s - m_omx_egl_render.GetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
+								__func__, omx_err);
+						exit(1);
+					}
+
+					port_format.nBufferCountActual = 2;
+					omx_err = OMX_SetParameter(ILC_GET_HANDLE(video_decode),
+							OMX_IndexParamPortDefinition, &port_format);
+					if (omx_err != OMX_ErrorNone) {
+						printf(
+								"%s - m_omx_egl_render.SetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
+								__func__, omx_err);
+						exit(1);
+					}
+
 					// Enable the output port and tell lg_egl_render to use the texture as a buffer
 					//ilclient_enable_port(lg_egl_render, 221); THIS BLOCKS SO CAN'T BE USED
 					if (OMX_SendCommand(
