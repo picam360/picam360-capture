@@ -102,6 +102,7 @@ public:
 		egl_render = NULL;
 		xmp_info = false;
 		memset(quatanion, 0, sizeof(quatanion));
+		fillbufferdone_count = 0;
 	}
 	void *user_data;
 	bool cam_run;
@@ -121,6 +122,7 @@ public:
 	COMPONENT_T* egl_render;
 	bool xmp_info;
 	float quatanion[4];
+	int fillbufferdone_count;
 };
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
@@ -129,11 +131,9 @@ static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
-	OMX_BUFFERHEADERTYPE *egl_buffer = ilclient_get_output_buffer(comp, 221, 1);
-	printf("%d\n", (int) egl_buffer->pAppPrivate);
+	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
-		lg_plugin_host->set_cam_texture_cur(send_frame_arg->cam_num,
-				(int) egl_buffer->pAppPrivate);
+		lg_plugin_host->set_cam_texture_cur(send_frame_arg->cam_num, cur);
 		if (send_frame_arg->xmp_info) {
 			lg_plugin_host->set_camera_quatanion(send_frame_arg->cam_num,
 					send_frame_arg->quatanion);
@@ -145,6 +145,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
+	send_frame_arg->fillbufferdone_count++;
 }
 
 static void *sendframe_thread_func(void* arg) {
@@ -306,7 +307,8 @@ static void *sendframe_thread_func(void* arg) {
 					OMX_PARAM_PORTDEFINITIONTYPE port_format;
 					OMX_INIT_STRUCTURE(port_format);
 					port_format.nPortIndex = 221;
-					omx_err = OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->egl_render),
+					omx_err = OMX_GetParameter(
+							ILC_GET_HANDLE(send_frame_arg->egl_render),
 							OMX_IndexParamPortDefinition, &port_format);
 					if (omx_err != OMX_ErrorNone) {
 						printf(
@@ -316,7 +318,8 @@ static void *sendframe_thread_func(void* arg) {
 					}
 
 					port_format.nBufferCountActual = 2;
-					omx_err = OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->egl_render),
+					omx_err = OMX_SetParameter(
+							ILC_GET_HANDLE(send_frame_arg->egl_render),
 							OMX_IndexParamPortDefinition, &port_format);
 					if (omx_err != OMX_ErrorNone) {
 						printf(
