@@ -436,26 +436,28 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 	load_texture("img/logo_img.png", &state->logo_texture);
 
 	for (int i = 0; i < state->num_of_cam; i++) {
-		//// load three texture buffers but use them on six OGL|ES texture surfaces
-		glGenTextures(1, &state->cam_texture[i]);
+		for (int j = 0; j < 2; j++) {
+			//// load three texture buffers but use them on six OGL|ES texture surfaces
+			glGenTextures(1, &state->cam_texture[i][j]);
 
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
-				state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
+					state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-		/* Create EGL Image */
-		state->egl_image[i] = eglCreateImageKHR(state->display, state->context,
-				EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i],
-				0);
+			/* Create EGL Image */
+			state->egl_image[i][j] = eglCreateImageKHR(state->display,
+					state->context, EGL_GL_TEXTURE_2D_KHR,
+					(EGLClientBuffer) state->cam_texture[i][j], 0);
 
-		if (state->egl_image[i] == EGL_NO_IMAGE_KHR) {
-			printf("eglCreateImageKHR failed.\n");
-			exit(1);
+			if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
+				printf("eglCreateImageKHR failed.\n");
+				exit(1);
+			}
 		}
 
 		// Start rendering
@@ -470,9 +472,6 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 					(state->video_direct) ? video_direct : video_decode_test,
 					args);
 		}
-
-		// Bind texture surface to current vertices
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
 	}
 }
 //------------------------------------------------------------------------------
@@ -1269,6 +1268,10 @@ static void lock_texture() {
 static void unlock_texture() {
 	pthread_mutex_unlock(&state->texture_mutex);
 }
+static void set_cam_texture_cur(int cam_num, int cur)
+{
+	state->cam_texture_cur[cam_num] = cur;
+}
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
@@ -1293,6 +1296,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.decode_video = decode_video;
 		state->plugin_host.lock_texture = lock_texture;
 		state->plugin_host.unlock_texture = unlock_texture;
+		state->plugin_host.set_cam_texture_cur = set_cam_texture_cur;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
@@ -1519,7 +1523,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 			mjpeg_decoder_switch_buffer(i);
 		}
 		glActiveTexture(GL_TEXTURE1 + i);
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i]);
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[cam_num]]);
 	}
 
 	//depth axis is z, vertical asis is y
@@ -1587,6 +1591,12 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	case OCULUS_RIFT:
 		mat4_fromQuat(view_matrix, get_quatanion());
 		mat4_invert(view_matrix, view_matrix);
+		{
+			float tmp[16];
+			mat4_identity(tmp);
+			mat4_rotateX(tmp, tmp, M_PI);
+			mat4_multiply(view_matrix, tmp, view_matrix);
+		}
 		break;
 	case MANUAL:
 		//euler Y(yaw)X(pitch)Z(roll)
@@ -1692,6 +1702,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glEnable(GL_CULL_FACE);
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
+	glFlush();
 
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

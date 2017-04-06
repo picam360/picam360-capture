@@ -89,6 +89,10 @@ public:
 		mrevent_init(&frame_ready);
 		mrevent_init(&buffer_ready);
 		active_frame = NULL;
+		egl_buffer = NULL;
+		egl_render = NULL;
+		xmp_info = false;
+		memset(quatanion, 0, sizeof(quatanion));
 	}
 	void *user_data;
 	bool cam_run;
@@ -104,19 +108,34 @@ public:
 	MREVENT_T buffer_ready;
 	pthread_t cam_thread;
 	_FRAME_T *active_frame;
+	OMX_BUFFERHEADERTYPE* egl_buffer;
+	COMPONENT_T* egl_render;
+	bool xmp_info;
+	float quatanion[4];
 };
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 
-static OMX_BUFFERHEADERTYPE* lg_egl_buffer[2] = { };
-static COMPONENT_T* lg_egl_render[2] = { };
-
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
-	send_frame_arg->decodedcount++;
-	mrevent_trigger(&send_frame_arg->buffer_ready);
+	OMX_BUFFERHEADERTYPE *egl_buffer　= ilclient_get_output_buffer(comp, 221, 1);
+	printf("%d\n", (int) egl_buffer->pAppPrivate);
+	if (lg_plugin_host) {
+		lg_plugin_host->set_cam_texture_cur(send_frame_arg->cam_num,
+				(int) egl_buffer->pAppPrivate);
+		if (send_frame_arg->xmp_info) {
+			lg_plugin_host->set_camera_quatanion(send_frame_arg->cam_num,
+					send_frame_arg->quatanion);
+		}
+	}
+	//int cam_num = send_frame_arg->cam_num;
+	if (OMX_FillThisBuffer(ilclient_get_handle(send_frame_arg->egl_render),
+			egl_buffer) != OMX_ErrorNone) {
+		printf("test  OMX_FillThisBuffer failed in callback\n");
+		exit(1);
+	}
 }
 
 static void *sendframe_thread_func(void* arg) {
@@ -161,15 +180,15 @@ static void *sendframe_thread_func(void* arg) {
 
 	// create lg_egl_render
 	if (status == 0
-			&& ilclient_create_component(client, &lg_egl_render[cam_num],
+			&& ilclient_create_component(client, &send_frame_arg->egl_render,
 					(char*) "egl_render",
 					(ILCLIENT_CREATE_FLAGS_T)(
 							ILCLIENT_DISABLE_ALL_PORTS
 									| ILCLIENT_ENABLE_OUTPUT_BUFFERS)) != 0)
 		status = -14;
-	list[1] = lg_egl_render[cam_num];
+	list[1] = send_frame_arg->egl_render;
 
-	set_tunnel(tunnel, video_decode, 131, lg_egl_render[cam_num], 220);
+	set_tunnel(tunnel, video_decode, 131, send_frame_arg->egl_render, 220);
 
 	if (status == 0)
 		ilclient_change_component_state(video_decode, OMX_StateIdle);
@@ -270,35 +289,43 @@ static void *sendframe_thread_func(void* arg) {
 					}
 
 					// Set lg_egl_render to idle
-					ilclient_change_component_state(lg_egl_render[cam_num],
+					ilclient_change_component_state(send_frame_arg->egl_render,
 							OMX_StateIdle);
 
 					// Enable the output port and tell lg_egl_render to use the texture as a buffer
 					//ilclient_enable_port(lg_egl_render, 221); THIS BLOCKS SO CAN'T BE USED
-					if (OMX_SendCommand(ILC_GET_HANDLE(lg_egl_render[cam_num]),
+					if (OMX_SendCommand(
+							ILC_GET_HANDLE(send_frame_arg->egl_render),
 							OMX_CommandPortEnable, 221, NULL)
 							!= OMX_ErrorNone) {
 						printf("OMX_CommandPortEnable failed.\n");
 						exit(1);
 					}
 
-					if (OMX_UseEGLImage(ILC_GET_HANDLE(lg_egl_render[cam_num]),
-							&lg_egl_buffer[cam_num], 221, NULL,
-							send_frame_arg->user_data) != OMX_ErrorNone) {
-						printf("OMX_UseEGLImage failed.\n");
-						exit(1);
+					for (int i = 0; i < 2; i++) {
+						if (OMX_UseEGLImage(
+								ILC_GET_HANDLE(send_frame_arg->egl_render),
+								&send_frame_arg->egl_buffer[i], 221, (void*) i,
+								((void**) send_frame_arg->user_data)[i])
+								!= OMX_ErrorNone) {
+							printf("OMX_UseEGLImage failed.\n");
+							exit(1);
+						}
 					}
 
 					// Set lg_egl_render to executing
-					ilclient_change_component_state(lg_egl_render[cam_num],
+					ilclient_change_component_state(send_frame_arg->egl_render,
 							OMX_StateExecuting);
 
 					// Request lg_egl_render to write data to the texture buffer
-					if (OMX_FillThisBuffer(
-							ILC_GET_HANDLE(lg_egl_render[cam_num]),
-							lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
-						printf("OMX_FillThisBuffer failed.\n");
-						exit(1);
+					for (int i = 0; i < 2; i++) {
+						if (OMX_FillThisBuffer(
+								ILC_GET_HANDLE(send_frame_arg->egl_render),
+								send_frame_arg->egl_buffer[i])
+								!= OMX_ErrorNone) {
+							printf("OMX_FillThisBuffer failed.\n");
+							exit(1);
+						}
 					}
 				}
 				if (!data_len) {
@@ -316,42 +343,6 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
-
-					if (lg_plugin_host) {
-						lg_plugin_host->lock_texture();
-					}
-					if (send_frame_arg->decodereqcount > 10
-							&& send_frame_arg->decodereqcount
-									> send_frame_arg->decodedcount) {
-						printf("delay %d, decode req %d, decoded %d\n",
-								send_frame_arg->cam_num,
-								send_frame_arg->decodereqcount,
-								send_frame_arg->decodedcount);
-						usleep(1000 * 1000);
-						if (send_frame_arg->decodereqcount
-								> send_frame_arg->decodedcount) {
-							if (port_settings_changed
-									&& OMX_FillThisBuffer(
-											ilclient_get_handle(
-													lg_egl_render[cam_num]),
-											lg_egl_buffer[cam_num])
-											!= OMX_ErrorNone) {
-								printf(
-										"test  OMX_FillThisBuffer failed in callback\n");
-								exit(1);
-							}
-							usleep(1000 * 1000);
-						}
-
-						if (send_frame_arg->decodereqcount
-								!= send_frame_arg->decodedcount) {
-							send_frame_arg->decodedcount++;
-							printf("frame lost\n");
-						} else {
-							printf("frame sync\n");
-						}
-					}
-					mrevent_reset(&send_frame_arg->buffer_ready);
 				}
 
 				if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf)
@@ -361,22 +352,9 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
-					//int cam_num = send_frame_arg->cam_num;
-					if (port_settings_changed
-							&& OMX_FillThisBuffer(
-									ilclient_get_handle(lg_egl_render[cam_num]),
-									lg_egl_buffer[cam_num]) != OMX_ErrorNone) {
-						printf("test  OMX_FillThisBuffer failed in callback\n");
-						exit(1);
-					}
-					send_frame_arg->decodereqcount++;
-					if (frame->xmp_info && lg_plugin_host) {
-						lg_plugin_host->set_camera_quatanion(cam_num,
-								frame->quatanion);
-					}
-					if (lg_plugin_host) {
-						lg_plugin_host->unlock_texture();
-					}
+					send_frame_arg->xmp_info = frame->xmp_info;
+					memcpy(send_frame_arg->quatanion, frame->xmp_info,
+							sizeof(send_frame_arg->quatanion));
 					delete packet;
 					break;
 				} else {
