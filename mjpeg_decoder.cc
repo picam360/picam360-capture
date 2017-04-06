@@ -131,21 +131,22 @@ static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
+	int cam_num = send_frame_arg->cam_num;
 	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
-		lg_plugin_host->set_cam_texture_cur(send_frame_arg->cam_num, cur);
+		lg_plugin_host->set_cam_texture_cur(cam_num, cur);
 		if (send_frame_arg->xmp_info) {
-			lg_plugin_host->set_camera_quatanion(send_frame_arg->cam_num,
+			lg_plugin_host->set_camera_quatanion(cam_num,
 					send_frame_arg->quatanion);
 		}
 	}
-	//int cam_num = send_frame_arg->cam_num;
+	send_frame_arg->fillbufferdone_count++;
+	cur = send_frame_arg->fillbufferdone_count % 2;
 	if (OMX_FillThisBuffer(ilclient_get_handle(send_frame_arg->egl_render),
-			egl_buffer) != OMX_ErrorNone) {
+			send_frame_arg->egl_buffer[cur]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
 		exit(1);
 	}
-	send_frame_arg->fillbufferdone_count++;
 }
 
 static void *sendframe_thread_func(void* arg) {
@@ -366,14 +367,12 @@ static void *sendframe_thread_func(void* arg) {
 							OMX_StateExecuting);
 
 					// Request lg_egl_render to write data to the texture buffer
-					for (int i = 0; i < 2; i++) {
-						if (OMX_FillThisBuffer(
-								ILC_GET_HANDLE(send_frame_arg->egl_render),
-								send_frame_arg->egl_buffer[i])
-								!= OMX_ErrorNone) {
-							printf("OMX_FillThisBuffer failed.\n");
-							exit(1);
-						}
+					if (OMX_FillThisBuffer(
+							ILC_GET_HANDLE(send_frame_arg->egl_render),
+							send_frame_arg->egl_buffer[i][0])
+							!= OMX_ErrorNone) {
+						printf("OMX_FillThisBuffer failed.\n");
+						exit(1);
 					}
 				}
 				if (!data_len) {
