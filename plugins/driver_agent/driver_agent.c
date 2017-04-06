@@ -190,83 +190,20 @@ static void parse_xml(char *xml) {
 	}
 }
 
-static void *recieve_thread_func(void* arg) {
-	int buff_size = RTP_MAXPAYLOADSIZE;
-	unsigned char *buff = malloc(buff_size);
-	int data_len = 0;
-	int marker = 0;
-	int camd_fd = -1;
-	bool xmp = false;
-	int buff_xmp_size = 4096;
-	char *buff_xmp = malloc(buff_xmp_size);
-	int xmp_len = 0;
-	int xmp_idx = 0;
+static void status_handler(unsigned char *data, int data_len) {
+	if (data[0] == 0xFF && data[1] == 0xD8) { //SOI
+		if (data[2] == 0xFF && data[3] == 0xE1) { //xmp
+			int xmp_len = 0;
+			xmp_len = ((unsigned char*) data)[4] << 8;
+			xmp_len += ((unsigned char*) data)[5];
 
-	while (1) {
-		bool reset = false;
-		if (camd_fd < 0) {
-			char buff[256];
-			sprintf(buff, "status");
-			camd_fd = open(buff, O_RDONLY);
-			if (camd_fd == -1) {
-				printf("failed to open %s\n", buff);
-				exit(-1);
-			}
-			printf("%s ready\n", buff);
-		}
-		data_len = read(camd_fd, buff, buff_size);
-		if (data_len == 0) {
-			printf("camera input invalid\n");
-			break;
-		}
-		if (reset) {
-			marker = 0;
-			continue;
-		}
-		for (int i = 0; i < data_len; i++) {
-			if (xmp) {
-				if (xmp_idx == 0) {
-					xmp_len = ((unsigned char*) buff)[i] << 8;
-				} else if (xmp_idx == 1) {
-					xmp_len += ((unsigned char*) buff)[i];
-					if (xmp_len > buff_xmp_size) {
-						free(buff_xmp);
-						buff_xmp_size = xmp_len;
-						buff_xmp = malloc(buff_xmp_size);
-					}
-					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
-					buff_xmp[1] = (xmp_len) & 0xFF;
-				} else {
-					buff_xmp[xmp_idx] = buff[i];
-				}
-				xmp_idx++;
-				if (xmp_idx >= xmp_len) {
-					char *xml = buff_xmp + strlen(buff_xmp) + 1;
-
-					parse_xml(xml);
-					xmp = false;
-				}
-			}
-			if (marker) {
-				marker = 0;
-				if (buff[i] == 0xE1) { //APP1
-					xmp = true;
-					xmp_len = 0;
-					xmp_idx = 0;
-				}
-			} else if (buff[i] == 0xFF) {
-				marker = 1;
-			}
+			char *xml = (char*) data + strlen((char*) data) + 1;
+			parse_xml(xml);
 		}
 	}
-
-	free(buff);
-	free(buff_xmp);
-
-	return NULL;
 }
 
-float sub_angle(float a, float b) {
+static float sub_angle(float a, float b) {
 	float v = a - b;
 	v -= floor(v / 360) * 360;
 	if (v > 180.0) {
@@ -643,15 +580,7 @@ static int rtp_callback(char *data, int data_len, int pt) {
 		return -1;
 	}
 	if (pt == PT_STATUS) {
-		int fd = -1;
-		if (lg_status_fd < 0) {
-			lg_status_fd = open("status", O_WRONLY | O_NONBLOCK);
-		}
-		fd = lg_status_fd;
-		if (fd < 0) {
-			return -1;
-		}
-		write(fd, data, data_len);
+		status_handler(data, data_len);
 	} else if (pt == PT_CAM_BASE + 0) {
 		if (lg_plugin_host && lg_plugin_host->decode_video) {
 			lg_plugin_host->decode_video(0, (unsigned char*) data, data_len);
@@ -679,9 +608,6 @@ static void init() {
 
 	pthread_t transmit_thread;
 	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
-
-	pthread_t recieve_thread;
-	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
 }
 
 #define MAX_INFO_LEN 1024
