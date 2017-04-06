@@ -190,15 +190,13 @@ static void parse_xml(char *xml) {
 }
 
 static void status_handler(unsigned char *data, int data_len) {
-	if (data[0] == 0xFF && data[1] == 0xD8) { //SOI
-		if (data[2] == 0xFF && data[3] == 0xE1) { //xmp
-			int xmp_len = 0;
-			xmp_len = ((unsigned char*) data)[4] << 8;
-			xmp_len += ((unsigned char*) data)[5];
+	if (data[0] == 0xFF && data[1] == 0xE1) { //xmp
+		int xmp_len = 0;
+		xmp_len = ((unsigned char*) data)[2] << 8;
+		xmp_len += ((unsigned char*) data)[3];
 
-			char *xml = (char*) data + strlen((char*) data) + 1;
-			parse_xml(xml);
-		}
+		char *xml = (char*) data + strlen((char*) data) + 1;
+		parse_xml(xml);
 	}
 }
 
