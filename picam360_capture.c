@@ -604,11 +604,13 @@ static void exit_func(void)
 // Function to be passed to atexit().
 {
 	for (int i = 0; i < state->num_of_cam; i++) {
-		if (state->egl_image[i] != 0) {
-			if (!eglDestroyImageKHR(state->display,
-					(EGLImageKHR) state->egl_image[i]))
-				printf("eglDestroyImageKHR failed.");
-			state->egl_image[i] = NULL;
+		for (int j = 0; j < 2; j++) {
+			if (state->egl_image[i][j] != 0) {
+				if (!eglDestroyImageKHR(state->display,
+						(EGLImageKHR) state->egl_image[i][j]))
+					printf("eglDestroyImageKHR failed.");
+				state->egl_image[i][j] = NULL;
+			}
 		}
 	}
 
@@ -1268,8 +1270,7 @@ static void lock_texture() {
 static void unlock_texture() {
 	pthread_mutex_unlock(&state->texture_mutex);
 }
-static void set_cam_texture_cur(int cam_num, int cur)
-{
+static void set_cam_texture_cur(int cam_num, int cur) {
 	state->cam_texture_cur[cam_num] = cur;
 }
 
@@ -1523,7 +1524,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 			mjpeg_decoder_switch_buffer(i);
 		}
 		glActiveTexture(GL_TEXTURE1 + i);
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[cam_num]]);
+		glBindTexture(GL_TEXTURE_2D,
+				state->cam_texture[i][state->cam_texture_cur[i]]);
 	}
 
 	//depth axis is z, vertical asis is y

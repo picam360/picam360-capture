@@ -89,7 +89,7 @@ public:
 		mrevent_init(&frame_ready);
 		mrevent_init(&buffer_ready);
 		active_frame = NULL;
-		egl_buffer = NULL;
+		memset(egl_buffer, 0, sizeof(egl_buffer));
 		egl_render = NULL;
 		xmp_info = false;
 		memset(quatanion, 0, sizeof(quatanion));
@@ -108,7 +108,7 @@ public:
 	MREVENT_T buffer_ready;
 	pthread_t cam_thread;
 	_FRAME_T *active_frame;
-	OMX_BUFFERHEADERTYPE* egl_buffer;
+	OMX_BUFFERHEADERTYPE* egl_buffer[2];
 	COMPONENT_T* egl_render;
 	bool xmp_info;
 	float quatanion[4];
@@ -120,7 +120,7 @@ static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
-	OMX_BUFFERHEADERTYPE *egl_buffer　= ilclient_get_output_buffer(comp, 221, 1);
+	OMX_BUFFERHEADERTYPE *egl_buffer = ilclient_get_output_buffer(comp, 221, 1);
 	printf("%d\n", (int) egl_buffer->pAppPrivate);
 	if (lg_plugin_host) {
 		lg_plugin_host->set_cam_texture_cur(send_frame_arg->cam_num,
@@ -353,7 +353,7 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					send_frame_arg->xmp_info = frame->xmp_info;
-					memcpy(send_frame_arg->quatanion, frame->xmp_info,
+					memcpy(send_frame_arg->quatanion, frame->quatanion,
 							sizeof(send_frame_arg->quatanion));
 					delete packet;
 					break;
@@ -476,6 +476,9 @@ void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
 	lg_send_frame_arg[cam_num]->cam_run = true;
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
 			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
+	char buff[256];
+	sprintf(buff, "sendframe_thread_func:%d", cam_num);
+	pthread_setname_np(lg_send_frame_arg[cam_num]->cam_thread, buff);
 }
 void deinit_mjpeg_decoder(int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
