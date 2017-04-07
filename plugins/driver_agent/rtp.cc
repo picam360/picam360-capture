@@ -17,6 +17,7 @@
 #include <string>
 #include <list>
 
+#ifdef USE_JRTP
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
 #include "rtpipv4address.h"
@@ -24,6 +25,86 @@
 #include "rtperrors.h"
 #include "rtplibraryversion.h"
 #include "rtppacket.h"
+
+using namespace jrtplib;
+
+static RTPSession lg_sess;
+
+#else
+
+struct RTPHeader {
+#ifdef RTP_BIG_ENDIAN
+	uint8_t version:2;
+	uint8_t padding:1;
+	uint8_t extension:1;
+	uint8_t csrccount:4;
+
+	uint8_t marker:1;
+	uint8_t payloadtype:7;
+#else // little endian
+	uint8_t csrccount :4;
+	uint8_t extension :1;
+	uint8_t padding :1;
+	uint8_t version :2;
+
+	uint8_t payloadtype :7;
+	uint8_t marker :1;
+#endif // RTP_BIG_ENDIAN
+
+	uint16_t sequencenumber;
+	uint32_t timestamp;
+	uint32_t ssrc;
+};
+
+class RTPPacket {
+public:
+	RTPPacket(size_t packetlength) :
+			packetlength(packetlength) {
+		packet = new uint8_t[packetlength];
+	}
+	~RTPPacket() {
+		delete packet;
+	}
+	uint16_t GetSequenceNumber() const {
+		return seqnr;
+	}
+	uint32_t GetTimestamp() const {
+		return timestamp;
+	}
+	uint8_t *GetPacketData() const {
+		return packet;
+	}
+	uint8_t *GetPayloadData() const {
+		return packet + sizeof(struct RTPHeader);
+	}
+	size_t GetPacketLength() const {
+		return packetlength;
+	}
+	size_t GetPayloadLength() const {
+		return packetlength - sizeof(struct RTPHeader);
+	}
+	void LoadHeader() {
+		struct RTPHeader *rtpheader_p = (struct RTPHeader) packet;
+		seqnr = ntohs(rtpheader_p->sequencenumber);
+		payloadtype = rtpheader_p->payloadtype;
+		timestamp = ntohl(rtpheader_p->timestamp);
+	}
+	void StoreHeader() {
+		struct RTPHeader *rtpheader_p = (struct RTPHeader) packet;
+		rtpheader_p->sequencenumber = htons(seqnr);
+		rtpheader_p->payloadtype = payloadtype;
+		rtpheader_p->timestamp = htonl(timestamp);
+	}
+	uint8_t payloadtype;
+	uint16_t seqnr;
+	uint32_t timestamp;
+	size_t packetlength;
+	uint8_t *packet;
+};
+static uint16_t lg_seqnr = 0;
+static uint32_t lg_timestamp = 0;
+static int lg_tx_fd = -1;
+#endif
 
 #include "rtp.h"
 
@@ -37,14 +118,11 @@ extern "C" {
 }
 #endif
 
-using namespace jrtplib;
-
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static bool lg_receive_run = false;
 static pthread_t lg_receive_thread;
-static RTPSession lg_sess;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
 
 static char lg_record_path[256];
@@ -97,8 +175,38 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			lg_bandwidth = lg_bandwidth * (1.0 - w) + tmp * w;
 		}
 
+#ifdef USE_JRTP
 		status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
+#else
+		if (lg_tx_fd >= 0) {
+			unsigned char header[8];
+			header[0] = 0xFF;
+			header[1] = 0xE1;
+			unsigned short len = sizeof(header) + sizeof(struct RTPHeader)
+					+ data_len;
+			for (int i = 0; i < 2; i++) {
+				header[2 + i] = (len >> (8 * i)) & 0xFF;
+			}
+			header[4] = (unsigned char) 'r';
+			header[5] = (unsigned char) 't';
+			header[6] = (unsigned char) 'p';
+			header[7] = (unsigned char) '\0';
+			write(lg_tx_fd, header, sizeof(header));
+
+			lg_seqnr++;
+			lg_timestamp += diff_usec;
+
+			RTPPacket *pack = new RTPPacket(sizeof(struct RTPHeader));
+			pack->seqnr = lg_seqnr;
+			pack->timestamp = timestamp;
+			pack->payloadtype = pt;
+			pack->LoadHeader();
+			write(lg_tx_fd, &pack->GetPacketData(), pack->GetPacketLength());
+			write(lg_tx_fd, data, data_len);
+			delete pack;
+		}
+#endif
 
 		last_time = time;
 		last_data_len = data_len;
@@ -108,6 +216,8 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 }
 
 static void *receive_thread_func(void* arg) {
+
+#ifdef USE_JRTP
 	int status;
 	while (lg_receive_run) {
 		lg_sess.BeginDataAccess();
@@ -133,7 +243,7 @@ static void *receive_thread_func(void* arg) {
 						lg_sess.DeletePacket(pack);
 					}
 				}
-			} while (lg_sess.GotoNextSourceWithData());
+			}while (lg_sess.GotoNextSourceWithData());
 		}
 
 		lg_sess.EndDataAccess();
@@ -143,6 +253,75 @@ static void *receive_thread_func(void* arg) {
 		checkerror(status);
 #endif // RTP_SUPPORT_THREAD
 	}
+#else
+	int rx_fd = open("rtp_rx", O_RDONLY);
+	if (rx_fd < 0) {
+		return NULL;
+	}
+	int xmp_len = 0;
+	int xmp_pos = 0;
+	bool xmp = false;
+	while (lg_receive_run) {
+		char buff[4096];
+		int data_len = read(rx_fd, buff, sizeof(buff));
+
+		for (int i = 0; i < data_len; i++) {
+			if (xmp) {
+				xmp_pos++;
+				if (xmp_pos == 2) {
+					xmp_len = buff[i];
+				} else if (xmp_pos == 3) {
+					xmp_len += buff[i] << 8;
+				} else if (xmp_pos == 4 && buff[i] == 'r') {
+				} else if (xmp_pos == 5 && buff[i] == 't') {
+				} else if (xmp_pos == 6 && buff[i] == 'p') {
+				} else if (xmp_pos == 7 && buff[i] == '\0') { // rtp header
+					i++;
+					xmp_pos++;
+					RTPPacket *pack = new RTPPacket(xmp_len - xmp_pos);
+					if (i + (xmp_len - xmp_pos) < data_len) {
+						memcpy(pack->GetPacketData(), &buff[i],
+								xmp_len - xmp_pos);
+						i += xmp_len - xmp_pos;
+					} else {
+						memcpy(pack->GetPacketData(), &buff[i], data_len - i);
+						xmp_pos += data_len - i;
+						xmp_pos += read(rx_fd, pack->GetPacketData() + xmp_pos,
+								xmp_len - xmp_pos);
+						i = data_len;
+					}
+					pack->LoadHeader();
+					if (lg_callback && lg_load_fd < 0) {
+						lg_callback(pack->GetPayloadData(),
+								pack->GetPayloadLength(),
+								pack->GetPayloadType(),
+								pack->GetSequenceNumber());
+					}
+					if (lg_record_fd > 0) {
+						pthread_mutex_lock(&lg_record_packet_queue_mlock);
+						lg_record_packet_queue.push_back(pack);
+						mrevent_trigger(&lg_record_packet_ready);
+						pthread_mutex_unlock(&lg_record_packet_queue_mlock);
+					} else {
+						delete pack;
+					}
+				} else {
+					xmp = false;
+				}
+			}
+			if (marker) {
+				marker = 0;
+				if (buff[i] == 0xE1) { //xmp
+					xmp = true;
+					xmp_pos = 1;
+					xmp_len = 0;
+				}
+			} else if (buff[i] == 0xFF) {
+				step = 1;
+			}
+		}
+	}
+#endif
 	return NULL;
 }
 
@@ -179,13 +358,21 @@ static void *record_thread_func(void* arg) {
 		header[7] = (unsigned char) '\0';
 		write(fd, header, sizeof(header));
 		write(fd, pack->GetPacketData(), pack->GetPacketLength());
+#ifdef USE_JRTP
 		lg_sess.DeletePacket(pack);
+#else
+		delete patk;
+#endif
 	}
 	pthread_mutex_lock(&lg_record_packet_queue_mlock);
 	while (!lg_record_packet_queue.empty()) {
 		pack = *(lg_record_packet_queue.begin());
 		lg_record_packet_queue.pop_front();
+#ifdef USE_JRTP
 		lg_sess.DeletePacket(pack);
+#else
+		delete patk;
+#endif
 	}
 	mrevent_reset(&lg_record_packet_ready);
 	pthread_mutex_unlock(&lg_record_packet_queue_mlock);
@@ -277,6 +464,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	}
 	is_init = true;
 
+#ifdef USE_JRTP
 	uint32_t destip;
 	int status;
 
@@ -286,17 +474,17 @@ int init_rtp(unsigned short portbase, char *destip_str,
 		return -1;
 	}
 
-	// The inet_addr function returns a value in network byte order, but
-	// we need the IP address in host byte order, so we use a call to
-	// ntohl
+// The inet_addr function returns a value in network byte order, but
+// we need the IP address in host byte order, so we use a call to
+// ntohl
 	destip = ntohl(destip);
 
 	RTPUDPv4TransmissionParams transparams;
 	RTPSessionParams sessparams;
 
-	sessparams.SetOwnTimestampUnit(1.0 / 1E6);	//micro sec
+	sessparams.SetOwnTimestampUnit(1.0 / 1E6);//micro sec
 	sessparams.SetMaximumPacketSize(
-	RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader));
+			RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader));
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
 
@@ -307,6 +495,9 @@ int init_rtp(unsigned short portbase, char *destip_str,
 
 	status = lg_sess.AddDestination(addr);
 	checkerror(status);
+#else
+	lg_tx_fd = open("rtp_tx", O_WDONLY);
+#endif
 
 	lg_receive_run = true;
 	pthread_create(&lg_receive_thread, NULL, receive_thread_func, (void*) NULL);
@@ -322,7 +513,14 @@ int deinit_rtp() {
 	}
 	lg_receive_run = false;
 	pthread_join(lg_receive_thread, NULL);
+#ifdef USE_JRTP
 	lg_sess.BYEDestroy(RTPTime(10, 0), 0, 0);
+#else
+	if (lg_tx_fd >= 0) {
+		close(lg_tx_fd);
+		lg_tx_fd = -1;
+	}
+#endif
 	is_init = false;
 	return 0;
 }
