@@ -579,7 +579,7 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	}
 	static unsigned int last_seq_num = 0;
 	if (seq_num != last_seq_num + 1) {
-		printf("packet lost : from %d to %d\n", last_seq_num, seq_num)
+		printf("packet lost : from %d to %d\n", last_seq_num, seq_num);
 	}
 	last_seq_num = seq_num;
 

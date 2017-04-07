@@ -234,7 +234,8 @@ static void *load_thread_func(void* arg) {
 
 		if (lg_callback) {
 			lg_callback(buff + sizeof(struct RTPHeader),
-					len - sizeof(struct RTPHeader), header->payloadtype);
+					len - sizeof(struct RTPHeader), header->payloadtype,
+					ntohs(header->sequencenumber));
 		}
 		{ //wait
 			unsigned int timestamp = ntohl(header->timestamp);
