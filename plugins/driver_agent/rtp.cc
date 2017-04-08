@@ -12,6 +12,8 @@
 #include <pthread.h>
 #include <math.h>
 #include <limits.h>
+#include <arpa/inet.h>
+#include <sys/time.h>
 
 #include <iostream>
 #include <string>
@@ -83,14 +85,17 @@ public:
 	size_t GetPayloadLength() const {
 		return packetlength - sizeof(struct RTPHeader);
 	}
+	uint8_t GetPayloadType() const {
+		return payloadtype;
+	}
 	void LoadHeader() {
-		struct RTPHeader *rtpheader_p = (struct RTPHeader) packet;
+		struct RTPHeader *rtpheader_p = (struct RTPHeader*) packet;
 		seqnr = ntohs(rtpheader_p->sequencenumber);
 		payloadtype = rtpheader_p->payloadtype;
 		timestamp = ntohl(rtpheader_p->timestamp);
 	}
 	void StoreHeader() {
-		struct RTPHeader *rtpheader_p = (struct RTPHeader) packet;
+		struct RTPHeader *rtpheader_p = (struct RTPHeader*) packet;
 		rtpheader_p->sequencenumber = htons(seqnr);
 		rtpheader_p->payloadtype = payloadtype;
 		rtpheader_p->timestamp = htonl(timestamp);
@@ -144,19 +149,20 @@ void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
 }
 
+#ifdef USE_JRTP
 static void checkerror(int rtperr) {
 	if (rtperr < 0) {
 		std::cout << "ERROR: " << RTPGetErrorString(rtperr) << std::endl;
 		exit(-1);
 	}
 }
+#endif
 
 float rtp_get_bandwidth() {
 	return lg_bandwidth;
 }
 
 int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
-	int status;
 	pthread_mutex_lock(&lg_mlock);
 	{
 		static int last_data_len = 0;
@@ -176,7 +182,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 		}
 
 #ifdef USE_JRTP
-		status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
+		int status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
 #else
 		if (lg_tx_fd >= 0) {
@@ -199,10 +205,10 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 
 			RTPPacket *pack = new RTPPacket(sizeof(struct RTPHeader));
 			pack->seqnr = lg_seqnr;
-			pack->timestamp = timestamp;
+			pack->timestamp = lg_timestamp;
 			pack->payloadtype = pt;
 			pack->LoadHeader();
-			write(lg_tx_fd, &pack->GetPacketData(), pack->GetPacketLength());
+			write(lg_tx_fd, pack->GetPacketData(), pack->GetPacketLength());
 			write(lg_tx_fd, data, data_len);
 			delete pack;
 		}
@@ -258,6 +264,7 @@ static void *receive_thread_func(void* arg) {
 	if (rx_fd < 0) {
 		return NULL;
 	}
+	int marker = 0;
 	int xmp_len = 0;
 	int xmp_pos = 0;
 	bool xmp = false;
@@ -317,7 +324,7 @@ static void *receive_thread_func(void* arg) {
 					xmp_len = 0;
 				}
 			} else if (buff[i] == 0xFF) {
-				step = 1;
+				marker = 1;
 			}
 		}
 	}
@@ -361,7 +368,7 @@ static void *record_thread_func(void* arg) {
 #ifdef USE_JRTP
 		lg_sess.DeletePacket(pack);
 #else
-		delete patk;
+		delete pack;
 #endif
 	}
 	pthread_mutex_lock(&lg_record_packet_queue_mlock);
@@ -371,7 +378,7 @@ static void *record_thread_func(void* arg) {
 #ifdef USE_JRTP
 		lg_sess.DeletePacket(pack);
 #else
-		delete patk;
+		delete pack;
 #endif
 	}
 	mrevent_reset(&lg_record_packet_ready);
@@ -496,7 +503,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	status = lg_sess.AddDestination(addr);
 	checkerror(status);
 #else
-	lg_tx_fd = open("rtp_tx", O_WDONLY);
+	lg_tx_fd = open("rtp_tx", O_WRONLY);
 #endif
 
 	lg_receive_run = true;
