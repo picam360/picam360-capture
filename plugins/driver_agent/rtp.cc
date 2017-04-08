@@ -65,7 +65,10 @@ public:
 		packet = new uint8_t[packetlength];
 	}
 	~RTPPacket() {
-		delete packet;
+		if (packet) {
+			delete packet;
+			packet = NULL;
+		}
 	}
 	uint16_t GetSequenceNumber() const {
 		return seqnr;
@@ -286,14 +289,15 @@ static void *receive_thread_func(void* arg) {
 					i++;
 					xmp_pos++;
 					RTPPacket *pack = new RTPPacket(xmp_len - xmp_pos);
-					if (i + (xmp_len - xmp_pos) < data_len) {
+					if (i + (xmp_len - xmp_pos) <= data_len) {
 						memcpy(pack->GetPacketData(), &buff[i],
 								xmp_len - xmp_pos);
 						i += xmp_len - xmp_pos;
 					} else {
-						memcpy(pack->GetPacketData(), &buff[i], data_len - i);
-						xmp_pos += data_len - i;
-						xmp_pos += read(rx_fd, pack->GetPacketData() + xmp_pos,
+						int rest_in_buff = data_len - i;
+						memcpy(pack->GetPacketData(), &buff[i], rest_in_buff);
+						xmp_pos += rest_in_buff;
+						xmp_pos += read(rx_fd, pack->GetPacketData() + rest_in_buff,
 								xmp_len - xmp_pos);
 						i = data_len;
 					}
