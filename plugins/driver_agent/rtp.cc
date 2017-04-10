@@ -154,7 +154,6 @@ static RTP_CALLBACK lg_callback = NULL;
 static float lg_bandwidth = 0;
 static float lg_bandwidth_limit = 24 * 1024 * 1024; //24Mbps
 
-
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
 }
@@ -262,7 +261,7 @@ static void *buffering_thread_func(void* arg) {
 		pthread_mutex_lock(&lg_buffering_queue_mlock);
 		lg_buffering_queue.push_back(raw_pack);
 		mrevent_trigger(&lg_buffering_ready);
-		pthread_mutex_unlock (&lg_buffering_queue_mlock);
+		pthread_mutex_unlock(&lg_buffering_queue_mlock);
 	}
 	return NULL;
 }
@@ -325,7 +324,7 @@ static void *receive_thread_func(void* arg) {
 		if (lg_buffering_queue.empty()) {
 			mrevent_reset(&lg_buffering_ready);
 		}
-		pthread_mutex_unlock (&lg_buffering_queue_mlock);
+		pthread_mutex_unlock(&lg_buffering_queue_mlock);
 
 		int data_len = raw_pack->GetPacketLength();
 		unsigned char *buff = raw_pack->GetPacketData();
@@ -364,12 +363,12 @@ static void *receive_thread_func(void* arg) {
 					}
 				} else {
 					if (xmp_pos == 8) {
-						pack = new RTPPacket(xmp_len - xmp_pos);
+						pack = new RTPPacket(xmp_len - 8);
 					}
 					if (i + (xmp_len - xmp_pos) <= data_len) {
-						memcpy(pack->GetPacketData(), &buff[i],
+						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i],
 								xmp_len - xmp_pos);
-						i += xmp_len - xmp_pos;
+						i += xmp_len - xmp_pos - 1;
 						xmp_pos = xmp_len;
 						pack->LoadHeader();
 						if (lg_callback && lg_load_fd < 0) {
@@ -390,8 +389,9 @@ static void *receive_thread_func(void* arg) {
 						xmp = false;
 					} else {
 						int rest_in_buff = data_len - i;
-						memcpy(pack->GetPacketData(), &buff[i], rest_in_buff);
-						i = data_len;
+						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i],
+								rest_in_buff);
+						i = data_len - 1;
 						xmp_pos += rest_in_buff;
 					}
 				}
@@ -408,6 +408,7 @@ static void *receive_thread_func(void* arg) {
 				}
 			}
 		}
+		delete raw_pack;
 	}
 #endif
 	return NULL;
