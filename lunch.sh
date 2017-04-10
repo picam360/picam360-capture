@@ -111,6 +111,11 @@ mkfifo rtp_tx
 chmod 0666 rtp_tx
 
 if [ $REMOTE = true ]; then
+
+#use tcp
+#	sudo killall nc
+#   nc 192.168.4.1 9006 < rtp_tx > rtp_rx &
+
 	sudo killall socat
 #	socat tcp-listen:9002 PIPE:rtp_rx &
 	socat -u udp-recv:9002 - > rtp_rx &
