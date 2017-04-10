@@ -98,21 +98,23 @@ fi
 mkfifo cam1
 chmod 0666 cam1
 
-if [ -e cmd ]; then
-	rm cmd
+if [ -e rtp_rx ]; then
+	rm rtp_rx
 fi
-mkfifo cmd
-chmod 0666 cmd
+mkfifo rtp_rx
+chmod 0666 rtp_rx
 
-if [ -e driver ]; then
-	rm driver
+if [ -e rtp_tx ]; then
+	rm rtp_tx
 fi
-mkfifo driver
-chmod 0666 driver
+mkfifo rtp_tx
+chmod 0666 rtp_tx
 
 if [ $REMOTE = true ]; then
 	sudo killall socat
-#	socat PIPE:driver UDP-DATAGRAM:192.168.4.1:9001 &
+#	socat tcp-listen:9002 PIPE:rtp_rx &
+	socat -u udp-recv:9002 - > rtp_rx &
+	socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.1:9004 &
 #	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
 	sudo killall raspivid

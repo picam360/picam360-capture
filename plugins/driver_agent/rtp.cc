@@ -19,6 +19,21 @@
 #include <string>
 #include <list>
 
+#include "rtp.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "mrevent.h"
+
+#ifdef __cplusplus
+}
+#endif
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #ifdef USE_JRTP
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
@@ -112,22 +127,12 @@ public:
 static uint16_t lg_seqnr = 0;
 static uint32_t lg_timestamp = 0;
 static int lg_tx_fd = -1;
+
+static pthread_t lg_buffering_thread;
+static MREVENT_T lg_buffering_ready;
+static pthread_mutex_t lg_buffering_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
+static std::list<RTPPacket*> lg_buffering_queue;
 #endif
-
-#include "rtp.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "mrevent.h"
-
-#ifdef __cplusplus
-}
-#endif
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static bool lg_receive_run = false;
 static pthread_t lg_receive_thread;
@@ -147,6 +152,8 @@ static pthread_t lg_load_thread;
 static RTP_CALLBACK lg_callback = NULL;
 
 static float lg_bandwidth = 0;
+static float lg_bandwidth_limit = 24 * 1024 * 1024; //24Mbps
+
 
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
@@ -210,12 +217,24 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			pack->seqnr = lg_seqnr;
 			pack->timestamp = lg_timestamp;
 			pack->payloadtype = pt;
-			pack->LoadHeader();
+			pack->StoreHeader();
 			write(lg_tx_fd, pack->GetPacketData(), pack->GetPacketLength());
 			write(lg_tx_fd, data, data_len);
 			delete pack;
 		}
 #endif
+		{ //limit bandwidth
+			struct timeval time2 = { };
+			gettimeofday(&time2, NULL);
+			struct timeval diff;
+			timersub(&time2, &time, &diff);
+			int diff_usec = diff.tv_sec * 1000000 + diff.tv_usec;
+			float cal_usec = 8.0f * data_len / (lg_bandwidth_limit / 1000000);
+			if (diff_usec < cal_usec) {
+				int need_to_wait = MIN(cal_usec - diff_usec, 1000000);
+				usleep(need_to_wait);
+			}
+		}
 
 		last_time = time;
 		last_data_len = data_len;
@@ -223,6 +242,31 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 	pthread_mutex_unlock(&lg_mlock);
 	return 0;
 }
+#ifdef USE_JRTP
+#else
+static void *buffering_thread_func(void* arg) {
+	int rx_fd = open("rtp_rx", O_RDONLY);
+	if (rx_fd < 0) {
+		return NULL;
+	}
+	while (lg_receive_run) {
+		int size = 4 * 1024;
+		RTPPacket *raw_pack = new RTPPacket(size);
+		raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(),
+				raw_pack->GetPacketLength());
+		if (raw_pack->packetlength <= 0) {
+			delete raw_pack;
+			continue;
+		}
+
+		pthread_mutex_lock(&lg_buffering_queue_mlock);
+		lg_buffering_queue.push_back(raw_pack);
+		mrevent_trigger(&lg_buffering_ready);
+		pthread_mutex_unlock (&lg_buffering_queue_mlock);
+	}
+	return NULL;
+}
+#endif
 
 static void *receive_thread_func(void* arg) {
 
@@ -263,72 +307,105 @@ static void *receive_thread_func(void* arg) {
 #endif // RTP_SUPPORT_THREAD
 	}
 #else
-	int rx_fd = open("rtp_rx", O_RDONLY);
-	if (rx_fd < 0) {
-		return NULL;
-	}
 	int marker = 0;
 	int xmp_len = 0;
 	int xmp_pos = 0;
 	bool xmp = false;
+	RTPPacket *pack = NULL;
 	while (lg_receive_run) {
-		char buff[4096];
-		int data_len = read(rx_fd, buff, sizeof(buff));
+		int res = mrevent_wait(&lg_buffering_ready, 1000);
+		if (res != 0) {
+			continue;
+		}
+
+		RTPPacket *raw_pack = NULL;
+		pthread_mutex_lock(&lg_buffering_queue_mlock);
+		raw_pack = *(lg_buffering_queue.begin());
+		lg_buffering_queue.pop_front();
+		if (lg_buffering_queue.empty()) {
+			mrevent_reset(&lg_buffering_ready);
+		}
+		pthread_mutex_unlock (&lg_buffering_queue_mlock);
+
+		int data_len = raw_pack->GetPacketLength();
+		unsigned char *buff = raw_pack->GetPacketData();
 
 		for (int i = 0; i < data_len; i++) {
 			if (xmp) {
-				xmp_pos++;
 				if (xmp_pos == 2) {
 					xmp_len = buff[i];
+					xmp_pos++;
 				} else if (xmp_pos == 3) {
 					xmp_len += buff[i] << 8;
-				} else if (xmp_pos == 4 && buff[i] == 'r') {
-				} else if (xmp_pos == 5 && buff[i] == 't') {
-				} else if (xmp_pos == 6 && buff[i] == 'p') {
-				} else if (xmp_pos == 7 && buff[i] == '\0') { // rtp header
-					i++;
 					xmp_pos++;
-					RTPPacket *pack = new RTPPacket(xmp_len - xmp_pos);
+				} else if (xmp_pos == 4) {
+					if (buff[i] == 'r') {
+						xmp_pos++;
+					} else {
+						xmp = false;
+					}
+				} else if (xmp_pos == 5) {
+					if (buff[i] == 't') {
+						xmp_pos++;
+					} else {
+						xmp = false;
+					}
+				} else if (xmp_pos == 6) {
+					if (buff[i] == 'p') {
+						xmp_pos++;
+					} else {
+						xmp = false;
+					}
+				} else if (xmp_pos == 7) { // rtp header
+					if (buff[i] == '\0') {
+						xmp_pos++;
+					} else {
+						xmp = false;
+					}
+				} else {
+					if (xmp_pos == 8) {
+						pack = new RTPPacket(xmp_len - xmp_pos);
+					}
 					if (i + (xmp_len - xmp_pos) <= data_len) {
 						memcpy(pack->GetPacketData(), &buff[i],
 								xmp_len - xmp_pos);
 						i += xmp_len - xmp_pos;
+						xmp_pos = xmp_len;
+						pack->LoadHeader();
+						if (lg_callback && lg_load_fd < 0) {
+							lg_callback(pack->GetPayloadData(),
+									pack->GetPayloadLength(),
+									pack->GetPayloadType(),
+									pack->GetSequenceNumber());
+						}
+						if (lg_record_fd > 0) {
+							pthread_mutex_lock(&lg_record_packet_queue_mlock);
+							lg_record_packet_queue.push_back(pack);
+							mrevent_trigger(&lg_record_packet_ready);
+							pthread_mutex_unlock(&lg_record_packet_queue_mlock);
+						} else {
+							delete pack;
+						}
+						pack = NULL;
+						xmp = false;
 					} else {
 						int rest_in_buff = data_len - i;
 						memcpy(pack->GetPacketData(), &buff[i], rest_in_buff);
-						xmp_pos += rest_in_buff;
-						xmp_pos += read(rx_fd, pack->GetPacketData() + rest_in_buff,
-								xmp_len - xmp_pos);
 						i = data_len;
+						xmp_pos += rest_in_buff;
 					}
-					pack->LoadHeader();
-					if (lg_callback && lg_load_fd < 0) {
-						lg_callback(pack->GetPayloadData(),
-								pack->GetPayloadLength(),
-								pack->GetPayloadType(),
-								pack->GetSequenceNumber());
-					}
-					if (lg_record_fd > 0) {
-						pthread_mutex_lock(&lg_record_packet_queue_mlock);
-						lg_record_packet_queue.push_back(pack);
-						mrevent_trigger(&lg_record_packet_ready);
-						pthread_mutex_unlock(&lg_record_packet_queue_mlock);
-					} else {
-						delete pack;
-					}
-				} else {
-					xmp = false;
 				}
-			}
-			if (marker) {
-				marker = 0;
-				if (buff[i] == 0xE1) { //xmp
-					xmp = true;
-					xmp_pos = 1;
-					xmp_len = 0;
+			} else {
+				if (marker) {
+					marker = 0;
+					if (buff[i] == 0xE1) { //xmp
+						xmp = true;
+						xmp_pos = 2;
+						xmp_len = 0;
+					}
+				} else if (buff[i] == 0xFF) {
+					marker = 1;
 				}
-			} else if (buff[i] == 0xFF) {
-				marker = 1;
 			}
 		}
 	}
@@ -475,6 +552,8 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	}
 	is_init = true;
 
+	lg_receive_run = true;
+
 #ifdef USE_JRTP
 	uint32_t destip;
 	int status;
@@ -508,9 +587,11 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	checkerror(status);
 #else
 	lg_tx_fd = open("rtp_tx", O_WRONLY);
+	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func,
+			(void*) NULL);
+	mrevent_init(&lg_buffering_ready);
 #endif
 
-	lg_receive_run = true;
 	pthread_create(&lg_receive_thread, NULL, receive_thread_func, (void*) NULL);
 
 	mrevent_init(&lg_record_packet_ready);
@@ -531,6 +612,7 @@ int deinit_rtp() {
 		close(lg_tx_fd);
 		lg_tx_fd = -1;
 	}
+	pthread_join(lg_buffering_thread, NULL);
 #endif
 	is_init = false;
 	return 0;
