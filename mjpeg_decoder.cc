@@ -101,6 +101,9 @@ public:
 		active_frame = NULL;
 		memset(egl_buffer, 0, sizeof(egl_buffer));
 		egl_render = NULL;
+		video_decode = NULL;
+		resize = NULL;
+		memset(tunnel, 0, sizeof(tunnel));
 		xmp_info = false;
 		memset(quatanion, 0, sizeof(quatanion));
 		fillbufferdone_count = 0;
@@ -123,6 +126,7 @@ public:
 	COMPONENT_T* resize;
 	OMX_BUFFERHEADERTYPE* egl_buffer[2];
 	COMPONENT_T* egl_render;
+	TUNNEL_T tunnel[3];
 	bool xmp_info;
 	float quatanion[4];
 	int fillbufferdone_count;
@@ -153,7 +157,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 }
 static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 
-	if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
+	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
 		return -7;
 	}
 
@@ -325,13 +329,11 @@ static void *sendframe_thread_func(void* arg) {
 	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format;
 	COMPONENT_T *list[4];
-	TUNNEL_T tunnel[3];
 	ILCLIENT_T *client;
 	int status = 0;
 	unsigned int data_len = 0;
 
 	memset(list, 0, sizeof(list));
-	memset(tunnel, 0, sizeof(tunnel));
 
 	if ((client = ilclient_init()) == NULL) {
 		return (void *) -3;
@@ -373,8 +375,8 @@ static void *sendframe_thread_func(void* arg) {
 		status = -14;
 	list[2] = send_frame_arg->egl_render;
 
-	set_tunnel(tunnel, send_frame_arg->video_decode, 131, resize, 60);
-	set_tunnel(tunnel + 1, send_frame_arg->resize, 61,
+	set_tunnel(send_frame_arg->tunnel, send_frame_arg->video_decode, 131, resize, 60);
+	set_tunnel(send_frame_arg->tunnel + 1, send_frame_arg->resize, 61,
 			send_frame_arg->egl_render, 220);
 
 	if (status == 0)
@@ -525,14 +527,14 @@ static void *sendframe_thread_func(void* arg) {
 			status = -20;
 
 		// need to flush the renderer to allow video_decode to disable its input port
-		ilclient_flush_tunnels(tunnel, 0);
+		ilclient_flush_tunnels(send_frame_arg->tunnel, 0);
 
 		ilclient_disable_port_buffers(send_frame_arg->video_decode, 130, NULL,
 				NULL, NULL);
 	}
 
-	ilclient_disable_tunnel(tunnel);
-	ilclient_teardown_tunnels(tunnel);
+	ilclient_disable_tunnel(send_frame_arg->tunnel);
+	ilclient_teardown_tunnels(send_frame_arg->tunnel);
 
 	ilclient_state_transition(list, OMX_StateIdle);
 	ilclient_state_transition(list, OMX_StateLoaded);
