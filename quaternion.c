@@ -5,6 +5,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "quaternion.h"
+
 QUATERNION get_quaternion_from_x(float rad) {
 	QUATERNION q;
 	q.x = sin(rad * 0.5);
