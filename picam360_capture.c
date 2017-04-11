@@ -1732,17 +1732,20 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			state->plugin_host.get_camera_temperature());
 	swprintf(disp[1], 64, L"fps %.1f", lg_fps);
 
+	int screen_width =
+			(state->stereo) ? state->screen_width / 2 : state->screen_width;
+	int screen_height = screen_height;
 	int line = 0;
 	for (int i = 0; i < 2; i++) {
-		pen.x = -((float) state->screen_width / 2
+		pen.x = -((float) screen_width / 2
 				- state->freetypegles.font->size / 8);
-		pen.y = ((float) state->screen_height / 2
+		pen.y = ((float) screen_height / 2
 				- state->freetypegles.font->size / 8)
 				- state->freetypegles.font->size * (line + 1);
 		add_text(vVector, state->freetypegles.font, disp[i], &back_color, &pen);
 
-		pen.x = -((float) state->screen_width / 2);
-		pen.y = ((float) state->screen_height / 2)
+		pen.x = -((float) screen_width / 2);
+		pen.y = ((float) screen_height / 2)
 				- state->freetypegles.font->size * (line + 1);
 		add_text(vVector, state->freetypegles.font, disp[i], &color, &pen);
 		line++;
@@ -1751,16 +1754,16 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		if (state->plugins[i]->get_info) {
 			wchar_t *info = state->plugins[i]->get_info(
 					state->plugins[i]->user_data);
-			pen.x = -((float) state->screen_width / 2
+			pen.x = -((float) screen_width / 2
 					- state->freetypegles.font->size / 8);
-			pen.y = ((float) state->screen_height / 2
+			pen.y = ((float) screen_height / 2
 					- state->freetypegles.font->size / 8)
 					- state->freetypegles.font->size * (line + 1);
 			add_text(vVector, state->freetypegles.font, info, &back_color,
 					&pen);
 
-			pen.x = -((float) state->screen_width / 2);
-			pen.y = ((float) state->screen_height / 2)
+			pen.x = -((float) screen_width / 2);
+			pen.y = ((float) screen_height / 2)
 					- state->freetypegles.font->size * (line + 1);
 			add_text(vVector, state->freetypegles.font, info, &color, &pen);
 			line++;
@@ -1779,8 +1782,8 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
 	mvpHandle = glGetUniformLocation(program, "u_mvp");
 
-	float a = 1.0f / (state->screen_width / 2);
-	float b = 1.0f / (state->screen_height / 2);
+	float a = 1.0f / (screen_width / 2);
+	float b = 1.0f / (screen_height / 2);
 
 	GLfloat mvp[] = { //
 			//
@@ -1811,17 +1814,16 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
 	if (state->stereo) {
-		int offset_x = (state->screen_width / 2 - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
+		int offset_x = (screen_width - frame->width) / 2;
+		int offset_y = (screen_height - frame->height) / 2;
 		for (int i = 0; i < 2; i++) {
-			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-			glViewport(offset_x + i * state->screen_width / 2, offset_y,
+			glViewport(offset_x + i * screen_width, offset_y,
 					(GLsizei) frame->width, (GLsizei) frame->height);
 			glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 		}
 	} else {
-		int offset_x = (state->screen_width - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
+		int offset_x = (screen_width - frame->width) / 2;
+		int offset_y = (screen_height - frame->height) / 2;
 		glViewport(offset_x, offset_y, (GLsizei) frame->width,
 				(GLsizei) frame->height);
 		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
