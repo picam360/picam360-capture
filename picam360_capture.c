@@ -97,6 +97,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model);
+static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
 
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
@@ -885,6 +886,8 @@ void frame_handler() {
 		//preview
 		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
+			redraw_info(state, frame);
+			eglSwapBuffers(state->display, state->surface);
 		}
 	}
 }
@@ -1645,7 +1648,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		glUniform1f(glGetUniformLocation(program, "scale"), scale);
 	}
 	{
-		float aspect_ratio = (float) state->cam_width / (float) state->cam_height;
+		float aspect_ratio = (float) state->cam_width
+				/ (float) state->cam_height;
 		glUniform1f(glGetUniformLocation(program, "aspect_ratio"),
 				aspect_ratio);
 	}
@@ -1780,14 +1784,14 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 
 	GLfloat mvp[] = { //
 			//
-					a, 0, 0, 0, //
-					0, b, 0, 0, //
-					0, 0, 1.0, 0, //
-					0, 0, 0, 1.0 //
+					a, 0, 0, 0,		//
+					0, b, 0, 0,		//
+					0, 0, 1.0, 0,		//
+					0, 0, 0, 1.0		//
 			};
 	glUniformMatrix4fv(mvpHandle, 1, GL_FALSE, (GLfloat *) mvp);
 
-	// Load the vertex data
+// Load the vertex data
 	glVertexAttribPointer(vertexHandle, 3, GL_FLOAT, GL_FALSE,
 			9 * sizeof(GLfloat), vVector->items);
 	glEnableVertexAttribArray(vertexHandle);
@@ -1806,13 +1810,22 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
-
-	int offset_x = (state->screen_width - frame->width) / 2;
-	int offset_y = (state->screen_height - frame->height) / 2;
-	glViewport(offset_x, offset_y, (GLsizei) frame->width,
-			(GLsizei) frame->height);
-
-	glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
+	if (state->stereo) {
+		int offset_x = (state->screen_width / 2 - frame->width) / 2;
+		int offset_y = (state->screen_height - frame->height) / 2;
+		for (int i = 0; i < 2; i++) {
+			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
+			glViewport(offset_x + i * state->screen_width / 2, offset_y,
+					(GLsizei) frame->width, (GLsizei) frame->height);
+			glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
+		}
+	} else {
+		int offset_x = (state->screen_width - frame->width) / 2;
+		int offset_y = (state->screen_height - frame->height) / 2;
+		glViewport(offset_x, offset_y, (GLsizei) frame->width,
+				(GLsizei) frame->height);
+		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
+	}
 
 	glDisableVertexAttribArray(vertexHandle);
 	glDisableVertexAttribArray(texHandle);
@@ -1828,14 +1841,14 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
 
-	// Start with a clear screen
+// Start with a clear screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, frame->texture);
 
-	//Load in the texture and thresholding parameters.
+//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 
 	GLuint loc = glGetAttribLocation(program, "vPosition");
@@ -1869,9 +1882,5 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
-	redraw_info(state, frame);
-
-	eglSwapBuffers(state->display, state->surface);
 }
 
