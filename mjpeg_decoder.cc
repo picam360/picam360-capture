@@ -138,6 +138,7 @@ static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
+	printf("buffer done \n");
 	int cam_num = send_frame_arg->cam_num;
 	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
@@ -157,9 +158,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 }
 static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 
-	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
-		return -7;
-	}
+	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
 	OMX_PARAM_PORTDEFINITIONTYPE portdef;
 
@@ -168,31 +167,36 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
 	portdef.nVersion.nVersion = OMX_VERSION;
 	portdef.nPortIndex = 131;
-	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->video_decode), OMX_IndexParamPortDefinition,
-			&portdef);
+	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->video_decode),
+			OMX_IndexParamPortDefinition, &portdef);
 
 	unsigned int uWidth = (unsigned int) portdef.format.image.nFrameWidth;
 	unsigned int uHeight = (unsigned int) portdef.format.image.nFrameHeight;
 
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
-	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize), OMX_IndexParamPortDefinition,
-			&portdef);
+	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
 
 	// establish tunnel between decoder output and resizer input
-	//OMX_SetupTunnel(decoder->imageDecoder->handle,
-	//		decoder->imageDecoder->outPort, decoder->imageResizer->handle,
-	//		decoder->imageResizer->inPort);
+	OMX_SetupTunnel(ILC_GET_HANDLE(send_frame_arg->video_decode), 131,
+			ILC_GET_HANDLE(send_frame_arg->resize), 60);
+
+//	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
+//printf("fail tunnel 0\n");
+//		return -7;
+//	}
 
 	// enable ports
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->video_decode), OMX_CommandPortEnable, 131,
-			NULL);
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize), OMX_CommandPortEnable, 60, NULL);
+	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->video_decode),
+			OMX_CommandPortEnable, 131, NULL);
+	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_CommandPortEnable, 60, NULL);
 
 	// put resizer in idle state (this allows the outport of the decoder
 	// to become enabled)
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize), OMX_CommandStateSet, OMX_StateIdle,
-			NULL);
+	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize), OMX_CommandStateSet,
+			OMX_StateIdle, NULL);
 
 	// wait for state change complete
 	ilclient_wait_for_event(send_frame_arg->resize, OMX_EventCmdComplete,
@@ -208,31 +212,52 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	ilclient_wait_for_event(send_frame_arg->resize,
 			OMX_EventPortSettingsChanged, 61, 1, 0, 1, 0, TIMEOUT_MS);
 
+	printf("port 61 setting changed\n");
+
 	ilclient_disable_port(send_frame_arg->resize, 61);
+
+	printf("start crop\n");
+	OMX_CONFIG_RECTTYPE omx_crop_req;
+	OMX_INIT_STRUCTURE(omx_crop_req);
+	omx_crop_req.nPortIndex = 60;
+	OMX_GetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
+	printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
+			omx_crop_req.nWidth, omx_crop_req.nHeight);
+	omx_crop_req.nLeft = (uWidth - 1944) / 2;
+	omx_crop_req.nTop = (uHeight - 1944) / 2;
+	omx_crop_req.nWidth = 1944;
+	omx_crop_req.nHeight = 1944;
+	OMX_SetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
+	OMX_GetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
+	printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
+			omx_crop_req.nWidth, omx_crop_req.nHeight);
 
 	// query output buffer requirements for resizer
 	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
 	portdef.nVersion.nVersion = OMX_VERSION;
 	portdef.nPortIndex = 61;
-	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize), OMX_IndexParamPortDefinition,
-			&portdef);
+	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
 
 	// change output color format and dimensions to match input
 	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
-	portdef.format.image.eColorFormat = OMX_COLOR_Format32bitABGR8888;
-	portdef.format.image.nFrameWidth = uWidth;
-	portdef.format.image.nFrameHeight = uHeight;
+	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
+	portdef.format.image.nFrameWidth = 1944;
+	portdef.format.image.nFrameHeight = 1944;
 	portdef.format.image.nStride = 0;
-	portdef.format.image.nSliceHeight = 0;
+	portdef.format.image.nSliceHeight = 16;
 	portdef.format.image.bFlagErrorConcealment = OMX_FALSE;
 
-	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize), OMX_IndexParamPortDefinition,
-			&portdef);
+	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
 
 	// grab output requirements again to get actual buffer size
 	// requirement (and buffer count requirement!)
-	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize), OMX_IndexParamPortDefinition,
-			&portdef);
+	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
 
 	// move resizer into executing state
 	ilclient_change_component_state(send_frame_arg->resize, OMX_StateExecuting);
@@ -245,11 +270,10 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 			(unsigned int) portdef.nBufferSize);
 	fflush (stdout);
 
-	// enable output port of resizer
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize), OMX_CommandPortEnable, 61, NULL);
-
-	ilclient_wait_for_event(send_frame_arg->resize, OMX_EventCmdComplete,
-			OMX_CommandPortEnable, 1, 61, 1, 0, TIMEOUT_MS);
+	if (ilclient_setup_tunnel(send_frame_arg->tunnel + 1, 0, 0) != 0) {
+		printf("fail tunnel 1\n");
+		return -7;
+	}
 
 	// Set lg_egl_render to idle
 	ilclient_change_component_state(send_frame_arg->egl_render, OMX_StateIdle);
@@ -315,6 +339,8 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 		printf("OMX_FillThisBuffer failed.\n");
 		exit(1);
 	}
+
+	printf("start fill buffer\n");
 	return 0;
 }
 
@@ -375,7 +401,8 @@ static void *sendframe_thread_func(void* arg) {
 		status = -14;
 	list[2] = send_frame_arg->egl_render;
 
-	set_tunnel(send_frame_arg->tunnel, send_frame_arg->video_decode, 131, resize, 60);
+	set_tunnel(send_frame_arg->tunnel, send_frame_arg->video_decode, 131,
+			send_frame_arg->resize, 60);
 	set_tunnel(send_frame_arg->tunnel + 1, send_frame_arg->resize, 61,
 			send_frame_arg->egl_render, 220);
 
