@@ -182,20 +182,10 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexParamPortDefinition, &portdef);
 
-	// establish tunnel between decoder output and resizer input
-	OMX_SetupTunnel(ILC_GET_HANDLE(send_frame_arg->video_decode), 131,
-			ILC_GET_HANDLE(send_frame_arg->resize), 60);
-
-	//	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
-	//		printf("fail tunnel 0\n");
-	//		return -7;
-	//	}
-
-	// enable ports
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->video_decode),
-			OMX_CommandPortEnable, 131, NULL);
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize),
-			OMX_CommandPortEnable, 60, NULL);
+	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
+		printf("fail tunnel 0\n");
+		return -7;
+	}
 
 	// put resizer in idle state (this allows the outport of the decoder
 	// to become enabled)
@@ -204,10 +194,6 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	// once the state changes, both ports should become enabled and the
 	// resizer
 	// output should generate a settings changed event
-	ilclient_wait_for_event(send_frame_arg->video_decode, OMX_EventCmdComplete,
-			OMX_CommandPortEnable, 1, 131, 1, 0, TIMEOUT_MS);
-	ilclient_wait_for_event(send_frame_arg->resize, OMX_EventCmdComplete,
-			OMX_CommandPortEnable, 1, 60, 1, 0, TIMEOUT_MS);
 	ilclient_wait_for_event(send_frame_arg->resize,
 			OMX_EventPortSettingsChanged, 61, 1, 0, 1, 0, TIMEOUT_MS);
 
