@@ -138,7 +138,7 @@ static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
 
-	printf("buffer done \n");
+	//printf("buffer done \n");
 	int cam_num = send_frame_arg->cam_num;
 	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
@@ -199,12 +199,7 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 
 	// put resizer in idle state (this allows the outport of the decoder
 	// to become enabled)
-	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->resize), OMX_CommandStateSet,
-			OMX_StateIdle, NULL);
-
-	// wait for state change complete
-	ilclient_wait_for_event(send_frame_arg->resize, OMX_EventCmdComplete,
-			OMX_CommandStateSet, 1, OMX_StateIdle, 1, 0, TIMEOUT_MS);
+	ilclient_change_component_state(send_frame_arg->resize, OMX_StateIdle);
 
 	// once the state changes, both ports should become enabled and the
 	// resizer
@@ -216,18 +211,13 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	ilclient_wait_for_event(send_frame_arg->resize,
 			OMX_EventPortSettingsChanged, 61, 1, 0, 1, 0, TIMEOUT_MS);
 
-	printf("port 61 setting changed\n");
+	//printf("port 61 setting changed\n");
 
 	ilclient_disable_port(send_frame_arg->resize, 61);
 
-	printf("start crop\n");
 	OMX_CONFIG_RECTTYPE omx_crop_req;
 	OMX_INIT_STRUCTURE(omx_crop_req);
 	omx_crop_req.nPortIndex = 60;
-	OMX_GetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
-			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
-	printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
-			omx_crop_req.nWidth, omx_crop_req.nHeight);
 	if (uWidth > texture_width) {
 		omx_crop_req.nLeft = (uWidth - texture_width) / 2;
 		omx_crop_req.nWidth = texture_width;
@@ -244,10 +234,8 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	}
 	OMX_SetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
-	OMX_GetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
-			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
-	printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
-			omx_crop_req.nWidth, omx_crop_req.nHeight);
+	//printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
+	//		omx_crop_req.nWidth, omx_crop_req.nHeight);
 
 	// query output buffer requirements for resizer
 	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
@@ -284,6 +272,9 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 			(unsigned int) portdef.nBufferSize);
 	fflush (stdout);
 
+	//resize -> egl_render
+
+	//setup tunnel
 	if (ilclient_setup_tunnel(send_frame_arg->tunnel + 1, 0, 0) != 0) {
 		printf("fail tunnel 1\n");
 		return -7;
