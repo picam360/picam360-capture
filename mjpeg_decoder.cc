@@ -170,8 +170,8 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->video_decode),
 			OMX_IndexParamPortDefinition, &portdef);
 
-	unsigned int uWidth = (unsigned int) portdef.format.image.nFrameWidth;
-	unsigned int uHeight = (unsigned int) portdef.format.image.nFrameHeight;
+	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
+	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
 
 	uint32_t texture_width = 0;
 	uint32_t texture_height = 0;
@@ -191,32 +191,22 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	// to become enabled)
 	ilclient_change_component_state(send_frame_arg->resize, OMX_StateIdle);
 
-	// once the state changes, both ports should become enabled and the
-	// resizer
-	// output should generate a settings changed event
-	ilclient_wait_for_event(send_frame_arg->resize,
-			OMX_EventPortSettingsChanged, 61, 1, 0, 1, 0, TIMEOUT_MS);
-
-	//printf("port 61 setting changed\n");
-
-	ilclient_disable_port(send_frame_arg->resize, 61);
-
 	OMX_CONFIG_RECTTYPE omx_crop_req;
 	OMX_INIT_STRUCTURE(omx_crop_req);
 	omx_crop_req.nPortIndex = 60;
-	if (uWidth > texture_width) {
-		omx_crop_req.nLeft = (uWidth - texture_width) / 2;
+	if (image_width > texture_width) {
+		omx_crop_req.nLeft = (image_width - texture_width) / 2;
 		omx_crop_req.nWidth = texture_width;
 	} else {
 		omx_crop_req.nLeft = 0;
-		omx_crop_req.nWidth = uWidth;
+		omx_crop_req.nWidth = image_width;
 	}
-	if (uHeight > texture_height) {
-		omx_crop_req.nTop = (uHeight - texture_height) / 2;
+	if (image_height > texture_height) {
+		omx_crop_req.nTop = (image_height - texture_height) / 2;
 		omx_crop_req.nHeight = texture_height;
 	} else {
 		omx_crop_req.nTop = 0;
-		omx_crop_req.nHeight = uHeight;
+		omx_crop_req.nHeight = image_height;
 	}
 	OMX_SetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
