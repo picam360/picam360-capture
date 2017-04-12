@@ -173,6 +173,10 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	unsigned int uWidth = (unsigned int) portdef.format.image.nFrameWidth;
 	unsigned int uHeight = (unsigned int) portdef.format.image.nFrameHeight;
 
+	uint32_t texture_width = 0;
+	uint32_t texture_height = 0;
+	lg_plugin_host->get_texture_size(&texture_width, &texture_height);
+
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
 	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
@@ -182,10 +186,10 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	OMX_SetupTunnel(ILC_GET_HANDLE(send_frame_arg->video_decode), 131,
 			ILC_GET_HANDLE(send_frame_arg->resize), 60);
 
-//	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
-//printf("fail tunnel 0\n");
-//		return -7;
-//	}
+	//	if (ilclient_setup_tunnel(send_frame_arg->tunnel, 0, 0) != 0) {
+	//		printf("fail tunnel 0\n");
+	//		return -7;
+	//	}
 
 	// enable ports
 	OMX_SendCommand(ILC_GET_HANDLE(send_frame_arg->video_decode),
@@ -224,10 +228,20 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
 	printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
 			omx_crop_req.nWidth, omx_crop_req.nHeight);
-	omx_crop_req.nLeft = (uWidth - 1944) / 2;
-	omx_crop_req.nTop = (uHeight - 1944) / 2;
-	omx_crop_req.nWidth = 1944;
-	omx_crop_req.nHeight = 1944;
+	if (uWidth > texture_width) {
+		omx_crop_req.nLeft = (uWidth - texture_width) / 2;
+		omx_crop_req.nWidth = texture_width;
+	} else {
+		omx_crop_req.nLeft = 0;
+		omx_crop_req.nWidth = uWidth;
+	}
+	if (uHeight > texture_height) {
+		omx_crop_req.nTop = (uHeight - texture_height) / 2;
+		omx_crop_req.nHeight = texture_height;
+	} else {
+		omx_crop_req.nTop = 0;
+		omx_crop_req.nHeight = uHeight;
+	}
 	OMX_SetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
 	OMX_GetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
@@ -245,8 +259,8 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	// change output color format and dimensions to match input
 	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
 	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
-	portdef.format.image.nFrameWidth = 1944;
-	portdef.format.image.nFrameHeight = 1944;
+	portdef.format.image.nFrameWidth = texture_width;
+	portdef.format.image.nFrameHeight = texture_height;
 	portdef.format.image.nStride = 0;
 	portdef.format.image.nSliceHeight = 16;
 	portdef.format.image.bFlagErrorConcealment = OMX_FALSE;
@@ -352,7 +366,6 @@ static void *sendframe_thread_func(void* arg) {
 
 	int cam_num = send_frame_arg->cam_num;
 
-	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format;
 	COMPONENT_T *list[4];
 	ILCLIENT_T *client;
