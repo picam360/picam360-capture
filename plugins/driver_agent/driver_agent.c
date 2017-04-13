@@ -683,7 +683,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		MENU_T *packet_save_menu = menu_new(L"Save", packet_menu_save_callback);
 		MENU_T *packet_load_menu = menu_new(L"Load", packet_menu_load_callback);
 		menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
-		menu_add_submenu(packet_load_menu, packet_save_menu, INT_MAX);
+		menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
 		menu_add_submenu(menu, packet_menu, INT_MAX);//add main menu
 	}
 }

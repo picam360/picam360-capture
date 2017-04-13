@@ -137,7 +137,7 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 	depth++;
 	for (int idx = 0; menu->submenu[idx]; idx++) {
 		MENU_T *submenu = menu->submenu[idx];
-		if (submenu->selected) {
+		if (submenu->activated) {
 			expand_menu(submenu, vVector, line_inout, screen_width,
 					screen_height, depth);
 		} else {
