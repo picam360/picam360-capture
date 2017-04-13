@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <wchar.h>
 #include <limits.h>
+#include <dirent.h>
 
 #include "driver_agent.h"
 #include "kokuyoseki.h"
@@ -660,6 +661,8 @@ static void packet_menu_save_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+			struct timeval time = { };
+			gettimeofday(&time, NULL);
 			struct tm *tmptr = NULL;
 			tmptr = localtime(&time.tv_sec);
 
@@ -721,18 +724,16 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 		if (1) {
 			struct dirent *d;
 			DIR *dir;
-			Device *dev = 0;
 
 			dir = opendir("/media/usbdisk");
 			while ((d = readdir(dir)) != 0) {
-				if (d->d_type == DT_REG) {
+				if (d->d_name[0] != L'.') {
 					char *name_s = malloc(256);
 					wchar_t name[256];
-					sprintf(name_s, 256, L"/media/usbdisk/%s", d->d_name);
+					snprintf(name_s, 256, "/media/usbdisk/%s", d->d_name);
 					swprintf(name, 256, L"%s", d->d_name);
 					MENU_T *node_menu = menu_new(name,
-							packet_menu_load_node_callback);
-					node_menu->user_data = name_s;
+							packet_menu_load_node_callback, name_s);
 					menu_add_submenu(menu, node_menu, INT_MAX);
 				}
 			}
@@ -773,9 +774,11 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	}
 	{			//menu
 		MENU_T *menu = lg_plugin_host->get_menu();
-		MENU_T *packet_menu = menu_new(L"Packet", NULL);
-		MENU_T *packet_save_menu = menu_new(L"Save", packet_menu_save_callback);
-		MENU_T *packet_load_menu = menu_new(L"Load", packet_menu_load_callback);
+		MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
+		MENU_T *packet_save_menu = menu_new(L"Save", packet_menu_save_callback,
+				NULL);
+		MENU_T *packet_load_menu = menu_new(L"Load", packet_menu_load_callback,
+				NULL);
 		menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
 		menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
 		menu_add_submenu(menu, packet_menu, INT_MAX);			//add main menu

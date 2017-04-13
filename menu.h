@@ -38,7 +38,7 @@ void deinit_menu();
 void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
 		bool stereo);
-MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback);
+MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback, void *user_data);
 void menu_delete(MENU_T **menu);
 void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx);
 void menu_operate(MENU_T *root, enum MENU_OPERATE operate);

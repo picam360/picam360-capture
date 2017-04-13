@@ -1352,7 +1352,7 @@ int main(int argc, char *argv[]) {
 
 	//menu
 	init_menu(state->screen_height / 32);
-	state->menu = menu_new(L"Menu", menu_callback);
+	state->menu = menu_new(L"Menu", menu_callback, NULL);
 
 	//frame id=0
 	if (frame_param[0]) {

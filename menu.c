@@ -97,11 +97,12 @@ void deinit_menu() {
 	//todo
 }
 
-MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback) {
+MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback, void *user_data) {
 	MENU_T *menu = (MENU_T*) malloc(sizeof(MENU_T));
 	memset(menu, 0, sizeof(MENU_T));
 	wcsncpy(menu->name, name, sizeof(menu->name) / sizeof(wchar_t));
 	menu->callback = callback;
+	menu->user_data = user_data;
 	return menu;
 }
 
