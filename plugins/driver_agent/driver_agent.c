@@ -560,10 +560,14 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			}
 		}
 	} else if (!lg_plugin_host->get_menu_visible()) {
-		lg_plugin_host->set_menu_visible(true);
+		switch (button) {
+		case BLACKOUT_BUTTON:
+			lg_plugin_host->set_menu_visible(true);
+			break;
+		}
 	} else {
 		switch (button) {
-		case NEXT_BUTTON_LONG:
+		case BACK_BUTTON_LONG:
 			lg_plugin_host->set_menu_visible(false);
 			break;
 		case NEXT_BUTTON:
