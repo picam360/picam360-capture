@@ -1149,7 +1149,7 @@ static void set_view_north(float value) {
 }
 
 static float *get_camera_quatanion(int cam_num) {
-	return state->camera_quatanion;
+	return state->camera_quatanion[cam_num];
 }
 static void set_camera_quatanion(int cam_num, float *value) {
 	for (int i = 0; i < 4; i++) {
@@ -1235,6 +1235,10 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
 	}
 	state->plugins[num_of_plugins] = NULL;
+}
+
+void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event){
+
 }
 
 int main(int argc, char *argv[]) {
@@ -1343,7 +1347,7 @@ int main(int argc, char *argv[]) {
 
 	//menu
 	init_menu();
-	state->menu = menu_new();
+	state->menu = menu_new("Menu", menu_callback);
 
 	//frame id=0
 	if (frame_param[0]) {
