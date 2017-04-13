@@ -68,7 +68,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model);
-static void redraw_info(PICAM360CAPTURE_T *state);
+static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
 
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
@@ -801,7 +801,7 @@ void frame_handler() {
 		//preview
 		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
-			redraw_info(state);
+			redraw_info(state, frame);
 			eglSwapBuffers(state->display, state->surface);
 		}
 	}
@@ -1691,7 +1691,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static void redraw_info(PICAM360CAPTURE_T *state) {
+static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	int len = 0;
 	const int MAX_INFO_SIZE = 1024;
 	wchar_t disp[MAX_INFO_SIZE];
