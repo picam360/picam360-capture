@@ -8,6 +8,7 @@
 #include <math.h>
 #include <pthread.h>
 #include <wchar.h>
+#include <limits.h>
 
 #include "driver_agent.h"
 #include "kokuyoseki.h"
@@ -650,18 +651,39 @@ static wchar_t *get_info(void *user_data) {
 	return lg_info;
 }
 
+static void packet_menu_save_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+
+}
+
+static void packet_menu_load_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+
+}
+
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
 
-	PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
-	strcpy(plugin->name, PLUGIN_NAME);
-	plugin->release = release;
-	plugin->command_handler = command_handler;
-	plugin->init_options = init_options;
-	plugin->save_options = save_options;
-	plugin->get_info = get_info;
-	plugin->user_data = plugin;
+	{
+		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
+		strcpy(plugin->name, PLUGIN_NAME);
+		plugin->release = release;
+		plugin->command_handler = command_handler;
+		plugin->init_options = init_options;
+		plugin->save_options = save_options;
+		plugin->get_info = get_info;
+		plugin->user_data = plugin;
 
-	*_plugin = plugin;
+		*_plugin = plugin;
+	}
+	{			//menu
+		MENU_T *menu = lg_plugin_host->get_menu();
+		MENU_T *packet_menu = menu_new(L"Packet", NULL);
+		MENU_T *packet_save_menu = menu_new(L"Save", packet_menu_save_callback);
+		MENU_T *packet_load_menu = menu_new(L"Load", packet_menu_load_callback);
+		menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
+		menu_add_submenu(packet_load_menu, packet_save_menu, INT_MAX);
+		menu_add_submenu(menu, packet_menu, INT_MAX);//add main menu
+	}
 }

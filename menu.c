@@ -112,18 +112,20 @@ void menu_delete(MENU_T *menu) {
 	free(menu);
 }
 void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
-		uint32_t screen_width, uint32_t screen_height) {
+		uint32_t screen_width, uint32_t screen_height, int depth) {
 	vec2 pen = { };
 	vec4 color = { 1, 1, 1, 1 };
 	vec4 activated_color = { 0, 1, 1, 1 };
 	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 	{
-		pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8);
+		pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8)
+				+ depth * lg_freetypegles.font->size;
 		pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
 				- lg_freetypegles.font->size * ((*line_inout) + 1);
 		add_text(vVector, lg_freetypegles.font, menu->name, &back_color, &pen);
 
-		pen.x = -((float) screen_width / 2);
+		pen.x = -((float) screen_width / 2)
+				+ depth * lg_freetypegles.font->size;
 		pen.y = ((float) screen_height / 2)
 				- lg_freetypegles.font->size * ((*line_inout) + 1);
 		add_text(vVector, lg_freetypegles.font, menu->name,
@@ -134,7 +136,7 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 		MENU_T *submenu = menu->submenu[idx];
 		if (submenu->selected) {
 			expand_menu(submenu, vVector, line_inout, screen_width,
-					screen_height);
+					screen_height, depth + 1);
 		} else {
 			pen.x =
 					-((float) screen_width / 2 - lg_freetypegles.font->size / 8);
@@ -194,7 +196,7 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 		}
 	}
 	if (root && root->activated) {
-		expand_menu(root, vVector, &line, screen_width, screen_height);
+		expand_menu(root, vVector, &line, screen_width, screen_height, 1);
 	}
 
 	// Use the program object
