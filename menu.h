@@ -2,6 +2,8 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <wchar.h>
 
 enum MENU_EVENT {
 	MENU_EVENT_NONE,
@@ -18,7 +20,7 @@ enum MENU_OPERATE {
 	MENU_OPERATE_DESELECT,
 };
 
-typedef struct _MENU_T;
+struct _MENU_T;
 typedef void (*MENU_CALLBACK)(struct _MENU_T *menu, enum MENU_EVENT event);
 typedef struct _MENU_T {
 	char name[256];

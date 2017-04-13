@@ -20,7 +20,13 @@
 
 #include "texture-atlas.h"
 #include "texture-font.h"
+#include "gl_program.h"
 
+typedef struct {
+	void *program;
+	GLuint vbo;
+	GLuint vbo_nop;
+} MODEL_T;
 struct {
 	texture_font_t *font;
 	texture_atlas_t *atlas;
@@ -92,6 +98,7 @@ MENU_T *menu_new(char *name, MENU_CALLBACK callback){
 	MENU_T *menu = (MENU_T*)malloc(sizeof(MENU_T));
 	strncpy(menu->name, name, sizeof(menu->name));
 	menu->callback = callback;
+	return menu;
 }
 
 void menu_delete(MENU_T **menu){
@@ -121,7 +128,6 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 		wchar_t *ptr;
 		wchar_t *tok = wcstok(status, L"\n", &ptr);
 		while (tok) {
-			wchar_t disp[64];
 			pen.x =
 					-((float) screen_width / 2 - lg_freetypegles.font->size / 8);
 			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
@@ -208,6 +214,6 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx){
 
 }
-void menu_operate(MENU_T *menu, MENU_OPERATE operate){
+void menu_operate(MENU_T *menu, enum MENU_OPERATE operate){
 
 }
