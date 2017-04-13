@@ -569,7 +569,7 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 				lg_light_strength += 1;
 				break;
 			case UI_MODE_FOV:
-				lg_plugin_host->set_fov(lg_plugin_host->get_fov() + 1);
+				lg_plugin_host->set_fov(lg_plugin_host->get_fov() - 1);
 				break;
 			default:
 				break;
@@ -581,7 +581,7 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 				lg_light_strength -= 1;
 				break;
 			case UI_MODE_FOV:
-				lg_plugin_host->set_fov(lg_plugin_host->get_fov() - 1);
+				lg_plugin_host->set_fov(lg_plugin_host->get_fov() + 1);
 				break;
 			default:
 				break;
@@ -805,20 +805,6 @@ static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	case MENU_EVENT_DESELECTED:
 		lg_ui_mode = UI_MODE_DEFAULT;
-		break;
-	default:
-		break;
-	}
-}
-static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
-	switch (event) {
-	case MENU_EVENT_SELECTED:
-		lg_pid_enabled = (bool) menu->user_data;
-		menu->parent->submenu[0]->marked = lg_pid_enabled;
-		menu->parent->submenu[1]->marked = !lg_pid_enabled;
-		menu->selected = false;
-		break;
-	case MENU_EVENT_DESELECTED:
 		break;
 	default:
 		break;
