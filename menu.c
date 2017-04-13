@@ -22,6 +22,11 @@
 #include "texture-font.h"
 #include "gl_program.h"
 
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+
 typedef struct {
 	void *program;
 	GLuint vbo;
@@ -159,38 +164,35 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 
 	uint32_t screen_width = (stereo) ? _screen_width / 2 : _screen_width;
 
+	vector_t * vVector = vector_new(sizeof(GLfloat));
+	int line = 0;
+
 	if (_status) {
 		const int MAX_STATUS_LEN = 1024;
 		wchar_t status[1024];
 		wcsncpy(status, _status, MAX_STATUS_LEN - 1);
 		status[MAX_STATUS_LEN - 1] = L'\0';	//fail safe
 
-		vector_t * vVector = vector_new(sizeof(GLfloat));
-
 		vec2 pen = { };
 		vec4 color = { 1, 1, 1, 1 };
 		vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 
-		int line = 0;
-		{
-			wchar_t *ptr;
-			wchar_t *tok = wcstok(status, L"\n", &ptr);
-			while (tok) {
-				pen.x = -((float) screen_width / 2
-						- lg_freetypegles.font->size / 8);
-				pen.y = ((float) screen_height / 2
-						- lg_freetypegles.font->size / 8)
-						- lg_freetypegles.font->size * (line + 1);
-				add_text(vVector, lg_freetypegles.font, tok, &back_color, &pen);
+		wchar_t *ptr;
+		wchar_t *tok = wcstok(status, L"\n", &ptr);
+		while (tok) {
+			pen.x =
+					-((float) screen_width / 2 - lg_freetypegles.font->size / 8);
+			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
+					- lg_freetypegles.font->size * (line + 1);
+			add_text(vVector, lg_freetypegles.font, tok, &back_color, &pen);
 
-				pen.x = -((float) screen_width / 2);
-				pen.y = ((float) screen_height / 2)
-						- lg_freetypegles.font->size * (line + 1);
-				add_text(vVector, lg_freetypegles.font, tok, &color, &pen);
+			pen.x = -((float) screen_width / 2);
+			pen.y = ((float) screen_height / 2)
+					- lg_freetypegles.font->size * (line + 1);
+			add_text(vVector, lg_freetypegles.font, tok, &color, &pen);
 
-				line++;
-				tok = wcstok(NULL, L"\n", &ptr);
-			}
+			line++;
+			tok = wcstok(NULL, L"\n", &ptr);
 		}
 	}
 	if (root && root->activated) {
@@ -301,7 +303,6 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 		selected_menu = root;
 	}
 	if (selected_menu) {
-		int idx = 0;
 		for (int idx = 0; selected_menu->submenu[idx]; idx++) {
 			if (selected_menu->submenu[idx]->activated) {
 				activated_menu = selected_menu->submenu[idx];
@@ -372,7 +373,7 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 				selected_menu->submenu[0]->activated = true;
 				if (selected_menu->submenu[0]->callback) {
 					selected_menu->submenu[0]->callback(
-							selected_menu->submenu[idx], MENU_EVENT_ACTIVATED);
+							selected_menu->submenu[0], MENU_EVENT_ACTIVATED);
 				}
 			}
 		}
