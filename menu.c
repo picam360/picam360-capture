@@ -22,10 +22,8 @@
 #include "texture-font.h"
 #include "gl_program.h"
 
-
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 
 typedef struct {
 	void *program;
@@ -369,11 +367,11 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 			if (activated_menu->callback) {
 				activated_menu->callback(selected_menu, MENU_EVENT_SELECTED);
 			}
-			if (selected_menu->submenu[0]) {
-				selected_menu->submenu[0]->activated = true;
-				if (selected_menu->submenu[0]->callback) {
-					selected_menu->submenu[0]->callback(
-							selected_menu->submenu[0], MENU_EVENT_ACTIVATED);
+			if (activated_menu->submenu[0]) {
+				activated_menu->submenu[0]->activated = true;
+				if (activated_menu->submenu[0]->callback) {
+					activated_menu->submenu[0]->callback(
+							activated_menu->submenu[0], MENU_EVENT_ACTIVATED);
 				}
 			}
 		}
@@ -394,7 +392,16 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 					}
 				}
 			}
+		} else if (activated_menu) {
+			activated_menu->activated = false;
+			if (activated_menu->callback) {
+				activated_menu->callback(activated_menu,
+						MENU_EVENT_DEACTIVATED);
+			}
 		}
+		break;
+	case MENU_OPERATE_NONE:
+	default:
 		break;
 	}
 }
