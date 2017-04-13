@@ -143,7 +143,7 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 	depth++;
 	for (int idx = 0; menu->submenu[idx]; idx++) {
 		MENU_T *submenu = menu->submenu[idx];
-		if (submenu->activated) {
+		if (submenu->selected) {
 			expand_menu(submenu, vVector, line_inout, screen_width,
 					screen_height, depth);
 		} else {
@@ -209,7 +209,7 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 		}
 	}
 	if (root && root->activated) {
-		expand_menu(root, vVector, &line, screen_width, screen_height, 1);
+		expand_menu(root, vVector, &line, screen_width, screen_height, 0);
 	}
 
 	// Use the program object

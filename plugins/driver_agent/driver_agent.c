@@ -22,6 +22,8 @@
 #include <mat4/fromQuat.h>
 #include <mat4/invert.h>
 
+#define PACKET_FOLDER_PATH "/media/usbdisk/packet"
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -403,7 +405,7 @@ void *transmit_thread_func(void* arg) {
 							tmptr = localtime(&time.tv_sec);
 
 							sprintf(lg_last_recorded_filename,
-									"/media/usbdisk/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
+									PACKET_FOLDER_PATH "/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
 									tmptr->tm_year + 1900, tmptr->tm_mon + 1,
 									tmptr->tm_mday, tmptr->tm_hour,
 									tmptr->tm_min, tmptr->tm_sec);
@@ -681,7 +683,7 @@ static void packet_menu_save_callback(struct _MENU_T *menu,
 			tmptr = localtime(&time.tv_sec);
 
 			sprintf(lg_last_recorded_filename,
-					"/media/usbdisk/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
+			PACKET_FOLDER_PATH "/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
 					tmptr->tm_year + 1900, tmptr->tm_mon + 1, tmptr->tm_mday,
 					tmptr->tm_hour, tmptr->tm_min, tmptr->tm_sec);
 			rtp_start_recording(lg_last_recorded_filename);
@@ -713,7 +715,7 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
 			rtp_start_loading((char*) menu->user_data,
 					(RTP_LOADING_CALLBACK) loading_callback);
-			printf("start loading %s\n", lg_last_recorded_filename);
+			printf("start loading %s\n", (char*) menu->user_data);
 			lg_plugin_host->set_menu_visible(false);
 		}
 		break;
@@ -740,12 +742,12 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 			struct dirent *d;
 			DIR *dir;
 
-			dir = opendir("/media/usbdisk");
+			dir = opendir(PACKET_FOLDER_PATH);
 			while ((d = readdir(dir)) != 0) {
 				if (d->d_name[0] != L'.') {
 					char *name_s = malloc(256);
 					wchar_t name[256];
-					snprintf(name_s, 256, "/media/usbdisk/%s", d->d_name);
+					snprintf(name_s, 256, PACKET_FOLDER_PATH "/%s", d->d_name);
 					swprintf(name, 256, L"%s", d->d_name);
 					MENU_T *node_menu = menu_new(name,
 							packet_menu_load_node_callback, name_s);
