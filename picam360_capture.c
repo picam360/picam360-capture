@@ -1210,6 +1210,12 @@ bool get_menu_visible() {
 void set_menu_visible(bool value) {
 	state->menu_visible = value;
 }
+float get_fov() {
+	return state->menu_visible;
+}
+void set_fov(float value) {
+	state->frame->fov = value;
+}
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
@@ -1240,6 +1246,9 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_menu = get_menu;
 		state->plugin_host.get_menu_visible = get_menu_visible;
 		state->plugin_host.set_menu_visible = set_menu_visible;
+
+		state->plugin_host.get_fov = get_fov;
+		state->plugin_host.set_fov = set_fov;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };

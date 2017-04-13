@@ -22,16 +22,19 @@
 #include <mat4/fromQuat.h>
 #include <mat4/invert.h>
 
-#define PACKET_FOLDER_PATH "/media/usbdisk/packet"
-
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define PLUGIN_NAME "driver_agent"
+#define PACKET_FOLDER_PATH "/media/usbdisk/packet"
 
 #define PT_STATUS 100
 #define PT_CMD 101
 #define PT_CAM_BASE 110
+
+enum UI_MODE {
+	UI_MODE_DEFAULT, UI_MODE_LIGHT, UI_MODE_FOV,
+} lg_ui_mode = UI_MODE_DEFAULT;
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
@@ -528,18 +531,6 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			lg_thrust -= 1;
 			printf("thrust %f\n", lg_thrust);
 			break;
-		case NEXT_BUTTON_LONG:
-			if (diff_sec < 0.25)
-				return;
-			lg_light_strength += 1;
-			printf("light %f\n", lg_light_strength);
-			break;
-		case BACK_BUTTON_LONG:
-			if (diff_sec < 0.25)
-				return;
-			lg_light_strength -= 1;
-			printf("light %f\n", lg_light_strength);
-			break;
 		case BLACKOUT_BUTTON:
 			if (!lg_plugin_host->get_menu_visible()) {
 				lg_plugin_host->set_menu_visible(true);
@@ -564,7 +555,27 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	} else if (!lg_plugin_host->get_menu_visible()) {
 		switch (button) {
 		case BLACKOUT_BUTTON:
-			lg_plugin_host->set_menu_visible(true);
+
+			break;
+		case NEXT_BUTTON:
+			switch (lg_ui_mode) {
+			case UI_MODE_LIGHT:
+				lg_light_strength += 1;
+				break;
+			case UI_MODE_FOV:
+				lg_plugin_host->set_fov(lg_plugin_host->get_fov() + 1);
+				break;
+			}
+			break;
+		case BACK_BUTTON:
+			switch (lg_ui_mode) {
+			case UI_MODE_LIGHT:
+				lg_light_strength -= 1;
+				break;
+			case UI_MODE_FOV:
+				lg_plugin_host->set_fov(lg_plugin_host->get_fov() - 1);
+				break;
+			}
 			break;
 		}
 	} else {
@@ -772,6 +783,18 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 		break;
 	}
 }
+static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		lg_ui_mode = (enum UI_MODE) menu->user_data;
+		break;
+	case MENU_EVENT_DESELECTED:
+		lg_ui_mode = UI_MODE_DEFAULT;
+		break;
+	default:
+		break;
+	}
+}
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
@@ -791,13 +814,25 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	}
 	{			//menu
 		MENU_T *menu = lg_plugin_host->get_menu();
-		MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
-		MENU_T *packet_save_menu = menu_new(L"Save", packet_menu_save_callback,
-				NULL);
-		MENU_T *packet_load_menu = menu_new(L"Load", packet_menu_load_callback,
-				NULL);
-		menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
-		menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
-		menu_add_submenu(menu, packet_menu, INT_MAX);			//add main menu
+		{
+			MENU_T *mode_menu = menu_new(L"Mode", NULL, NULL);
+			MENU_T *mode_light_menu = menu_new(L"Light", mode_menu_callback,
+					(void*) UI_MODE_LIGHT);
+			MENU_T *mode_fov_menu = menu_new(L"Fov", mode_menu_callback,
+					(void*) UI_MODE_FOV);
+			menu_add_submenu(mode_menu, mode_light_menu, INT_MAX);
+			menu_add_submenu(mode_menu, mode_fov_menu, INT_MAX);
+			menu_add_submenu(menu, mode_menu, INT_MAX);		//add main menu
+		}
+		{
+			MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
+			MENU_T *packet_save_menu = menu_new(L"Save",
+					packet_menu_save_callback, NULL);
+			MENU_T *packet_load_menu = menu_new(L"Load",
+					packet_menu_load_callback, NULL);
+			menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
+			menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
+			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
+		}
 	}
 }

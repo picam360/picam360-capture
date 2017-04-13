@@ -34,6 +34,9 @@ typedef struct _PLUGIN_HOST_T{
 	MENU_T *(*get_menu)();
 	bool (*get_menu_visible)();
 	void (*set_menu_visible)(bool value);
+
+	float (*get_fov)();
+	void (*set_fov)(float value);
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T{

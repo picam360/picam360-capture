@@ -141,29 +141,10 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 	}
 	(*line_inout)++;
 	depth++;
-	for (int idx = 0; menu->submenu[idx]; idx++) {
-		MENU_T *submenu = menu->submenu[idx];
-		if (submenu->selected) {
-			expand_menu(submenu, vVector, line_inout, screen_width,
+	if (menu->selected) {
+		for (int idx = 0; menu->submenu[idx]; idx++) {
+			expand_menu(menu->submenu[idx], vVector, line_inout, screen_width,
 					screen_height, depth);
-		} else {
-			vec4 *color =
-					submenu->selected ? &selected_color :
-					submenu->activated ? &activated_color : &defualt_color;
-			pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8)
-					+ depth * lg_freetypegles.font->size;
-			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
-					- lg_freetypegles.font->size * ((*line_inout) + 1);
-			add_text(vVector, lg_freetypegles.font, submenu->name, &back_color,
-					&pen);
-
-			pen.x = -((float) screen_width / 2)
-					+ depth * lg_freetypegles.font->size;
-			pen.y = ((float) screen_height / 2)
-					- lg_freetypegles.font->size * ((*line_inout) + 1);
-			add_text(vVector, lg_freetypegles.font, submenu->name, color, &pen);
-
-			(*line_inout)++;
 		}
 	}
 }
