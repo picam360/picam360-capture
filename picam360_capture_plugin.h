@@ -32,6 +32,8 @@ typedef struct _PLUGIN_HOST_T{
 	void (*get_texture_size)(uint32_t *width_out, uint32_t *height_out);
 
 	MENU_T *(*get_menu)();
+	bool (*get_menu_visible)();
+	void (*set_menu_visible)(bool value);
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T{

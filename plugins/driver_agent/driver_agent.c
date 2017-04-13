@@ -539,12 +539,33 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			printf("light %f\n", lg_light_strength);
 			break;
 		case BLACKOUT_BUTTON:
-			menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT); //open menu
+			if (!lg_plugin_host->get_menu_visible()) {
+				lg_plugin_host->set_menu_visible(true);
+			} else {
+				menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT); //open menu
+			}
 			//lg_func++;
 			break;
 		}
+		{
+			float *quat;
+			switch (button) {
+			case NEXT_BUTTON:
+			case BACK_BUTTON:
+				quat = lg_plugin_host->get_view_quatanion();
+				if (quat) {
+					memcpy(lg_target_quatanion, quat,
+							sizeof(lg_target_quatanion));
+				}
+			}
+		}
+	} else if (!lg_plugin_host->get_menu_visible()) {
+		lg_plugin_host->set_menu_visible(true);
 	} else {
 		switch (button) {
+		case NEXT_BUTTON_LONG:
+			lg_plugin_host->set_menu_visible(false);
+			break;
 		case NEXT_BUTTON:
 			menu_operate(menu, MENU_OPERATE_SELECT);
 			break;
@@ -554,17 +575,6 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 		case BLACKOUT_BUTTON:
 			menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT);
 			break;
-		}
-	}
-	{
-		float *quat;
-		switch (button) {
-		case NEXT_BUTTON:
-		case BACK_BUTTON:
-			quat = lg_plugin_host->get_view_quatanion();
-			if (quat) {
-				memcpy(lg_target_quatanion, quat, sizeof(lg_target_quatanion));
-			}
 		}
 	}
 	lg_last_kokuyoseki_time = time;
@@ -700,6 +710,7 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			rtp_start_loading((char*) menu->user_data,
 					(RTP_LOADING_CALLBACK) loading_callback);
 			printf("start loading %s\n", lg_last_recorded_filename);
+			lg_plugin_host->set_menu_visible(false);
 		}
 		break;
 	case MENU_EVENT_DESELECTED:

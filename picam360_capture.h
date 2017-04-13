@@ -172,6 +172,7 @@ typedef struct _PICAM360CAPTURE_T {
 	pthread_mutex_t texture_mutex;
 
 	MENU_T *menu;
+	bool menu_visible;
 
 	PLUGIN_T **plugins;
 	struct _OPTIONS_T options;

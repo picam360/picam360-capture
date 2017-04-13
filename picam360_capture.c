@@ -801,7 +801,9 @@ void frame_handler() {
 		//preview
 		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
-			redraw_info(state, frame);
+			if (state->menu_visible) {
+				redraw_info(state, frame);
+			}
 			eglSwapBuffers(state->display, state->surface);
 		}
 	}
@@ -1199,8 +1201,14 @@ static void get_texture_size(uint32_t *width_out, uint32_t *height_out) {
 		*height_out = state->cam_height;
 	}
 }
-MENU_T *get_menu(){
+MENU_T *get_menu() {
 	return state->menu;
+}
+bool get_menu_visible() {
+	return state->menu_visible;
+}
+void set_menu_visible(bool value) {
+	state->menu_visible = value;
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {

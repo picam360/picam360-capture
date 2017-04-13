@@ -386,7 +386,7 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 		if (activated_menu && activated_menu != selected_menu) {
 			activated_menu->selected = true;
 			if (activated_menu->callback) {
-				activated_menu->callback(selected_menu, MENU_EVENT_SELECTED);
+				activated_menu->callback(activated_menu, MENU_EVENT_SELECTED);
 			}
 			if (activated_menu->submenu[0]) {
 				activated_menu->submenu[0]->activated = true;
