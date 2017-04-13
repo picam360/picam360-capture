@@ -539,6 +539,9 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			}
 			//lg_func++;
 			break;
+		case BACK_BUTTON_LONG:
+			lg_plugin_host->set_menu_visible(false);
+			break;
 		}
 		{
 			float *quat;
@@ -555,7 +558,7 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	} else if (!lg_plugin_host->get_menu_visible()) {
 		switch (button) {
 		case BLACKOUT_BUTTON:
-
+			lg_plugin_host->set_menu_visible(true);
 			break;
 		case NEXT_BUTTON:
 			switch (lg_ui_mode) {
@@ -787,6 +790,7 @@ static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		lg_ui_mode = (enum UI_MODE) menu->user_data;
+		lg_plugin_host->set_menu_visible(false);
 		break;
 	case MENU_EVENT_DESELECTED:
 		lg_ui_mode = UI_MODE_DEFAULT;
