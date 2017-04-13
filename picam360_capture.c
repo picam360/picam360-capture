@@ -1237,7 +1237,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	state->plugins[num_of_plugins] = NULL;
 }
 
-void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event){
+void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 
 }
 
@@ -1346,7 +1346,7 @@ int main(int argc, char *argv[]) {
 	init_ogl(state);
 
 	//menu
-	init_menu();
+	init_menu(state->screen_height / 32);
 	state->menu = menu_new("Menu", menu_callback);
 
 	//frame id=0
@@ -1706,9 +1706,10 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		if (state->plugins[i]->get_info) {
 			wchar_t *info = state->plugins[i]->get_info(
 					state->plugins[i]->user_data);
-			len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%s", info);
+			len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls", info);
 		}
 	}
-	menu_redraw(state->menu, disp, state->screen_width, state->screen_height, frame->width, frame->height, state->stereo);
+	menu_redraw(state->menu, disp, state->screen_width, state->screen_height,
+			frame->width, frame->height, state->stereo);
 }
 

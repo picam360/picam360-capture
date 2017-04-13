@@ -68,7 +68,7 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
 	}
 }
 
-void init_menu() {
+void init_menu(uint32_t font_size) {
 	// all the shaders have at least texture unit 0 active so
 	// activate it now and leave it active
 	glActiveTexture(GL_TEXTURE0);
@@ -77,7 +77,7 @@ void init_menu() {
 	lg_freetypegles.atlas = texture_atlas_new(1024, 1024, 1);
 
 	lg_freetypegles.font = texture_font_new(lg_freetypegles.atlas,
-			"./libs/freetypeGlesRpi/fonts/custom.ttf", 10);
+			"./libs/freetypeGlesRpi/fonts/custom.ttf", font_size);
 
 	/* Cache some glyphs to speed things up */
 	texture_font_load_glyphs(lg_freetypegles.font,
@@ -94,23 +94,25 @@ void deinit_menu() {
 	//todo
 }
 
-MENU_T *menu_new(char *name, MENU_CALLBACK callback){
-	MENU_T *menu = (MENU_T*)malloc(sizeof(MENU_T));
+MENU_T *menu_new(char *name, MENU_CALLBACK callback) {
+	MENU_T *menu = (MENU_T*) malloc(sizeof(MENU_T));
 	strncpy(menu->name, name, sizeof(menu->name));
 	menu->callback = callback;
 	return menu;
 }
 
-void menu_delete(MENU_T **menu){
+void menu_delete(MENU_T **menu) {
 	free(*menu);
 	*menu = NULL;
 }
 
-void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
+void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
 		bool stereo) {
 	int program = GLProgram_GetId(lg_freetypegles.model.program);
 	glUseProgram(program);
+
+	uint32_t screen_width = (stereo) ? _screen_width / 2 : _screen_width;
 
 	const int MAX_STATUS_LEN = 1024;
 	wchar_t status[1024];
@@ -188,10 +190,10 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
 	if (stereo) {
-		int offset_x = (screen_width / 2 - frame_width) / 2;
+		int offset_x = (screen_width - frame_width) / 2;
 		int offset_y = (screen_height - frame_height) / 2;
 		for (int i = 0; i < 2; i++) {
-			glViewport(offset_x + i * screen_width / 2, offset_y,
+			glViewport(offset_x + i * screen_width, offset_y,
 					(GLsizei) frame_width, (GLsizei) frame_height);
 			glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 		}
@@ -211,9 +213,9 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 
 	vector_delete(vVector);
 }
-void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx){
+void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
 
 }
-void menu_operate(MENU_T *menu, enum MENU_OPERATE operate){
+void menu_operate(MENU_T *menu, enum MENU_OPERATE operate) {
 
 }

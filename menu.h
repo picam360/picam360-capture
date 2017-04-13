@@ -29,7 +29,7 @@ typedef struct _MENU_T {
 	struct _MENU_T *submenu[256];
 } MENU_T;
 
-void init_menu();
+void init_menu(uint32_t font_size);
 void deinit_menu();
 void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
