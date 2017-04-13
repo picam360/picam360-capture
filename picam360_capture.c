@@ -1211,7 +1211,7 @@ void set_menu_visible(bool value) {
 	state->menu_visible = value;
 }
 float get_fov() {
-	return state->menu_visible;
+	return state->frame->fov;
 }
 void set_fov(float value) {
 	state->frame->fov = value;
