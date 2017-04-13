@@ -1,5 +1,4 @@
-#ifndef _MREVENT_H
-#define _MREVENT_H
+#pragma once
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -17,5 +16,3 @@ void mrevent_trigger(MREVENT_T *ev);
 void mrevent_reset(MREVENT_T *ev);
 
 int mrevent_wait(MREVENT_T *ev, long usec);
-
-#endif

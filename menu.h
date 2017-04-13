@@ -1,5 +1,4 @@
-#ifndef _MREVENT_H
-#define _MREVENT_H
+#pragma once
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -19,13 +18,13 @@ enum MENU_OPERATE{
 	DESELECT,
 };
 
-typedef struct _MENU;
-typedef void (*MENU_CALLBACK)(struct _MENU *menu, MENU_EVENT event);
-typedef struct _MENU{
+typedef struct _MENU_T;
+typedef void (*MENU_CALLBACK)(struct _MENU_T *menu, MENU_EVENT event);
+typedef struct _MENU_T{
 	char name[256];
 	bool activated;
 	MENU_CALLBACK callback;
-	struct _MENU *submenu[256];
+	struct _MENU_T *submenu[256];
 } MENU_T;
 
 
@@ -36,5 +35,3 @@ MENU_T *menu_new(char *name, MENU_CALLBACK callback);
 void menu_delete(MENU_T **menu);
 void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx);
 void menu_operate(MENU_T *menu, MENU_OPERATE operate);
-
-#endif
