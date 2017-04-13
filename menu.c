@@ -132,20 +132,22 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 				menu->activated ? &activated_color : &color, &pen);
 	}
 	(*line_inout)++;
+	depth++;
 	for (int idx = 0; menu->submenu[idx]; idx++) {
 		MENU_T *submenu = menu->submenu[idx];
 		if (submenu->selected) {
 			expand_menu(submenu, vVector, line_inout, screen_width,
-					screen_height, depth + 1);
+					screen_height, depth);
 		} else {
-			pen.x =
-					-((float) screen_width / 2 - lg_freetypegles.font->size / 8);
+			pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8)
+					+ depth * lg_freetypegles.font->size;
 			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
 					- lg_freetypegles.font->size * ((*line_inout) + 1);
 			add_text(vVector, lg_freetypegles.font, submenu->name, &back_color,
 					&pen);
 
-			pen.x = -((float) screen_width / 2);
+			pen.x = -((float) screen_width / 2)
+					+ depth * lg_freetypegles.font->size;
 			pen.y = ((float) screen_height / 2)
 					- lg_freetypegles.font->size * ((*line_inout) + 1);
 			add_text(vVector, lg_freetypegles.font, submenu->name,
