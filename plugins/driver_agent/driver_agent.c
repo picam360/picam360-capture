@@ -35,6 +35,9 @@
 enum UI_MODE {
 	UI_MODE_DEFAULT, UI_MODE_LIGHT, UI_MODE_FOV,
 } lg_ui_mode = UI_MODE_DEFAULT;
+enum SYSTEM_CMD {
+	SYSTEM_CMD_NONE, SYSTEM_CMD_SHUTDOWN,
+};
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
@@ -821,6 +824,33 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		lg_pid_enabled = (bool) menu->user_data;
+		menu->parent->submenu[0]->marked = lg_pid_enabled;
+		menu->parent->submenu[1]->marked = !lg_pid_enabled;
+		menu->selected = false;
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
+static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		if ((enum SYSTEM_CMD) menu->user_data == SYSTEM_CMD_SHUTDOWN) {
+			exit(1);
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
@@ -870,6 +900,13 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
 			menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
 			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
+		}
+		{
+			MENU_T *system_menu = menu_new(L"System", NULL, NULL);
+			MENU_T *system_shutdown_menu = menu_new(L"Shutdown",
+					system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN);
+			menu_add_submenu(system_menu, system_shutdown_menu, INT_MAX);
+			menu_add_submenu(menu, system_menu, INT_MAX);		//add main menu
 		}
 	}
 }
