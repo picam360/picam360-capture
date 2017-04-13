@@ -333,9 +333,11 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 								MENU_EVENT_DEACTIVATED);
 					}
 					if (idx == 0) {
-						for (; parent->submenu[idx]; idx++) {
+						for (; selected_menu->submenu[idx]; idx++) {
 							//go to last
 						}
+					} else {
+						idx--;
 					}
 					selected_menu->submenu[idx]->activated = true;
 					if (selected_menu->submenu[idx]->callback) {
@@ -359,6 +361,8 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 					}
 					if (selected_menu->submenu[idx + 1] == NULL) {
 						idx = 0;
+					} else {
+						idx++;
 					}
 					selected_menu->submenu[idx]->activated = true;
 					if (selected_menu->submenu[idx]->callback) {
