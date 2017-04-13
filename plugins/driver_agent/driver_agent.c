@@ -653,12 +653,106 @@ static wchar_t *get_info(void *user_data) {
 
 static void packet_menu_save_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		break;
+	case MENU_EVENT_SELECTED:
+		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+			struct tm *tmptr = NULL;
+			tmptr = localtime(&time.tv_sec);
 
+			sprintf(lg_last_recorded_filename,
+					"/media/usbdisk/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
+					tmptr->tm_year + 1900, tmptr->tm_mon + 1, tmptr->tm_mday,
+					tmptr->tm_hour, tmptr->tm_min, tmptr->tm_sec);
+			rtp_start_recording(lg_last_recorded_filename);
+			printf("start recording %s\n", lg_last_recorded_filename);
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		if (rtp_is_recording(NULL)) {
+			rtp_stop_recording();
+			printf("stop recording\n");
+		}
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
+}
+
+static void packet_menu_load_node_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		break;
+	case MENU_EVENT_SELECTED:
+		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+			rtp_start_loading((char*) menu->user_data,
+					(RTP_LOADING_CALLBACK) loading_callback);
+			printf("start loading %s\n", lg_last_recorded_filename);
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		if (rtp_is_loading(NULL)) {
+			rtp_stop_loading();
+			printf("stop loading\n");
+		}
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		free(menu->user_data);
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
 }
 
 static void packet_menu_load_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		if (1) {
+			struct dirent *d;
+			DIR *dir;
+			Device *dev = 0;
 
+			dir = opendir("/media/usbdisk");
+			while ((d = readdir(dir)) != 0) {
+				if (d->d_type == DT_REG) {
+					char *name_s = malloc(256);
+					wchar_t name[256];
+					sprintf(name_s, 256, L"/media/usbdisk/%s", d->d_name);
+					swprintf(name, 256, L"%s", d->d_name);
+					MENU_T *node_menu = menu_new(name,
+							packet_menu_load_node_callback);
+					node_menu->user_data = name_s;
+					menu_add_submenu(menu, node_menu, INT_MAX);
+				}
+			}
+		}
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		for (int idx = 0; menu->submenu[idx]; idx++) {
+			menu_delete(&menu->submenu[idx]);
+		}
+		break;
+	case MENU_EVENT_SELECTED:
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
 }
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
@@ -684,6 +778,6 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		MENU_T *packet_load_menu = menu_new(L"Load", packet_menu_load_callback);
 		menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
 		menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
-		menu_add_submenu(menu, packet_menu, INT_MAX);//add main menu
+		menu_add_submenu(menu, packet_menu, INT_MAX);			//add main menu
 	}
 }

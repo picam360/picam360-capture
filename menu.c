@@ -105,11 +105,16 @@ MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback) {
 	return menu;
 }
 
-void menu_delete(MENU_T *menu) {
+void menu_delete(MENU_T **_menu) {
+	MENU_T *menu = *_menu;
 	for (int idx = 0; menu->submenu[idx]; idx++) {
-		menu_delete(menu->submenu[idx]);
+		menu_delete(&menu->submenu[idx]);
+	}
+	if (menu->callback) {
+		menu->callback(menu, MENU_EVENT_BEFORE_DELETE);
 	}
 	free(menu);
+	*_menu = NULL;
 }
 void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 		uint32_t screen_width, uint32_t screen_height, int depth) {
@@ -345,6 +350,7 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 								selected_menu->submenu[idx],
 								MENU_EVENT_ACTIVATED);
 					}
+					break;
 				}
 			}
 		}
@@ -370,6 +376,7 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 								selected_menu->submenu[idx],
 								MENU_EVENT_ACTIVATED);
 					}
+					break;
 				}
 			}
 		}
