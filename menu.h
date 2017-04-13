@@ -27,6 +27,7 @@ typedef struct _MENU_T {
 	wchar_t name[256];
 	bool activated;
 	bool selected;
+	bool marked;
 	MENU_CALLBACK callback;
 	struct _MENU_T *parent;
 	struct _MENU_T *submenu[256];

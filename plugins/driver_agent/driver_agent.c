@@ -568,6 +568,8 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			case UI_MODE_FOV:
 				lg_plugin_host->set_fov(lg_plugin_host->get_fov() + 1);
 				break;
+			default:
+				break;
 			}
 			break;
 		case BACK_BUTTON:
@@ -578,7 +580,11 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			case UI_MODE_FOV:
 				lg_plugin_host->set_fov(lg_plugin_host->get_fov() - 1);
 				break;
+			default:
+				break;
 			}
+			break;
+		default:
 			break;
 		}
 	} else {
@@ -594,6 +600,8 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			break;
 		case BLACKOUT_BUTTON:
 			menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT);
+			break;
+		default:
 			break;
 		}
 	}
@@ -799,6 +807,20 @@ static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		lg_pid_enabled = (bool) menu->user_data;
+		menu->parent->submenu[0]->marked = lg_pid_enabled;
+		menu->parent->submenu[1]->marked = !lg_pid_enabled;
+		menu->selected = false;
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
@@ -827,6 +849,17 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(mode_menu, mode_light_menu, INT_MAX);
 			menu_add_submenu(mode_menu, mode_fov_menu, INT_MAX);
 			menu_add_submenu(menu, mode_menu, INT_MAX);		//add main menu
+		}
+		{
+			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
+			MENU_T *pid_on_menu = menu_new(L"On", pid_menu_callback,
+					(void*) true);
+			MENU_T *pid_off_menu = menu_new(L"Off", pid_menu_callback,
+					(void*) false);
+			pid_off_menu->marked = true;
+			menu_add_submenu(pid_menu, pid_on_menu, INT_MAX);
+			menu_add_submenu(pid_menu, pid_off_menu, INT_MAX);
+			menu_add_submenu(menu, pid_menu, INT_MAX);		//add main menu
 		}
 		{
 			MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
