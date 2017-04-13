@@ -1199,6 +1199,9 @@ static void get_texture_size(uint32_t *width_out, uint32_t *height_out) {
 		*height_out = state->cam_height;
 	}
 }
+MENU_T *get_menu(){
+	return state->menu;
+}
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
@@ -1225,6 +1228,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.unlock_texture = unlock_texture;
 		state->plugin_host.set_cam_texture_cur = set_cam_texture_cur;
 		state->plugin_host.get_texture_size = get_texture_size;
+
+		state->plugin_host.get_menu = get_menu;
 	}
 
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };

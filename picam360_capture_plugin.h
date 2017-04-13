@@ -30,6 +30,8 @@ typedef struct _PLUGIN_HOST_T{
 	void (*unlock_texture)();
 	void (*set_cam_texture_cur)(int cam_num, int cur);
 	void (*get_texture_size)(uint32_t *width_out, uint32_t *height_out);
+
+	MENU_T *(*get_menu)();
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T{

@@ -513,30 +513,46 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	struct timeval diff;
 	timersub(&time, &lg_last_kokuyoseki_time, &diff);
 	float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-	switch (button) {
-	case NEXT_BUTTON:
-		lg_thrust += 1;
-		printf("thrust %f\n", lg_thrust);
-		break;
-	case BACK_BUTTON:
-		lg_thrust -= 1;
-		printf("thrust %f\n", lg_thrust);
-		break;
-	case NEXT_BUTTON_LONG:
-		if (diff_sec < 0.25)
-			return;
-		lg_light_strength += 1;
-		printf("light %f\n", lg_light_strength);
-		break;
-	case BACK_BUTTON_LONG:
-		if (diff_sec < 0.25)
-			return;
-		lg_light_strength -= 1;
-		printf("light %f\n", lg_light_strength);
-		break;
-	case BLACKOUT_BUTTON:
-		lg_func++;
-		break;
+	MENU_T *menu = lg_plugin_host->get_menu();
+	if (!menu->activated) {
+		switch (button) {
+		case NEXT_BUTTON:
+			lg_thrust += 1;
+			printf("thrust %f\n", lg_thrust);
+			break;
+		case BACK_BUTTON:
+			lg_thrust -= 1;
+			printf("thrust %f\n", lg_thrust);
+			break;
+		case NEXT_BUTTON_LONG:
+			if (diff_sec < 0.25)
+				return;
+			lg_light_strength += 1;
+			printf("light %f\n", lg_light_strength);
+			break;
+		case BACK_BUTTON_LONG:
+			if (diff_sec < 0.25)
+				return;
+			lg_light_strength -= 1;
+			printf("light %f\n", lg_light_strength);
+			break;
+		case BLACKOUT_BUTTON:
+			menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT); //open menu
+			//lg_func++;
+			break;
+		}
+	} else {
+		switch (button) {
+		case NEXT_BUTTON:
+			menu_operate(menu, MENU_OPERATE_SELECT);
+			break;
+		case BACK_BUTTON:
+			menu_operate(menu, MENU_OPERATE_DESELECT);
+			break;
+		case BLACKOUT_BUTTON:
+			menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT);
+			break;
+		}
 	}
 	{
 		float *quat;

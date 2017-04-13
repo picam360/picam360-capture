@@ -94,56 +94,107 @@ void deinit_menu() {
 	//todo
 }
 
-MENU_T *menu_new(char *name, MENU_CALLBACK callback) {
+MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback) {
 	MENU_T *menu = (MENU_T*) malloc(sizeof(MENU_T));
-	strncpy(menu->name, name, sizeof(menu->name));
+	memset(menu, 0, sizeof(MENU_T));
+	wcsncpy(menu->name, name, sizeof(menu->name) / sizeof(wchar_t));
 	menu->callback = callback;
 	return menu;
 }
 
-void menu_delete(MENU_T **menu) {
-	free(*menu);
-	*menu = NULL;
+void menu_delete(MENU_T *menu) {
+	for (int idx = 0; menu->submenu[idx]; idx++) {
+		menu_delete(menu->submenu[idx]);
+	}
+	free(menu);
+}
+void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
+		uint32_t screen_width, uint32_t screen_height) {
+	vec2 pen = { };
+	vec4 color = { 1, 1, 1, 1 };
+	vec4 activated_color = { 0, 1, 1, 1 };
+	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
+	{
+		pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8);
+		pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
+				- lg_freetypegles.font->size * ((*line_inout) + 1);
+		add_text(vVector, lg_freetypegles.font, menu->name, &back_color, &pen);
+
+		pen.x = -((float) screen_width / 2);
+		pen.y = ((float) screen_height / 2)
+				- lg_freetypegles.font->size * ((*line_inout) + 1);
+		add_text(vVector, lg_freetypegles.font, menu->name,
+				menu->activated ? &activated_color : &color, &pen);
+	}
+	(*line_inout)++;
+	for (int idx = 0; menu->submenu[idx]; idx++) {
+		MENU_T *submenu = menu->submenu[idx];
+		if (submenu->selected) {
+			expand_menu(submenu, vVector, line_inout, screen_width,
+					screen_height);
+		} else {
+			pen.x =
+					-((float) screen_width / 2 - lg_freetypegles.font->size / 8);
+			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
+					- lg_freetypegles.font->size * ((*line_inout) + 1);
+			add_text(vVector, lg_freetypegles.font, submenu->name, &back_color,
+					&pen);
+
+			pen.x = -((float) screen_width / 2);
+			pen.y = ((float) screen_height / 2)
+					- lg_freetypegles.font->size * ((*line_inout) + 1);
+			add_text(vVector, lg_freetypegles.font, submenu->name,
+					submenu->activated ? &activated_color : &color, &pen);
+		}
+		(*line_inout)++;
+	}
 }
 
 void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
 		bool stereo) {
+
 	int program = GLProgram_GetId(lg_freetypegles.model.program);
 	glUseProgram(program);
 
 	uint32_t screen_width = (stereo) ? _screen_width / 2 : _screen_width;
 
-	const int MAX_STATUS_LEN = 1024;
-	wchar_t status[1024];
-	wcsncpy(status, _status, MAX_STATUS_LEN - 1);
-	status[MAX_STATUS_LEN - 1] = L'\0';	//fail safe
+	if (_status) {
+		const int MAX_STATUS_LEN = 1024;
+		wchar_t status[1024];
+		wcsncpy(status, _status, MAX_STATUS_LEN - 1);
+		status[MAX_STATUS_LEN - 1] = L'\0';	//fail safe
 
-	vector_t * vVector = vector_new(sizeof(GLfloat));
+		vector_t * vVector = vector_new(sizeof(GLfloat));
 
-	vec2 pen = { };
-	vec4 color = { 1, 1, 1, 1 };
-	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
+		vec2 pen = { };
+		vec4 color = { 1, 1, 1, 1 };
+		vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 
-	int line = 0;
-	{
-		wchar_t *ptr;
-		wchar_t *tok = wcstok(status, L"\n", &ptr);
-		while (tok) {
-			pen.x =
-					-((float) screen_width / 2 - lg_freetypegles.font->size / 8);
-			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
-					- lg_freetypegles.font->size * (line + 1);
-			add_text(vVector, lg_freetypegles.font, tok, &back_color, &pen);
+		int line = 0;
+		{
+			wchar_t *ptr;
+			wchar_t *tok = wcstok(status, L"\n", &ptr);
+			while (tok) {
+				pen.x = -((float) screen_width / 2
+						- lg_freetypegles.font->size / 8);
+				pen.y = ((float) screen_height / 2
+						- lg_freetypegles.font->size / 8)
+						- lg_freetypegles.font->size * (line + 1);
+				add_text(vVector, lg_freetypegles.font, tok, &back_color, &pen);
 
-			pen.x = -((float) screen_width / 2);
-			pen.y = ((float) screen_height / 2)
-					- lg_freetypegles.font->size * (line + 1);
-			add_text(vVector, lg_freetypegles.font, tok, &color, &pen);
+				pen.x = -((float) screen_width / 2);
+				pen.y = ((float) screen_height / 2)
+						- lg_freetypegles.font->size * (line + 1);
+				add_text(vVector, lg_freetypegles.font, tok, &color, &pen);
 
-			line++;
-			tok = wcstok(NULL, L"\n", &ptr);
+				line++;
+				tok = wcstok(NULL, L"\n", &ptr);
+			}
 		}
+	}
+	if (root && root->activated) {
+		expand_menu(root, vVector, &line, screen_width, screen_height);
 	}
 
 	// Use the program object
@@ -214,8 +265,135 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 	vector_delete(vVector);
 }
 void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
-
+	if (parent == NULL || child == NULL) {
+		return;
+	}
+	int last_idx = 0;
+	for (last_idx = 0; parent->submenu[last_idx]; last_idx++) {
+		//count
+	}
+	idx = MAX(MIN(idx, last_idx), 0);
+	for (int cur = last_idx; cur != idx; cur--) {
+		parent->submenu[cur] = parent->submenu[cur - 1];
+	}
+	parent->submenu[idx] = child;
+	child->parent = parent;
 }
-void menu_operate(MENU_T *menu, enum MENU_OPERATE operate) {
-
+void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
+	if (root == NULL) {
+		return;
+	}
+	MENU_T *activated_menu = NULL;
+	MENU_T *selected_menu = NULL;
+	if (!root->activated) {
+		if (operate == MENU_OPERATE_ACTIVE_BACK
+				|| operate == MENU_OPERATE_ACTIVE_NEXT) {
+			root->activated = true;
+			if (root->callback) {
+				root->callback(root, MENU_EVENT_ACTIVATED);
+			}
+		}
+		return;
+	} else {
+		activated_menu = root;
+	}
+	if (root->selected) {
+		selected_menu = root;
+	}
+	if (selected_menu) {
+		int idx = 0;
+		for (int idx = 0; selected_menu->submenu[idx]; idx++) {
+			if (selected_menu->submenu[idx]->activated) {
+				activated_menu = selected_menu->submenu[idx];
+			}
+			if (selected_menu->submenu[idx]->selected) {
+				selected_menu = selected_menu->submenu[idx];
+				idx = -1;
+				continue;
+			}
+		}
+	}
+	switch (operate) {
+	case MENU_OPERATE_ACTIVE_BACK:
+		if (selected_menu && selected_menu != activated_menu) {
+			for (int idx = 0; selected_menu->submenu[idx]; idx++) {
+				if (selected_menu->submenu[idx] == activated_menu) {
+					if (idx == 0) {
+						return;
+					}
+					selected_menu->submenu[idx]->activated = false;
+					if (selected_menu->submenu[idx]->callback) {
+						selected_menu->submenu[idx]->callback(
+								selected_menu->submenu[idx],
+								MENU_EVENT_DEACTIVATED);
+					}
+					idx--;
+					selected_menu->submenu[idx]->activated = true;
+					if (selected_menu->submenu[idx]->callback) {
+						selected_menu->submenu[idx]->callback(
+								selected_menu->submenu[idx],
+								MENU_EVENT_ACTIVATED);
+					}
+				}
+			}
+		}
+		break;
+	case MENU_OPERATE_ACTIVE_NEXT:
+		if (selected_menu && selected_menu != activated_menu) {
+			for (int idx = 0; selected_menu->submenu[idx]; idx++) {
+				if (selected_menu->submenu[idx] == activated_menu) {
+					if (selected_menu->submenu[idx + 1] == NULL) {
+						return;
+					}
+					selected_menu->submenu[idx]->activated = false;
+					if (selected_menu->submenu[idx]->callback) {
+						selected_menu->submenu[idx]->callback(
+								selected_menu->submenu[idx],
+								MENU_EVENT_DEACTIVATED);
+					}
+					idx++;
+					selected_menu->submenu[idx]->activated = true;
+					if (selected_menu->submenu[idx]->callback) {
+						selected_menu->submenu[idx]->callback(
+								selected_menu->submenu[idx],
+								MENU_EVENT_ACTIVATED);
+					}
+				}
+			}
+		}
+		break;
+	case MENU_OPERATE_SELECT:
+		if (activated_menu && activated_menu != selected_menu) {
+			activated_menu->selected = true;
+			if (activated_menu->callback) {
+				activated_menu->callback(selected_menu, MENU_EVENT_SELECTED);
+			}
+			if (selected_menu->submenu[0]) {
+				selected_menu->submenu[0]->activated = true;
+				if (selected_menu->submenu[0]->callback) {
+					selected_menu->submenu[0]->callback(
+							selected_menu->submenu[idx], MENU_EVENT_ACTIVATED);
+				}
+			}
+		}
+		break;
+	case MENU_OPERATE_DESELECT:
+		if (selected_menu) {
+			selected_menu->selected = false;
+			if (selected_menu->callback) {
+				selected_menu->callback(selected_menu, MENU_EVENT_DESELECTED);
+			}
+			for (int idx = 0; selected_menu->submenu[idx]; idx++) {
+				if (selected_menu->submenu[idx]->activated) {
+					selected_menu->submenu[idx]->activated = false;
+					if (selected_menu->submenu[idx]->callback) {
+						selected_menu->submenu[idx]->callback(
+								selected_menu->submenu[idx],
+								MENU_EVENT_DEACTIVATED);
+					}
+				}
+			}
+		}
+		break;
+	}
 }
