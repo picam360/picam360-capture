@@ -114,10 +114,13 @@ void menu_delete(MENU_T *menu) {
 void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 		uint32_t screen_width, uint32_t screen_height, int depth) {
 	vec2 pen = { };
-	vec4 color = { 1, 1, 1, 1 };
+	vec4 defualt_color = { 1, 1, 1, 1 };
 	vec4 activated_color = { 0, 1, 1, 1 };
+	vec4 selected_color = { 1, 0, 1, 1 };
 	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 	{
+		vec4 *color = menu->selected ? &selected_color :
+						menu->activated ? &activated_color : &defualt_color;
 		pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8)
 				+ depth * lg_freetypegles.font->size;
 		pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
@@ -128,8 +131,7 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 				+ depth * lg_freetypegles.font->size;
 		pen.y = ((float) screen_height / 2)
 				- lg_freetypegles.font->size * ((*line_inout) + 1);
-		add_text(vVector, lg_freetypegles.font, menu->name,
-				menu->activated ? &activated_color : &color, &pen);
+		add_text(vVector, lg_freetypegles.font, menu->name, color, &pen);
 	}
 	(*line_inout)++;
 	depth++;
@@ -139,6 +141,9 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 			expand_menu(submenu, vVector, line_inout, screen_width,
 					screen_height, depth);
 		} else {
+			vec4 *color =
+					submenu->selected ? &selected_color :
+					submenu->activated ? &activated_color : &defualt_color;
 			pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8)
 					+ depth * lg_freetypegles.font->size;
 			pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
@@ -150,8 +155,7 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 					+ depth * lg_freetypegles.font->size;
 			pen.y = ((float) screen_height / 2)
 					- lg_freetypegles.font->size * ((*line_inout) + 1);
-			add_text(vVector, lg_freetypegles.font, submenu->name,
-					submenu->activated ? &activated_color : &color, &pen);
+			add_text(vVector, lg_freetypegles.font, submenu->name, color, &pen);
 		}
 		(*line_inout)++;
 	}
