@@ -126,9 +126,9 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 	vec4 marked_color = { 1, 1, 0, 1 };
 	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
 	{
-		vec4 *color = menu->marked ? &marked_color :
-						menu->selected ? &selected_color :
-						menu->activated ? &activated_color : &defualt_color;
+		vec4 *color = menu->selected ? &selected_color :
+						menu->activated ? &activated_color :
+						menu->marked ? &marked_color : &defualt_color;
 		pen.x = -((float) screen_width / 2 - lg_freetypegles.font->size / 8)
 				+ depth * lg_freetypegles.font->size;
 		pen.y = ((float) screen_height / 2 - lg_freetypegles.font->size / 8)
