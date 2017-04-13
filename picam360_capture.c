@@ -1,32 +1,3 @@
-/*
- Copyright (c) 2012, Broadcom Europe Ltd
- Copyright (c) 2012, OtherCrashOverride
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
- * Redistributions of source code must retain the above copyright
- notice, this list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright
- notice, this list of conditions and the following disclaimer in the
- documentation and/or other materials provided with the distribution.
- * Neither the name of the copyright holder nor the
- names of its contributors may be used to endorse or promote products
- derived from this software without specific prior written permission.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
- DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-// A rotating cube rendered with OpenGL|ES. Three images used as textures on the cube faces.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,68 +68,12 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model);
-static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
+static void redraw_info(PICAM360CAPTURE_T *state);
 
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
 static float lg_fps = 0;
 
-// --------------------------------------------------------------- add_text ---
-void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text,
-		vec4 * color, vec2 * pen) {
-	size_t i;
-	float r = color->red, g = color->green, b = color->blue, a = color->alpha;
-	for (i = 0; i < wcslen(text); ++i) {
-		texture_glyph_t *glyph = texture_font_get_glyph(font, text[i]);
-		if (glyph != NULL) {
-			int kerning = 0;
-			if (i > 0) {
-				kerning = texture_glyph_get_kerning(glyph, text[i - 1]);
-			}
-			pen->x += kerning;
-			int x0 = (int) (pen->x + glyph->offset_x);
-			int y0 = (int) (pen->y + glyph->offset_y);
-			int x1 = (int) (x0 + glyph->width);
-			int y1 = (int) (y0 - glyph->height);
-			float s0 = glyph->s0;
-			float t0 = glyph->t0;
-			float s1 = glyph->s1;
-			float t1 = glyph->t1;
-
-			// data is x,y,z,s,t,r,g,b,a
-			GLfloat vertices[] = { x0, y0, 0, s0, t0, r, g, b, a, x0, y1, 0, s0,
-					t1, r, g, b, a, x1, y1, 0, s1, t1, r, g, b, a, x0, y0, 0,
-					s0, t0, r, g, b, a, x1, y1, 0, s1, t1, r, g, b, a, x1, y0,
-					0, s1, t0, r, g, b, a };
-
-			vector_push_back_data(vVector, vertices, 9 * 6);
-
-			pen->x += glyph->advance_x;
-		}
-	}
-}
-static void init_freetypeGles(PICAM360CAPTURE_T *state) {
-	// all the shaders have at least texture unit 0 active so
-	// activate it now and leave it active
-	glActiveTexture(GL_TEXTURE0);
-
-	/* Texture atlas to store individual glyphs */
-	state->freetypegles.atlas = texture_atlas_new(1024, 1024, 1);
-
-	state->freetypegles.font = texture_font_new(state->freetypegles.atlas,
-			"./libs/freetypeGlesRpi/fonts/custom.ttf", 10);
-
-	/* Cache some glyphs to speed things up */
-	texture_font_load_glyphs(state->freetypegles.font,
-			L" !\"#$%&'()*+,-./0123456789:;<=>?"
-					L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
-					L"`abcdefghijklmnopqrstuvwxyz{|}~");
-
-	state->freetypegles.model.program = GLProgram_new(
-			"shader/freetypegles.vert", "shader/freetypegles.frag");
-
-	texture_atlas_upload(state->freetypegles.atlas);
-}
 /***********************************************************
  * Name: init_ogl
  *
@@ -886,7 +801,7 @@ void frame_handler() {
 		//preview
 		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
-			redraw_info(state, frame);
+			redraw_info(state);
 			eglSwapBuffers(state->display, state->surface);
 		}
 	}
@@ -1276,11 +1191,11 @@ static void unlock_texture() {
 static void set_cam_texture_cur(int cam_num, int cur) {
 	state->cam_texture_cur[cam_num] = cur;
 }
-static void get_texture_size(uint32_t *width_out, uint32_t *height_out){
-	if(width_out){
+static void get_texture_size(uint32_t *width_out, uint32_t *height_out) {
+	if (width_out) {
 		*width_out = state->cam_width;
 	}
-	if(height_out){
+	if (height_out) {
 		*height_out = state->cam_height;
 	}
 }
@@ -1426,8 +1341,9 @@ int main(int argc, char *argv[]) {
 	// Start OGLES
 	init_ogl(state);
 
-	//freetypeGles
-	init_freetypeGles(state);
+	//menu
+	init_menu();
+	state->menu = menu_new();
 
 	//frame id=0
 	if (frame_param[0]) {
@@ -1726,124 +1642,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	state->plugin_host.unlock_texture();
 }
-static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
-	int program = GLProgram_GetId(state->freetypegles.model.program);
-	glUseProgram(program);
-
-	vector_t * vVector = vector_new(sizeof(GLfloat));
-
-	vec2 pen = { };
-	vec4 color = { 1, 1, 1, 1 };
-	vec4 back_color = { 0.2, 0.2, 0.2, 1 };
-
-	wchar_t disp[2][64];
-	swprintf(disp[0], 64, L"Temp %.1f degC",
-			state->plugin_host.get_camera_temperature());
-	swprintf(disp[1], 64, L"fps %.1f", lg_fps);
-
-	int line = 0;
-	for (int i = 0; i < 2; i++) {
-		pen.x = -((float) state->screen_width / 2
-				- state->freetypegles.font->size / 8);
-		pen.y = ((float) state->screen_height / 2
-				- state->freetypegles.font->size / 8)
-				- state->freetypegles.font->size * (line + 1);
-		add_text(vVector, state->freetypegles.font, disp[i], &back_color, &pen);
-
-		pen.x = -((float) state->screen_width / 2);
-		pen.y = ((float) state->screen_height / 2)
-				- state->freetypegles.font->size * (line + 1);
-		add_text(vVector, state->freetypegles.font, disp[i], &color, &pen);
-		line++;
-	}
-	for (int i = 0; state->plugins[i] != NULL; i++) {
-		if (state->plugins[i]->get_info) {
-			wchar_t *info = state->plugins[i]->get_info(
-					state->plugins[i]->user_data);
-			pen.x = -((float) state->screen_width / 2
-					- state->freetypegles.font->size / 8);
-			pen.y = ((float) state->screen_height / 2
-					- state->freetypegles.font->size / 8)
-					- state->freetypegles.font->size * (line + 1);
-			add_text(vVector, state->freetypegles.font, info, &back_color,
-					&pen);
-
-			pen.x = -((float) state->screen_width / 2);
-			pen.y = ((float) state->screen_height / 2)
-					- state->freetypegles.font->size * (line + 1);
-			add_text(vVector, state->freetypegles.font, info, &color, &pen);
-			line++;
-		}
-	}
-
-	// Use the program object
-	glUseProgram(program);
-
-	int vertexHandle, texHandle, samplerHandle, colorHandle, mvpHandle;
-	// Bind vPosition to attribute 0
-	vertexHandle = glGetAttribLocation(program, "a_position");
-	texHandle = glGetAttribLocation(program, "a_st");
-	colorHandle = glGetAttribLocation(program, "a_color");
-	samplerHandle = glGetUniformLocation(program, "texture_uniform");
-
-	mvpHandle = glGetUniformLocation(program, "u_mvp");
-
-	float a = 1.0f / (state->screen_width / 2);
-	float b = 1.0f / (state->screen_height / 2);
-
-	GLfloat mvp[] = { //
-			//
-					a, 0, 0, 0,		//
-					0, b, 0, 0,		//
-					0, 0, 1.0, 0,		//
-					0, 0, 0, 1.0		//
-			};
-	glUniformMatrix4fv(mvpHandle, 1, GL_FALSE, (GLfloat *) mvp);
-
-// Load the vertex data
-	glVertexAttribPointer(vertexHandle, 3, GL_FLOAT, GL_FALSE,
-			9 * sizeof(GLfloat), vVector->items);
-	glEnableVertexAttribArray(vertexHandle);
-	glVertexAttribPointer(texHandle, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(GLfloat),
-			(GLfloat*) vVector->items + 3);
-	glEnableVertexAttribArray(texHandle);
-	glVertexAttribPointer(colorHandle, 4, GL_FLOAT, GL_FALSE,
-			9 * sizeof(GLfloat), (GLfloat*) vVector->items + 5);
-	glEnableVertexAttribArray(colorHandle);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, state->freetypegles.atlas->id);
-
-	glUniform1i(samplerHandle, 0);
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_CULL_FACE);
-	if (state->stereo) {
-		int offset_x = (state->screen_width / 2 - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
-		for (int i = 0; i < 2; i++) {
-			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-			glViewport(offset_x + i * state->screen_width / 2, offset_y,
-					(GLsizei) frame->width, (GLsizei) frame->height);
-			glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
-		}
-	} else {
-		int offset_x = (state->screen_width - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
-		glViewport(offset_x, offset_y, (GLsizei) frame->width,
-				(GLsizei) frame->height);
-		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
-	}
-
-	glDisableVertexAttribArray(vertexHandle);
-	glDisableVertexAttribArray(texHandle);
-	glDisableVertexAttribArray(colorHandle);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	vector_delete(vVector);
-}
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model) {
@@ -1891,5 +1689,22 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+static void redraw_info(PICAM360CAPTURE_T *state) {
+	int len = 0;
+	const int MAX_INFO_SIZE = 1024;
+	wchar_t disp[MAX_INFO_SIZE];
+	len += swprintf(disp, MAX_INFO_SIZE, L"Temp %.1f degC",
+			state->plugin_host.get_camera_temperature());
+	len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\nfps %.1f", lg_fps);
+	for (int i = 0; state->plugins[i] != NULL; i++) {
+		if (state->plugins[i]->get_info) {
+			wchar_t *info = state->plugins[i]->get_info(
+					state->plugins[i]->user_data);
+			len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%s", info);
+		}
+	}
+	menu_redraw(state->menu, disp, state->screen_width, state->screen_height, frame->width, frame->height, state->stereo);
 }
 

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <jansson.h>//json parser
+#include "menu.h"
 
 
 typedef struct _PLUGIN_HOST_T{

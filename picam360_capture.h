@@ -35,9 +35,6 @@
 
 #include "picam360_capture_plugin.h"
 
-#include "texture-atlas.h"
-#include "texture-font.h"
-
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
 
@@ -174,11 +171,7 @@ typedef struct _PICAM360CAPTURE_T {
 	MODEL_T model_data[MAX_OPERATION_NUM];
 	pthread_mutex_t texture_mutex;
 
-	struct {
-		texture_font_t *font;
-		texture_atlas_t *atlas;
-		MODEL_T model;
-	} freetypegles;
+	MENU_T *menu;
 
 	PLUGIN_T **plugins;
 	struct _OPTIONS_T options;
