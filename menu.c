@@ -119,7 +119,7 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 	int line = 0;
 	{
 		wchar_t *ptr;
-		wchar_t *tok = wcstok(status, "\n", &ptr);
+		wchar_t *tok = wcstok(status, L"\n", &ptr);
 		while (tok) {
 			wchar_t disp[64];
 			pen.x =
@@ -134,7 +134,7 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 			add_text(vVector, lg_freetypegles.font, tok, &color, &pen);
 
 			line++;
-			tok = wcstok(NULL, "\n", &ptr);
+			tok = wcstok(NULL, L"\n", &ptr);
 		}
 	}
 
@@ -182,19 +182,18 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
 	if (stereo) {
-		int offset_x = (state->screen_width / 2 - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
+		int offset_x = (screen_width / 2 - frame_width) / 2;
+		int offset_y = (screen_height - frame_height) / 2;
 		for (int i = 0; i < 2; i++) {
-			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-			glViewport(offset_x + i * state->screen_width / 2, offset_y,
-					(GLsizei) frame->width, (GLsizei) frame->height);
+			glViewport(offset_x + i * screen_width / 2, offset_y,
+					(GLsizei) frame_width, (GLsizei) frame_height);
 			glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 		}
 	} else {
-		int offset_x = (state->screen_width - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
-		glViewport(offset_x, offset_y, (GLsizei) frame->width,
-				(GLsizei) frame->height);
+		int offset_x = (screen_width - frame_width) / 2;
+		int offset_y = (screen_height - frame_height) / 2;
+		glViewport(offset_x, offset_y, (GLsizei) frame_width,
+				(GLsizei) frame_height);
 		glDrawArrays(GL_TRIANGLES, 0, vVector->size / 9);
 	}
 
