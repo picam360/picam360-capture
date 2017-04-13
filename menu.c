@@ -156,8 +156,9 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 			pen.y = ((float) screen_height / 2)
 					- lg_freetypegles.font->size * ((*line_inout) + 1);
 			add_text(vVector, lg_freetypegles.font, submenu->name, color, &pen);
+
+			(*line_inout)++;
 		}
-		(*line_inout)++;
 	}
 }
 
@@ -278,7 +279,7 @@ void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
 	}
 	int last_idx = 0;
 	for (last_idx = 0; parent->submenu[last_idx]; last_idx++) {
-		//count
+		//go to last
 	}
 	idx = MAX(MIN(idx, last_idx), 0);
 	for (int cur = last_idx; cur != idx; cur--) {
@@ -325,16 +326,17 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 		if (selected_menu && selected_menu != activated_menu) {
 			for (int idx = 0; selected_menu->submenu[idx]; idx++) {
 				if (selected_menu->submenu[idx] == activated_menu) {
-					if (idx == 0) {
-						return;
-					}
 					selected_menu->submenu[idx]->activated = false;
 					if (selected_menu->submenu[idx]->callback) {
 						selected_menu->submenu[idx]->callback(
 								selected_menu->submenu[idx],
 								MENU_EVENT_DEACTIVATED);
 					}
-					idx--;
+					if (idx == 0) {
+						for (; parent->submenu[idx]; idx++) {
+							//go to last
+						}
+					}
 					selected_menu->submenu[idx]->activated = true;
 					if (selected_menu->submenu[idx]->callback) {
 						selected_menu->submenu[idx]->callback(
@@ -349,16 +351,15 @@ void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 		if (selected_menu && selected_menu != activated_menu) {
 			for (int idx = 0; selected_menu->submenu[idx]; idx++) {
 				if (selected_menu->submenu[idx] == activated_menu) {
-					if (selected_menu->submenu[idx + 1] == NULL) {
-						return;
-					}
 					selected_menu->submenu[idx]->activated = false;
 					if (selected_menu->submenu[idx]->callback) {
 						selected_menu->submenu[idx]->callback(
 								selected_menu->submenu[idx],
 								MENU_EVENT_DEACTIVATED);
 					}
-					idx++;
+					if (selected_menu->submenu[idx + 1] == NULL) {
+						idx = 0;
+					}
 					selected_menu->submenu[idx]->activated = true;
 					if (selected_menu->submenu[idx]->callback) {
 						selected_menu->submenu[idx]->callback(
