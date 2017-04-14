@@ -16,7 +16,7 @@ void rtp_start_recording(char *path);
 void rtp_stop_recording();
 bool rtp_is_recording(char **path);
 void rtp_start_loading(char *path, bool auto_play, bool is_looping,
-		RTP_LOADING_CALLBACK callback);
+		RTP_LOADING_CALLBACK callback, void *userdata);
 void rtp_increment_loading(int elapsed_usec);
 void rtp_stop_loading();
 bool rtp_is_loading(char **path);

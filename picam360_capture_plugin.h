@@ -9,7 +9,7 @@ enum PICAM360_CAPTURE_EVENT{
 	PICAM360_CAPTURE_EVENT_AFTER_FRAME,
 };
 
-typedef void (*PICAM360_CAPTURE_CALLBACK)(PICAM360_CAPTURE_EVENT event);
+typedef void (*PICAM360_CAPTURE_CALLBACK)(enum PICAM360_CAPTURE_EVENT event);
 
 typedef struct _PLUGIN_HOST_T{
 	float *(*get_view_quatanion)();

@@ -382,74 +382,6 @@ void *transmit_thread_func(void* arg) {
 				}
 			}
 		} // end of !low_motor_control
-		  //kokuyoseki func
-		if (lg_last_button == BLACKOUT_BUTTON && lg_func != -1) {
-			timersub(&time, &lg_last_kokuyoseki_time, &diff);
-			diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-			if (diff_sec > 0.5) {
-				printf("func %d: ", lg_func);
-				switch (lg_func) {
-				case 1:
-					lg_light_strength = 0;
-					printf("light off\n");
-					break;
-				case 2:
-					lg_thrust = 0;
-					printf("thrust off\n");
-					break;
-				case 3:
-					lg_thrust = 0;
-					for (int k = 0; k < 3; k++) {
-						lg_pid_value[k] = 0;
-					}
-					if (lg_pid_enabled) {
-						lg_pid_enabled = false;
-						printf("pid off\n");
-					} else {
-						lg_pid_enabled = true;
-						printf("pid on\n");
-					}
-					break;
-				case 4:
-					if (!rtp_is_loading(NULL)) {
-						if (rtp_is_recording(NULL)) {
-							rtp_stop_recording();
-							printf("stop recording\n");
-						} else {
-							struct tm *tmptr = NULL;
-							tmptr = localtime(&time.tv_sec);
-
-							sprintf(lg_last_recorded_filename,
-									PACKET_FOLDER_PATH "/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
-									tmptr->tm_year + 1900, tmptr->tm_mon + 1,
-									tmptr->tm_mday, tmptr->tm_hour,
-									tmptr->tm_min, tmptr->tm_sec);
-							rtp_start_recording(lg_last_recorded_filename);
-							printf("start recording %s\n",
-									lg_last_recorded_filename);
-						}
-					}
-					break;
-				case 5:
-					if (!rtp_is_recording(NULL)) {
-						if (rtp_is_loading(NULL)) {
-							rtp_stop_loading();
-							printf("stop loading\n");
-						} else if (lg_last_recorded_filename[0] != '\0') {
-							rtp_start_loading(lg_last_recorded_filename,
-									(RTP_LOADING_CALLBACK) loading_callback);
-							printf("start loading %s\n",
-									lg_last_recorded_filename);
-						}
-					}
-					break;
-				}
-				if (lg_func > 10) {
-					exit(0);
-				}
-				lg_func = -1;
-			}
-		}
 
 		xmp_len = picam360_driver_xmp(buff, sizeof(buff), lg_light_value[0],
 				lg_light_value[1], lg_motor_value[0], lg_motor_value[1],
@@ -514,7 +446,7 @@ static void command_handler(void *user_data, char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(param, (RTP_LOADING_CALLBACK) loading_callback);
+			rtp_start_loading(param, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
