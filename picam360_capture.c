@@ -1279,6 +1279,13 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	}
 
 	const int INITIAL_SPACE = 16;
+
+	state->callbacks = malloc(
+			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
+	memset(state->callbacks, 0,
+			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
+	state->callbacks[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
+
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
 	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -1287,12 +1294,6 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
 	}
 	state->plugins[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
-
-	state->callbacks = malloc(
-			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
-	memset(state->callbacks, 0,
-			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
-	state->callbacks[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
 }
 
 void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {

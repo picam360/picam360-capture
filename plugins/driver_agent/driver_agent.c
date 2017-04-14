@@ -796,7 +796,7 @@ static void packet_menu_convert_callback(struct _MENU_T *menu,
 				if (d->d_name[0] != L'.') {
 					char *name_s = malloc(256);
 					wchar_t name[256];
-					snprintf(name_s, 256, PACKET_FOLDER_PATH "/%s", d->d_name);
+					snprintf(name_s, 256, "%s", d->d_name);
 					swprintf(name, 256, L"%s", d->d_name);
 					MENU_T *node_menu = menu_new(name,
 							packet_menu_convert_node_callback, name_s);
@@ -933,5 +933,5 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(menu, system_menu, INT_MAX);		//add main menu
 		}
 	}
-	lg_plugin_host - add_event_handler(picam360_capture_callback);
+	lg_plugin_host->add_event_handler(picam360_capture_callback);
 }
