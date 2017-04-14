@@ -545,6 +545,7 @@ static void *load_thread_func(void* arg) {
 			} else {
 				elapsed_usec = timestamp - last_timestamp;
 			}
+			current_play_time += elapsed_usec;
 			if (lg_auto_play) {
 				struct timeval diff;
 				timersub(&time, &last_time, &diff);
@@ -554,21 +555,17 @@ static void *load_thread_func(void* arg) {
 					usleep(MIN(elapsed_usec - diff_usec, 1000000));
 				}
 				last_time = time;
-			} else {
-				while (lg_record_fd >= 0) {
-					int res = mrevent_wait(&lg_play_time_updated, 1000);
-					if (res != 0) {
-						continue;
-					}
-					if (current_play_time + elapsed_usec < lg_play_time) {
-						break;
-					} else {
-						mrevent_reset(&lg_play_time_updated);
-					}
+				lg_play_time += elapsed_usec;
+			}
+			while (lg_record_fd >= 0) {
+				if (current_play_time <= lg_play_time) {
+					break;
+				} else {
+					mrevent_reset(&lg_play_time_updated);
 				}
+				mrevent_wait(&lg_play_time_updated, 1000);
 			}
 			last_timestamp = timestamp;
-			current_play_time += elapsed_usec;
 		}
 
 		if (lg_callback) {
