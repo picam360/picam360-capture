@@ -681,8 +681,8 @@ void rtp_start_loading(char *path, bool auto_play, bool is_looping,
 	lg_auto_play = auto_play;
 	lg_is_looping = is_looping;
 	lg_load_fd = open(lg_load_path, O_RDONLY);
-	void **args = malloc(sizeof(void*) * 2);
-	args[0] = callback;
+	void **args = (void**) malloc(sizeof(void*) * 2);
+	args[0] = (void*) callback;
 	args[1] = user_data;
 	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) args);
 }
