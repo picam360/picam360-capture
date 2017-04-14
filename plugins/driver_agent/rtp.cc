@@ -473,8 +473,9 @@ static void *record_thread_func(void* arg) {
 }
 
 static void *load_thread_func(void* arg) {
-	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) arg[0];
-	void *user_data = (RTP_LOADING_CALLBACK) arg[1];
+	void **args = (void**) arg;
+	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) args[0];
+	void *user_data = args[1];
 	free(arg);
 
 	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
@@ -564,13 +565,13 @@ static void *load_thread_func(void* arg) {
 		}
 
 		if (lg_callback) {
-			lg_callback(user_data, buff + sizeof(struct RTPHeader),
+			lg_callback(buff + sizeof(struct RTPHeader),
 					len - sizeof(struct RTPHeader), header->payloadtype,
 					ntohs(header->sequencenumber));
 		}
 	}
 	if (callback) {
-		callback(ret);
+		callback(user_data, ret);
 	}
 	return NULL;
 }
@@ -680,10 +681,10 @@ void rtp_start_loading(char *path, bool auto_play, bool is_looping,
 	lg_auto_play = auto_play;
 	lg_is_looping = is_looping;
 	lg_load_fd = open(lg_load_path, O_RDONLY);
-	void *data = malloc(sizeof(void*)*2);
-	data[0] = callback;
-	data[1] = user_data;
-	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) data);
+	void **args = malloc(sizeof(void*) * 2);
+	args[0] = callback;
+	args[1] = user_data;
+	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) args);
 }
 
 void rtp_increment_loading(int elapsed_usec) {

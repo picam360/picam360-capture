@@ -861,7 +861,7 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
-static void picam360_capture_callback(PICAM360_CAPTURE_EVENT event) {
+static void picam360_capture_callback(enum PICAM360_CAPTURE_EVENT event) {
 	switch (event) {
 	case PICAM360_CAPTURE_EVENT_AFTER_FRAME:
 		if (lg_is_converting) {
