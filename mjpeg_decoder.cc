@@ -326,6 +326,8 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 }
 
 static void *sendframe_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "MJPEG SENDFRAME");
+
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
 	int last_framecount = send_frame_arg->framecount;
 	struct timeval last_time = { };
@@ -639,9 +641,6 @@ void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
 	lg_send_frame_arg[cam_num]->cam_run = true;
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
 			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
-	char buff[256];
-	sprintf(buff, "sendframe_thread_func:%d", cam_num);
-	pthread_setname_np(lg_send_frame_arg[cam_num]->cam_thread, buff);
 }
 void deinit_mjpeg_decoder(int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);

@@ -34,6 +34,8 @@ static int read_hex(const char * const filename) {
 
 static bool lg_stop_thread = false;
 void *poling_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "KOKUYOSEKI");
+
 	struct dirent *d;
 	DIR *dir;
 	char fileName[256];

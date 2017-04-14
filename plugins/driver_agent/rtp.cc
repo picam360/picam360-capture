@@ -248,6 +248,8 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 #ifdef USE_JRTP
 #else
 static void *buffering_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "RTP BUFFERING");
+
 	int rx_fd = open("rtp_rx", O_RDONLY);
 	if (rx_fd < 0) {
 		return NULL;
@@ -272,6 +274,7 @@ static void *buffering_thread_func(void* arg) {
 #endif
 
 static void *receive_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "RTP RECEIVE");
 
 #ifdef USE_JRTP
 	int status;
@@ -419,6 +422,8 @@ static void *receive_thread_func(void* arg) {
 }
 
 static void *record_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "RTP RECORD");
+
 	RTPPacket *pack;
 	while (lg_record_fd >= 0) {
 		int res = mrevent_wait(&lg_record_packet_ready, 1000);
@@ -473,6 +478,8 @@ static void *record_thread_func(void* arg) {
 }
 
 static void *load_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "RTP LOAD");
+
 	void **args = (void**) arg;
 	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) args[0];
 	void *user_data = args[1];

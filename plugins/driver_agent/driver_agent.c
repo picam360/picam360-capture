@@ -234,6 +234,8 @@ static void loading_callback(void *user_data, int ret) {
 }
 
 void *transmit_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "DA TRANSMIT");
+
 	int xmp_len = 0;
 	int buff_size = 4096;
 	char buff[buff_size];
@@ -767,7 +769,7 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 				lg_plugin_host->set_menu_visible(false);
 				lg_is_converting = true;
 
-				printf("start converting %s\n", name);
+				printf("start converting %s to %s\n", src, dst);
 			} else {
 				menu->selected = false;
 			}
