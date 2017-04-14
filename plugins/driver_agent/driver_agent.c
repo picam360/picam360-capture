@@ -121,7 +121,6 @@ static struct timeval lg_delta_pid_time[3] = { };
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
 static int lg_last_button = -1;
-static int lg_func = -1;
 
 #define NUM_OF_CAM 2
 static float lg_fps[NUM_OF_CAM] = { };
@@ -223,9 +222,11 @@ static float sub_angle(float a, float b) {
 	return v;
 }
 
+static void packet_menu_convert_node_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event);
 static void loading_callback(void *user_data, int ret) {
 	if (lg_is_converting) {
-		MENU_T *menu = (MENU_T*)user_data;
+		MENU_T *menu = (MENU_T*) user_data;
 		menu->selected = false;
 		packet_menu_convert_node_callback(menu, MENU_EVENT_DESELECTED);
 	}
@@ -446,7 +447,8 @@ static void command_handler(void *user_data, char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(param, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
+			rtp_start_loading(param, true, true,
+					(RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
@@ -481,7 +483,6 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			} else {
 				menu_operate(menu, MENU_OPERATE_ACTIVE_NEXT); //open menu
 			}
-			//lg_func++;
 			break;
 		case BACK_BUTTON_LONG:
 			lg_plugin_host->set_menu_visible(false);
@@ -679,11 +680,11 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			char *name[256];
+			char name[256];
 			snprintf(name, 256, PACKET_FOLDER_PATH "/%s",
 					(char*) menu->user_data);
 			rtp_start_loading(name, true, true,
-					(RTP_LOADING_CALLBACK) loading_callback);
+					(RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start loading %s\n", name);
 			lg_plugin_host->set_menu_visible(false);
 		}
@@ -751,8 +752,8 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			char *cmd[512];
-			char *name[256];
+			char cmd[512];
+			char name[256];
 			snprintf(name, 256, VIDEO_FOLDER_PATH "/%s.mjpeg",
 					(char*) menu->user_data);
 			rtp_start_loading(name, false, false,
