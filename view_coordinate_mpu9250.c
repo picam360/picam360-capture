@@ -25,6 +25,7 @@ static float lg_north = 0;
 static int lg_north_count = 0;
 
 void *threadFunc(void *data) {
+	pthread_setname_np(pthread_self(), "MPU9250");
 
 	do {
 		ms_update();
