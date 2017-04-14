@@ -674,7 +674,7 @@ bool rtp_is_recording(char **path) {
 	return (lg_record_fd > 0);
 }
 
-void rtp_start_loading(char *path, bool auto_play, bool is_looping,
+bool rtp_start_loading(char *path, bool auto_play, bool is_looping,
 		RTP_LOADING_CALLBACK callback, void *user_data) {
 	rtp_stop_loading();
 	strcpy(lg_load_path, path);
@@ -686,8 +686,10 @@ void rtp_start_loading(char *path, bool auto_play, bool is_looping,
 		args[0] = (void*) callback;
 		args[1] = user_data;
 		pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) args);
+		return true;
 	} else {
 		printf("failed to open %s\n", lg_load_path);
+		return false;
 	}
 }
 

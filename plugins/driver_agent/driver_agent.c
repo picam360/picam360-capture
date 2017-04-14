@@ -753,17 +753,24 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
 			char cmd[512];
-			char name[256];
-			snprintf(name, 256, VIDEO_FOLDER_PATH "/%s.mjpeg",
+			char src[256];
+			char dst[256];
+			snprintf(src, 256, PACKET_FOLDER_PATH "/%s",
 					(char*) menu->user_data);
-			rtp_start_loading(name, false, false,
+			snprintf(dst, 256, VIDEO_FOLDER_PATH "/%s.mjpeg",
+					(char*) menu->user_data);
+			bool succeeded = rtp_start_loading(src, false, false,
 					(RTP_LOADING_CALLBACK) loading_callback, menu);
-			sprintf(cmd, "start_record -W 4096 -H 2048 -o %s", name);
-			lg_plugin_host->send_command(cmd);
-			lg_plugin_host->set_menu_visible(false);
-			lg_is_converting = true;
+			if (succeeded) {
+				sprintf(cmd, "start_record -W 4096 -H 2048 -o %s", dst);
+				lg_plugin_host->send_command(cmd);
+				lg_plugin_host->set_menu_visible(false);
+				lg_is_converting = true;
 
-			printf("start converting %s\n", name);
+				printf("start converting %s\n", name);
+			} else {
+				menu->selected = false;
+			}
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
