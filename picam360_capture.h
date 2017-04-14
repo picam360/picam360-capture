@@ -174,6 +174,7 @@ typedef struct _PICAM360CAPTURE_T {
 	MENU_T *menu;
 	bool menu_visible;
 
-	PLUGIN_T **plugins;
+	PLUGIN_T *plugins[];
 	struct _OPTIONS_T options;
+	PICAM360_CAPTURE_CALLBACK callbacks[];
 } PICAM360CAPTURE_T;

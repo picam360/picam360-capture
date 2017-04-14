@@ -148,6 +148,10 @@ static std::list<RTPPacket*> lg_record_packet_queue;
 static char lg_load_path[256];
 static int lg_load_fd = -1;
 static pthread_t lg_load_thread;
+static bool lg_auto_play = false;
+static bool lg_is_looping = false;
+static MREVENT_T lg_play_time_updated;
+static uint64_t lg_play_time = 0;
 
 static RTP_CALLBACK lg_callback = NULL;
 
@@ -469,26 +473,36 @@ static void *record_thread_func(void* arg) {
 }
 
 static void *load_thread_func(void* arg) {
-	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) arg;
+	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) arg[0];
+	void *user_data = (RTP_LOADING_CALLBACK) arg[1];
+	free(arg);
+
 	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
-	unsigned int last_timestanp = 0;
+	unsigned int last_timestamp = 0;
+	uint64_t current_play_time = 0;
 	struct timeval last_time = { };
 	bool is_first = true;
 	int ret = 0;
+	lg_play_time = 0;
 	while (lg_load_fd >= 0) {
 		int raw_header_size = 8;
 		int read_len;
 		struct RTPHeader *header = (struct RTPHeader *) buff;
 		read_len = read(lg_load_fd, buff, raw_header_size);
 		if (read_len == 0) { //eof
-			lseek(lg_load_fd, 0, SEEK_SET);
-			continue;
+			if (lg_is_looping) {
+				lseek(lg_load_fd, 0, SEEK_SET);
+				continue;
+			} else {
+				break;
+			}
 		}
 		if (read_len != 8 || buff[0] != 0xFF || buff[1] != 0xE1
 				|| buff[4] != 'r' || buff[5] != 't' || buff[6] != 'p'
 				|| buff[7] != '\0') {
 			//error
 			ret = -1;
+			perror("rtp error\n");
 			break;
 		}
 		unsigned short len = 0;
@@ -508,35 +522,51 @@ static void *load_thread_func(void* arg) {
 			break;
 		}
 
-		if (lg_callback) {
-			lg_callback(buff + sizeof(struct RTPHeader),
-					len - sizeof(struct RTPHeader), header->payloadtype,
-					ntohs(header->sequencenumber));
-		}
 		{ //wait
 			unsigned int timestamp = ntohl(header->timestamp);
 			struct timeval time = { };
 			gettimeofday(&time, NULL);
 			if (is_first) {
 				is_first = false;
-				last_timestanp = timestamp;
+				last_timestamp = timestamp;
 				gettimeofday(&last_time, NULL);
 			}
-			int elapsed_nsec;
-			if (timestamp < last_timestanp) {
-				elapsed_nsec = timestamp + (UINT_MAX - last_timestanp);
+			int elapsed_usec;
+			if (timestamp < last_timestamp) {
+				elapsed_usec = timestamp + (UINT_MAX - last_timestamp);
 			} else {
-				elapsed_nsec = timestamp - last_timestanp;
+				elapsed_usec = timestamp - last_timestamp;
 			}
-			struct timeval diff;
-			timersub(&time, &last_time, &diff);
-			int diff_nsec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
+			if (lg_auto_play) {
+				struct timeval diff;
+				timersub(&time, &last_time, &diff);
+				int diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
 
-			if (diff_nsec < elapsed_nsec) {
-				usleep(MIN(elapsed_nsec - diff_nsec, 1000000));
+				if (diff_usec < elapsed_usec) {
+					usleep(MIN(elapsed_usec - diff_usec, 1000000));
+				}
+				last_time = time;
+			} else {
+				while (lg_record_fd >= 0) {
+					int res = mrevent_wait(&lg_play_time_updated, 1000);
+					if (res != 0) {
+						continue;
+					}
+					if (current_play_time + elapsed_usec < lg_play_time) {
+						break;
+					} else {
+						mrevent_reset(&lg_play_time_updated);
+					}
+				}
 			}
-			last_time = time;
-			last_timestanp = timestamp;
+			last_timestamp = timestamp;
+			current_play_time += elapsed_usec;
+		}
+
+		if (lg_callback) {
+			lg_callback(user_data, buff + sizeof(struct RTPHeader),
+					len - sizeof(struct RTPHeader), header->payloadtype,
+					ntohs(header->sequencenumber));
 		}
 	}
 	if (callback) {
@@ -596,6 +626,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	pthread_create(&lg_receive_thread, NULL, receive_thread_func, (void*) NULL);
 
 	mrevent_init(&lg_record_packet_ready);
+	mrevent_init(&lg_play_time_updated);
 
 	return 0;
 }
@@ -642,11 +673,22 @@ bool rtp_is_recording(char **path) {
 	return (lg_record_fd > 0);
 }
 
-void rtp_start_loading(char *path, RTP_LOADING_CALLBACK callback) {
+void rtp_start_loading(char *path, bool auto_play, bool is_looping,
+		RTP_LOADING_CALLBACK callback, void *user_data) {
 	rtp_stop_loading();
 	strcpy(lg_load_path, path);
+	lg_auto_play = auto_play;
+	lg_is_looping = is_looping;
 	lg_load_fd = open(lg_load_path, O_RDONLY);
-	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) callback);
+	void *data = malloc(sizeof(void*)*2);
+	data[0] = callback;
+	data[1] = user_data;
+	pthread_create(&lg_load_thread, NULL, load_thread_func, (void*) data);
+}
+
+void rtp_increment_loading(int elapsed_usec) {
+	lg_play_time += elapsed_usec;
+	mrevent_trigger(&lg_play_time_updated);
 }
 
 void rtp_stop_loading() {

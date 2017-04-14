@@ -5,6 +5,11 @@
 #include <jansson.h>//json parser
 #include "menu.h"
 
+enum PICAM360_CAPTURE_EVENT{
+	PICAM360_CAPTURE_EVENT_AFTER_FRAME,
+};
+
+typedef void (*PICAM360_CAPTURE_CALLBACK)(PICAM360_CAPTURE_EVENT event);
 
 typedef struct _PLUGIN_HOST_T{
 	float *(*get_view_quatanion)();
@@ -37,6 +42,9 @@ typedef struct _PLUGIN_HOST_T{
 
 	float (*get_fov)();
 	void (*set_fov)(float value);
+
+	void (*add_event_handler)(PICAM360_CAPTURE_CALLBACK callback);
+	void (*send_command)(char *cmd);
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T{

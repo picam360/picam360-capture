@@ -807,6 +807,12 @@ void frame_handler() {
 			eglSwapBuffers(state->display, state->surface);
 		}
 	}
+	for (int i = 0; i < 256; i++) {
+		if (state->callbacks[i] == NULL) {
+			break;
+		}
+		state->callbacks[i](PICAM360_CAPTURE_EVENT_AFTER_FRAME);
+	}
 }
 
 static double calib_step = 0.01;
@@ -1053,7 +1059,23 @@ void _command_handler(char *_buff) {
 	}
 }
 
-void command_handler() {
+void command_handler(char *buff) {
+	bool handled = false;
+	for (int i = 0; state->plugins[i] != NULL; i++) {
+		int name_len = strlen(state->plugins[i]->name);
+		if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+				&& buff[name_len] == '.') {
+			state->plugins[i]->command_handler(state->plugins[i]->user_data,
+					buff);
+			handled = true;
+		}
+	}
+	if (!handled) {
+		_command_handler(buff);
+	}
+}
+
+void stdin_command_handler() {
 	while (inputAvailable()) {
 		char buff[256];
 		bool error = false;
@@ -1071,19 +1093,7 @@ void command_handler() {
 		if (error) {
 			break;
 		}
-		bool handled = false;
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			int name_len = strlen(state->plugins[i]->name);
-			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-					&& buff[name_len] == '.') {
-				state->plugins[i]->command_handler(state->plugins[i]->user_data,
-						buff);
-				handled = true;
-			}
-		}
-		if (!handled) {
-			_command_handler(buff);
-		}
+		command_handler(buff);
 	}
 }
 
@@ -1201,20 +1211,34 @@ static void get_texture_size(uint32_t *width_out, uint32_t *height_out) {
 		*height_out = state->cam_height;
 	}
 }
-MENU_T *get_menu() {
+static MENU_T *get_menu() {
 	return state->menu;
 }
-bool get_menu_visible() {
+static bool get_menu_visible() {
 	return state->menu_visible;
 }
-void set_menu_visible(bool value) {
+static void set_menu_visible(bool value) {
 	state->menu_visible = value;
 }
-float get_fov() {
+static float get_fov() {
 	return state->frame->fov;
 }
-void set_fov(float value) {
+static void set_fov(float value) {
 	state->frame->fov = value;
+}
+static void add_event_handler(PICAM360_CAPTURE_CALLBACK callback) {
+	for (int i = 0; i < 256; i++) {
+		if (state->callbacks[i] == (void*) -1) {
+			//todo;
+			exit(-1);
+		} else if (state->callbacks[i] == NULL) {
+			state->callbacks[i] = callback;
+			break;
+		}
+	}
+}
+static void send_command(char *cmd) {
+	command_handler(cmd);
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
@@ -1249,16 +1273,26 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.get_fov = get_fov;
 		state->plugin_host.set_fov = set_fov;
+
+		state->plugin_host.add_event_handler = add_event_handler;
+		state->plugin_host.send_command = send_command;
 	}
 
+	const int INITIAL_SPACE = 16;
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
-	state->plugins = (PLUGIN_T**) malloc(
-			sizeof(PLUGIN_T*) * (num_of_plugins + 1));
+	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
+	memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
 	for (int i = 0; i < num_of_plugins; i++) {
 		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
 	}
-	state->plugins[num_of_plugins] = NULL;
+	state->plugins[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
+
+	state->callbacks = malloc(
+			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
+	memset(state->callbacks, 0,
+			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
+	state->callbacks[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
 }
 
 void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
@@ -1408,7 +1442,7 @@ int main(int argc, char *argv[]) {
 		struct timeval time = { };
 		gettimeofday(&time, NULL);
 
-		command_handler();
+		stdin_command_handler();
 		if (state->frame_sync) {
 			int res = 0;
 			for (int i = 0; i < state->num_of_cam; i++) {

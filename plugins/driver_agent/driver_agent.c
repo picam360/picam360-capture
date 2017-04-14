@@ -27,6 +27,8 @@
 
 #define PLUGIN_NAME "driver_agent"
 #define PACKET_FOLDER_PATH "/media/usbdisk/packet"
+#define STILL_FOLDER_PATH "/media/usbdisk/still"
+#define VIDEO_FOLDER_PATH "/media/usbdisk/video"
 
 #define PT_STATUS 100
 #define PT_CMD 101
@@ -44,6 +46,8 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 #define MAX_DELAY_COUNT 256
 static float lg_video_delay = 0.0;
 static float lg_bandwidth = 0.0;
+
+static bool lg_is_converting = false;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -219,7 +223,12 @@ static float sub_angle(float a, float b) {
 	return v;
 }
 
-static void loading_callback(int ret) {
+static void loading_callback(void *user_data, int ret) {
+	if (lg_is_converting) {
+		MENU_T *menu = (MENU_T*)user_data;
+		menu->selected = false;
+		packet_menu_convert_node_callback(menu, MENU_EVENT_DESELECTED);
+	}
 	printf("end of loading\n");
 }
 
@@ -738,9 +747,12 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			rtp_start_loading((char*) menu->user_data,
+			char *name[256];
+			snprintf(name, 256, PACKET_FOLDER_PATH "/%s",
+					(char*) menu->user_data);
+			rtp_start_loading(name, true, true,
 					(RTP_LOADING_CALLBACK) loading_callback);
-			printf("start loading %s\n", (char*) menu->user_data);
+			printf("start loading %s\n", name);
 			lg_plugin_host->set_menu_visible(false);
 		}
 		break;
@@ -772,10 +784,89 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 				if (d->d_name[0] != L'.') {
 					char *name_s = malloc(256);
 					wchar_t name[256];
-					snprintf(name_s, 256, PACKET_FOLDER_PATH "/%s", d->d_name);
+					snprintf(name_s, 256, "%s", d->d_name);
 					swprintf(name, 256, L"%s", d->d_name);
 					MENU_T *node_menu = menu_new(name,
 							packet_menu_load_node_callback, name_s);
+					menu_add_submenu(menu, node_menu, INT_MAX);
+				}
+			}
+		}
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		for (int idx = 0; menu->submenu[idx]; idx++) {
+			menu_delete(&menu->submenu[idx]);
+		}
+		break;
+	case MENU_EVENT_SELECTED:
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
+}
+
+static void packet_menu_convert_node_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		break;
+	case MENU_EVENT_SELECTED:
+		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+			char *cmd[512];
+			char *name[256];
+			snprintf(name, 256, VIDEO_FOLDER_PATH "/%s.mjpeg",
+					(char*) menu->user_data);
+			rtp_start_loading(name, false, false,
+					(RTP_LOADING_CALLBACK) loading_callback, menu);
+			sprintf(cmd, "start_record -W 4096 -H 2048 -o %s", name);
+			lg_plugin_host->send_command(cmd);
+			lg_plugin_host->set_menu_visible(false);
+			lg_is_converting = true;
+
+			printf("start converting %s\n", name);
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		if (rtp_is_loading(NULL)) {
+			rtp_stop_loading();
+			lg_is_converting = false;
+
+			printf("stop converting\n");
+		}
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		free(menu->user_data);
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
+}
+
+static void packet_menu_convert_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		if (1) {
+			struct dirent *d;
+			DIR *dir;
+
+			dir = opendir(PACKET_FOLDER_PATH);
+			while ((d = readdir(dir)) != 0) {
+				if (d->d_name[0] != L'.') {
+					char *name_s = malloc(256);
+					wchar_t name[256];
+					snprintf(name_s, 256, PACKET_FOLDER_PATH "/%s", d->d_name);
+					swprintf(name, 256, L"%s", d->d_name);
+					MENU_T *node_menu = menu_new(name,
+							packet_menu_convert_node_callback, name_s);
 					menu_add_submenu(menu, node_menu, INT_MAX);
 				}
 			}
@@ -837,6 +928,17 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+static void picam360_capture_callback(PICAM360_CAPTURE_EVENT event) {
+	switch (event) {
+	case PICAM360_CAPTURE_EVENT_AFTER_FRAME:
+		if (lg_is_converting) {
+			rtp_increment_loading(100 * 1000); //fps
+		}
+		break;
+	default:
+		break;
+	}
+}
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
@@ -883,8 +985,11 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					packet_menu_save_callback, NULL);
 			MENU_T *packet_load_menu = menu_new(L"Load",
 					packet_menu_load_callback, NULL);
+			MENU_T *packet_convert_menu = menu_new(L"Convert",
+					packet_menu_convert_callback, NULL);
 			menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
 			menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
+			menu_add_submenu(packet_menu, packet_convert_menu, INT_MAX);
 			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
 		}
 		{
@@ -895,4 +1000,5 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(menu, system_menu, INT_MAX);		//add main menu
 		}
 	}
+	lg_plugin_host - add_event_handler(picam360_capture_callback);
 }
