@@ -476,6 +476,18 @@ static void command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
 		rtp_stop_loading();
 		printf("stop_loading : completed\n");
+	} else if (strncmp(cmd, PLUGIN_NAME ".n", sizeof(buff)) == 0) {
+		struct timeval time;
+		gettimeofday(&time, NULL);
+		kokuyoseki_callback(time, NEXT_BUTTON, 0);
+	} else if (strncmp(cmd, PLUGIN_NAME ".b", sizeof(buff)) == 0) {
+		struct timeval time;
+		gettimeofday(&time, NULL);
+		kokuyoseki_callback(time, BACK_BUTTON, 0);
+	} else if (strncmp(cmd, PLUGIN_NAME ".m", sizeof(buff)) == 0) {
+		struct timeval time;
+		gettimeofday(&time, NULL);
+		kokuyoseki_callback(time, BLACKOUT_BUTTON, 0);
 	} else {
 		printf(":unknown command : %s\n", buff);
 	}
