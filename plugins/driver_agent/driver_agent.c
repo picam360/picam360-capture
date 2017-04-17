@@ -474,7 +474,7 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 				lg_convert_frame_num++;
 
 				char dst[256];
-				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
+				snprintf(dst, 256, "%s/%d.jpeg",
 						lg_convert_base_path, lg_convert_frame_num);
 				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
 						dst);
@@ -794,7 +794,7 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
 						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
 						S_IROTH | S_IXOTH | S_IXOTH);
-				if (ret == 0) {
+				if (ret == 0 || errno == EEXIST) {
 					char dst[256];
 					snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
 							lg_convert_frame_num);

@@ -692,6 +692,7 @@ bool delete_frame(FRAME_T *frame) {
 void frame_handler() {
 	struct timeval s, f;
 	double elapsed_ms;
+	bool snap_finished = false;
 	FRAME_T **frame_pp = &state->frame;
 	while (*frame_pp) {
 		FRAME_T *frame = *frame_pp;
@@ -776,8 +777,7 @@ void frame_handler() {
 			frame->output_mode = OUTPUT_MODE_NONE;
 			frame->delete_after_processed = true;
 
-			state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
-					PICAM360_CAPTURE_EVENT_AFTER_SNAP);
+			snap_finished = true;
 			break;
 		case OUTPUT_MODE_VIDEO:
 			AddFrame(frame->recorder, frame->img_buff);
@@ -810,6 +810,10 @@ void frame_handler() {
 			}
 			eglSwapBuffers(state->display, state->surface);
 		}
+	}
+	if (snap_finished) {
+		state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
+				PICAM360_CAPTURE_EVENT_AFTER_SNAP);
 	}
 	state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
 			PICAM360_CAPTURE_EVENT_AFTER_FRAME);
