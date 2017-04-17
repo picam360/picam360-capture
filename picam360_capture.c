@@ -1232,9 +1232,23 @@ static void send_command(const char *cmd) {
 static void send_event(uint32_t node_id, uint32_t event_id) {
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]) {
-			state->plugins[i]->event_handler(state->plugins[i]->user_data, node_id, event_id);
+			state->plugins[i]->event_handler(state->plugins[i]->user_data,
+					node_id, event_id);
 		}
 	}
+}
+static void snap(int width, int height, enum RENDERING_MODE mode,
+		const char *path) {
+	char cmd[512];
+	char *mode_str = "";
+	switch (mode) {
+	case RENDERING_MODE_EQUIRECTANGULAR:
+		mode_str = "-E";
+		break;
+	}
+
+	sprintf(cmd, "snap -W %d -H %d %s -o %s", width, height, mode_str, path);
+	state->plugin_host.send_command(cmd);
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
@@ -1272,6 +1286,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
+
+		state->plugin_host.snap = snap;
 	}
 
 	const int INITIAL_SPACE = 16;

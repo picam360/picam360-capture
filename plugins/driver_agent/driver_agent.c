@@ -792,7 +792,7 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 				snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
 						(char*) menu->user_data);
 				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
-						lg_convert_base_path, lg_convert_frame_id);
+						lg_convert_base_path, lg_convert_frame_num);
 				succeeded = mkdir(lg_convert_base_path,
 						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
 						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
