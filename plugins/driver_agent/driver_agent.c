@@ -57,7 +57,7 @@ static void release(void *user_data) {
 	free(user_data);
 }
 
-static void get_last_id(const char *path) {
+static int get_last_id(const char *path) {
 	int last_id = 0;
 	struct dirent *d;
 	DIR *dir;
@@ -147,8 +147,6 @@ static int lg_last_button = -1;
 #define NUM_OF_CAM 2
 static float lg_fps[NUM_OF_CAM] = { };
 static int lg_frameskip[NUM_OF_CAM] = { };
-
-static char lg_last_recorded_filename[256] = { };
 
 static void parse_xml(char *xml) {
 	char *q_str = NULL;
