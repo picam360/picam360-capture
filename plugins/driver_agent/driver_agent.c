@@ -53,6 +53,8 @@ static bool lg_is_converting = false;
 static char lg_convert_base_path[256];
 static uint32_t lg_convert_frame_num = 0;
 
+static void kokuyoseki_callback(struct timeval time, int button, int value);
+
 static void release(void *user_data) {
 	free(user_data);
 }
@@ -706,8 +708,6 @@ static void packet_menu_save_callback(struct _MENU_T *menu,
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
 			snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
-			lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
-					dst);
 			rtp_start_recording(dst);
 			printf("start recording %s\n", dst);
 		}
