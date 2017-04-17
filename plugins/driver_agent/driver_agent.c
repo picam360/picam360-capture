@@ -62,7 +62,7 @@ static int get_last_id(const char *path) {
 	struct dirent *d;
 	DIR *dir;
 
-	dir = opendir(PACKET_FOLDER_PATH);
+	dir = opendir(path);
 	while ((d = readdir(dir)) != 0) {
 		if (d->d_name[0] != L'.') {
 			int id = 0;
