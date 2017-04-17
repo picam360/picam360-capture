@@ -66,7 +66,9 @@ static int get_last_id(const char *path) {
 	while ((d = readdir(dir)) != 0) {
 		if (d->d_name[0] != L'.') {
 			int id = 0;
-			sscanf(d->d_name, "%d.", &id);
+			char id_str[256] = { };
+			sscanf(d->d_name, "%[^.]", id_str);
+			sscanf(id_str, "%d", id);
 			if (id > last_id) {
 				last_id = id;
 			}
