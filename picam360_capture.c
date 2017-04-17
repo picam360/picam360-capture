@@ -12,6 +12,7 @@
 #include <linux/input.h>
 #include <fcntl.h>
 #include <wchar.h>
+#include <pthread.h>
 
 #include "bcm_host.h"
 
@@ -1282,7 +1283,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
 		state->plugins[i]->node_id = i + 100;
 	}
-	state->plugins[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
+	state->plugins[INITIAL_SPACE - 1] = (void*) -1;
 }
 
 void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {

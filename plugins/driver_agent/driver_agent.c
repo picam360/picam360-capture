@@ -10,6 +10,7 @@
 #include <wchar.h>
 #include <limits.h>
 #include <dirent.h>
+#include <pthread.h>
 
 #include "driver_agent.h"
 #include "kokuyoseki.h"
@@ -464,20 +465,19 @@ static void command_handler(void *user_data, const char *_buff) {
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
-	switch(node_id){
+	switch (node_id) {
 	case PICAM360_HOST_NODE_ID:
 		switch (event_id) {
 		case PICAM360_CAPTURE_EVENT_AFTER_SNAP:
 			if (lg_is_converting) {
 				rtp_increment_loading(100 * 1000); //10 fps
-				lg_convert_frame_id++;
+				lg_convert_frame_num++;
 
 				char dst[256];
-				snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
-						(char*) menu->user_data);
 				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
-						lg_convert_base_path, lg_convert_frame_id);
-				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR, dst);
+						lg_convert_base_path, lg_convert_frame_num);
+				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
+						dst);
 			}
 			break;
 		default:
@@ -793,11 +793,22 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 						(char*) menu->user_data);
 				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
 						lg_convert_base_path, lg_convert_frame_id);
-				mkdir(lg_convert_base_path);
-				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR, dst);
-				lg_is_converting = true;
+				succeeded = mkdir(lg_convert_base_path,
+						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
+						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
+						S_IROTH | S_IXOTH | S_IXOTH);
+				if (succeeded == 0) {
+					lg_plugin_host->snap(4096, 2048,
+							RENDERING_MODE_EQUIRECTANGULAR, dst);
+					lg_is_converting = true;
 
-				printf("start converting %s to %s\n", src, lg_convert_base_path);
+					printf("start converting %s to %s\n", src,
+							lg_convert_base_path);
+				} else {
+					menu->selected = false;
+					packet_menu_convert_node_callback(menu,
+							MENU_EVENT_DESELECTED);
+				}
 			} else {
 				menu->selected = false;
 			}
