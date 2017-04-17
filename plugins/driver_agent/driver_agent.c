@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -50,7 +51,7 @@ static float lg_bandwidth = 0.0;
 
 static bool lg_is_converting = false;
 static char lg_convert_base_path[256];
-static uint_32 lg_convert_frame_num = 0;
+static uint32_t lg_convert_frame_num = 0;
 
 static void release(void *user_data) {
 	free(user_data);
