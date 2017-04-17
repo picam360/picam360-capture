@@ -816,7 +816,7 @@ void frame_handler() {
 
 static double calib_step = 0.01;
 
-void _command_handler(char *_buff) {
+void _command_handler(const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd = strtok(buff, " \n");
@@ -1058,7 +1058,7 @@ void _command_handler(char *_buff) {
 	}
 }
 
-void command_handler(char *buff) {
+void command_handler(const char *buff) {
 	bool handled = false;
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		int name_len = strlen(state->plugins[i]->name);
@@ -1231,7 +1231,7 @@ static void send_command(const char *cmd) {
 static void send_event(uint32_t node_id, uint32_t event_id) {
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]) {
-			state->plugins[i]->event_handler(node_id, event_id);
+			state->plugins[i]->event_handler(state->plugins[i]->user_data, node_id, event_id);
 		}
 	}
 }
@@ -1274,13 +1274,6 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	}
 
 	const int INITIAL_SPACE = 16;
-
-	state->callbacks = malloc(
-			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
-	memset(state->callbacks, 0,
-			sizeof(PICAM360_CAPTURE_CALLBACK*) * INITIAL_SPACE);
-	state->callbacks[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
-
 	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
 	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
