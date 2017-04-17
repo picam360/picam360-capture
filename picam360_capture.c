@@ -1608,6 +1608,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateZ(view_matrix, view_matrix, frame->view_roll);
 		mat4_rotateX(view_matrix, view_matrix, frame->view_pitch);
 		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
+		mat4_invert(view_matrix, view_matrix);
 		break;
 	}
 	mat4_multiply(view_matrix, view_offset_matrix, view_matrix); // Rv=RvRvo

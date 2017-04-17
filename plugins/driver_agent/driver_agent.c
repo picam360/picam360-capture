@@ -57,6 +57,24 @@ static void release(void *user_data) {
 	free(user_data);
 }
 
+static void get_last_id(const char *path) {
+	int last_id = 0;
+	struct dirent *d;
+	DIR *dir;
+
+	dir = opendir(PACKET_FOLDER_PATH);
+	while ((d = readdir(dir)) != 0) {
+		if (d->d_name[0] != L'.') {
+			int id = 0;
+			sscanf(d->d_name, "%d.", &id);
+			if (id > last_id) {
+				last_id = id;
+			}
+		}
+	}
+	return last_id;
+}
+
 static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 		float light1_value, float motor0_value, float motor1_value,
 		float motor2_value, float motor3_value) {
@@ -475,8 +493,8 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 				lg_convert_frame_num++;
 
 				char dst[256];
-				snprintf(dst, 256, "%s/%d.jpeg",
-						lg_convert_base_path, lg_convert_frame_num);
+				snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
+						lg_convert_frame_num);
 				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
 						dst);
 			}
@@ -675,17 +693,13 @@ static void packet_menu_save_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			struct timeval time = { };
-			gettimeofday(&time, NULL);
-			struct tm *tmptr = NULL;
-			tmptr = localtime(&time.tv_sec);
-
-			sprintf(lg_last_recorded_filename,
-			PACKET_FOLDER_PATH "/%04d-%02d-%02d_%02d-%02d-%02d.rtp",
-					tmptr->tm_year + 1900, tmptr->tm_mon + 1, tmptr->tm_mday,
-					tmptr->tm_hour, tmptr->tm_min, tmptr->tm_sec);
-			rtp_start_recording(lg_last_recorded_filename);
-			printf("start recording %s\n", lg_last_recorded_filename);
+			char dst[256];
+			int last_id = get_last_id(PACKET_FOLDER_PATH);
+			snprintf(dst, 256, PACKET_FOLDER_PATH "%d.rtp", last_id + 1);
+			lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
+					dst);
+			rtp_start_recording(dst);
+			printf("start recording %s\n", dst);
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
@@ -870,6 +884,31 @@ static void packet_menu_convert_callback(struct _MENU_T *menu,
 		break;
 	}
 }
+static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		switch ((int) menu->user_data) {
+		case 0:
+			menu->selected = false;
+			{
+				char dst[256];
+				int last_id = get_last_id(STILL_FOLDER_PATH);
+				snprintf(dst, 256, STILL_FOLDER_PATH "%d.jpeg", last_id + 1);
+				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
+						dst);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		lg_ui_mode = UI_MODE_DEFAULT;
+		break;
+	default:
+		break;
+	}
+}
 static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -930,6 +969,13 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	}
 	{			//menu
 		MENU_T *menu = lg_plugin_host->get_menu();
+		{
+			MENU_T *function_menu = menu_new(L"Function", NULL, NULL);
+			MENU_T *function_snap_menu = menu_new(L"Snap",
+					function_menu_callback, (void*) 0);
+			menu_add_submenu(function_menu, function_snap_menu, INT_MAX);
+			menu_add_submenu(menu, function_menu, INT_MAX);		//add main menu
+		}
 		{
 			MENU_T *mode_menu = menu_new(L"Mode", NULL, NULL);
 			MENU_T *mode_light_menu = menu_new(L"Light", mode_menu_callback,
