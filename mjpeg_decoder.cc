@@ -147,6 +147,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 			lg_plugin_host->set_camera_quatanion(cam_num,
 					send_frame_arg->quatanion);
 		}
+		lg_plugin_host.send_event(PICAM360_HOST_NODE_ID,
+				PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED + cam_num);
 	}
 	send_frame_arg->fillbufferdone_count++;
 	cur = send_frame_arg->fillbufferdone_count % 2;

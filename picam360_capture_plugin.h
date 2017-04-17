@@ -5,13 +5,16 @@
 #include <jansson.h>//json parser
 #include "menu.h"
 
-enum PICAM360_CAPTURE_EVENT{
-	PICAM360_CAPTURE_EVENT_AFTER_FRAME,
+enum PICAM360_CAPTURE_EVENT {
+	PICAM360_CAPTURE_EVENT_AFTER_FRAME, PICAM360_CAPTURE_EVENT_AFTER_SNAP, PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED,PICAM360_CAPTURE_EVENT_TEXTURE1_UPDATED,
+};
+enum RENDERING_MODE {
+	RENDERING_MODE_WINDOW, RENDERING_MODE_EQUIRECTANGULAR, RENDERING_MODE_FISHEYE,
 };
 
-typedef void (*PICAM360_CAPTURE_CALLBACK)(enum PICAM360_CAPTURE_EVENT event);
+#define PICAM360_HOST_NODE_ID 0
 
-typedef struct _PLUGIN_HOST_T{
+typedef struct _PLUGIN_HOST_T {
 	float *(*get_view_quatanion)();
 	void (*set_view_quatanion)(float *value);
 	float *(*get_view_compass)();
@@ -43,18 +46,22 @@ typedef struct _PLUGIN_HOST_T{
 	float (*get_fov)();
 	void (*set_fov)(float value);
 
-	void (*add_event_handler)(PICAM360_CAPTURE_CALLBACK callback);
-	void (*send_command)(char *cmd);
+	void (*send_command)(const char *cmd);
+	void (*send_event)(uint32_t node_id, uint32_t event_id);
+
+	void (*snap)(int width, int height, enum RENDERING_MODE mode, const char *path);
 } PLUGIN_HOST_T;
 
-typedef struct _PLUGIN_T{
+typedef struct _PLUGIN_T {
 	char name[64];
 	void (*release)(void *user_data);
-	void (*command_handler)(void *user_data, char *cmd);
+	void (*command_handler)(void *user_data, const char *cmd);
+	void (*event_handler)(void *user_data, uint32_t node_id, uint32_t event_id);
 	void (*init_options)(void *user_data, json_t *options);
 	void (*save_options)(void *user_data, json_t *options);
 	wchar_t *(*get_info)(void *user_data);
 	void *user_data;
+	uint32_t node_id;
 } PLUGIN_T;
 
 typedef void (*CREATE_PLUGIN)(PLUGIN_HOST_T *plugin_host, PLUGIN_T **plugin);

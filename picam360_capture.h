@@ -176,5 +176,4 @@ typedef struct _PICAM360CAPTURE_T {
 
 	PLUGIN_T **plugins;
 	struct _OPTIONS_T options;
-	PICAM360_CAPTURE_CALLBACK *callbacks;
 } PICAM360CAPTURE_T;

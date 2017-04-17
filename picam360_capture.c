@@ -774,6 +774,9 @@ void frame_handler() {
 
 			frame->output_mode = OUTPUT_MODE_NONE;
 			frame->delete_after_processed = true;
+
+			state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
+					PICAM360_CAPTURE_EVENT_AFTER_SNAP);
 			break;
 		case OUTPUT_MODE_VIDEO:
 			AddFrame(frame->recorder, frame->img_buff);
@@ -807,12 +810,8 @@ void frame_handler() {
 			eglSwapBuffers(state->display, state->surface);
 		}
 	}
-	for (int i = 0; i < 256; i++) {
-		if (state->callbacks[i] == NULL) {
-			break;
-		}
-		state->callbacks[i](PICAM360_CAPTURE_EVENT_AFTER_FRAME);
-	}
+	state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
+			PICAM360_CAPTURE_EVENT_AFTER_FRAME);
 }
 
 static double calib_step = 0.01;
@@ -1226,19 +1225,15 @@ static float get_fov() {
 static void set_fov(float value) {
 	state->frame->fov = value;
 }
-static void add_event_handler(PICAM360_CAPTURE_CALLBACK callback) {
-	for (int i = 0; i < 256; i++) {
-		if (state->callbacks[i] == (void*) -1) {
-			//todo;
-			exit(-1);
-		} else if (state->callbacks[i] == NULL) {
-			state->callbacks[i] = callback;
-			break;
+static void send_command(const char *cmd) {
+	command_handler(cmd);
+}
+static void send_event(uint32_t node_id, uint32_t event_id) {
+	for (int i = 0; state->plugins[i] != NULL; i++) {
+		if (state->plugins[i]) {
+			state->plugins[i]->event_handler(node_id, event_id);
 		}
 	}
-}
-static void send_command(char *cmd) {
-	command_handler(cmd);
 }
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
@@ -1274,8 +1269,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_fov = get_fov;
 		state->plugin_host.set_fov = set_fov;
 
-		state->plugin_host.add_event_handler = add_event_handler;
 		state->plugin_host.send_command = send_command;
+		state->plugin_host.send_event = send_event;
 	}
 
 	const int INITIAL_SPACE = 16;
@@ -1292,6 +1287,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
 	for (int i = 0; i < num_of_plugins; i++) {
 		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
+		state->plugins[i]->node_id = i + 100;
 	}
 	state->plugins[INITIAL_SPACE - 1] = (PICAM360_CAPTURE_CALLBACK*) -1;
 }

@@ -48,6 +48,8 @@ static float lg_video_delay = 0.0;
 static float lg_bandwidth = 0.0;
 
 static bool lg_is_converting = false;
+static char lg_convert_base_path[256];
+static bool lg_convert_frame_num = 0;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -397,7 +399,7 @@ void *transmit_thread_func(void* arg) {
 	} // end of while
 }
 
-static void command_handler(void *user_data, char *_buff) {
+static void command_handler(void *user_data, const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd;
@@ -458,6 +460,32 @@ static void command_handler(void *user_data, char *_buff) {
 		printf("stop_loading : completed\n");
 	} else {
 		printf(":unknown command : %s\n", buff);
+	}
+}
+
+static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
+	switch(node_id){
+	case PICAM360_HOST_NODE_ID:
+		switch (event_id) {
+		case PICAM360_CAPTURE_EVENT_AFTER_SNAP:
+			if (lg_is_converting) {
+				rtp_increment_loading(100 * 1000); //10 fps
+				lg_convert_frame_id++;
+
+				char dst[256];
+				snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
+						(char*) menu->user_data);
+				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
+						lg_convert_base_path, lg_convert_frame_id);
+				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR, dst);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
 	}
 }
 
@@ -754,22 +782,22 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			char cmd[512];
 			char src[256];
-			char dst[256];
 			snprintf(src, 256, PACKET_FOLDER_PATH "/%s",
-					(char*) menu->user_data);
-			snprintf(dst, 256, VIDEO_FOLDER_PATH "/%s.mjpeg",
 					(char*) menu->user_data);
 			bool succeeded = rtp_start_loading(src, false, false,
 					(RTP_LOADING_CALLBACK) loading_callback, menu);
 			if (succeeded) {
-				sprintf(cmd, "start_record -W 4096 -H 2048 -o %s", dst);
-				lg_plugin_host->send_command(cmd);
-				lg_plugin_host->set_menu_visible(false);
+				char dst[256];
+				snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
+						(char*) menu->user_data);
+				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
+						lg_convert_base_path, lg_convert_frame_id);
+				mkdir(lg_convert_base_path);
+				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR, dst);
 				lg_is_converting = true;
 
-				printf("start converting %s to %s\n", src, dst);
+				printf("start converting %s to %s\n", src, lg_convert_base_path);
 			} else {
 				menu->selected = false;
 			}
@@ -870,17 +898,6 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
-static void picam360_capture_callback(enum PICAM360_CAPTURE_EVENT event) {
-	switch (event) {
-	case PICAM360_CAPTURE_EVENT_AFTER_FRAME:
-		if (lg_is_converting) {
-			rtp_increment_loading(100 * 1000); //fps
-		}
-		break;
-	default:
-		break;
-	}
-}
 
 void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
@@ -891,6 +908,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		strcpy(plugin->name, PLUGIN_NAME);
 		plugin->release = release;
 		plugin->command_handler = command_handler;
+		plugin->event_handler = event_handler;
 		plugin->init_options = init_options;
 		plugin->save_options = save_options;
 		plugin->get_info = get_info;
@@ -942,5 +960,4 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(menu, system_menu, INT_MAX);		//add main menu
 		}
 	}
-	lg_plugin_host->add_event_handler(picam360_capture_callback);
 }
