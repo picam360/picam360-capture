@@ -49,7 +49,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
 
-	void (*snap)(uint_32 width, uint_32 height, enum RENDERING_MODE mode, const char *path);
+	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode, const char *path);
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T {

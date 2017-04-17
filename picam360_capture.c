@@ -1241,7 +1241,7 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 		}
 	}
 }
-static void snap(uint_32 width, uint_32 height, enum RENDERING_MODE mode,
+static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 		const char *path) {
 	char cmd[512];
 	char *mode_str = "";
