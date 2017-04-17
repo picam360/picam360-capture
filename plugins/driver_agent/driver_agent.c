@@ -693,7 +693,7 @@ static void packet_menu_save_callback(struct _MENU_T *menu,
 		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
-			snprintf(dst, 256, PACKET_FOLDER_PATH "%d.rtp", last_id + 1);
+			snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
 			lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
 					dst);
 			rtp_start_recording(dst);
@@ -891,7 +891,7 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 			{
 				char dst[256];
 				int last_id = get_last_id(STILL_FOLDER_PATH);
-				snprintf(dst, 256, STILL_FOLDER_PATH "%d.jpeg", last_id + 1);
+				snprintf(dst, 256, STILL_FOLDER_PATH "/%d.jpeg", last_id + 1);
 				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
 						dst);
 			}

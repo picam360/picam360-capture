@@ -1311,7 +1311,7 @@ void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 }
 
 int main(int argc, char *argv[]) {
-	pthread_setname_np(pthread_self(), "PICAM360 MAIN");
+	//pthread_setname_np(pthread_self(), "PICAM360 MAIN");
 
 	bool input_file_mode = false;
 	int opt;
