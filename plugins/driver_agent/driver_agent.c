@@ -788,16 +788,16 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 			bool succeeded = rtp_start_loading(src, false, false,
 					(RTP_LOADING_CALLBACK) loading_callback, menu);
 			if (succeeded) {
-				char dst[256];
 				snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
 						(char*) menu->user_data);
-				snprintf(lg_convert_base_path, 256, "%s/%d.jpeg",
-						lg_convert_base_path, lg_convert_frame_num);
-				succeeded = mkdir(lg_convert_base_path,
+				int ret = mkdir(lg_convert_base_path,
 						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
 						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
 						S_IROTH | S_IXOTH | S_IXOTH);
-				if (succeeded == 0) {
+				if (ret == 0) {
+					char dst[256];
+					snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
+							lg_convert_frame_num);
 					lg_plugin_host->snap(4096, 2048,
 							RENDERING_MODE_EQUIRECTANGULAR, dst);
 					lg_is_converting = true;
@@ -805,12 +805,12 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 					printf("start converting %s to %s\n", src,
 							lg_convert_base_path);
 				} else {
-					menu->selected = false;
-					packet_menu_convert_node_callback(menu,
-							MENU_EVENT_DESELECTED);
+					succeeded = false;
 				}
-			} else {
+			}
+			if (!succeeded) {
 				menu->selected = false;
+				packet_menu_convert_node_callback(menu, MENU_EVENT_DESELECTED);
 			}
 		}
 		break;
