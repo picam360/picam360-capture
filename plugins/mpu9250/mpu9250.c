@@ -67,15 +67,15 @@ static void *threadFunc(void *data) {
 		{ //north
 			float north = 0;
 
-			float view_matrix[16];
-			mat4_fromQuat(view_matrix, lg_quat);
-			mat4_invert(view_matrix, view_matrix);
+			float matrix[16];
+			mat4_fromQuat(matrix, lg_quat);
+			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
 			memcpy(compass_mat, lg_compass, sizeof(float) * 4);
 
 			mat4_transpose(compass_mat, compass_mat);
-			mat4_multiply(compass_mat, compass_mat, view_matrix);
+			mat4_multiply(compass_mat, compass_mat, matrix);
 			mat4_transpose(compass_mat, compass_mat);
 
 			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
@@ -113,18 +113,18 @@ static void init() {
 }
 
 static float *get_quatanion() {
-//	float view_offset_matrix[16];
-//	mat4_identity(view_offset_matrix);
+//	float offset_matrix[16];
+//	mat4_identity(offset_matrix);
 //	// Rvo : view offset
 //	//euler Y(yaw)X(pitch)Z(roll)
-//	mat4_rotateZ(view_offset_matrix, view_offset_matrix,
-//			state->options.view_offset_roll);
-//	mat4_rotateX(view_offset_matrix, view_offset_matrix,
-//			state->options.view_offset_pitch);
-//	mat4_rotateY(view_offset_matrix, view_offset_matrix,
-//			state->options.view_offset_yaw);
+//	mat4_rotateZ(offset_matrix, offset_matrix,
+//			state->options.offset_roll);
+//	mat4_rotateX(offset_matrix, offset_matrix,
+//			state->options.offset_pitch);
+//	mat4_rotateY(offset_matrix, offset_matrix,
+//			state->options.offset_yaw);
 //
-//	mat4_multiply(view_matrix, view_offset_matrix, view_matrix); // Rv=RvRvo
+//	mat4_multiply(matrix, offset_matrix, matrix); // Rv=RvRvo
 
 	return lg_quat;
 }
@@ -157,26 +157,26 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 	}
 }
 
-static float lg_view_offset_pitch = 0;
-static float lg_view_offset_yaw = 0;
-static float lg_view_offset_roll = 0;
+static float lg_offset_pitch = 0;
+static float lg_offset_yaw = 0;
+static float lg_offset_roll = 0;
 
 static void init_options(void *user_data, json_t *options) {
-	lg_view_offset_pitch = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".view_offset_pitch"));
-	lg_view_offset_yaw = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".view_offset_yaw"));
-	lg_view_offset_roll = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".view_offset_roll"));
+	lg_offset_pitch = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".offset_pitch"));
+	lg_offset_yaw = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".offset_yaw"));
+	lg_offset_roll = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".offset_roll"));
 }
 
 static void save_options(void *user_data, json_t *options) {
-	json_object_set_new(options, PLUGIN_NAME ".view_offset_pitch",
-			json_real(lg_view_offset_pitch));
-	json_object_set_new(options, PLUGIN_NAME ".view_offset_yaw",
-			json_real(lg_view_offset_yaw));
-	json_object_set_new(options, PLUGIN_NAME ".view_offset_roll",
-			json_real(lg_view_offset_roll));
+	json_object_set_new(options, PLUGIN_NAME ".offset_pitch",
+			json_real(lg_offset_pitch));
+	json_object_set_new(options, PLUGIN_NAME ".offset_yaw",
+			json_real(lg_offset_yaw));
+	json_object_set_new(options, PLUGIN_NAME ".offset_roll",
+			json_real(lg_offset_roll));
 }
 
 void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
