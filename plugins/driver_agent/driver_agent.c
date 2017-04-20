@@ -128,10 +128,14 @@ static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
-static float lg_camera_quatanion[4] = { 0, 0, 0, 1 };
-static float lg_camera_compass[4] = { 0, 0, 0, 1 };
-static float lg_camera_north = 0;
-static float lg_camera_north_count = 0;
+static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
+//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
+static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
+//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
+static float lg_quatanion[4] = { 0, 0, 0, 1 };
+static float lg_compass[4] = { 0, 0, 0, 1 };
+static float lg_north = 0;
+static float lg_north_count = 0;
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
 static bool lg_pid_enabled = false;
@@ -160,33 +164,49 @@ static void parse_xml(char *xml) {
 		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
 				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
 		//convert from mpu coodinate to opengl coodinate
-		lg_camera_quatanion[0] = quatanion[1]; //x
-		lg_camera_quatanion[1] = quatanion[3]; //y : swap y and z
-		lg_camera_quatanion[2] = -quatanion[2]; //z : swap y and z
-		lg_camera_quatanion[3] = quatanion[0]; //w
+		lg_quatanion[0] = quatanion[1]; //x
+		lg_quatanion[1] = quatanion[3]; //y : swap y and z
+		lg_quatanion[2] = -quatanion[2]; //z : swap y and z
+		lg_quatanion[3] = quatanion[0]; //w
 	}
 	q_str = strstr(xml, "<compass");
 	if (q_str) {
 		float compass[3];
 		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &compass[0],
 				&compass[1], &compass[2]);
+		float calib[3];
+		float bias[3];
+		float gain[3];
+		for (int i = 0; i < 3; i++) {
+			lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+			lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
+			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
+			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
+		}
+		float norm = sqrt(
+				calib[0] * calib[0] + calib[1] * calib[1]
+						+ calib[2] * calib[2]);
+		for (int i = 0; i < 3; i++) {
+			calib[i] /= norm;
+		}
 		//convert from mpu coodinate to opengl coodinate
-		lg_camera_compass[0] = compass[1];
-		lg_camera_compass[1] = -compass[0];
-		lg_camera_compass[2] = -compass[2];
-		lg_camera_compass[3] = 1.0;
+		lg_compass[0] = calib[1];
+		lg_compass[1] = -calib[0];
+		lg_compass[2] = -calib[2];
+		lg_compass[3] = 1.0;
 
-		lg_plugin_host->set_camera_compass(lg_camera_compass);
+		lg_plugin_host->set_camera_compass(lg_compass);
 
 		{ //north
 			float north = 0;
 
 			float matrix[16];
-			mat4_fromQuat(matrix, lg_camera_quatanion);
+			mat4_fromQuat(matrix, lg_quatanion);
 			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
-			memcpy(compass_mat, lg_camera_compass, sizeof(float) * 4);
+			memcpy(compass_mat, lg_compass, sizeof(float) * 4);
 
 			mat4_transpose(compass_mat, compass_mat);
 			mat4_multiply(compass_mat, compass_mat, matrix);
@@ -194,13 +214,13 @@ static void parse_xml(char *xml) {
 
 			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
 
-			lg_camera_north = (lg_camera_north * lg_camera_north_count + north)
-					/ (lg_camera_north_count + 1);
-			lg_camera_north_count++;
-			if (lg_camera_north_count > 1000) {
-				lg_camera_north_count = 1000;
+			lg_north = (lg_north * lg_north_count + north)
+					/ (lg_north_count + 1);
+			lg_north_count++;
+			if (lg_north_count > 1000) {
+				lg_north_count = 1000;
 			}
-			lg_plugin_host->set_camera_north(lg_camera_north);
+			lg_plugin_host->set_camera_north(lg_north);
 		}
 	}
 	q_str = strstr(xml, "<temperature");
@@ -305,7 +325,7 @@ void *transmit_thread_func(void* arg) {
 				mat4_identity(camera_matrix);
 				mat4_identity(target_matrix);
 				mat4_identity(north_matrix);
-				mat4_fromQuat(camera_matrix, lg_camera_quatanion);
+				mat4_fromQuat(camera_matrix, lg_quatanion);
 				mat4_fromQuat(target_matrix, lg_target_quatanion);
 				mat4_invert(target_matrix, target_matrix);
 				// Rn
@@ -432,6 +452,13 @@ static void command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
+	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass_calib", sizeof(buff))
+			== 0) {
+
+		for (int i = 0; i < 3; i++) {
+			lg_compass_min[i] = INT_MAX;
+			lg_compass_max[i] = -INT_MAX;
+		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
@@ -630,6 +657,14 @@ static void init_options(void *user_data, json_t *options) {
 			json_object_get(options, PLUGIN_NAME ".d_gain"));
 	lg_video_delay = json_number_value(
 			json_object_get(options, PLUGIN_NAME ".video_delay"));
+
+	for (int i = 0; i < 3; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		lg_compass_min[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		lg_compass_max[i] = json_number_value(json_object_get(options, buff));
+	}
 }
 
 static void save_options(void *user_data, json_t *options) {
@@ -638,6 +673,14 @@ static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
 	json_object_set_new(options, PLUGIN_NAME ".video_delay",
 			json_real(lg_video_delay));
+
+	for (int i = 0; i < 3; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		json_object_set_new(options, buff, json_real(lg_compass_min[i]));
+		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
+	}
 }
 
 static int rtp_callback(unsigned char *data, unsigned int data_len,

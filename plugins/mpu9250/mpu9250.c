@@ -28,6 +28,7 @@ static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[4] = { };
 static float lg_quat[4] = { };
+static float lg_quat_after_offset[4] = { };
 static float lg_north = 0;
 static int lg_north_count = 0;
 
@@ -55,6 +56,7 @@ static void *threadFunc(void *data) {
 			for (int i = 0; i < 3; i++) {
 				calib[i] /= norm;
 			}
+			//convert from mpu coodinate to opengl coodinate
 			lg_compass[0] = calib[1];
 			lg_compass[1] = -calib[0];
 			lg_compass[2] = -calib[2];
@@ -65,6 +67,17 @@ static void *threadFunc(void *data) {
 			lg_quat[1] = quatanion[3];	//y : swap y and z
 			lg_quat[2] = -quatanion[2];	//z : swap y and z
 			lg_quat[3] = quatanion[0];	//w
+		}
+		{
+			QUATERNION_T quat_offset = quaternion_init();
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_z(lg_offset_roll));
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_y(lg_offset_yaw));
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_x(lg_offset_pitch));
+			*((QUATERNION_T*) &lg_quat_after_offset) = quaternion_multiply(
+					quat_offset, lg_quat); // Rv=RvRvo
 		}
 		{ //north
 			float north = 0;
@@ -116,20 +129,7 @@ static void init() {
 }
 
 static float *get_quatanion() {
-//	float offset_matrix[16];
-//	mat4_identity(offset_matrix);
-//	// Rvo : view offset
-//	//euler Y(yaw)X(pitch)Z(roll)
-//	mat4_rotateZ(offset_matrix, offset_matrix,
-//			state->options.offset_roll);
-//	mat4_rotateX(offset_matrix, offset_matrix,
-//			state->options.offset_pitch);
-//	mat4_rotateY(offset_matrix, offset_matrix,
-//			state->options.offset_yaw);
-//
-//	mat4_multiply(matrix, offset_matrix, matrix); // Rv=RvRvo
-
-	return lg_quat;
+	return lg_quat_after_offset;
 }
 
 static float *get_compass() {
@@ -149,6 +149,20 @@ static void release(void *user_data) {
 }
 
 static void command_handler(void *user_data, const char *_buff) {
+	char buff[256];
+	strncpy(buff, _buff, sizeof(buff));
+	char *cmd;
+	cmd = strtok(buff, " \n");
+	if (cmd == NULL) {
+		//do nothing
+	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass_calib", sizeof(buff))
+			== 0) {
+
+		for (int i = 0; i < 3; i++) {
+			lg_compass_min[i] = INT_MAX;
+			lg_compass_max[i] = -INT_MAX;
+		}
+	}
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
@@ -171,6 +185,15 @@ static void init_options(void *user_data, json_t *options) {
 			json_object_get(options, PLUGIN_NAME ".offset_yaw"));
 	lg_offset_roll = json_number_value(
 			json_object_get(options, PLUGIN_NAME ".offset_roll"));
+
+	for (int i = 0; i < 3; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		lg_compass_min[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		lg_compass_max[i] = json_number_value(json_object_get(options, buff));
+	}
+
 }
 
 static void save_options(void *user_data, json_t *options) {
@@ -180,6 +203,14 @@ static void save_options(void *user_data, json_t *options) {
 			json_real(lg_offset_yaw));
 	json_object_set_new(options, PLUGIN_NAME ".offset_roll",
 			json_real(lg_offset_roll));
+
+	for (int i = 0; i < 3; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		json_object_set_new(options, buff, json_real(lg_compass_min[i]));
+		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
+	}
 }
 
 static wchar_t *get_info(void *user_data) {

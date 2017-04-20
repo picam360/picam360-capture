@@ -1,13 +1,17 @@
 #pragma once
 
-typedef struct _QUATERNION {
-	float x;
-	float y;
-	float z;
-	float w;
-} QUATERNION;
+typedef union _QUATERNION_T {
+	struct {
+		float x;
+		float y;
+		float z;
+		float w;
+	};
+	float ary[4];
+} QUATERNION_T;
 
-QUATERNION get_quaternion_from_x(float rad);
-QUATERNION get_quaternion_from_y(float rad);
-QUATERNION get_quaternion_from_z(float rad);
-QUATERNION multiply_quaternion(QUATERNION a, QUATERNION b);
+QUATERNION_T quaternion_init();
+QUATERNION_T quaternion_get_from_x(float rad);
+QUATERNION_T quaternion_get_from_y(float rad);
+QUATERNION_T quaternion_get_from_z(float rad);
+QUATERNION_T quaternion_multiply(QUATERNION_T a, QUATERNION_T b);
