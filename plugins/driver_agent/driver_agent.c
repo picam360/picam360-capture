@@ -135,6 +135,8 @@ static float lg_camera_north_count = 0;
 static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
 
 static bool lg_pid_enabled = false;
+static float lg_yaw_diff = 0;
+static float lg_pitch_diff = 0;
 static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
@@ -311,16 +313,17 @@ void *transmit_thread_func(void* arg) {
 				mat4_transpose(vtg, vtg);
 
 				float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-				float yaw = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
-				float pitch = atan2(xz, vtg[1]) * 180 / M_PI;
+				lg_yaw_diff = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
+				lg_pitch_diff = atan2(xz, vtg[1]) * 180 / M_PI; //[-180:180]
 
 				static float last_yaw = 0;
 				lg_delta_pid_time[0] = time;
-				lg_delta_pid_target[0][0] = cos(yaw * M_PI / 180)
-						* (pitch / 180); // x [-1:1]
-				lg_delta_pid_target[1][0] = sin(yaw * M_PI / 180)
-						* (pitch / 180); // z [-1:1]
-				lg_delta_pid_target[2][0] = sub_angle(yaw, last_yaw) / 180; // delta yaw [-1:1]
+				lg_delta_pid_target[0][0] = cos(lg_yaw_diff * M_PI / 180)
+						* (lg_pitch_diff / 180); // x [-1:1]
+				lg_delta_pid_target[1][0] = sin(lg_yaw_diff * M_PI / 180)
+						* (lg_pitch_diff / 180); // z [-1:1]
+				lg_delta_pid_target[2][0] = sub_angle(lg_yaw_diff, last_yaw)
+						/ 180; // delta yaw [-1:1]
 
 				timersub(&lg_delta_pid_time[0], &lg_delta_pid_time[1], &diff);
 				diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
@@ -349,7 +352,7 @@ void *transmit_thread_func(void* arg) {
 					}
 					lg_delta_pid_time[j] = lg_delta_pid_time[j - 1];
 				}
-				last_yaw = yaw;
+				last_yaw = lg_yaw_diff;
 
 				// 0 - 1
 				// |   |
@@ -686,11 +689,13 @@ static wchar_t *get_info(void *user_data) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", from %hs", path);
 	}
 	if (lg_pid_enabled) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"\nyaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f\n",
-				yaw, pitch, lg_pid_value[0],
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
+				L"\npitch=%fyaw=%f,\t\tpid_value=%f\tdelta_value=%f\n",
+				lg_pitch_diff, lg_yaw_diff, lg_pid_value[0],
 				lg_delta_pid_target[0][0]);
 		for (int i = 0; i < MOTOR_NUM; i++) {
-			cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"m%d=%d, ", i, lg_motor_value[i]);
+			cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"m%d=%d, ", i,
+					lg_motor_value[i]);
 		}
 	}
 	return lg_info;
