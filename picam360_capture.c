@@ -26,12 +26,12 @@
 #include "video_direct.h"
 #include "picam360_tools.h"
 #include "gl_program.h"
-#include "device.h"
 #include "auto_calibration.h"
-#include "view_coordinate_mpu9250.h"
 
 //these plugin should be got out to shared object
 #include "plugins/driver_agent/driver_agent.h"
+#include "plugins/mpu9250/mpu9250.h"
+#include "plugins/oculus_rift_dk2/oculus_rift_dk2.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -437,12 +437,6 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				state->options.cam_horizon_r[i] = 0.8;
 			}
 		}
-		state->options.view_offset_pitch = json_number_value(
-				json_object_get(options, "view_offset_pitch"));
-		state->options.view_offset_yaw = json_number_value(
-				json_object_get(options, "view_offset_yaw"));
-		state->options.view_offset_roll = json_number_value(
-				json_object_get(options, "view_offset_roll"));
 
 		if (state->plugins) {
 			for (int i = 0; state->plugins[i] != NULL; i++) {
@@ -495,12 +489,6 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, buff,
 				json_real(state->options.cam_horizon_r[i]));
 	}
-	json_object_set_new(options, "view_offset_pitch",
-			json_real(state->options.view_offset_pitch));
-	json_object_set_new(options, "view_offset_yaw",
-			json_real(state->options.view_offset_yaw));
-	json_object_set_new(options, "view_offset_roll",
-			json_real(state->options.view_offset_roll));
 
 	if (state->plugins) {
 		for (int i = 0; state->plugins[i] != NULL; i++) {
@@ -569,7 +557,6 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->id = next_frame_id++;
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
-	frame->view_coordinate_mode = state->default_view_coordinate_mode;
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
@@ -596,10 +583,11 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 					sizeof(frame->output_filepath));
 			break;
 		case 'v':
-			if (strcmp(optarg, "MPU9250") == 0) {
-				frame->view_coordinate_mode = MPU9250;
-			} else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
-				frame->view_coordinate_mode = OCULUS_RIFT;
+			frame->view_mpu = state->mpus[0];
+			for (int i = 0; state->mpus[i] != NULL; i++) {
+				if (strncmp(state->mpus[i]->name, optarg, 64) == 0) {
+					frame->view_mpu = state->mpus[i];
+				}
 			}
 			break;
 		default:
@@ -607,16 +595,13 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		}
 	}
 
-	switch (frame->view_coordinate_mode) {
-	case MPU9250:
-		init_mpu9250();
-		break;
-	case OCULUS_RIFT:
-		init_device();
-		break;
-	case MANUAL:
-	default:
-		break;
+	if (frame->view_mpu == NULL) {
+		for (int i = 0; state->mpus[i] != NULL; i++) {
+			if (strncmp(state->mpus[i]->name,
+					state->default_view_coordinate_mode, 64) == 0) {
+				frame->view_mpu = state->mpus[i];
+			}
+		}
 	}
 
 	if (render_width > 2048) {
@@ -850,10 +835,8 @@ void _command_handler(const char *_buff) {
 			FRAME_T *frame = create_frame(state, argc, argv);
 			frame->next = state->frame;
 			frame->output_mode = OUTPUT_MODE_STILL;
-			frame->view_pitch = 90 * M_PI / 180.0;
-			frame->view_yaw = 0;
-			frame->view_roll = 0;
-			frame->view_coordinate_mode = MANUAL;
+			frame->view_mpu = state->mpus[0];
+			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
 			state->frame = frame;
 		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
@@ -872,10 +855,8 @@ void _command_handler(const char *_buff) {
 			FRAME_T *frame = create_frame(state, argc, argv);
 			frame->next = state->frame;
 			frame->output_mode = OUTPUT_MODE_VIDEO;
-			frame->view_pitch = 90 * M_PI / 180.0;
-			frame->view_yaw = 0;
-			frame->view_roll = 0;
-			frame->view_coordinate_mode = MANUAL;
+			frame->view_mpu = state->mpus[0];
+			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
 			state->frame = frame;
 			printf("start_record id=%d\n", frame->id);
 		}
@@ -986,10 +967,8 @@ void _command_handler(const char *_buff) {
 			for (FRAME_T *frame = state->frame; frame != NULL;
 					frame = frame->next) {
 				if (frame->id == id) {
-					frame->view_pitch = pitch * M_PI / 180.0;
-					frame->view_yaw = yaw * M_PI / 180.0;
-					frame->view_roll = roll * M_PI / 180.0;
-					frame->view_coordinate_mode = MANUAL;
+					manual_mpu_set(frame->view_mpu, pitch * M_PI / 180.0,
+							yaw * M_PI / 180.0, roll * M_PI / 180.0);
 					printf("set_view_orientation\n");
 					break;
 				}
@@ -1103,15 +1082,8 @@ void stdin_command_handler() {
 
 //plugin host methods
 static float *get_view_quatanion() {
-	switch (state->default_view_coordinate_mode) {
-	case MPU9250:
-		return get_quatanion_mpu9250();
-		break;
-	case OCULUS_RIFT:
-		return get_quatanion();
-		break;
-	case MANUAL:
-		break;
+	if (state->frame) {
+		return state->frame->get_quatanion();
 	}
 	return NULL;
 }
@@ -1119,14 +1091,8 @@ static void set_view_quatanion(float *value) {
 	//TODO
 }
 static float *get_view_compass() {
-	switch (state->default_view_coordinate_mode) {
-	case MPU9250:
-		return get_compass_mpu9250();
-		break;
-	case OCULUS_RIFT:
-		break;
-	case MANUAL:
-		break;
+	if (state->frame) {
+		return state->frame->get_compass();
 	}
 	return NULL;
 }
@@ -1134,14 +1100,8 @@ static void set_view_compass(float *value) {
 	//TODO
 }
 static float get_view_temperature() {
-	switch (state->default_view_coordinate_mode) {
-	case MPU9250:
-		return get_temperature_mpu9250();
-		break;
-	case OCULUS_RIFT:
-		break;
-	case MANUAL:
-		break;
+	if (state->frame) {
+		return state->frame->get_temperature();
 	}
 	return 0;
 }
@@ -1149,14 +1109,8 @@ static void set_view_temperature(float value) {
 	//TODO
 }
 static float get_view_north() {
-	switch (state->default_view_coordinate_mode) {
-	case MPU9250:
-		return get_north_mpu9250();
-		break;
-	case OCULUS_RIFT:
-		break;
-	case MANUAL:
-		break;
+	if (state->frame) {
+		return state->frame->get_north();
 	}
 	return 0;
 }
@@ -1241,6 +1195,26 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 		}
 	}
 }
+static void add_mpu(MPU_T *mpu) {
+	for (int i = 0; state->mpus[i] != (void*) -1; i++) {
+		if (state->mpus[i] == NULL) {
+			state->mpus[i] = mpu;
+			return;
+		}
+		if (state->mpus[i + 1] == (void*) -1) {
+			int space = (i + 2) * 2;
+			if (space > 256) {
+				printf(stderr, "error on add_mpu\n");
+				return;
+			}
+			MPU_T *current = state->mpus;
+			state->mpus = malloc(sizeof(MPU_T*) * space);
+			memcpy(state->mpus, current, sizeof(MPU_T*) * (i + 1));
+			state->mpus[space - 1] = (void*) -1;
+			free(current);
+		}
+	}
+}
 static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 		const char *path) {
 	char cmd[512];
@@ -1290,12 +1264,19 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
+		state->plugin_host.add_mpu = add_mpu;
 
 		state->plugin_host.snap = snap;
 	}
+	{
+		MPU_T *mpu = NULL;
+		create_manual_mpu(&mpu);
+		state->plugin_host->add_mpu(mpu);
+	}
 
 	const int INITIAL_SPACE = 16;
-	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent };
+	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent, create_mpu9250,
+			create_oculus_rift_dk2 };
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
 	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
 	memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -1304,6 +1285,10 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugins[i]->node_id = i + 100;
 	}
 	state->plugins[INITIAL_SPACE - 1] = (void*) -1;
+
+	state->mpus = malloc(sizeof(MPU_T*) * INITIAL_SPACE);
+	memset(state->mpus, 0, sizeof(MPU_T*) * INITIAL_SPACE);
+	state->mpus[INITIAL_SPACE - 1] = (void*) -1;
 }
 
 void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
@@ -1326,6 +1311,7 @@ int main(int argc, char *argv[]) {
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
+	strncpy(state->default_view_coordinate_mode, "manual", 64);
 
 	umask(0000);
 
@@ -1372,22 +1358,7 @@ int main(int argc, char *argv[]) {
 			strncpy(frame_param, optarg, 256);
 			break;
 		case 'v':
-			if (strcmp(optarg, "MPU9250") == 0) {
-				state->default_view_coordinate_mode = MPU9250;
-			} else if (strcmp(optarg, "OCULUS-RIFT") == 0) {
-				state->default_view_coordinate_mode = OCULUS_RIFT;
-			}
-			switch (state->default_view_coordinate_mode) {
-			case MPU9250:
-				init_mpu9250();
-				break;
-			case OCULUS_RIFT:
-				init_device();
-				break;
-			case MANUAL:
-			default:
-				break;
-			}
+			strncpy(state->default_view_coordinate_mode, optarg, 64);
 			break;
 		default:
 			/* '?' */
@@ -1418,6 +1389,18 @@ int main(int argc, char *argv[]) {
 	init_menu(state->screen_height / 32);
 	state->menu = menu_new(L"Menu", menu_callback, NULL);
 
+	// Setup the model world
+	init_model_proj(state);
+
+	// initialise the OGLES texture(s)
+	init_textures(state);
+
+	// init plugin
+	init_plugins(state);
+
+	//init options
+	init_options(state);
+
 	//frame id=0
 	if (frame_param[0]) {
 		char *param = frame_param;
@@ -1433,18 +1416,6 @@ int main(int argc, char *argv[]) {
 		argv[argc] = 0;
 		state->frame = create_frame(state, argc, argv);
 	}
-
-	// Setup the model world
-	init_model_proj(state);
-
-	// initialise the OGLES texture(s)
-	init_textures(state);
-
-	// init plugin
-	init_plugins(state);
-
-	//init options
-	init_options(state);
 
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
@@ -1535,7 +1506,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	float camera_offset_matrix[16];
 	float camera_matrix[16];
 	float camera_matrix_1[16];
-	float view_offset_matrix[16];
 	float view_matrix[16];
 	float north_matrix[16];
 	float world_matrix[16];
@@ -1544,7 +1514,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	mat4_identity(camera_offset_matrix);
 	mat4_identity(camera_matrix);
 	mat4_identity(camera_matrix_1);
-	mat4_identity(view_offset_matrix);
 	mat4_identity(view_matrix);
 	mat4_identity(north_matrix);
 	mat4_identity(world_matrix);
@@ -1560,9 +1529,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
 		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
 
-		mat4_rotateZ(camera_matrix, camera_matrix_1, state->camera_roll);
-		mat4_rotateX(camera_matrix, camera_matrix_1, state->camera_pitch);
-		mat4_rotateY(camera_matrix, camera_matrix_1, state->camera_yaw);
+		mat4_rotateZ(camera_matrix_1, camera_matrix_1, state->camera_roll);
+		mat4_rotateX(camera_matrix_1, camera_matrix_1, state->camera_pitch);
+		mat4_rotateY(camera_matrix_1, camera_matrix_1, state->camera_yaw);
 	}
 
 //	// Rco : camera offset
@@ -1576,40 +1545,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 //
 //	mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
 
-	// Rvo : view offset
-	//euler Y(yaw)X(pitch)Z(roll)
-	mat4_rotateZ(view_offset_matrix, view_offset_matrix,
-			state->options.view_offset_roll);
-	mat4_rotateX(view_offset_matrix, view_offset_matrix,
-			state->options.view_offset_pitch);
-	mat4_rotateY(view_offset_matrix, view_offset_matrix,
-			state->options.view_offset_yaw);
-
 	// Rv : view
-	switch (frame->view_coordinate_mode) {
-	case MPU9250:
-		mat4_fromQuat(view_matrix, get_quatanion_mpu9250());
+	if (frame->view_mpu) {
+		mat4_fromQuat(view_matrix, frame->view_mpu->get_quatanion());
 		mat4_invert(view_matrix, view_matrix);
-		break;
-	case OCULUS_RIFT:
-		mat4_fromQuat(view_matrix, get_quatanion());
-		mat4_invert(view_matrix, view_matrix);
-		{
-			float tmp[16];
-			mat4_identity(tmp);
-			mat4_rotateX(tmp, tmp, M_PI);
-			mat4_multiply(view_matrix, tmp, view_matrix);
-		}
-		break;
-	case MANUAL:
-		//euler Y(yaw)X(pitch)Z(roll)
-		mat4_rotateZ(view_matrix, view_matrix, frame->view_roll);
-		mat4_rotateX(view_matrix, view_matrix, frame->view_pitch);
-		mat4_rotateY(view_matrix, view_matrix, frame->view_yaw);
-		mat4_invert(view_matrix, view_matrix);
-		break;
 	}
-	mat4_multiply(view_matrix, view_offset_matrix, view_matrix); // Rv=RvRvo
 
 	// Rn
 	{

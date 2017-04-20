@@ -14,6 +14,16 @@ enum RENDERING_MODE {
 
 #define PICAM360_HOST_NODE_ID 0
 
+typedef struct _MPU_T {
+	char name[64];
+	void (*release)(void *user_data);
+	float *(*get_quatanion)(void *user_data);
+	float *(*get_compass)(void *user_data);
+	float (*get_temperature)(void *user_data);
+	float (*get_north)(void *user_data);
+	void *user_data;
+} MPU_T;
+
 typedef struct _PLUGIN_HOST_T {
 	float *(*get_view_quatanion)();
 	void (*set_view_quatanion)(float *value);
@@ -48,6 +58,7 @@ typedef struct _PLUGIN_HOST_T {
 
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
+	void (*add_mpu)(MPU_T *mpu);
 
 	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode, const char *path);
 } PLUGIN_HOST_T;

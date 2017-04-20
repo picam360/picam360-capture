@@ -50,9 +50,6 @@ enum OPERATION_MODE {
 enum CODEC_TYPE {
 	H264, MJPEG
 };
-enum VIEW_COODINATE_MODE {
-	MANUAL, MPU9250, OCULUS_RIFT
-};
 
 struct _PICAM360CAPTURE_T;
 
@@ -90,11 +87,7 @@ typedef struct _FRAME_T {
 
 	float fov;
 	//for unif matrix
-	//euler angles
-	float view_pitch;
-	float view_yaw;
-	float view_roll;
-	enum VIEW_COODINATE_MODE view_coordinate_mode;
+	MPU_t *view_mpu;
 
 	void *custom_data;
 	//event
@@ -165,7 +158,7 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_temperature;
 	float camera_north;
 	bool camera_coordinate_from_device;
-	enum VIEW_COODINATE_MODE default_view_coordinate_mode;
+	char view_coordinate_mode[64];
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
@@ -175,5 +168,6 @@ typedef struct _PICAM360CAPTURE_T {
 	bool menu_visible;
 
 	PLUGIN_T **plugins;
+	MPU_T **mpus;
 	struct _OPTIONS_T options;
 } PICAM360CAPTURE_T;

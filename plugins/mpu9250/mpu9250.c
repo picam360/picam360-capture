@@ -15,6 +15,11 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define PLUGIN_NAME "mpu9250"
+#define MPU_NAME "mpu9250"
+
+static PLUGIN_HOST_T *lg_plugin_host = NULL;
+
 static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
@@ -24,7 +29,7 @@ static float lg_quat[4] = { };
 static float lg_north = 0;
 static int lg_north_count = 0;
 
-void *threadFunc(void *data) {
+static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
 	do {
@@ -89,7 +94,7 @@ void *threadFunc(void *data) {
 
 static bool is_init = false;
 
-void init_mpu9250() {
+static void init() {
 	if (is_init) {
 		return;
 	} else {
@@ -107,18 +112,100 @@ void init_mpu9250() {
 	pthread_create(&f1_thread, NULL, threadFunc, NULL);
 }
 
-float *get_quatanion_mpu9250() {
+static float *get_quatanion() {
+//	float view_offset_matrix[16];
+//	mat4_identity(view_offset_matrix);
+//	// Rvo : view offset
+//	//euler Y(yaw)X(pitch)Z(roll)
+//	mat4_rotateZ(view_offset_matrix, view_offset_matrix,
+//			state->options.view_offset_roll);
+//	mat4_rotateX(view_offset_matrix, view_offset_matrix,
+//			state->options.view_offset_pitch);
+//	mat4_rotateY(view_offset_matrix, view_offset_matrix,
+//			state->options.view_offset_yaw);
+//
+//	mat4_multiply(view_matrix, view_offset_matrix, view_matrix); // Rv=RvRvo
+
 	return lg_quat;
 }
 
-float *get_compass_mpu9250() {
+static float *get_compass() {
 	return lg_compass;
 }
 
-float get_temperature_mpu9250() {
+static float get_temperature() {
 	return temp;
 }
 
-float get_north_mpu9250() {
+static float get_north() {
 	return lg_north;
+}
+
+static void release(void *user_data) {
+	free(user_data);
+}
+
+static void command_handler(void *user_data, const char *_buff) {
+}
+
+static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
+	switch (node_id) {
+	case PICAM360_HOST_NODE_ID:
+		break;
+	default:
+		break;
+	}
+}
+
+static float lg_view_offset_pitch = 0;
+static float lg_view_offset_yaw = 0;
+static float lg_view_offset_roll = 0;
+
+static void init_options(void *user_data, json_t *options) {
+	lg_view_offset_pitch = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".view_offset_pitch"));
+	lg_view_offset_yaw = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".view_offset_yaw"));
+	lg_view_offset_roll = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".view_offset_roll"));
+}
+
+static void save_options(void *user_data, json_t *options) {
+	json_object_set_new(options, PLUGIN_NAME ".view_offset_pitch",
+			json_real(lg_view_offset_pitch));
+	json_object_set_new(options, PLUGIN_NAME ".view_offset_yaw",
+			json_real(lg_view_offset_yaw));
+	json_object_set_new(options, PLUGIN_NAME ".view_offset_roll",
+			json_real(lg_view_offset_roll));
+}
+
+void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+	init();
+	lg_plugin_host = plugin_host;
+
+	{
+		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
+		strcpy(plugin->name, PLUGIN_NAME);
+		plugin->release = release;
+		plugin->command_handler = command_handler;
+		plugin->event_handler = event_handler;
+		plugin->init_options = init_options;
+		plugin->save_options = save_options;
+		plugin->get_info = get_info;
+		plugin->user_data = plugin;
+
+		*_plugin = plugin;
+	}
+	{
+		MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
+		strcpy(mpu->name, MPU_NAME);
+		mpu->release = release;
+		mpu->get_quatanion = get_quatanion;
+		mpu->get_compass = get_compass;
+		mpu->get_temperature = get_temperature;
+		mpu->get_north = get_north;
+		mpu->user_data = mpu;
+
+		lg_plugin_host->add_mpu(mpu);
+	}
 }
