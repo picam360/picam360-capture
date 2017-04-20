@@ -28,6 +28,7 @@ static void *threadFunc(void *data) {
 
 		// Send a keepalive - this is too often.  Need to only send on keepalive interval
 		sendSensorKeepAlive(localDev);
+		usleep(10000);//less than 100hz
 	}
 	return 0;
 }

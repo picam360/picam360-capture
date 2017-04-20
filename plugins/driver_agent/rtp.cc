@@ -198,6 +198,9 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 		int status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
 #else
+		if (lg_tx_fd < 0) {
+			lg_tx_fd = open("rtp_tx", O_WRONLY);
+		}
 		if (lg_tx_fd >= 0) {
 			unsigned char header[8];
 			header[0] = 0xFF;
@@ -622,7 +625,6 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	status = lg_sess.AddDestination(addr);
 	checkerror(status);
 #else
-	lg_tx_fd = open("rtp_tx", O_WRONLY);
 	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func,
 			(void*) NULL);
 	mrevent_init(&lg_buffering_ready);
