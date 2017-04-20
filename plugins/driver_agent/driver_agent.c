@@ -382,15 +382,7 @@ void *transmit_thread_func(void* arg) {
 					}
 					lg_motor_value[i] = value;
 				}
-				if (1) {
-					printf("yaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f",
-							yaw, pitch, lg_pid_value[0],
-							lg_delta_pid_target[0][0]);
-					for (int i = 0; i < MOTOR_NUM; i++) {
-						printf(", m%d=%d", i, lg_motor_value[i]);
-					}
-					printf("\n");
-				} // end of pid control
+				// end of pid control
 			} else {
 				for (int i = 0; i < MOTOR_NUM; i++) {
 					float value = lg_thrust;
@@ -692,6 +684,14 @@ static wchar_t *get_info(void *user_data) {
 		char *path;
 		rtp_is_loading(&path);
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", from %hs", path);
+	}
+	if (lg_pid_enabled) {
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"\nyaw=%f,\tpitch=%f\tpid_value=%f\tdelta_value=%f\n",
+				yaw, pitch, lg_pid_value[0],
+				lg_delta_pid_target[0][0]);
+		for (int i = 0; i < MOTOR_NUM; i++) {
+			cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"m%d=%d, ", i, lg_motor_value[i]);
+		}
 	}
 	return lg_info;
 }
