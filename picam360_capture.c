@@ -1730,7 +1730,10 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		if (state->plugins[i]->get_info) {
 			wchar_t *info = state->plugins[i]->get_info(
 					state->plugins[i]->user_data);
-			len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls", info);
+			if (info) {
+				len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls",
+						info);
+			}
 		}
 	}
 	menu_redraw(state->menu, disp, state->screen_width, state->screen_height,

@@ -154,6 +154,17 @@ static int lg_frameskip[NUM_OF_CAM] = { };
 
 static void parse_xml(char *xml) {
 	char *q_str = NULL;
+	q_str = strstr(xml, "<quaternion");
+	if (q_str) {
+		float quatanion[4];
+		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+		//convert from mpu coodinate to opengl coodinate
+		lg_camera_quatanion[0] = quatanion[1]; //x
+		lg_camera_quatanion[1] = quatanion[3]; //y : swap y and z
+		lg_camera_quatanion[2] = -quatanion[2]; //z : swap y and z
+		lg_camera_quatanion[3] = quatanion[0]; //w
+	}
 	q_str = strstr(xml, "<compass");
 	if (q_str) {
 		float compass[3];
