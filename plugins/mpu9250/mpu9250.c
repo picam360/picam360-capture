@@ -12,6 +12,8 @@
 #include <mat4/fromQuat.h>
 #include <mat4/invert.h>
 
+#include "mpu9250.h"
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -90,6 +92,7 @@ static void *threadFunc(void *data) {
 
 		usleep(5000);
 	} while (1);
+	return NULL;
 }
 
 static bool is_init = false;
@@ -177,6 +180,10 @@ static void save_options(void *user_data, json_t *options) {
 			json_real(lg_offset_yaw));
 	json_object_set_new(options, PLUGIN_NAME ".offset_roll",
 			json_real(lg_offset_roll));
+}
+
+static wchar_t *get_info(void *user_data) {
+	return NULL;
 }
 
 void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {

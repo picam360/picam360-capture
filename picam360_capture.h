@@ -87,7 +87,7 @@ typedef struct _FRAME_T {
 
 	float fov;
 	//for unif matrix
-	MPU_t *view_mpu;
+	MPU_T *view_mpu;
 
 	void *custom_data;
 	//event
@@ -158,7 +158,7 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_temperature;
 	float camera_north;
 	bool camera_coordinate_from_device;
-	char view_coordinate_mode[64];
+	char default_view_coordinate_mode[64];
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];

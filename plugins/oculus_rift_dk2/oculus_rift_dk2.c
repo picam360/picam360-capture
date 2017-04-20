@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <libovr_nsb/OVR.h>
 
+#include "oculus_rift_dk2.h"
+
 #define PLUGIN_NAME "oculus_rift_dk2"
 #define MPU_NAME "oculus_rift_dk2"
 
@@ -105,6 +107,10 @@ static void init_options(void *user_data, json_t *options) {
 }
 
 static void save_options(void *user_data, json_t *options) {
+}
+
+static wchar_t *get_info(void *user_data) {
+	return NULL;
 }
 
 void create_oculus_rift_dk2(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {

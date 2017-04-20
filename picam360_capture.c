@@ -27,6 +27,7 @@
 #include "picam360_tools.h"
 #include "gl_program.h"
 #include "auto_calibration.h"
+#include "manual_mpu.h"
 
 //these plugin should be got out to shared object
 #include "plugins/driver_agent/driver_agent.h"
@@ -1082,8 +1083,8 @@ void stdin_command_handler() {
 
 //plugin host methods
 static float *get_view_quatanion() {
-	if (state->frame) {
-		return state->frame->get_quatanion();
+	if (state->frame && state->frame->view_mpu) {
+		return state->frame->view_mpu->get_quatanion(state->frame->view_mpu);
 	}
 	return NULL;
 }
@@ -1091,8 +1092,8 @@ static void set_view_quatanion(float *value) {
 	//TODO
 }
 static float *get_view_compass() {
-	if (state->frame) {
-		return state->frame->get_compass();
+	if (state->frame && state->frame->view_mpu) {
+		return state->frame->view_mpu->get_compass(state->frame->view_mpu);
 	}
 	return NULL;
 }
@@ -1100,8 +1101,8 @@ static void set_view_compass(float *value) {
 	//TODO
 }
 static float get_view_temperature() {
-	if (state->frame) {
-		return state->frame->get_temperature();
+	if (state->frame && state->frame->view_mpu) {
+		return state->frame->view_mpu->get_temperature(state->frame->view_mpu);
 	}
 	return 0;
 }
@@ -1109,8 +1110,8 @@ static void set_view_temperature(float value) {
 	//TODO
 }
 static float get_view_north() {
-	if (state->frame) {
-		return state->frame->get_north();
+	if (state->frame && state->frame->view_mpu) {
+		return state->frame->view_mpu->get_north(state->frame->view_mpu);
 	}
 	return 0;
 }
@@ -1204,10 +1205,10 @@ static void add_mpu(MPU_T *mpu) {
 		if (state->mpus[i + 1] == (void*) -1) {
 			int space = (i + 2) * 2;
 			if (space > 256) {
-				printf(stderr, "error on add_mpu\n");
+				fprintf(stderr, "error on add_mpu\n");
 				return;
 			}
-			MPU_T *current = state->mpus;
+			MPU_T **current = state->mpus;
 			state->mpus = malloc(sizeof(MPU_T*) * space);
 			memcpy(state->mpus, current, sizeof(MPU_T*) * (i + 1));
 			state->mpus[space - 1] = (void*) -1;
@@ -1222,6 +1223,8 @@ static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 	switch (mode) {
 	case RENDERING_MODE_EQUIRECTANGULAR:
 		mode_str = "-E";
+		break;
+	default:
 		break;
 	}
 
@@ -1271,7 +1274,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	{
 		MPU_T *mpu = NULL;
 		create_manual_mpu(&mpu);
-		state->plugin_host->add_mpu(mpu);
+		state->plugin_host.add_mpu(mpu);
 	}
 
 	const int INITIAL_SPACE = 16;
@@ -1547,7 +1550,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	// Rv : view
 	if (frame->view_mpu) {
-		mat4_fromQuat(view_matrix, frame->view_mpu->get_quatanion());
+		mat4_fromQuat(view_matrix, frame->view_mpu->get_quatanion(frame->view_mpu));
 		mat4_invert(view_matrix, view_matrix);
 	}
 

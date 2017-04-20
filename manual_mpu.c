@@ -1,14 +1,18 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <limits.h>
-#include <math.h>
-#include <string.h>
 
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
 #include <mat4/fromQuat.h>
 #include <mat4/invert.h>
+
+#include "manual_mpu.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -18,7 +22,7 @@
 static float lg_compass[4] = { };
 static float lg_quat[4] = { };
 static float lg_north = 0;
-static int lg_north_count = 0;
+static float lg_temp = 0;
 
 static float *get_quatanion() {
 	return lg_quat;
@@ -29,7 +33,7 @@ static float *get_compass() {
 }
 
 static float get_temperature() {
-	return temp;
+	return lg_temp;
 }
 
 static float get_north() {
