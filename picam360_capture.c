@@ -1197,6 +1197,13 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 	}
 }
 static void add_mpu(MPU_T *mpu) {
+	if (state->mpus == NULL) {
+		const int INITIAL_SPACE = 16;
+		state->mpus = malloc(sizeof(MPU_T*) * INITIAL_SPACE);
+		memset(state->mpus, 0, sizeof(MPU_T*) * INITIAL_SPACE);
+		state->mpus[INITIAL_SPACE - 1] = (void*) -1;
+	}
+
 	for (int i = 0; state->mpus[i] != (void*) -1; i++) {
 		if (state->mpus[i] == NULL) {
 			state->mpus[i] = mpu;
@@ -1271,6 +1278,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.snap = snap;
 	}
+
 	{
 		MPU_T *mpu = NULL;
 		create_manual_mpu(&mpu);
@@ -1288,10 +1296,6 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugins[i]->node_id = i + 100;
 	}
 	state->plugins[INITIAL_SPACE - 1] = (void*) -1;
-
-	state->mpus = malloc(sizeof(MPU_T*) * INITIAL_SPACE);
-	memset(state->mpus, 0, sizeof(MPU_T*) * INITIAL_SPACE);
-	state->mpus[INITIAL_SPACE - 1] = (void*) -1;
 }
 
 void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
@@ -1550,7 +1554,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	// Rv : view
 	if (frame->view_mpu) {
-		mat4_fromQuat(view_matrix, frame->view_mpu->get_quatanion(frame->view_mpu));
+		mat4_fromQuat(view_matrix,
+				frame->view_mpu->get_quatanion(frame->view_mpu));
 		mat4_invert(view_matrix, view_matrix);
 	}
 
