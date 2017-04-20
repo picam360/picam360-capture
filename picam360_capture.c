@@ -1287,9 +1287,9 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 	const int INITIAL_SPACE = 16;
 	CREATE_PLUGIN create_plugin_funcs[] = { //
-			create_oculus_rift_dk2, //this should be first, pthread_create is related
-					create_driver_agent, //
+			create_driver_agent, //
 					create_mpu9250, //
+					create_oculus_rift_dk2, //
 			};
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
 	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -1306,6 +1306,9 @@ void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 }
 
 int main(int argc, char *argv[]) {
+
+	create_oculus_rift_dk2(NULL, NULL); //this should be first, pthread_create is related
+
 	bool input_file_mode = false;
 	int opt;
 	char frame_param[256] = { };

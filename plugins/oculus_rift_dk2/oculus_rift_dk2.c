@@ -117,7 +117,7 @@ void create_oculus_rift_dk2(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
 
-	{
+	if (_plugin) {
 		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
 		strcpy(plugin->name, PLUGIN_NAME);
 		plugin->release = release;
@@ -130,7 +130,7 @@ void create_oculus_rift_dk2(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 
 		*_plugin = plugin;
 	}
-	{
+	if (plugin_host) {
 		MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
 		strcpy(mpu->name, MPU_NAME);
 		mpu->release = release;
