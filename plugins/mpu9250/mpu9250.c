@@ -116,9 +116,6 @@ static void init() {
 }
 
 static float *get_quatanion() {
-	if (!is_init) {
-		init();
-	}
 //	float offset_matrix[16];
 //	mat4_identity(offset_matrix);
 //	// Rvo : view offset
@@ -190,6 +187,7 @@ static wchar_t *get_info(void *user_data) {
 }
 
 void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+	init();
 	lg_plugin_host = plugin_host;
 
 	{

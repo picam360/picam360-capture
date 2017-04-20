@@ -65,9 +65,6 @@ static void init() {
 }
 
 static float *get_quatanion() {
-	if (!is_init) {
-		init();
-	}
 	//update
 	if (dev != NULL) {
 		quat[0] = -dev->Q[0];
@@ -117,6 +114,7 @@ static wchar_t *get_info(void *user_data) {
 }
 
 void create_oculus_rift_dk2(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+	init();
 	lg_plugin_host = plugin_host;
 
 	{
