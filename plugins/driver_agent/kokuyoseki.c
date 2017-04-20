@@ -33,7 +33,7 @@ static int read_hex(const char * const filename) {
 }
 
 static bool lg_stop_thread = false;
-void *poling_thread_func(void* arg) {
+static void *poling_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "KOKUYOSEKI");
 
 	struct dirent *d;
@@ -65,6 +65,9 @@ void *poling_thread_func(void* arg) {
 			break;
 		}
 	}
+
+	closedir(dir);
+
 	if (kokuyoseki_event == NULL) {
 		return NULL;
 	}
@@ -94,7 +97,7 @@ void *poling_thread_func(void* arg) {
 /////////////////////////////////////////////////////////////////////////////////////////////
 void open_kokuyoseki() {
 	lg_stop_thread = false;
-	static pthread_t poling_thread;
+	pthread_t poling_thread;
 	pthread_create(&poling_thread, NULL, poling_thread_func, (void*) NULL);
 	return;
 }

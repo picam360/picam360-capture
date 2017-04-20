@@ -1286,8 +1286,11 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	}
 
 	const int INITIAL_SPACE = 16;
-	CREATE_PLUGIN create_plugin_funcs[] = { create_driver_agent, create_mpu9250,
-			create_oculus_rift_dk2 };
+	CREATE_PLUGIN create_plugin_funcs[] = { //
+			create_oculus_rift_dk2, //this should be first, pthread_create is related
+					create_driver_agent, //
+					create_mpu9250, //
+			};
 	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
 	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
 	memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
