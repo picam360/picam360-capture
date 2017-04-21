@@ -759,7 +759,7 @@ static wchar_t *get_info(void *user_data) {
 	}
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-				L"\ncompass calib : min[%d,%d,%d] max[%d,%d,%d]",
+				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
 				lg_compass_min[0], lg_compass_min[1], lg_compass_min[2],
 				lg_compass_max[0], lg_compass_max[1], lg_compass_max[2]);
 	}
