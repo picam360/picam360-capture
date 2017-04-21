@@ -1591,14 +1591,14 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	//RcRv(Rc^-1)RcRw
 	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
 	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
-	mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
+	//mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
 	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRnRvRw
 
 	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
 
 	mat4_multiply(unif_matrix_1, unif_matrix_1, world_matrix); // Rw
 	mat4_multiply(unif_matrix_1, unif_matrix_1, view_matrix); // RvRw
-	mat4_multiply(unif_matrix_1, unif_matrix_1, north_matrix); // RnRvRw
+	//mat4_multiply(unif_matrix_1, unif_matrix_1, north_matrix); // RnRvRw
 	mat4_multiply(unif_matrix_1, unif_matrix_1, camera_matrix_1); // RcRnRvRw
 
 	mat4_transpose(unif_matrix_1, unif_matrix_1); // this mat4 library is row primary, opengl is column primary

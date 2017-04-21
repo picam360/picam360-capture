@@ -107,6 +107,14 @@ static void *threadFunc(void *data) {
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_y(lg_offset_yaw));
 			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
+			lg_quat_after_offset = quaternion_multiply(
+					quaternion_get_from_z(north * M_PI / 180),
+					lg_quat_after_offset); // Rv=RvoRvRn
+
+			float x, y, z;
+			quaternion_get_euler(lg_quat_after_offset, &x, &y, &z,
+					EULER_SEQUENCE_YXZ);
+			printf("north %f\n", y * 180 / M_PI)
 		}
 
 		usleep(5000);
@@ -222,8 +230,7 @@ static void save_options(void *user_data, json_t *options) {
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
-	cur += swprintf(lg_info, MAX_INFO_LEN,
-			L"");
+	cur += swprintf(lg_info, MAX_INFO_LEN, L"");
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
 				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
