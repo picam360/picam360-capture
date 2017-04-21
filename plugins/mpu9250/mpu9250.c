@@ -5,7 +5,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "MotionSensor/MotionSensor.h"
+#include "MotionSensor.h"
 
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
