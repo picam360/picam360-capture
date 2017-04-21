@@ -103,7 +103,7 @@ static void *threadFunc(void *data) {
 					quaternion_get_from_x(lg_offset_pitch));
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_y(lg_offset_yaw));
-			lg_quat_after_offset = quaternion_multiply(quat_offset, lg_quat); // Rv=RvRvo
+			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
 		}
 
 		usleep(5000);
@@ -158,7 +158,7 @@ static void command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass_calib", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass", sizeof(buff))
 			== 0) {
 
 		for (int i = 0; i < 3; i++) {

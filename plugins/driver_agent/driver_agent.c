@@ -456,7 +456,7 @@ static void command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass_calib", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass", sizeof(buff))
 			== 0) {
 
 		for (int i = 0; i < 3; i++) {
@@ -993,12 +993,73 @@ static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
-		lg_pid_enabled = (bool) menu->user_data;
-		menu->parent->submenu[0]->marked = lg_pid_enabled;
-		menu->parent->submenu[1]->marked = !lg_pid_enabled;
+		lg_pid_enabled = !(bool) menu->user_data;
+		if (lg_pid_enabled) {
+			strcpy(menu->name, "On");
+		} else {
+			strcpy(menu->name, "Off");
+		}
 		menu->selected = false;
 		break;
 	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
+static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		switch ((int) menu->user_data) {
+		case 0://save
+			menu->selected = false;
+			{
+				char cmd[256];
+				snprintf(cmd, 256, "save");
+				lg_plugin_host->send_command(cmd);
+			}
+			break;
+		case 1://image circle
+			{
+				char cmd[256];
+				snprintf(cmd, 256, "start_ac");
+				lg_plugin_host->send_command(cmd);
+			}
+			break;
+		case 2://reset viewer compass
+			menu->selected = false;
+			{
+				char cmd[256];
+				snprintf(cmd, 256, "mpu9250.reset_compass");
+				lg_plugin_host->send_command(cmd);
+				snprintf(cmd, 256, "oculus_rift_dk2.reset_compass");
+				lg_plugin_host->send_command(cmd);
+			}
+			break;
+		case 3://reset vehicle compass
+			menu->selected = false;
+			{
+				char cmd[256];
+				snprintf(cmd, 256, "driver_agent.reset_compass");
+				lg_plugin_host->send_command(cmd);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		switch ((int) menu->user_data) {
+		case 1://image circle
+			{
+				char cmd[256];
+				snprintf(cmd, 256, "stop_ac");
+				lg_plugin_host->send_command(cmd);
+			}
+			break;
+		default:
+			break;
+		}
 		break;
 	default:
 		break;
@@ -1056,8 +1117,6 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		}
 		{
 			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
-			MENU_T *pid_on_menu = menu_new(L"On", pid_menu_callback,
-					(void*) true);
 			MENU_T *pid_off_menu = menu_new(L"Off", pid_menu_callback,
 					(void*) false);
 			pid_off_menu->marked = true;
@@ -1077,6 +1136,27 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
 			menu_add_submenu(packet_menu, packet_convert_menu, INT_MAX);
 			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
+		}
+		{
+			MENU_T *calibration_menu = menu_new(L"Clibration", NULL, NULL);
+			MENU_T *calibration_save_menu = menu_new(L"Save",
+					calibration_menu_callback, (void*) 0);
+			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",
+					calibration_menu_callback, (void*) 1);
+			MENU_T *calibration_reset_viewer_compass_menu = menu_new(
+					L"ResetViewerCompass", calibration_menu_callback,
+					(void*) 3);
+			MENU_T *calibration_reset_vehicle_compass_menu = menu_new(
+					L"ResetVehicleCompass", calibration_menu_callback,
+					(void*) 4);
+			menu_add_submenu(calibration_menu, calibration_image_circle_menu,
+					INT_MAX);
+			menu_add_submenu(calibration_menu,
+					calibration_reset_viewer_compass_menu, INT_MAX);
+			menu_add_submenu(calibration_menu,
+					calibration_reset_vehicle_compass_menu, INT_MAX);
+			menu_add_submenu(calibration_menu, calibration_save_menu, INT_MAX);	//save is last
+			menu_add_submenu(menu, calibration_menu, INT_MAX);	//add main menu
 		}
 		{
 			MENU_T *system_menu = menu_new(L"System", NULL, NULL);

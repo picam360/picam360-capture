@@ -14,4 +14,4 @@ VECTOR4D_T quaternion_init();
 VECTOR4D_T quaternion_get_from_x(float rad);
 VECTOR4D_T quaternion_get_from_y(float rad);
 VECTOR4D_T quaternion_get_from_z(float rad);
-VECTOR4D_T quaternion_multiply(VECTOR4D_T a, VECTOR4D_T b);
+VECTOR4D_T quaternion_multiply(VECTOR4D_T a, VECTOR4D_T b); // Q = QbQa
