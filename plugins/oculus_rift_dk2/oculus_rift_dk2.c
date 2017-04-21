@@ -11,7 +11,7 @@
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 static Device *dev = NULL;
-static float quat[4];
+static VECTOR4D_T quat;
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Continuous sample/update thread code
@@ -42,10 +42,10 @@ static void init() {
 	}
 	//reset quat x=90 y=0 z=0
 	{
-		quat[0] = 0.70711;
-		quat[1] = 0;
-		quat[2] = 0;
-		quat[3] = 0.70711;
+		quat.ary[0] = 0.70711;
+		quat.ary[1] = 0;
+		quat.ary[2] = 0;
+		quat.ary[3] = 0.70711;
 	}
 
 	dev = openRift(0, 0);
@@ -64,19 +64,20 @@ static void init() {
 	pthread_create(&f1_thread, NULL, threadFunc, dev);
 }
 
-static float *get_quatanion() {
+static VECTOR4D_T get_quatanion() {
 	//update
 	if (dev != NULL) {
-		quat[0] = -dev->Q[0];
-		quat[1] = dev->Q[1];
-		quat[2] = -dev->Q[2];
-		quat[3] = dev->Q[3];
+		quat.ary[0] = -dev->Q[0];
+		quat.ary[1] = dev->Q[1];
+		quat.ary[2] = -dev->Q[2];
+		quat.ary[3] = dev->Q[3];
 	}
 	return quat;
 }
 
-static float *get_compass() {
-	return NULL;
+static VECTOR4D_T get_compass() {
+	VECTOR4D_T ret = {};
+	return ret;
 }
 
 static float get_temperature() {

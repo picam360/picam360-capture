@@ -105,6 +105,7 @@ typedef struct {
 } MODEL_T;
 typedef struct _PICAM360CAPTURE_T {
 	PLUGIN_HOST_T plugin_host;
+	pthread_mutex_t mutex;
 	int split;
 	bool preview;
 	bool stereo;
@@ -121,8 +122,8 @@ typedef struct _PICAM360CAPTURE_T {
 	int active_cam;
 	int num_of_cam;
 	pthread_t thread[MAX_CAM_NUM];
-	void* egl_image[MAX_CAM_NUM][2];//double buffer
-	GLuint cam_texture[MAX_CAM_NUM][2];//double buffer
+	void* egl_image[MAX_CAM_NUM][2]; //double buffer
+	GLuint cam_texture[MAX_CAM_NUM][2]; //double buffer
 	int cam_texture_cur[MAX_CAM_NUM];
 	GLuint logo_texture;
 	GLuint calibration_texture;
@@ -153,8 +154,8 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_pitch; // x axis
 	float camera_yaw; // y axis
 	float camera_roll; // z axis
-	float camera_quatanion[MAX_CAM_NUM][4];
-	float camera_compass[4];
+	VECTOR4D_T camera_quatanion[MAX_CAM_NUM + 1];
+	VECTOR4D_T camera_compass;
 	float camera_temperature;
 	float camera_north;
 	bool camera_coordinate_from_device;

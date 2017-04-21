@@ -17,27 +17,23 @@ enum RENDERING_MODE {
 typedef struct _MPU_T {
 	char name[64];
 	void (*release)(void *user_data);
-	float *(*get_quatanion)(void *user_data);
-	float *(*get_compass)(void *user_data);
+	VECTOR4D_T (*get_quatanion)(void *user_data);
+	VECTOR4D_T (*get_compass)(void *user_data);
 	float (*get_temperature)(void *user_data);
 	float (*get_north)(void *user_data);
 	void *user_data;
 } MPU_T;
 
 typedef struct _PLUGIN_HOST_T {
-	float *(*get_view_quatanion)();
-	void (*set_view_quatanion)(float *value);
-	float *(*get_view_compass)();
-	void (*set_view_compass)(float *value);
+	VECTOR4D_T (*get_view_quatanion)();
+	VECTOR4D_T (*get_view_compass)();
 	float (*get_view_temperature)();
-	void (*set_view_temperature)(float value);
 	float (*get_view_north)();
-	void (*set_view_north)(float value);
 
-	float *(*get_camera_quatanion)(int cam_num);
-	void (*set_camera_quatanion)(int cam_num, float *value);
-	float *(*get_camera_compass)();
-	void (*set_camera_compass)(float *value);
+	VECTOR4D_T (*get_camera_quatanion)(int cam_num);
+	void (*set_camera_quatanion)(int cam_num, VECTOR4D_T value);
+	VECTOR4D_T (*get_camera_compass)();
+	void (*set_camera_compass)(VECTOR4D_T value);
 	float (*get_camera_temperature)();
 	void (*set_camera_temperature)(float value);
 	float (*get_camera_north)();

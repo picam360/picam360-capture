@@ -1,6 +1,6 @@
 #pragma once
 
-typedef union _QUATERNION_T {
+typedef union _VECTOR4D_T {
 	struct {
 		float x;
 		float y;
@@ -8,10 +8,10 @@ typedef union _QUATERNION_T {
 		float w;
 	};
 	float ary[4];
-} QUATERNION_T;
+} VECTOR4D_T;
 
-QUATERNION_T quaternion_init();
-QUATERNION_T quaternion_get_from_x(float rad);
-QUATERNION_T quaternion_get_from_y(float rad);
-QUATERNION_T quaternion_get_from_z(float rad);
-QUATERNION_T quaternion_multiply(QUATERNION_T a, QUATERNION_T b);
+VECTOR4D_T quaternion_init();
+VECTOR4D_T quaternion_get_from_x(float rad);
+VECTOR4D_T quaternion_get_from_y(float rad);
+VECTOR4D_T quaternion_get_from_z(float rad);
+VECTOR4D_T quaternion_multiply(VECTOR4D_T a, VECTOR4D_T b);

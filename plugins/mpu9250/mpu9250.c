@@ -26,9 +26,9 @@ static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
-static float lg_compass[4] = { };
-static float lg_quat[4] = { };
-static float lg_quat_after_offset[4] = { };
+static VECTOR4D_T lg_compass = { };
+static VECTOR4D_T lg_quat = { };
+static VECTOR4D_T lg_quat_after_offse = { };
 static float lg_north = 0;
 static int lg_north_count = 0;
 
@@ -57,33 +57,22 @@ static void *threadFunc(void *data) {
 				calib[i] /= norm;
 			}
 			//convert from mpu coodinate to opengl coodinate
-			lg_compass[0] = calib[1];
-			lg_compass[1] = -calib[0];
-			lg_compass[2] = -calib[2];
-			lg_compass[3] = 1.0;
+			lg_compass.ary[0] = calib[1];
+			lg_compass.ary[1] = -calib[0];
+			lg_compass.ary[2] = -calib[2];
+			lg_compass.ary[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
-			lg_quat[0] = quatanion[1];	//x
-			lg_quat[1] = quatanion[3];	//y : swap y and z
-			lg_quat[2] = -quatanion[2];	//z : swap y and z
-			lg_quat[3] = quatanion[0];	//w
-		}
-		{
-			QUATERNION_T quat_offset = quaternion_init();
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_z(lg_offset_roll));
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_y(lg_offset_yaw));
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_x(lg_offset_pitch));
-			*((QUATERNION_T*) &lg_quat_after_offset) = quaternion_multiply(
-					quat_offset, lg_quat); // Rv=RvRvo
+			lg_quat.ary[0] = quatanion[1];	//x
+			lg_quat.ary[1] = quatanion[3];	//y : swap y and z
+			lg_quat.ary[2] = -quatanion[2];	//z : swap y and z
+			lg_quat.ary[3] = quatanion[0];	//w
 		}
 		{ //north
 			float north = 0;
 
 			float matrix[16];
-			mat4_fromQuat(matrix, lg_quat);
+			mat4_fromQuat(matrix, lg_quat.ary);
 			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
@@ -101,6 +90,17 @@ static void *threadFunc(void *data) {
 			if (lg_north_count > 1000) {
 				lg_north_count = 1000;
 			}
+		}
+		{ //calib
+			QUATERNION_T quat_offset = quaternion_init();
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_z(lg_offset_roll));
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_x(lg_offset_pitch));
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_y(lg_offset_yaw));
+			*((QUATERNION_T*) lg_quat_after_offset) = quaternion_multiply(
+					quat_offset, lg_quat); // Rv=RvRvo
 		}
 
 		usleep(5000);
@@ -128,11 +128,11 @@ static void init() {
 	pthread_create(&f1_thread, NULL, threadFunc, NULL);
 }
 
-static float *get_quatanion() {
+static VECTOR4D_T get_quatanion() {
 	return lg_quat_after_offset;
 }
 
-static float *get_compass() {
+static VECTOR4D_T get_compass() {
 	return lg_compass;
 }
 

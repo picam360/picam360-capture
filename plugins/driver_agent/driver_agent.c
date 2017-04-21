@@ -132,11 +132,10 @@ static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
-static float lg_quatanion[4] = { 0, 0, 0, 1 };
-static float lg_compass[4] = { 0, 0, 0, 1 };
+static VECTOR4D_T lg_compass = { .ary { 0, 0, 0, 1 } };
 static float lg_north = 0;
 static float lg_north_count = 0;
-static float lg_target_quatanion[4] = { 0, 0, 0, 1 };
+static VECTOR4D_T lg_target_quatanion = { .ary { 0, 0, 0, 1 } };
 
 static bool lg_pid_enabled = false;
 static float lg_yaw_diff = 0;
@@ -160,14 +159,17 @@ static void parse_xml(char *xml) {
 	char *q_str = NULL;
 	q_str = strstr(xml, "<quaternion");
 	if (q_str) {
+		VECTOR4D_T quat = { };
 		float quatanion[4];
 		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
 				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
 		//convert from mpu coodinate to opengl coodinate
-		lg_quatanion[0] = quatanion[1]; //x
-		lg_quatanion[1] = quatanion[3]; //y : swap y and z
-		lg_quatanion[2] = -quatanion[2]; //z : swap y and z
-		lg_quatanion[3] = quatanion[0]; //w
+		quat.ary[0] = quatanion[1]; //x
+		quat.ary[1] = quatanion[3]; //y : swap y and z
+		quat.ary[2] = -quatanion[2]; //z : swap y and z
+		quat.ary[3] = quatanion[0]; //w
+
+		lg_plugin_host->set_camera_quaternion(-1, quat);
 	}
 	q_str = strstr(xml, "<compass");
 	if (q_str) {
@@ -191,10 +193,10 @@ static void parse_xml(char *xml) {
 			calib[i] /= norm;
 		}
 		//convert from mpu coodinate to opengl coodinate
-		lg_compass[0] = calib[1];
-		lg_compass[1] = -calib[0];
-		lg_compass[2] = -calib[2];
-		lg_compass[3] = 1.0;
+		lg_compass.ary[0] = calib[1];
+		lg_compass.ary[1] = -calib[0];
+		lg_compass.ary[2] = -calib[2];
+		lg_compass.ary[3] = 1.0;
 
 		lg_plugin_host->set_camera_compass(lg_compass);
 
@@ -202,11 +204,12 @@ static void parse_xml(char *xml) {
 			float north = 0;
 
 			float matrix[16];
-			mat4_fromQuat(matrix, lg_quatanion);
+			VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
+			mat4_fromQuat(matrix, quat.ary);
 			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
-			memcpy(compass_mat, lg_compass, sizeof(float) * 4);
+			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
 
 			mat4_transpose(compass_mat, compass_mat);
 			mat4_multiply(compass_mat, compass_mat, matrix);
@@ -315,6 +318,7 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
 			if (lg_pid_enabled) {
+				VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
 				//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
 				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
 				float unif_matrix[16];
@@ -325,8 +329,8 @@ void *transmit_thread_func(void* arg) {
 				mat4_identity(camera_matrix);
 				mat4_identity(target_matrix);
 				mat4_identity(north_matrix);
-				mat4_fromQuat(camera_matrix, lg_quatanion);
-				mat4_fromQuat(target_matrix, lg_target_quatanion);
+				mat4_fromQuat(camera_matrix, quat.ary);
+				mat4_fromQuat(target_matrix, lg_target_quatanion.ary);
 				mat4_invert(target_matrix, target_matrix);
 				// Rn
 				{

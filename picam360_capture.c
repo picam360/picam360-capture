@@ -1082,23 +1082,19 @@ void stdin_command_handler() {
 }
 
 //plugin host methods
-static float *get_view_quatanion() {
+static VECTOR4D_T get_view_quatanion() {
+	VECTOR4D_T ret = { };
 	if (state->frame && state->frame->view_mpu) {
-		return state->frame->view_mpu->get_quatanion(state->frame->view_mpu);
+		ret = state->frame->view_mpu->get_quatanion(state->frame->view_mpu);
 	}
-	return NULL;
+	return ret;
 }
-static void set_view_quatanion(float *value) {
-	//TODO
-}
-static float *get_view_compass() {
+static VECTOR4D_T get_view_compass() {
+	VECTOR4D_T ret = { };
 	if (state->frame && state->frame->view_mpu) {
-		return state->frame->view_mpu->get_compass(state->frame->view_mpu);
+		ret = state->frame->view_mpu->get_compass(state->frame->view_mpu);
 	}
-	return NULL;
-}
-static void set_view_compass(float *value) {
-	//TODO
+	return ret;
 }
 static float get_view_temperature() {
 	if (state->frame && state->frame->view_mpu) {
@@ -1106,35 +1102,52 @@ static float get_view_temperature() {
 	}
 	return 0;
 }
-static void set_view_temperature(float value) {
-	//TODO
-}
 static float get_view_north() {
 	if (state->frame && state->frame->view_mpu) {
 		return state->frame->view_mpu->get_north(state->frame->view_mpu);
 	}
 	return 0;
 }
-static void set_view_north(float value) {
-	//TODO
-}
 
-static float *get_camera_quatanion(int cam_num) {
-	return state->camera_quatanion[cam_num];
-}
-static void set_camera_quatanion(int cam_num, float *value) {
-	for (int i = 0; i < 4; i++) {
-		state->camera_quatanion[cam_num][i] = value[i];
+static VECTOR4D_T get_camera_quatanion(int cam_num) {
+	VECTOR4D_T ret = { };
+	pthread_mutex_lock(&state->mutex);
+
+	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+		ret = state->camera_quatanion[cam_num];
+	} else {
+		ret = state->camera_quatanion[MAX_CAM_NUM];
 	}
+
+	pthread_mutex_unlock(&state->mutex);
+	return ret;
+}
+static void set_camera_quatanion(int cam_num, VECTOR4D_T value) {
+	pthread_mutex_lock(&state->mutex);
+
+	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+		state->camera_quatanion[cam_num] = value;
+	}
+	state->camera_quatanion[MAX_CAM_NUM] = value; //latest
 	state->camera_coordinate_from_device = true;
+
+	pthread_mutex_unlock(&state->mutex);
 }
 static float *get_camera_compass() {
-	return state->camera_compass;
+	VECTOR4D_T ret = { };
+	pthread_mutex_lock(&state->mutex);
+
+	ret = state->camera_compass;
+
+	pthread_mutex_unlock(&state->mutex);
+	return ret;
 }
-static void set_camera_compass(float *value) {
-	for (int i = 0; i < 4; i++) {
-		state->camera_compass[i] = value[i];
-	}
+static void set_camera_compass(VECTOR4D_T value) {
+	pthread_mutex_lock(&state->mutex);
+
+	state->camera_compass = value;
+
+	pthread_mutex_unlock(&state->mutex);
 }
 static float get_camera_temperature() {
 	return state->camera_temperature;
@@ -1242,13 +1255,9 @@ static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
 		state->plugin_host.get_view_quatanion = get_view_quatanion;
-		state->plugin_host.set_view_quatanion = set_view_quatanion;
 		state->plugin_host.get_view_compass = get_view_compass;
-		state->plugin_host.set_view_compass = set_view_compass;
 		state->plugin_host.get_view_temperature = get_view_temperature;
-		state->plugin_host.set_view_temperature = set_view_temperature;
 		state->plugin_host.get_view_north = get_view_north;
-		state->plugin_host.set_view_north = set_view_north;
 
 		state->plugin_host.get_camera_quatanion = get_camera_quatanion;
 		state->plugin_host.set_camera_quatanion = set_camera_quatanion;
@@ -1382,15 +1391,18 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	for (int i = 0; i < MAX_CAM_NUM; i++) {
-		mrevent_init(&state->request_frame_event[i]);
-		mrevent_trigger(&state->request_frame_event[i]);
-		mrevent_init(&state->arrived_frame_event[i]);
-		mrevent_reset(&state->arrived_frame_event[i]);
-	}
+	{ //mrevent & mutex init
+		for (int i = 0; i < MAX_CAM_NUM; i++) {
+			mrevent_init(&state->request_frame_event[i]);
+			mrevent_trigger(&state->request_frame_event[i]);
+			mrevent_init(&state->arrived_frame_event[i]);
+			mrevent_reset(&state->arrived_frame_event[i]);
+		}
 
-	//texture mutex init
-	pthread_mutex_init(&state->texture_mutex, 0);
+		pthread_mutex_init(&state->mutex, 0);
+		//texture mutex init
+		pthread_mutex_init(&state->texture_mutex, 0);
+	}
 
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
