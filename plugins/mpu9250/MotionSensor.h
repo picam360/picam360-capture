@@ -9,7 +9,7 @@
 extern "C"{
 #endif
 
-extern float quatanion[4];
+extern float quaternion[4];
 extern float ypr[3]; //yaw, pitch, roll
 extern float accel[3];
 extern float gyro[3];

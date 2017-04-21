@@ -154,7 +154,7 @@ typedef struct _PICAM360CAPTURE_T {
 	float camera_pitch; // x axis
 	float camera_yaw; // y axis
 	float camera_roll; // z axis
-	VECTOR4D_T camera_quatanion[MAX_CAM_NUM + 1];
+	VECTOR4D_T camera_quaternion[MAX_CAM_NUM + 1];
 	VECTOR4D_T camera_compass;
 	float camera_temperature;
 	float camera_north;

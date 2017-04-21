@@ -62,7 +62,7 @@ public:
 		pthread_mutex_init(&packets_mlock, NULL);
 		mrevent_init(&packet_ready);
 		xmp_info = false;
-		memset(quatanion, 0, sizeof(quatanion));
+		memset(quaternion, 0, sizeof(quaternion));
 	}
 	~_FRAME_T() {
 		_FRAME_T *frame = this;
@@ -82,7 +82,7 @@ public:
 	pthread_mutex_t packets_mlock;
 	MREVENT_T packet_ready;
 	bool xmp_info;
-	float quatanion[4];
+	float quaternion[4];
 };
 class _SENDFRAME_ARG_T {
 public:
@@ -105,7 +105,7 @@ public:
 		resize = NULL;
 		memset(tunnel, 0, sizeof(tunnel));
 		xmp_info = false;
-		memset(quatanion, 0, sizeof(quatanion));
+		memset(quaternion, 0, sizeof(quaternion));
 		fillbufferdone_count = 0;
 	}
 	void *user_data;
@@ -128,7 +128,7 @@ public:
 	COMPONENT_T* egl_render;
 	TUNNEL_T tunnel[3];
 	bool xmp_info;
-	float quatanion[4];
+	float quaternion[4];
 	int fillbufferdone_count;
 };
 
@@ -144,8 +144,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	if (lg_plugin_host) {
 		lg_plugin_host->set_cam_texture_cur(cam_num, cur);
 		if (send_frame_arg->xmp_info) {
-			lg_plugin_host->set_camera_quatanion(cam_num,
-					send_frame_arg->quatanion);
+			lg_plugin_host->set_camera_quaternion(cam_num,
+					send_frame_arg->quaternion);
 		}
 		lg_plugin_host->send_event(PICAM360_HOST_NODE_ID,
 				PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED + cam_num);
@@ -519,8 +519,8 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					send_frame_arg->xmp_info = frame->xmp_info;
-					memcpy(send_frame_arg->quatanion, frame->quatanion,
-							sizeof(send_frame_arg->quatanion));
+					memcpy(send_frame_arg->quaternion, frame->quaternion,
+							sizeof(send_frame_arg->quaternion));
 					delete packet;
 					break;
 				} else {
@@ -564,14 +564,14 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 	char *q_str = NULL;
 	q_str = strstr(xml, "<quaternion");
 	if (q_str) {
-		float quatanion[4];
+		float quaternion[4];
 		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+				&quaternion[0], &quaternion[1], &quaternion[2], &quaternion[3]);
 		//convert from mpu coodinate to opengl coodinate
-		frame->quatanion[0] = quatanion[1]; //x
-		frame->quatanion[1] = quatanion[3]; //y : swap y and z
-		frame->quatanion[2] = -quatanion[2]; //z : swap y and z
-		frame->quatanion[3] = quatanion[0]; //w
+		frame->quaternion[0] = quaternion[1]; //x
+		frame->quaternion[1] = quaternion[3]; //y : swap y and z
+		frame->quaternion[2] = -quaternion[2]; //z : swap y and z
+		frame->quaternion[3] = quaternion[0]; //w
 	}
 }
 
