@@ -6,7 +6,7 @@
 #include <math.h>
 
 #include "helper_3dmath.h"
-#include "../MotionSensor.h"
+#include "MotionSensor.h"
 
 #ifdef __cplusplus
 extern "C"{

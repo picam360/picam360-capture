@@ -5,7 +5,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "MotionSensor.h"
+#include "MotionSensor/MotionSensor.h"
 
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
@@ -28,7 +28,7 @@ static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static VECTOR4D_T lg_compass = { };
 static VECTOR4D_T lg_quat = { };
-static VECTOR4D_T lg_quat_after_offse = { };
+static VECTOR4D_T lg_quat_after_offset = { };
 static float lg_north = 0;
 static int lg_north_count = 0;
 

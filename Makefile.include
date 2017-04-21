@@ -23,7 +23,7 @@ all: $(BIN) $(LIB)
 
 
 MotionSensor/libMotionSensor.a:
-	$(MAKE) -C MotionSensor/
+	$(MAKE) -C libs/MotionSensor/
 
 libs/libI2Cdev.a:
 	$(MAKE) -C libs/I2Cdev
