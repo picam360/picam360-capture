@@ -39,6 +39,13 @@
 enum UI_MODE {
 	UI_MODE_DEFAULT, UI_MODE_LIGHT, UI_MODE_FOV,
 } lg_ui_mode = UI_MODE_DEFAULT;
+enum CALIBRATION_CMD {
+	CALIBRATION_CMD_NONE,
+	CALIBRATION_CMD_SAVE,
+	CALIBRATION_CMD_IMAGE_CIRCLE,
+	CALIBRATION_CMD_VIEWER_COMPASS,
+	CALIBRATION_CMD_VEHICLE_COMPASS,
+};
 enum SYSTEM_CMD {
 	SYSTEM_CMD_NONE, SYSTEM_CMD_SHUTDOWN,
 };
@@ -1028,7 +1035,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		switch ((int) menu->user_data) {
-		case 0: //save
+		case CALIBRATION_CMD_SAVE:
 			menu->selected = false;
 			{
 				char cmd[256];
@@ -1036,14 +1043,14 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 1: //image circle
+		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "start_ac");
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 2: //reset viewer compass
+		case CALIBRATION_CMD_VIEWER_COMPASS:
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "mpu9250.start_compass_calib");
@@ -1052,7 +1059,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 				//lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 3: //reset vehicle compass
+		case CALIBRATION_CMD_VEHICLE_COMPASS:
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "driver_agent.start_compass_calib");
@@ -1065,14 +1072,14 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_DESELECTED:
 		switch ((int) menu->user_data) {
-		case 1: //image circle
+		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "stop_ac");
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 2: //reset viewer compass
+		case CALIBRATION_CMD_VIEWER_COMPASS:
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "mpu9250.stop_compass_calib");
@@ -1081,7 +1088,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 				//lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 3: //reset vehicle compass
+		case CALIBRATION_CMD_VEHICLE_COMPASS:
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "driver_agent.stop_compass_calib");
@@ -1170,13 +1177,16 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		{
 			MENU_T *calibration_menu = menu_new(L"Clibration", NULL, NULL);
 			MENU_T *calibration_record_menu = menu_new(L"Save",
-					calibration_menu_callback, (void*) 0);
+					calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE);
 			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",
-					calibration_menu_callback, (void*) 1);
+					calibration_menu_callback,
+					(void*) CALIBRATION_CMD_IMAGE_CIRCLE);
 			MENU_T *calibration_viewer_compass_menu = menu_new(L"ViewerCompass",
-					calibration_menu_callback, (void*) 3);
+					calibration_menu_callback,
+					(void*) CALIBRATION_CMD_VIEWER_COMPASS);
 			MENU_T *calibration_vehicle_compass_menu = menu_new(
-					L"VehicleCompass", calibration_menu_callback, (void*) 4);
+					L"VehicleCompass", calibration_menu_callback,
+					(void*) CALIBRATION_CMD_VEHICLE_COMPASS);
 			menu_add_submenu(calibration_menu, calibration_image_circle_menu,
 					INT_MAX);
 			menu_add_submenu(calibration_menu, calibration_viewer_compass_menu,
