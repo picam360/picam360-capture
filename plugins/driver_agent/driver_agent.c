@@ -995,9 +995,9 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	case MENU_EVENT_SELECTED:
 		lg_pid_enabled = !(bool) menu->user_data;
 		if (lg_pid_enabled) {
-			strcpy(menu->name, "On");
+			swprintf(menu->name, 8, L"On");
 		} else {
-			strcpy(menu->name, "Off");
+			swprintf(menu->name, 8, L"Off");
 		}
 		menu->selected = false;
 		break;
@@ -1120,7 +1120,6 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			MENU_T *pid_off_menu = menu_new(L"Off", pid_menu_callback,
 					(void*) false);
 			pid_off_menu->marked = true;
-			menu_add_submenu(pid_menu, pid_on_menu, INT_MAX);
 			menu_add_submenu(pid_menu, pid_off_menu, INT_MAX);
 			menu_add_submenu(menu, pid_menu, INT_MAX);		//add main menu
 		}
