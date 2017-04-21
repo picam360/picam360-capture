@@ -132,10 +132,10 @@ static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
-static VECTOR4D_T lg_compass = { .ary { 0, 0, 0, 1 } };
+static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
 static float lg_north = 0;
 static float lg_north_count = 0;
-static VECTOR4D_T lg_target_quatanion = { .ary { 0, 0, 0, 1 } };
+static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
 
 static bool lg_pid_enabled = false;
 static float lg_yaw_diff = 0;
@@ -160,14 +160,14 @@ static void parse_xml(char *xml) {
 	q_str = strstr(xml, "<quaternion");
 	if (q_str) {
 		VECTOR4D_T quat = { };
-		float quatanion[4];
+		float quaternion[4];
 		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&quatanion[0], &quatanion[1], &quatanion[2], &quatanion[3]);
+				&quaternion[0], &quaternion[1], &quaternion[2], &quaternion[3]);
 		//convert from mpu coodinate to opengl coodinate
-		quat.ary[0] = quatanion[1]; //x
-		quat.ary[1] = quatanion[3]; //y : swap y and z
-		quat.ary[2] = -quatanion[2]; //z : swap y and z
-		quat.ary[3] = quatanion[0]; //w
+		quat.ary[0] = quaternion[1]; //x
+		quat.ary[1] = quaternion[3]; //y : swap y and z
+		quat.ary[2] = -quaternion[2]; //z : swap y and z
+		quat.ary[3] = quaternion[0]; //w
 
 		lg_plugin_host->set_camera_quaternion(-1, quat);
 	}
@@ -330,7 +330,7 @@ void *transmit_thread_func(void* arg) {
 				mat4_identity(target_matrix);
 				mat4_identity(north_matrix);
 				mat4_fromQuat(camera_matrix, quat.ary);
-				mat4_fromQuat(target_matrix, lg_target_quatanion.ary);
+				mat4_fromQuat(target_matrix, lg_target_quaternion.ary);
 				mat4_invert(target_matrix, target_matrix);
 				// Rn
 				{
@@ -591,10 +591,10 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			switch (button) {
 			case NEXT_BUTTON:
 			case BACK_BUTTON:
-				quat = lg_plugin_host->get_view_quatanion();
+				quat = lg_plugin_host->get_view_quaternion();
 				if (quat) {
-					memcpy(lg_target_quatanion, quat,
-							sizeof(lg_target_quatanion));
+					memcpy(lg_target_quaternion, quat,
+							sizeof(lg_target_quaternion));
 				}
 			}
 		}

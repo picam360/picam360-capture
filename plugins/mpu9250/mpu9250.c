@@ -63,10 +63,10 @@ static void *threadFunc(void *data) {
 			lg_compass.ary[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
-			lg_quat.ary[0] = quatanion[1];	//x
-			lg_quat.ary[1] = quatanion[3];	//y : swap y and z
-			lg_quat.ary[2] = -quatanion[2];	//z : swap y and z
-			lg_quat.ary[3] = quatanion[0];	//w
+			lg_quat.ary[0] = quaternion[1];	//x
+			lg_quat.ary[1] = quaternion[3];	//y : swap y and z
+			lg_quat.ary[2] = -quaternion[2];	//z : swap y and z
+			lg_quat.ary[3] = quaternion[0];	//w
 		}
 		{ //north
 			float north = 0;
@@ -128,7 +128,7 @@ static void init() {
 	pthread_create(&f1_thread, NULL, threadFunc, NULL);
 }
 
-static VECTOR4D_T get_quatanion() {
+static VECTOR4D_T get_quaternion() {
 	return lg_quat_after_offset;
 }
 
@@ -238,7 +238,7 @@ void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
 		strcpy(mpu->name, MPU_NAME);
 		mpu->release = release;
-		mpu->get_quatanion = get_quatanion;
+		mpu->get_quaternion = get_quaternion;
 		mpu->get_compass = get_compass;
 		mpu->get_temperature = get_temperature;
 		mpu->get_north = get_north;

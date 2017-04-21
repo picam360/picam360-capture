@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <jansson.h>//json parser
 #include "menu.h"
+#include "quaternion.h"
 
 enum PICAM360_CAPTURE_EVENT {
 	PICAM360_CAPTURE_EVENT_AFTER_FRAME, PICAM360_CAPTURE_EVENT_AFTER_SNAP, PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED,PICAM360_CAPTURE_EVENT_TEXTURE1_UPDATED,
@@ -17,7 +18,7 @@ enum RENDERING_MODE {
 typedef struct _MPU_T {
 	char name[64];
 	void (*release)(void *user_data);
-	VECTOR4D_T (*get_quatanion)(void *user_data);
+	VECTOR4D_T (*get_quaternion)(void *user_data);
 	VECTOR4D_T (*get_compass)(void *user_data);
 	float (*get_temperature)(void *user_data);
 	float (*get_north)(void *user_data);
@@ -25,13 +26,13 @@ typedef struct _MPU_T {
 } MPU_T;
 
 typedef struct _PLUGIN_HOST_T {
-	VECTOR4D_T (*get_view_quatanion)();
+	VECTOR4D_T (*get_view_quaternion)();
 	VECTOR4D_T (*get_view_compass)();
 	float (*get_view_temperature)();
 	float (*get_view_north)();
 
-	VECTOR4D_T (*get_camera_quatanion)(int cam_num);
-	void (*set_camera_quatanion)(int cam_num, VECTOR4D_T value);
+	VECTOR4D_T (*get_camera_quaternion)(int cam_num);
+	void (*set_camera_quaternion)(int cam_num, VECTOR4D_T value);
 	VECTOR4D_T (*get_camera_compass)();
 	void (*set_camera_compass)(VECTOR4D_T value);
 	float (*get_camera_temperature)();

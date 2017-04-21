@@ -64,7 +64,7 @@ static void init() {
 	pthread_create(&f1_thread, NULL, threadFunc, dev);
 }
 
-static VECTOR4D_T get_quatanion() {
+static VECTOR4D_T get_quaternion() {
 	//update
 	if (dev != NULL) {
 		quat.ary[0] = -dev->Q[0];
@@ -135,7 +135,7 @@ void create_oculus_rift_dk2(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
 		strcpy(mpu->name, MPU_NAME);
 		mpu->release = release;
-		mpu->get_quatanion = get_quatanion;
+		mpu->get_quaternion = get_quaternion;
 		mpu->get_compass = get_compass;
 		mpu->get_temperature = get_temperature;
 		mpu->get_north = get_north;

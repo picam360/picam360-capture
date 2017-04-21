@@ -24,7 +24,7 @@ static float lg_quat[4] = { };
 static float lg_north = 0;
 static float lg_temp = 0;
 
-static float *get_quatanion() {
+static float *get_quaternion() {
 	return lg_quat;
 }
 
@@ -48,7 +48,7 @@ void create_manual_mpu(MPU_T **_mpu) {
 	MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
 	strcpy(mpu->name, MPU_NAME);
 	mpu->release = release;
-	mpu->get_quatanion = get_quatanion;
+	mpu->get_quaternion = get_quaternion;
 	mpu->get_compass = get_compass;
 	mpu->get_temperature = get_temperature;
 	mpu->get_north = get_north;

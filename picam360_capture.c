@@ -1082,10 +1082,10 @@ void stdin_command_handler() {
 }
 
 //plugin host methods
-static VECTOR4D_T get_view_quatanion() {
+static VECTOR4D_T get_view_quaternion() {
 	VECTOR4D_T ret = { };
 	if (state->frame && state->frame->view_mpu) {
-		ret = state->frame->view_mpu->get_quatanion(state->frame->view_mpu);
+		ret = state->frame->view_mpu->get_quaternion(state->frame->view_mpu);
 	}
 	return ret;
 }
@@ -1109,31 +1109,31 @@ static float get_view_north() {
 	return 0;
 }
 
-static VECTOR4D_T get_camera_quatanion(int cam_num) {
+static VECTOR4D_T get_camera_quaternion(int cam_num) {
 	VECTOR4D_T ret = { };
 	pthread_mutex_lock(&state->mutex);
 
 	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
-		ret = state->camera_quatanion[cam_num];
+		ret = state->camera_quaternion[cam_num];
 	} else {
-		ret = state->camera_quatanion[MAX_CAM_NUM];
+		ret = state->camera_quaternion[MAX_CAM_NUM];
 	}
 
 	pthread_mutex_unlock(&state->mutex);
 	return ret;
 }
-static void set_camera_quatanion(int cam_num, VECTOR4D_T value) {
+static void set_camera_quaternion(int cam_num, VECTOR4D_T value) {
 	pthread_mutex_lock(&state->mutex);
 
 	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
-		state->camera_quatanion[cam_num] = value;
+		state->camera_quaternion[cam_num] = value;
 	}
-	state->camera_quatanion[MAX_CAM_NUM] = value; //latest
+	state->camera_quaternion[MAX_CAM_NUM] = value; //latest
 	state->camera_coordinate_from_device = true;
 
 	pthread_mutex_unlock(&state->mutex);
 }
-static float *get_camera_compass() {
+static VECTOR4D_T get_camera_compass() {
 	VECTOR4D_T ret = { };
 	pthread_mutex_lock(&state->mutex);
 
@@ -1254,13 +1254,13 @@ static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	{ //init host
-		state->plugin_host.get_view_quatanion = get_view_quatanion;
+		state->plugin_host.get_view_quaternion = get_view_quaternion;
 		state->plugin_host.get_view_compass = get_view_compass;
 		state->plugin_host.get_view_temperature = get_view_temperature;
 		state->plugin_host.get_view_north = get_view_north;
 
-		state->plugin_host.get_camera_quatanion = get_camera_quatanion;
-		state->plugin_host.set_camera_quatanion = set_camera_quatanion;
+		state->plugin_host.get_camera_quaternion = get_camera_quaternion;
+		state->plugin_host.set_camera_quaternion = set_camera_quaternion;
 		state->plugin_host.get_camera_compass = get_camera_compass;
 		state->plugin_host.set_camera_compass = set_camera_compass;
 		state->plugin_host.get_camera_temperature = get_camera_temperature;
@@ -1546,8 +1546,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	// Rc : camera orientation
 
 	if (state->camera_coordinate_from_device) {
-		mat4_fromQuat(camera_matrix, state->camera_quatanion[0]);
-		mat4_fromQuat(camera_matrix_1, state->camera_quatanion[1]);
+		mat4_fromQuat(camera_matrix, state->camera_quaternion[0].ary);
+		mat4_fromQuat(camera_matrix_1, state->camera_quaternion[1].ary);
 	} else {
 		//euler Y(yaw)X(pitch)Z(roll)
 		mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
@@ -1573,7 +1573,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	// Rv : view
 	if (frame->view_mpu) {
 		mat4_fromQuat(view_matrix,
-				frame->view_mpu->get_quatanion(frame->view_mpu));
+				frame->view_mpu->get_quaternion(frame->view_mpu).ary);
 		mat4_invert(view_matrix, view_matrix);
 	}
 
