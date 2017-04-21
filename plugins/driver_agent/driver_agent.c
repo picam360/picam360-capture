@@ -456,8 +456,7 @@ static void command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass", sizeof(buff)) == 0) {
 
 		for (int i = 0; i < 3; i++) {
 			lg_compass_min[i] = INT_MAX;
@@ -754,7 +753,7 @@ static wchar_t *get_info(void *user_data) {
 	return lg_info;
 }
 
-static void packet_menu_save_callback(struct _MENU_T *menu,
+static void packet_menu_record_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_ACTIVATED:
@@ -762,19 +761,22 @@ static void packet_menu_save_callback(struct _MENU_T *menu,
 	case MENU_EVENT_DEACTIVATED:
 		break;
 	case MENU_EVENT_SELECTED:
-		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+		menu->selected = false;
+		if (rtp_is_recording(NULL)) {
+			rtp_stop_recording();
+			swprintf(menu->name, 8, L"Record");
+			printf("stop recording\n");
+		}
+		else if (!rtp_is_loading(NULL)) {
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
 			snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
 			rtp_start_recording(dst);
+			swprintf(menu->name, 256, L"StopRecording:%s", dst);
 			printf("start recording %s\n", dst);
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
-		if (rtp_is_recording(NULL)) {
-			rtp_stop_recording();
-			printf("stop recording\n");
-		}
 		break;
 	case MENU_EVENT_BEFORE_DELETE:
 		break;
@@ -994,10 +996,12 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		lg_pid_enabled = !(bool) menu->user_data;
+		menu->user_data = (void*) lg_pid_enabled;
 		if (lg_pid_enabled) {
 			swprintf(menu->name, 8, L"On");
 		} else {
 			swprintf(menu->name, 8, L"Off");
+			memset(lg_pid_value, 0, sizeof(lg_pid_value));
 		}
 		menu->selected = false;
 		break;
@@ -1007,11 +1011,12 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
-static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+static void calibration_menu_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		switch ((int) menu->user_data) {
-		case 0://save
+		case 0: //save
 			menu->selected = false;
 			{
 				char cmd[256];
@@ -1019,14 +1024,14 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 1://image circle
-			{
-				char cmd[256];
-				snprintf(cmd, 256, "start_ac");
-				lg_plugin_host->send_command(cmd);
-			}
+		case 1: //image circle
+		{
+			char cmd[256];
+			snprintf(cmd, 256, "start_ac");
+			lg_plugin_host->send_command(cmd);
+		}
 			break;
-		case 2://reset viewer compass
+		case 2: //reset viewer compass
 			menu->selected = false;
 			{
 				char cmd[256];
@@ -1036,7 +1041,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 3://reset vehicle compass
+		case 3: //reset vehicle compass
 			menu->selected = false;
 			{
 				char cmd[256];
@@ -1050,12 +1055,12 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		break;
 	case MENU_EVENT_DESELECTED:
 		switch ((int) menu->user_data) {
-		case 1://image circle
-			{
-				char cmd[256];
-				snprintf(cmd, 256, "stop_ac");
-				lg_plugin_host->send_command(cmd);
-			}
+		case 1: //image circle
+		{
+			char cmd[256];
+			snprintf(cmd, 256, "stop_ac");
+			lg_plugin_host->send_command(cmd);
+		}
 			break;
 		default:
 			break;
@@ -1111,34 +1116,34 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					(void*) UI_MODE_LIGHT);
 			MENU_T *mode_fov_menu = menu_new(L"Fov", mode_menu_callback,
 					(void*) UI_MODE_FOV);
+			MENU_T *mode_pid_menu = menu_new(L"PID", NULL, NULL);
+			{
+				MENU_T *pid_off_menu = menu_new(L"Off", pid_menu_callback,
+						(void*) false);
+				pid_off_menu->marked = true;
+				menu_add_submenu(mode_pid_menu, pid_off_menu, INT_MAX);
+			}
 			menu_add_submenu(mode_menu, mode_light_menu, INT_MAX);
 			menu_add_submenu(mode_menu, mode_fov_menu, INT_MAX);
+			menu_add_submenu(mode_menu, mode_pid_menu, INT_MAX);
 			menu_add_submenu(menu, mode_menu, INT_MAX);		//add main menu
 		}
 		{
-			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
-			MENU_T *pid_off_menu = menu_new(L"Off", pid_menu_callback,
-					(void*) false);
-			pid_off_menu->marked = true;
-			menu_add_submenu(pid_menu, pid_off_menu, INT_MAX);
-			menu_add_submenu(menu, pid_menu, INT_MAX);		//add main menu
-		}
-		{
 			MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
-			MENU_T *packet_save_menu = menu_new(L"Save",
-					packet_menu_save_callback, NULL);
+			MENU_T *packet_record_menu = menu_new(L"Save",
+					packet_menu_record_callback, NULL);
 			MENU_T *packet_load_menu = menu_new(L"Load",
 					packet_menu_load_callback, NULL);
 			MENU_T *packet_convert_menu = menu_new(L"Convert",
 					packet_menu_convert_callback, NULL);
-			menu_add_submenu(packet_menu, packet_save_menu, INT_MAX);
+			menu_add_submenu(packet_menu, packet_record_menu, INT_MAX);
 			menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
 			menu_add_submenu(packet_menu, packet_convert_menu, INT_MAX);
 			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
 		}
 		{
 			MENU_T *calibration_menu = menu_new(L"Clibration", NULL, NULL);
-			MENU_T *calibration_save_menu = menu_new(L"Save",
+			MENU_T *calibration_record_menu = menu_new(L"Record",
 					calibration_menu_callback, (void*) 0);
 			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",
 					calibration_menu_callback, (void*) 1);
@@ -1154,7 +1159,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					calibration_reset_viewer_compass_menu, INT_MAX);
 			menu_add_submenu(calibration_menu,
 					calibration_reset_vehicle_compass_menu, INT_MAX);
-			menu_add_submenu(calibration_menu, calibration_save_menu, INT_MAX);	//save is last
+			menu_add_submenu(calibration_menu, calibration_record_menu, INT_MAX);	//save is last
 			menu_add_submenu(menu, calibration_menu, INT_MAX);	//add main menu
 		}
 		{
