@@ -108,14 +108,23 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 			sprintf(buff + xmp_len,
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<picam360_driver"
-							" light0_value=\"%f\" light1_value=\"%f\""
-							" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\""
-							" video_delay=\"%f\""
-							" />", light0_value, light1_value, motor0_value,
-					motor1_value, motor2_value, motor3_value, lg_video_delay);
+	{
+		xmp_len +=
+				sprintf(buff + xmp_len,
+						"<picam360_driver"
+								" light0_value=\"%f\" light1_value=\"%f\""
+								" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\""
+								" video_delay=\"%f\"", light0_value,
+						light1_value, motor0_value, motor1_value, motor2_value,
+						motor3_value, lg_video_delay, lg_command_id,
+						lg_command);
+		if (lg_ack_command_id != lg_command_id) {
+			xmp_len += sprintf(buff + xmp_len,
+					" command_id=\"%d\" command=\"%s\"", lg_command_id,
+					lg_command);
+		}
+		sprintf(buff + xmp_len, " />");
+	}
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -155,6 +164,10 @@ static float lg_pid_value[3] = { }; //x, z, delta yaw
 static float lg_delta_pid_target[3][3] = { }; //x, z, delta yaw
 static struct timeval lg_delta_pid_time[3] = { };
 
+static int lg_ack_command_id = 0;
+static int lg_command_id = 0;
+static char lg_command[1024] = { };
+
 //kokuyoseki
 static struct timeval lg_last_kokuyoseki_time = { };
 static int lg_last_button = -1;
@@ -165,7 +178,7 @@ static int lg_frameskip[NUM_OF_CAM] = { };
 
 static void parse_xml(char *xml) {
 	char *q_str = NULL;
-	q_str = strstr(xml, "<quaternion");
+	q_str = strstr(xml, "<quaternion ");
 	if (q_str) {
 		VECTOR4D_T quat = { };
 		float quaternion[4];
@@ -179,36 +192,33 @@ static void parse_xml(char *xml) {
 
 		lg_plugin_host->set_camera_quaternion(-1, quat);
 	}
-	q_str = strstr(xml, "<compass");
+	q_str = strstr(xml, "<compass ");
 	if (q_str) {
 		float compass[3];
 		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &compass[0],
 				&compass[1], &compass[2]);
-		float calib[3];
-		float bias[3];
-		float gain[3];
-		for (int i = 0; i < 3; i++) {
-			if (lg_is_compass_calib) {
-				lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
-				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
-			}
-			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
-			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
-		}
-		float norm = sqrt(
-				calib[0] * calib[0] + calib[1] * calib[1]
-						+ calib[2] * calib[2]);
-		for (int i = 0; i < 3; i++) {
-			calib[i] /= norm;
-		}
 		//convert from mpu coodinate to opengl coodinate
-		lg_compass.ary[0] = calib[1];
-		lg_compass.ary[1] = -calib[0];
-		lg_compass.ary[2] = -calib[2];
+		lg_compass.ary[0] = compass[1];
+		lg_compass.ary[1] = -compass[0];
+		lg_compass.ary[2] = -compass[2];
 		lg_compass.ary[3] = 1.0;
 
 		lg_plugin_host->set_camera_compass(lg_compass);
+
+		if (lg_is_compass_calib) {
+			q_str = strstr(xml, "<compass_min ");
+			if (q_str) {
+				sscanf(q_str, "<compass_min x=\"%f\" y=\"%f\" z=\"%f\" />",
+						&lg_compass_min[0], &lg_compass_min[1],
+						&lg_compass_min[2]);
+			}
+			q_str = strstr(xml, "<compass_max ");
+			if (q_str) {
+				sscanf(q_str, "<compass_max x=\"%f\" y=\"%f\" z=\"%f\" />",
+						&lg_compass_min[0], &lg_compass_min[1],
+						&lg_compass_min[2]);
+			}
+		}
 
 		{ //north
 			float north = 0;
@@ -236,14 +246,14 @@ static void parse_xml(char *xml) {
 			lg_plugin_host->set_camera_north(lg_north);
 		}
 	}
-	q_str = strstr(xml, "<temperature");
+	q_str = strstr(xml, "<temperature ");
 	if (q_str) {
 		float temperature;
 		sscanf(q_str, "<temperature v=\"%f\" />", &temperature);
 
 		lg_plugin_host->set_camera_temperature(temperature);
 	}
-	q_str = strstr(xml, "<bandwidth");
+	q_str = strstr(xml, "<bandwidth ");
 	if (q_str) {
 		float bandwidth;
 		sscanf(q_str, "<bandwidth v=\"%f\" />", &bandwidth);
@@ -252,7 +262,7 @@ static void parse_xml(char *xml) {
 	{
 		int offset = 0;
 		do {
-			q_str = strstr(xml + offset, "<video_info");
+			q_str = strstr(xml + offset, "<video_info ");
 			offset = (unsigned long) q_str - (unsigned long) xml + 1;
 			if (q_str) {
 				int id;
@@ -267,6 +277,10 @@ static void parse_xml(char *xml) {
 				}
 			}
 		} while (q_str);
+	}
+	q_str = strstr(xml, "<ack_command_id ");
+	if (q_str) {
+		sscanf(q_str, "<ack_command_id v=\"%d\" />", &lg_ack_command_id);
 	}
 }
 
@@ -473,9 +487,14 @@ static void command_handler(void *user_data, const char *_buff) {
 			lg_compass_min[i] = INT_MAX;
 			lg_compass_max[i] = -INT_MAX;
 		}
+		lg_command_id++;
+		sprintf(lg_command, "picam360_driver.start_compass_calib");
+
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
 			== 0) {
 		lg_is_compass_calib = false;
+		lg_command_id++;
+		sprintf(lg_command, "picam360_driver.stop_compass_calib");
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
@@ -693,6 +712,9 @@ static void save_options(void *user_data, json_t *options) {
 		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
 		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
 	}
+
+	lg_command_id++;
+	sprintf(lg_command, "picam360_driver.save");
 }
 
 static int rtp_callback(unsigned char *data, unsigned int data_len,
