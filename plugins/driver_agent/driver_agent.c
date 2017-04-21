@@ -60,6 +60,46 @@ static bool lg_is_converting = false;
 static char lg_convert_base_path[256];
 static uint32_t lg_convert_frame_num = 0;
 
+#define LIGHT_NUM 2
+#define MOTOR_NUM 4
+static int lg_light_value[LIGHT_NUM] = { 0, 0 };
+static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static float lg_light_strength = 0; //0 to 100
+static float lg_thrust = 0; //-100 to 100
+static float lg_brake_ps = 5; // percent
+static bool lg_lowlevel_control = false;
+static bool lg_is_compass_calib = false;
+static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
+//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
+static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
+//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
+static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
+static float lg_north = 0;
+static float lg_north_count = 0;
+static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
+
+static bool lg_pid_enabled = false;
+static float lg_yaw_diff = 0;
+static float lg_pitch_diff = 0;
+static float lg_p_gain = 1.0;
+static float lg_i_gain = 1.0;
+static float lg_d_gain = 1.0;
+static float lg_pid_value[3] = { }; //x, z, delta yaw
+static float lg_delta_pid_target[3][3] = { }; //x, z, delta yaw
+static struct timeval lg_delta_pid_time[3] = { };
+
+static int lg_ack_command_id = 0;
+static int lg_command_id = 0;
+static char lg_command[1024] = { };
+
+//kokuyoseki
+static struct timeval lg_last_kokuyoseki_time = { };
+static int lg_last_button = -1;
+
+#define NUM_OF_CAM 2
+static float lg_fps[NUM_OF_CAM] = { };
+static int lg_frameskip[NUM_OF_CAM] = { };
+
 static void kokuyoseki_callback(struct timeval time, int button, int value);
 
 static void release(void *user_data) {
@@ -135,46 +175,6 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 
 	return xmp_len;
 }
-
-#define LIGHT_NUM 2
-#define MOTOR_NUM 4
-static int lg_light_value[LIGHT_NUM] = { 0, 0 };
-static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
-static float lg_light_strength = 0; //0 to 100
-static float lg_thrust = 0; //-100 to 100
-static float lg_brake_ps = 5; // percent
-static bool lg_lowlevel_control = false;
-static bool lg_is_compass_calib = false;
-static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
-//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
-static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
-//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
-static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
-static float lg_north = 0;
-static float lg_north_count = 0;
-static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
-
-static bool lg_pid_enabled = false;
-static float lg_yaw_diff = 0;
-static float lg_pitch_diff = 0;
-static float lg_p_gain = 1.0;
-static float lg_i_gain = 1.0;
-static float lg_d_gain = 1.0;
-static float lg_pid_value[3] = { }; //x, z, delta yaw
-static float lg_delta_pid_target[3][3] = { }; //x, z, delta yaw
-static struct timeval lg_delta_pid_time[3] = { };
-
-static int lg_ack_command_id = 0;
-static int lg_command_id = 0;
-static char lg_command[1024] = { };
-
-//kokuyoseki
-static struct timeval lg_last_kokuyoseki_time = { };
-static int lg_last_button = -1;
-
-#define NUM_OF_CAM 2
-static float lg_fps[NUM_OF_CAM] = { };
-static int lg_frameskip[NUM_OF_CAM] = { };
 
 static void parse_xml(char *xml) {
 	char *q_str = NULL;
