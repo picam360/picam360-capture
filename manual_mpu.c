@@ -19,16 +19,16 @@
 
 #define MPU_NAME "manual"
 
-static float lg_compass[4] = { };
-static float lg_quat[4] = { };
+static VECTOR4D_T lg_compass = { };
+static VECTOR4D_T lg_quat = { };
 static float lg_north = 0;
 static float lg_temp = 0;
 
-static float *get_quaternion() {
+static VECTOR4D_T get_quaternion() {
 	return lg_quat;
 }
 
-static float *get_compass() {
+static VECTOR4D_T get_compass() {
 	return lg_compass;
 }
 

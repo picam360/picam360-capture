@@ -22,7 +22,7 @@ INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/v
 all: $(BIN) $(LIB)
 
 
-lib/MotionSensor/libMotionSensor.a:
+libs/MotionSensor/libMotionSensor.a:
 	$(MAKE) -C libs/MotionSensor
 
 libs/libI2Cdev.a:
