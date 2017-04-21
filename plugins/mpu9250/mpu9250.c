@@ -22,6 +22,7 @@
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
+static bool lg_is_compass_calib = false;
 static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
@@ -47,8 +48,10 @@ static void *threadFunc(void *data) {
 			float bias[3];
 			float gain[3];
 			for (int i = 0; i < 3; i++) {
-				lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
-				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+				if (lg_is_compass_calib) {
+					lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+					lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+				}
 				bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
 				gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
 				calib[i] = (compass[i] - bias[i])
@@ -158,13 +161,16 @@ static void command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
 			== 0) {
-
+		lg_is_compass_calib = true;
 		for (int i = 0; i < 3; i++) {
 			lg_compass_min[i] = INT_MAX;
 			lg_compass_max[i] = -INT_MAX;
 		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
+			== 0) {
+		lg_is_compass_calib = false;
 	}
 }
 
@@ -212,8 +218,19 @@ static void save_options(void *user_data, json_t *options) {
 	}
 }
 
+#define MAX_INFO_LEN 1024
+static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
-	return NULL;
+	int cur = 0;
+	cur += swprintf(lg_info, MAX_INFO_LEN,
+			L"");
+	if (lg_is_compass_calib) {
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
+				L"\ncompass calib : min[%d,%d,%d] max[%d,%d,%d]",
+				lg_compass_min[0], lg_compass_min[1], lg_compass_min[2],
+				lg_compass_max[0], lg_compass_max[1], lg_compass_max[2]);
+	}
+	return lg_info;
 }
 
 void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {

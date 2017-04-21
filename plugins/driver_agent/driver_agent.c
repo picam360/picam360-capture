@@ -128,6 +128,7 @@ static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static bool lg_lowlevel_control = false;
+static bool lg_is_compass_calib = false;
 static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
@@ -180,8 +181,10 @@ static void parse_xml(char *xml) {
 		float bias[3];
 		float gain[3];
 		for (int i = 0; i < 3; i++) {
-			lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
-			lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+			if (lg_is_compass_calib) {
+				lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+			}
 			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
 			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
 			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
@@ -456,12 +459,16 @@ static void command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".reset_compass", sizeof(buff)) == 0) {
-
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
+			== 0) {
+		lg_is_compass_calib = true;
 		for (int i = 0; i < 3; i++) {
 			lg_compass_min[i] = INT_MAX;
 			lg_compass_max[i] = -INT_MAX;
 		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
+			== 0) {
+		lg_is_compass_calib = false;
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
@@ -750,6 +757,12 @@ static wchar_t *get_info(void *user_data) {
 					lg_motor_value[i]);
 		}
 	}
+	if (lg_is_compass_calib) {
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
+				L"\ncompass calib : min[%d,%d,%d] max[%d,%d,%d]",
+				lg_compass_min[0], lg_compass_min[1], lg_compass_min[2],
+				lg_compass_max[0], lg_compass_max[1], lg_compass_max[2]);
+	}
 	return lg_info;
 }
 
@@ -766,8 +779,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 			rtp_stop_recording();
 			swprintf(menu->name, 8, L"Record");
 			printf("stop recording\n");
-		}
-		else if (!rtp_is_loading(NULL)) {
+		} else if (!rtp_is_loading(NULL)) {
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
 			snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
@@ -1025,27 +1037,25 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 			}
 			break;
 		case 1: //image circle
-		{
-			char cmd[256];
-			snprintf(cmd, 256, "start_ac");
-			lg_plugin_host->send_command(cmd);
-		}
-			break;
-		case 2: //reset viewer compass
-			menu->selected = false;
-			{
+			if (1) {
 				char cmd[256];
-				snprintf(cmd, 256, "mpu9250.reset_compass");
-				lg_plugin_host->send_command(cmd);
-				snprintf(cmd, 256, "oculus_rift_dk2.reset_compass");
+				snprintf(cmd, 256, "start_ac");
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
-		case 3: //reset vehicle compass
-			menu->selected = false;
-			{
+		case 2: //reset viewer compass
+			if (1) {
 				char cmd[256];
-				snprintf(cmd, 256, "driver_agent.reset_compass");
+				snprintf(cmd, 256, "mpu9250.start_compass_calib");
+				lg_plugin_host->send_command(cmd);
+				//snprintf(cmd, 256, "oculus_rift_dk2.start_compass_calib");
+				//lg_plugin_host->send_command(cmd);
+			}
+			break;
+		case 3: //reset vehicle compass
+			if (1) {
+				char cmd[256];
+				snprintf(cmd, 256, "driver_agent.start_compass_calib");
 				lg_plugin_host->send_command(cmd);
 			}
 			break;
@@ -1056,11 +1066,27 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 	case MENU_EVENT_DESELECTED:
 		switch ((int) menu->user_data) {
 		case 1: //image circle
-		{
-			char cmd[256];
-			snprintf(cmd, 256, "stop_ac");
-			lg_plugin_host->send_command(cmd);
-		}
+			if (1) {
+				char cmd[256];
+				snprintf(cmd, 256, "stop_ac");
+				lg_plugin_host->send_command(cmd);
+			}
+			break;
+		case 2: //reset viewer compass
+			if (1) {
+				char cmd[256];
+				snprintf(cmd, 256, "mpu9250.stop_compass_calib");
+				lg_plugin_host->send_command(cmd);
+				//snprintf(cmd, 256, "oculus_rift_dk2.stop_compass_calib");
+				//lg_plugin_host->send_command(cmd);
+			}
+			break;
+		case 3: //reset vehicle compass
+			if (1) {
+				char cmd[256];
+				snprintf(cmd, 256, "driver_agent.stop_compass_calib");
+				lg_plugin_host->send_command(cmd);
+			}
 			break;
 		default:
 			break;
@@ -1130,7 +1156,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		}
 		{
 			MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
-			MENU_T *packet_record_menu = menu_new(L"Save",
+			MENU_T *packet_record_menu = menu_new(L"Record",
 					packet_menu_record_callback, NULL);
 			MENU_T *packet_load_menu = menu_new(L"Load",
 					packet_menu_load_callback, NULL);
@@ -1143,23 +1169,22 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		}
 		{
 			MENU_T *calibration_menu = menu_new(L"Clibration", NULL, NULL);
-			MENU_T *calibration_record_menu = menu_new(L"Record",
+			MENU_T *calibration_record_menu = menu_new(L"Save",
 					calibration_menu_callback, (void*) 0);
 			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",
 					calibration_menu_callback, (void*) 1);
-			MENU_T *calibration_reset_viewer_compass_menu = menu_new(
-					L"ResetViewerCompass", calibration_menu_callback,
-					(void*) 3);
-			MENU_T *calibration_reset_vehicle_compass_menu = menu_new(
-					L"ResetVehicleCompass", calibration_menu_callback,
-					(void*) 4);
+			MENU_T *calibration_viewer_compass_menu = menu_new(L"ViewerCompass",
+					calibration_menu_callback, (void*) 3);
+			MENU_T *calibration_vehicle_compass_menu = menu_new(
+					L"VehicleCompass", calibration_menu_callback, (void*) 4);
 			menu_add_submenu(calibration_menu, calibration_image_circle_menu,
 					INT_MAX);
-			menu_add_submenu(calibration_menu,
-					calibration_reset_viewer_compass_menu, INT_MAX);
-			menu_add_submenu(calibration_menu,
-					calibration_reset_vehicle_compass_menu, INT_MAX);
-			menu_add_submenu(calibration_menu, calibration_record_menu, INT_MAX);	//save is last
+			menu_add_submenu(calibration_menu, calibration_viewer_compass_menu,
+					INT_MAX);
+			menu_add_submenu(calibration_menu, calibration_vehicle_compass_menu,
+					INT_MAX);
+			menu_add_submenu(calibration_menu, calibration_record_menu,
+					INT_MAX);	//save is last
 			menu_add_submenu(menu, calibration_menu, INT_MAX);	//add main menu
 		}
 		{
