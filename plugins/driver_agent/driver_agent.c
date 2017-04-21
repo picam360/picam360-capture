@@ -587,15 +587,10 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 			break;
 		}
 		{
-			float *quat;
 			switch (button) {
 			case NEXT_BUTTON:
 			case BACK_BUTTON:
-				quat = lg_plugin_host->get_view_quaternion();
-				if (quat) {
-					memcpy(lg_target_quaternion, quat,
-							sizeof(lg_target_quaternion));
-				}
+				lg_target_quaternion = lg_plugin_host->get_view_quaternion();
 			}
 		}
 	} else if (!lg_plugin_host->get_menu_visible()) {

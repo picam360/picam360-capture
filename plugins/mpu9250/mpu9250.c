@@ -32,6 +32,10 @@ static VECTOR4D_T lg_quat_after_offse = { };
 static float lg_north = 0;
 static int lg_north_count = 0;
 
+static float lg_offset_pitch = 0;
+static float lg_offset_yaw = 0;
+static float lg_offset_roll = 0;
+
 static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
@@ -76,7 +80,7 @@ static void *threadFunc(void *data) {
 			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
-			memcpy(compass_mat, lg_compass, sizeof(float) * 4);
+			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
 
 			mat4_transpose(compass_mat, compass_mat);
 			mat4_multiply(compass_mat, compass_mat, matrix);
@@ -92,15 +96,14 @@ static void *threadFunc(void *data) {
 			}
 		}
 		{ //calib
-			QUATERNION_T quat_offset = quaternion_init();
+			VECTOR4D_T quat_offset = quaternion_init();
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_z(lg_offset_roll));
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_x(lg_offset_pitch));
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_y(lg_offset_yaw));
-			*((QUATERNION_T*) lg_quat_after_offset) = quaternion_multiply(
-					quat_offset, lg_quat); // Rv=RvRvo
+			lg_quat_after_offset = quaternion_multiply(quat_offset, lg_quat); // Rv=RvRvo
 		}
 
 		usleep(5000);
@@ -173,10 +176,6 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 		break;
 	}
 }
-
-static float lg_offset_pitch = 0;
-static float lg_offset_yaw = 0;
-static float lg_offset_roll = 0;
 
 static void init_options(void *user_data, json_t *options) {
 	lg_offset_pitch = json_number_value(
