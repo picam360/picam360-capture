@@ -53,7 +53,6 @@ enum SYSTEM_CMD {
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 #define MAX_DELAY_COUNT 256
-static float lg_video_delay = 0.0;
 static float lg_bandwidth = 0.0;
 
 static bool lg_is_converting = false;
@@ -153,11 +152,9 @@ static int picam360_driver_xmp(char *buff, int buff_len, float light0_value,
 				sprintf(buff + xmp_len,
 						"<picam360_driver"
 								" light0_value=\"%f\" light1_value=\"%f\""
-								" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\""
-								" video_delay=\"%f\"", light0_value,
-						light1_value, motor0_value, motor1_value, motor2_value,
-						motor3_value, lg_video_delay, lg_command_id,
-						lg_command);
+								" motor0_value=\"%f\" motor1_value=\"%f\" motor2_value=\"%f\" motor3_value=\"%f\"",
+						light0_value, light1_value, motor0_value, motor1_value,
+						motor2_value, motor3_value);
 		if (lg_ack_command_id != lg_command_id) {
 			xmp_len += sprintf(buff + xmp_len,
 					" command_id=\"%d\" command=\"%s\"", lg_command_id,
@@ -215,8 +212,8 @@ static void parse_xml(char *xml) {
 			q_str = strstr(xml, "<compass_max ");
 			if (q_str) {
 				sscanf(q_str, "<compass_max x=\"%f\" y=\"%f\" z=\"%f\" />",
-						&lg_compass_min[0], &lg_compass_min[1],
-						&lg_compass_min[2]);
+						&lg_compass_max[0], &lg_compass_max[1],
+						&lg_compass_max[2]);
 			}
 		}
 
@@ -483,18 +480,17 @@ static void command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
 			== 0) {
 		lg_is_compass_calib = true;
-		for (int i = 0; i < 3; i++) {
-			lg_compass_min[i] = INT_MAX;
-			lg_compass_max[i] = -INT_MAX;
-		}
 		lg_command_id++;
 		sprintf(lg_command, "picam360_driver.start_compass_calib");
 
+		printf("start_compass_calib : completed\n");
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
 			== 0) {
 		lg_is_compass_calib = false;
 		lg_command_id++;
 		sprintf(lg_command, "picam360_driver.stop_compass_calib");
+
+		printf("stop_compass_calib : completed\n");
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
@@ -524,7 +520,10 @@ static void command_handler(void *user_data, const char *_buff) {
 		if (param != NULL) {
 			float value = 0;
 			sscanf(param, "%f", &value);
-			lg_video_delay = MAX(MIN(value,MAX_DELAY_COUNT), 0);
+
+			lg_command_id++;
+			sprintf(lg_command, "picam360_driver.set_video_delay %f", value);
+
 			printf("set_video_delay : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff))
@@ -686,32 +685,12 @@ static void init_options(void *user_data, json_t *options) {
 			json_object_get(options, PLUGIN_NAME ".i_gain"));
 	lg_d_gain = json_number_value(
 			json_object_get(options, PLUGIN_NAME ".d_gain"));
-	lg_video_delay = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".video_delay"));
-
-	for (int i = 0; i < 3; i++) {
-		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
-		lg_compass_min[i] = json_number_value(json_object_get(options, buff));
-		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
-		lg_compass_max[i] = json_number_value(json_object_get(options, buff));
-	}
 }
 
 static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
 	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
 	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
-	json_object_set_new(options, PLUGIN_NAME ".video_delay",
-			json_real(lg_video_delay));
-
-	for (int i = 0; i < 3; i++) {
-		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
-		json_object_set_new(options, buff, json_real(lg_compass_min[i]));
-		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
-		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
-	}
 
 	lg_command_id++;
 	sprintf(lg_command, "picam360_driver.save");
