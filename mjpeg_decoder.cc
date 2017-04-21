@@ -62,7 +62,7 @@ public:
 		pthread_mutex_init(&packets_mlock, NULL);
 		mrevent_init(&packet_ready);
 		xmp_info = false;
-		memset(quaternion, 0, sizeof(quaternion));
+		memset(&quaternion, 0, sizeof(quaternion));
 	}
 	~_FRAME_T() {
 		_FRAME_T *frame = this;
@@ -82,7 +82,7 @@ public:
 	pthread_mutex_t packets_mlock;
 	MREVENT_T packet_ready;
 	bool xmp_info;
-	float quaternion[4];
+	VECTOR4D_T quaternion;
 };
 class _SENDFRAME_ARG_T {
 public:
@@ -105,7 +105,7 @@ public:
 		resize = NULL;
 		memset(tunnel, 0, sizeof(tunnel));
 		xmp_info = false;
-		memset(quaternion, 0, sizeof(quaternion));
+		memset(&quaternion, 0, sizeof(quaternion));
 		fillbufferdone_count = 0;
 	}
 	void *user_data;
@@ -128,7 +128,7 @@ public:
 	COMPONENT_T* egl_render;
 	TUNNEL_T tunnel[3];
 	bool xmp_info;
-	float quaternion[4];
+	VECTOR4D_T quaternion;
 	int fillbufferdone_count;
 };
 
@@ -519,8 +519,7 @@ static void *sendframe_thread_func(void* arg) {
 
 				if (packet->eof) {
 					send_frame_arg->xmp_info = frame->xmp_info;
-					memcpy(send_frame_arg->quaternion, frame->quaternion,
-							sizeof(send_frame_arg->quaternion));
+					send_frame_arg->quaternion = frame->quaternion;
 					delete packet;
 					break;
 				} else {
@@ -568,10 +567,10 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
 				&quaternion[0], &quaternion[1], &quaternion[2], &quaternion[3]);
 		//convert from mpu coodinate to opengl coodinate
-		frame->quaternion[0] = quaternion[1]; //x
-		frame->quaternion[1] = quaternion[3]; //y : swap y and z
-		frame->quaternion[2] = -quaternion[2]; //z : swap y and z
-		frame->quaternion[3] = quaternion[0]; //w
+		frame->quaternion.ary[0] = quaternion[1]; //x
+		frame->quaternion.ary[1] = quaternion[3]; //y : swap y and z
+		frame->quaternion.ary[2] = -quaternion[2]; //z : swap y and z
+		frame->quaternion.ary[3] = quaternion[0]; //w
 	}
 }
 
