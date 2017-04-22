@@ -94,8 +94,8 @@ static void *threadFunc(void *data) {
 			lg_north = (lg_north * lg_north_count + north)
 					/ (lg_north_count + 1);
 			lg_north_count++;
-			if (lg_north_count > 1000) {
-				lg_north_count = 1000;
+			if (lg_north_count > 100) {
+				lg_north_count = 100;
 			}
 		}
 		{ //calib
@@ -108,13 +108,14 @@ static void *threadFunc(void *data) {
 					quaternion_get_from_y(lg_offset_yaw));
 			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
 			lg_quat_after_offset = quaternion_multiply(
-					quaternion_get_from_z(north * M_PI / 180),
+					quaternion_get_from_z(-lg_north * M_PI / 180),
 					lg_quat_after_offset); // Rv=RvoRvRn
 
 			float x, y, z;
-			quaternion_get_euler(lg_quat_after_offset, &x, &y, &z,
+			quaternion_get_euler(lg_quat_after_offset, &z, &x, &y,
 					EULER_SEQUENCE_YXZ);
-			printf("north %f\n", y * 180 / M_PI)
+			printf("north %f\n", y * 180 / M_PI);
+			printf("north %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 		}
 
 		usleep(5000);

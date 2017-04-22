@@ -88,11 +88,11 @@ static void threeaxisrot(float r11, float r12, float r21, float r31, float r32,
 	res[2] = atan2(r11, r12);
 }
 
-void quaternion_get_euler(VECTOR4D_T q, float *_x, float *_y, float *_z,
+void quaternion_get_euler(VECTOR4D_T q, float *r1, float *r2, float *r3,
 		enum EULER_SEQUENCE seq) {
 	float res[3];
 
-	switch (rotSeq) {
+	switch (seq) {
 	case EULER_SEQUENCE_ZYX:
 		threeaxisrot(2 * (q.x * q.y + q.w * q.z),
 				q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z,
@@ -174,13 +174,13 @@ void quaternion_get_euler(VECTOR4D_T q, float *_x, float *_y, float *_z,
 		break;
 	}
 
-	if (_x) {
-		*_x = res[0];
+	if (r1) {
+		*r1 = res[2];
 	}
 	if (_y) {
-		*_y = res[1];
+		*r2 = res[1];
 	}
 	if (_z) {
-		*_z = res[2];
+		*r3 = res[0];
 	}
 }

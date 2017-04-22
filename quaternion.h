@@ -32,4 +32,4 @@ VECTOR4D_T quaternion_get_from_z(float rad);
 VECTOR4D_T quaternion_multiply(VECTOR4D_T a, VECTOR4D_T b); // Q = QbQa
 VECTOR4D_T quaternion_conjugate(VECTOR4D_T q);
 VECTOR4D_T quaternion_normalize(VECTOR4D_T a);
-void quaternion_get_euler(VECTOR4D_T q, float *x, float *y, float *z, enum EULER_SEQUENCE seq);
+void quaternion_get_euler(VECTOR4D_T q, float *r1, float *r2, float *r3, enum EULER_SEQUENCE seq);
