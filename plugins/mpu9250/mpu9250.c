@@ -108,13 +108,12 @@ static void *threadFunc(void *data) {
 					quaternion_get_from_y(lg_offset_yaw));
 			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
 			lg_quat_after_offset = quaternion_multiply(
-					quaternion_get_from_z(-lg_north * M_PI / 180),
+					quaternion_get_from_y(-lg_north * M_PI / 180),
 					lg_quat_after_offset); // Rv=RvoRvRn
 
 			float x, y, z;
-			quaternion_get_euler(lg_quat_after_offset, &z, &x, &y,
+			quaternion_get_euler(lg_quat_after_offset, &y, &x, &z,
 					EULER_SEQUENCE_YXZ);
-			printf("north %f\n", y * 180 / M_PI);
 			printf("north %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 		}
 

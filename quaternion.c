@@ -177,10 +177,10 @@ void quaternion_get_euler(VECTOR4D_T q, float *r1, float *r2, float *r3,
 	if (r1) {
 		*r1 = res[2];
 	}
-	if (_y) {
+	if (r2) {
 		*r2 = res[1];
 	}
-	if (_z) {
+	if (r3) {
 		*r3 = res[0];
 	}
 }
