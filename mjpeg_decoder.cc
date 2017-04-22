@@ -563,14 +563,8 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 	char *q_str = NULL;
 	q_str = strstr(xml, "<quaternion");
 	if (q_str) {
-		float quaternion[4];
-		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&quaternion[0], &quaternion[1], &quaternion[2], &quaternion[3]);
-		//convert from mpu coodinate to opengl coodinate
-		frame->quaternion.ary[0] = quaternion[1]; //x
-		frame->quaternion.ary[1] = quaternion[3]; //y : swap y and z
-		frame->quaternion.ary[2] = -quaternion[2]; //z : swap y and z
-		frame->quaternion.ary[3] = quaternion[0]; //w
+		sscanf(q_str, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
+				&frame->quaternion.x, &frame->quaternion.y, &frame->quaternion.z, &frame->quaternion.w);
 	}
 }
 
