@@ -72,8 +72,6 @@ static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
-static VECTOR4D_T lg_quat = { .ary = { 0, 0, 0, 1 } };
-static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
 static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
 
 static bool lg_pid_enabled = false;
@@ -176,17 +174,19 @@ static void parse_xml(char *xml) {
 	char *q_str = NULL;
 	q_str = strstr(xml, "<quaternion ");
 	if (q_str) {
+		VECTOR4D_T quat = { .ary = { 0, 0, 0, 1 } };
 		sscanf(q_str, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
-				&lg_quat.x, &lg_quat.y, &lg_quat.z, &lg_quat.w);
+				&quat.x, &quat.y, &quat.z, &quat.w);
 
-		lg_plugin_host->set_camera_quaternion(-1, lg_quat);
+		lg_plugin_host->set_camera_quaternion(-1, quat);
 	}
 	q_str = strstr(xml, "<compass ");
 	if (q_str) {
-		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &lg_compass.x,
-				&lg_compass.y, &lg_compass.z);
+		VECTOR4D_T compass = { .ary = { 0, 0, 0, 1 } };
+		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &compass.x,
+				&compass.y, &compass.z);
 
-		lg_plugin_host->set_camera_compass(lg_compass);
+		lg_plugin_host->set_camera_compass(compass);
 
 		if (lg_is_compass_calib) {
 			q_str = strstr(xml, "<compass_min ");
@@ -703,7 +703,8 @@ static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
 	float north;
-	quaternion_get_euler(lg_quat, &north, NULL, NULL,
+	VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
+	quaternion_get_euler(quat, &north, NULL, NULL,
 			EULER_SEQUENCE_YXZ);
 	cur += swprintf(lg_info, MAX_INFO_LEN,
 			L"N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d", north * 180 / M_PI, lg_bandwidth, lg_fps[0],
