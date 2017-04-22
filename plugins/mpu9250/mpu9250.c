@@ -36,6 +36,16 @@ static float lg_offset_pitch = 0;
 static float lg_offset_yaw = 0;
 static float lg_offset_roll = 0;
 
+static float sub_angle(float a, float b) {
+	float v = a - b;
+	v -= floor(v / 360) * 360;
+	if (v > 180.0) {
+		v -= 360.0;
+	}
+	return v;
+}
+
+static bool lg_debugdump = false;
 static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
@@ -65,7 +75,7 @@ static void *threadFunc(void *data) {
 			//convert from mpu coodinate to opengl coodinate
 			lg_compass.ary[0] = calib[1];
 			lg_compass.ary[1] = -calib[0];
-			lg_compass.ary[2] = -calib[2];
+			lg_compass.ary[2] = calib[2];
 			lg_compass.ary[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
@@ -79,25 +89,39 @@ static void *threadFunc(void *data) {
 
 			float matrix[16];
 			mat4_fromQuat(matrix, lg_quat.ary);
-			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
 			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
+			if (lg_debugdump) {
+				printf("compass1 %f : %f, %f, %f\n", lg_north, compass_mat[0],
+						compass_mat[1], compass_mat[2]);
+			}
 
 			mat4_transpose(compass_mat, compass_mat);
 			mat4_multiply(compass_mat, compass_mat, matrix);
 			mat4_transpose(compass_mat, compass_mat);
 
+			if (lg_debugdump) {
+				printf("compass2 %f : %f, %f, %f\n", lg_north, compass_mat[0],
+						compass_mat[1], compass_mat[2]);
+			}
+
 			north = -atan2(compass_mat[0], compass_mat[2]) * 180 / M_PI; // start from z axis
 
-			lg_north = (lg_north * lg_north_count + north)
-					/ (lg_north_count + 1);
+			lg_north = lg_north
+					+ sub_angle(lg_north, north) / (lg_north_count + 1);
 			lg_north_count++;
 			if (lg_north_count > 100) {
 				lg_north_count = 100;
 			}
 		}
 		{ //calib
+			float x, y, z;
+			if (lg_debugdump) {
+				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("original %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+						y * 180 / M_PI, z * 180 / M_PI);
+			}
 			VECTOR4D_T quat_offset = quaternion_init();
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_z(lg_offset_roll));
@@ -106,9 +130,18 @@ static void *threadFunc(void *data) {
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_y(lg_offset_yaw));
 			lg_quat = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
+			if (lg_debugdump) {
+				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+						y * 180 / M_PI, z * 180 / M_PI);
+			}
 			lg_quat = quaternion_multiply(
-					quaternion_get_from_y(-lg_north * M_PI / 180),
-					lg_quat); // Rv=RvoRvRn
+					quaternion_get_from_y(-lg_north * M_PI / 180), lg_quat); // Rv=RvoRvRn
+			if (lg_debugdump) {
+				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("north   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+						y * 180 / M_PI, z * 180 / M_PI);
+			}
 		}
 
 		usleep(5000);
@@ -225,10 +258,8 @@ static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
 	float north;
-	quaternion_get_euler(lg_quat, &north, NULL, NULL,
-			EULER_SEQUENCE_YXZ);
-	cur += swprintf(lg_info, MAX_INFO_LEN,
-			L"N %.1f", north * 180 / M_PI);
+	quaternion_get_euler(lg_quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
+	cur += swprintf(lg_info, MAX_INFO_LEN, L"N %.1f", north * 180 / M_PI);
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
 				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
