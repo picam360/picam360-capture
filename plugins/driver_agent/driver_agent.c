@@ -72,9 +72,8 @@ static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
+static VECTOR4D_T lg_quat = { .ary = { 0, 0, 0, 1 } };
 static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
-static float lg_north = 0;
-static float lg_north_count = 0;
 static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
 
 static bool lg_pid_enabled = false;
@@ -177,28 +176,15 @@ static void parse_xml(char *xml) {
 	char *q_str = NULL;
 	q_str = strstr(xml, "<quaternion ");
 	if (q_str) {
-		VECTOR4D_T quat = { };
-		float quaternion[4];
-		sscanf(q_str, "<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-				&quaternion[0], &quaternion[1], &quaternion[2], &quaternion[3]);
-		//convert from mpu coodinate to opengl coodinate
-		quat.ary[0] = quaternion[1]; //x
-		quat.ary[1] = quaternion[3]; //y : swap y and z
-		quat.ary[2] = -quaternion[2]; //z : swap y and z
-		quat.ary[3] = quaternion[0]; //w
+		sscanf(q_str, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
+				&lg_quat.x, &lg_quat.y, &lg_quat.z, &lg_quat.w);
 
-		lg_plugin_host->set_camera_quaternion(-1, quat);
+		lg_plugin_host->set_camera_quaternion(-1, lg_quat);
 	}
 	q_str = strstr(xml, "<compass ");
 	if (q_str) {
-		float compass[3];
-		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &compass[0],
-				&compass[1], &compass[2]);
-		//convert from mpu coodinate to opengl coodinate
-		lg_compass.ary[0] = compass[1];
-		lg_compass.ary[1] = -compass[0];
-		lg_compass.ary[2] = -compass[2];
-		lg_compass.ary[3] = 1.0;
+		sscanf(q_str, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", &lg_compass.x,
+				&lg_compass.y, &lg_compass.z);
 
 		lg_plugin_host->set_camera_compass(lg_compass);
 
@@ -215,32 +201,6 @@ static void parse_xml(char *xml) {
 						&lg_compass_max[0], &lg_compass_max[1],
 						&lg_compass_max[2]);
 			}
-		}
-
-		{ //north
-			float north = 0;
-
-			float matrix[16];
-			VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
-			mat4_fromQuat(matrix, quat.ary);
-			mat4_invert(matrix, matrix);
-
-			float compass_mat[16] = { };
-			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
-
-			mat4_transpose(compass_mat, compass_mat);
-			mat4_multiply(compass_mat, compass_mat, matrix);
-			mat4_transpose(compass_mat, compass_mat);
-
-			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
-
-			lg_north = (lg_north * lg_north_count + north)
-					/ (lg_north_count + 1);
-			lg_north_count++;
-			if (lg_north_count > 1000) {
-				lg_north_count = 1000;
-			}
-			lg_plugin_host->set_camera_north(lg_north);
 		}
 	}
 	q_str = strstr(xml, "<temperature ");
@@ -742,8 +702,11 @@ static void init() {
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
+	float north;
+	quaternion_get_euler(lg_quat, &north, NULL, NULL,
+			EULER_SEQUENCE_YXZ);
 	cur += swprintf(lg_info, MAX_INFO_LEN,
-			L"rx %.1f Mbps, fps %.1f:%.1f skip %d:%d", lg_bandwidth, lg_fps[0],
+			L"N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d", north * 180 / M_PI, lg_bandwidth, lg_fps[0],
 			lg_fps[1], lg_frameskip[0], lg_frameskip[1]);
 	if (rtp_is_recording(NULL)) {
 		char *path;

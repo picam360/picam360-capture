@@ -29,7 +29,6 @@ static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static VECTOR4D_T lg_compass = { };
 static VECTOR4D_T lg_quat = { };
-static VECTOR4D_T lg_quat_after_offset = { };
 static float lg_north = 0;
 static int lg_north_count = 0;
 
@@ -106,15 +105,10 @@ static void *threadFunc(void *data) {
 					quaternion_get_from_x(lg_offset_pitch));
 			quat_offset = quaternion_multiply(quat_offset,
 					quaternion_get_from_y(lg_offset_yaw));
-			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
-			lg_quat_after_offset = quaternion_multiply(
+			lg_quat = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
+			lg_quat = quaternion_multiply(
 					quaternion_get_from_y(-lg_north * M_PI / 180),
-					lg_quat_after_offset); // Rv=RvoRvRn
-
-			float x, y, z;
-			quaternion_get_euler(lg_quat_after_offset, &y, &x, &z,
-					EULER_SEQUENCE_YXZ);
-			printf("north %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
+					lg_quat); // Rv=RvoRvRn
 		}
 
 		usleep(5000);
@@ -143,7 +137,7 @@ static void init() {
 }
 
 static VECTOR4D_T get_quaternion() {
-	return lg_quat_after_offset;
+	return lg_quat;
 }
 
 static VECTOR4D_T get_compass() {
@@ -230,7 +224,11 @@ static void save_options(void *user_data, json_t *options) {
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
-	cur += swprintf(lg_info, MAX_INFO_LEN, L"");
+	float north;
+	quaternion_get_euler(lg_quat, &north, NULL, NULL,
+			EULER_SEQUENCE_YXZ);
+	cur += swprintf(lg_info, MAX_INFO_LEN,
+			L"N %.1f", north * 180 / M_PI);
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
 				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
