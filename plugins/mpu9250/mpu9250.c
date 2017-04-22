@@ -88,7 +88,7 @@ static void *threadFunc(void *data) {
 			mat4_multiply(compass_mat, compass_mat, matrix);
 			mat4_transpose(compass_mat, compass_mat);
 
-			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+			north = -atan2(compass_mat[0], compass_mat[2]) * 180 / M_PI; // start from z axis
 
 			lg_north = (lg_north * lg_north_count + north)
 					/ (lg_north_count + 1);
