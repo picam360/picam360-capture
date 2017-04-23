@@ -75,7 +75,7 @@ static void *threadFunc(void *data) {
 			//convert from mpu coodinate to opengl coodinate
 			lg_compass.ary[0] = calib[1];
 			lg_compass.ary[1] = -calib[0];
-			lg_compass.ary[2] = calib[2];
+			lg_compass.ary[2] = -calib[2];
 			lg_compass.ary[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
@@ -89,6 +89,7 @@ static void *threadFunc(void *data) {
 
 			float matrix[16];
 			mat4_fromQuat(matrix, lg_quat.ary);
+			mat4_invert(matrix, matrix);
 
 			float compass_mat[16] = { };
 			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
@@ -106,10 +107,10 @@ static void *threadFunc(void *data) {
 						compass_mat[1], compass_mat[2]);
 			}
 
-			north = -atan2(compass_mat[0], compass_mat[2]) * 180 / M_PI; // start from z axis
+			north = atan2(compass_mat[0], compass_mat[2]) * 180 / M_PI; // start from z axis
 
 			lg_north = lg_north
-					+ sub_angle(lg_north, north) / (lg_north_count + 1);
+					+ sub_angle(north - lg_north) / (lg_north_count + 1);
 			lg_north_count++;
 			if (lg_north_count > 100) {
 				lg_north_count = 100;
