@@ -110,7 +110,7 @@ static void *threadFunc(void *data) {
 			north = atan2(compass_mat[0], compass_mat[2]) * 180 / M_PI; // start from z axis
 
 			lg_north = lg_north
-					+ sub_angle(north - lg_north) / (lg_north_count + 1);
+					+ sub_angle(north, lg_north) / (lg_north_count + 1);
 			lg_north_count++;
 			if (lg_north_count > 100) {
 				lg_north_count = 100;
