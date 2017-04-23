@@ -272,6 +272,7 @@ static void loading_callback(void *user_data, int ret) {
 	printf("end of loading\n");
 }
 
+static bool lg_debugdump = false;
 void *transmit_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "DA TRANSMIT");
 
@@ -299,38 +300,45 @@ void *transmit_thread_func(void* arg) {
 			lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
 			if (lg_pid_enabled) {
+				float x, y, z;
+				if (lg_debugdump) {
+					quaternion_get_euler(lg_target_quaternion, &y, &x, &z,
+							EULER_SEQUENCE_YXZ);
+					printf("target  : %f, %f, %f\n", x * 180 / M_PI,
+							y * 180 / M_PI, z * 180 / M_PI);
+				}
 				VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
+				quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI));
+				if (lg_debugdump) {
+					quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+					printf("vehicle : %f, %f, %f\n", x * 180 / M_PI,
+							y * 180 / M_PI, z * 180 / M_PI);
+				}
 				//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
 				float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
 				float unif_matrix[16];
 				float camera_matrix[16];
 				float target_matrix[16];
-				float north_matrix[16];
 				mat4_identity(unif_matrix);
 				mat4_identity(camera_matrix);
 				mat4_identity(target_matrix);
-				mat4_identity(north_matrix);
 				mat4_fromQuat(camera_matrix, quat.ary);
 				mat4_fromQuat(target_matrix, lg_target_quaternion.ary);
 				mat4_invert(target_matrix, target_matrix);
-				// Rn
-				{
-					float north_diff = lg_plugin_host->get_view_north()
-							- lg_plugin_host->get_camera_north();
-					mat4_rotateY(north_matrix, north_matrix,
-							north_diff * M_PI / 180);
-				}
 				mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1
-				mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRt-1Rw
 				mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRt-1
 
 				mat4_transpose(vtg, vtg);
 				mat4_multiply(vtg, vtg, unif_matrix);
 				mat4_transpose(vtg, vtg);
 
+				if (lg_debugdump) {
+					printf("vehicle : %f, %f, %f\n", vtg[0], vtg[1], vtg[2]);
+				}
+
 				float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
 				lg_yaw_diff = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
-				lg_pitch_diff = atan2(xz, vtg[1]) * 180 / M_PI; //[-180:180]
+				lg_pitch_diff = atan2(xz, -vtg[1]) * 180 / M_PI; //[-180:180]
 
 				static float last_yaw = 0;
 				lg_delta_pid_time[0] = time;
@@ -704,11 +712,11 @@ static wchar_t *get_info(void *user_data) {
 	int cur = 0;
 	float north;
 	VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
-	quaternion_get_euler(quat, &north, NULL, NULL,
-			EULER_SEQUENCE_YXZ);
+	quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
 	cur += swprintf(lg_info, MAX_INFO_LEN,
-			L"N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d", north * 180 / M_PI, lg_bandwidth, lg_fps[0],
-			lg_fps[1], lg_frameskip[0], lg_frameskip[1]);
+			L"N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
+			north * 180 / M_PI, lg_bandwidth, lg_fps[0], lg_fps[1],
+			lg_frameskip[0], lg_frameskip[1]);
 	if (rtp_is_recording(NULL)) {
 		char *path;
 		rtp_is_recording(&path);
