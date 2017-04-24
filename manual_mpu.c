@@ -19,8 +19,8 @@
 
 #define MPU_NAME "manual"
 
-static VECTOR4D_T lg_compass = { };
-static VECTOR4D_T lg_quat = { };
+static VECTOR4D_T lg_compass = = {.ary = {0, 0, 0, 1}};
+static VECTOR4D_T lg_quat = = {.ary = {0, 0, 0, 1}};
 static float lg_north = 0;
 static float lg_temp = 0;
 
@@ -57,6 +57,9 @@ void create_manual_mpu(MPU_T **_mpu) {
 	*_mpu = mpu;
 }
 
-void manual_mpu_set(MPU_T *mpu, float x_deg, float y_deg, float z_deg){
-
+void manual_mpu_set(MPU_T *mpu, float x_deg, float y_deg, float z_deg) {
+	lg_quat = quaternion_init();
+	lg_quat = quaternion_multiply(lg_quat, quaternion_get_from_z(z_deg));
+	lg_quat = quaternion_multiply(lg_quat, quaternion_get_from_x(y_deg));
+	lg_quat = quaternion_multiply(lg_quat, quaternion_get_from_y(x_deg));
 }

@@ -1080,6 +1080,7 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		if ((enum SYSTEM_CMD) menu->user_data == SYSTEM_CMD_SHUTDOWN) {
+			system("sudo shutdown now");
 			exit(1);
 		}
 		break;
