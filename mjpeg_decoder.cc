@@ -142,7 +142,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
 		lg_plugin_host->set_cam_texture_cur(cam_num, cur);
-		if (send_frame_arg->last_frame && send_frame_arg->last_frame->xmp_info) {
+		if (send_frame_arg->last_frame
+				&& send_frame_arg->last_frame->xmp_info) {
 			lg_plugin_host->set_camera_quaternion(cam_num,
 					send_frame_arg->last_frame->quaternion);
 			lg_plugin_host->set_camera_offset(cam_num,
@@ -420,20 +421,27 @@ static void *sendframe_thread_func(void* arg) {
 			if (res != 0) {
 				continue;
 			}
-			_FRAME_T *frame;
+			_FRAME_T *frame = NULL;
 			pthread_mutex_lock(&send_frame_arg->frames_mlock);
 			while (1) {
-				frame = *(send_frame_arg->frames.begin());
-				send_frame_arg->frames.pop_front();
-				send_frame_arg->framecount++;
+				if (!send_frame_arg->frames.empty()) {
+					frame = *(send_frame_arg->frames.begin());
+					send_frame_arg->frames.pop_front();
+					send_frame_arg->framecount++;
+				}
 				if (send_frame_arg->frames.empty()) {
 					mrevent_reset(&send_frame_arg->frame_ready);
 					break;
+				} else {
+					send_frame_arg->frameskip++;
+					delete frame; //skip frame
+					frame = NULL;
 				}
-				send_frame_arg->frameskip++;
-				delete frame; //skip frame
 			}
 			pthread_mutex_unlock(&send_frame_arg->frames_mlock);
+			if (frame == NULL) {
+				continue;
+			}
 			while (send_frame_arg->cam_run) {
 				{ //fps
 					struct timeval time = { };
@@ -519,7 +527,7 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
-					if(send_frame_arg->last_frame != NULL) {
+					if (send_frame_arg->last_frame != NULL) {
 						delete send_frame_arg->last_frame;
 					}
 					send_frame_arg->last_frame = frame;
@@ -566,12 +574,15 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 	q_str = strstr(xml, "<quaternion");
 	if (q_str) {
 		sscanf(q_str, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
-				&frame->quaternion.x, &frame->quaternion.y, &frame->quaternion.z, &frame->quaternion.w);
+				&frame->quaternion.x, &frame->quaternion.y,
+				&frame->quaternion.z, &frame->quaternion.w);
 	}
 	q_str = strstr(xml, "<offset");
 	if (q_str) {
-		sscanf(q_str, "<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
-				&frame->offset.x, &frame->offset.y, &frame->offset.z, &frame->offset.w);
+		sscanf(q_str,
+				"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
+				&frame->offset.x, &frame->offset.y, &frame->offset.z,
+				&frame->offset.w);
 	}
 }
 
