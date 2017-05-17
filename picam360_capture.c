@@ -500,7 +500,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		}
 	}
 
-	json_dump_file(options, CONFIG_FILE, 0);
+	json_dump_file(options, CONFIG_FILE, JSON_INDENT(4));
 
 	json_decref(options);
 }
