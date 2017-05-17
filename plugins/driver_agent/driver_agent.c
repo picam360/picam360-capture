@@ -308,7 +308,7 @@ void *transmit_thread_func(void* arg) {
 							y * 180 / M_PI, z * 180 / M_PI);
 				}
 				VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
-				quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI));
+				//quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI)); //mpu offset
 				if (lg_debugdump) {
 					quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
 					printf("vehicle : %f, %f, %f\n", x * 180 / M_PI,
