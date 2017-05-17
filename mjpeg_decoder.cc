@@ -83,6 +83,7 @@ public:
 	MREVENT_T packet_ready;
 	bool xmp_info;
 	VECTOR4D_T quaternion;
+	VECTOR4D_T offset;
 };
 class _SENDFRAME_ARG_T {
 public:
@@ -106,6 +107,7 @@ public:
 		memset(tunnel, 0, sizeof(tunnel));
 		xmp_info = false;
 		memset(&quaternion, 0, sizeof(quaternion));
+		memset(&offset, 0, sizeof(offset));
 		fillbufferdone_count = 0;
 	}
 	void *user_data;
@@ -146,6 +148,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		if (send_frame_arg->xmp_info) {
 			lg_plugin_host->set_camera_quaternion(cam_num,
 					send_frame_arg->quaternion);
+			lg_plugin_host->set_camera_offset(cam_num,
+					send_frame_arg->offset);
 		}
 		lg_plugin_host->send_event(PICAM360_HOST_NODE_ID,
 				PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED + cam_num);
@@ -565,6 +569,11 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 	if (q_str) {
 		sscanf(q_str, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
 				&frame->quaternion.x, &frame->quaternion.y, &frame->quaternion.z, &frame->quaternion.w);
+	}
+	q_str = strstr(xml, "<offset");
+	if (q_str) {
+		sscanf(q_str, "<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
+				&frame->offset.x, &frame->offset.y, &frame->offset.z, &frame->offset.w);
 	}
 }
 

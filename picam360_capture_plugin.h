@@ -31,6 +31,8 @@ typedef struct _PLUGIN_HOST_T {
 	float (*get_view_temperature)();
 	float (*get_view_north)();
 
+	VECTOR4D_T (*get_camera_offset)(int cam_num);
+	void (*set_camera_offset)(int cam_num, VECTOR4D_T value);
 	VECTOR4D_T (*get_camera_quaternion)(int cam_num);
 	void (*set_camera_quaternion)(int cam_num, VECTOR4D_T value);
 	VECTOR4D_T (*get_camera_compass)();

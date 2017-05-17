@@ -1109,6 +1109,33 @@ static float get_view_north() {
 	return 0;
 }
 
+static VECTOR4D_T get_camera_offset(int cam_num) {
+	VECTOR4D_T ret = { };
+	pthread_mutex_lock(&state->mutex);
+
+	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+		ret.x = state->options.cam_offset_x[cam_num];
+		ret.y = state->options.cam_offset_y[cam_num];
+		ret.z = state->options.cam_offset_yaw[cam_num];
+		ret.w = state->options.cam_horizon_r[cam_num];
+	}
+
+	pthread_mutex_unlock(&state->mutex);
+	return ret;
+}
+static void set_camera_offset(int cam_num, VECTOR4D_T value) {
+	pthread_mutex_lock(&state->mutex);
+
+	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+		state->options.cam_offset_x[cam_num] = value.x;
+		state->options.cam_offset_y[cam_num] = value.y;
+		state->options.cam_offset_yaw[cam_num] = value.z;
+		state->options.cam_horizon_r[cam_num] = value.w;
+	}
+
+	pthread_mutex_unlock(&state->mutex);
+}
+
 static VECTOR4D_T get_camera_quaternion(int cam_num) {
 	VECTOR4D_T ret = { };
 	pthread_mutex_lock(&state->mutex);
@@ -1259,6 +1286,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_view_temperature = get_view_temperature;
 		state->plugin_host.get_view_north = get_view_north;
 
+		state->plugin_host.get_camera_offset = get_camera_offset;
+		state->plugin_host.set_camera_offset = set_camera_offset;
 		state->plugin_host.get_camera_quaternion = get_camera_quaternion;
 		state->plugin_host.set_camera_quaternion = set_camera_quaternion;
 		state->plugin_host.get_camera_compass = get_camera_compass;
