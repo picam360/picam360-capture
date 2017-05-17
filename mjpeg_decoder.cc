@@ -63,6 +63,7 @@ public:
 		mrevent_init(&packet_ready);
 		xmp_info = false;
 		memset(&quaternion, 0, sizeof(quaternion));
+		memset(&offset, 0, sizeof(offset));
 	}
 	~_FRAME_T() {
 		_FRAME_T *frame = this;
@@ -105,9 +106,6 @@ public:
 		video_decode = NULL;
 		resize = NULL;
 		memset(tunnel, 0, sizeof(tunnel));
-		xmp_info = false;
-		memset(&quaternion, 0, sizeof(quaternion));
-		memset(&offset, 0, sizeof(offset));
 		fillbufferdone_count = 0;
 	}
 	void *user_data;
@@ -124,13 +122,12 @@ public:
 	MREVENT_T buffer_ready;
 	pthread_t cam_thread;
 	_FRAME_T *active_frame;
+	_FRAME_T *last_frame;
 	COMPONENT_T* video_decode;
 	COMPONENT_T* resize;
 	OMX_BUFFERHEADERTYPE* egl_buffer[2];
 	COMPONENT_T* egl_render;
 	TUNNEL_T tunnel[3];
-	bool xmp_info;
-	VECTOR4D_T quaternion;
 	int fillbufferdone_count;
 };
 
@@ -145,11 +142,11 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
 		lg_plugin_host->set_cam_texture_cur(cam_num, cur);
-		if (send_frame_arg->xmp_info) {
+		if (send_frame_arg->last_frame && send_frame_arg->last_frame->xmp_info) {
 			lg_plugin_host->set_camera_quaternion(cam_num,
-					send_frame_arg->quaternion);
+					send_frame_arg->last_frame->quaternion);
 			lg_plugin_host->set_camera_offset(cam_num,
-					send_frame_arg->offset);
+					send_frame_arg->last_frame->offset);
 		}
 		lg_plugin_host->send_event(PICAM360_HOST_NODE_ID,
 				PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED + cam_num);
@@ -522,15 +519,16 @@ static void *sendframe_thread_func(void* arg) {
 				}
 
 				if (packet->eof) {
-					send_frame_arg->xmp_info = frame->xmp_info;
-					send_frame_arg->quaternion = frame->quaternion;
+					if(send_frame_arg->last_frame != NULL) {
+						delete send_frame_arg->last_frame;
+					}
+					send_frame_arg->last_frame = frame;
 					delete packet;
 					break;
 				} else {
 					delete packet;
 				}
 			}
-			delete frame;
 		}
 
 		buf->nFilledLen = 0;
