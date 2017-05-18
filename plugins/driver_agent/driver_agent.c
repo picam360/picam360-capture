@@ -514,6 +514,32 @@ static void command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
 		rtp_stop_loading();
 		printf("stop_loading : completed\n");
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_x", sizeof(buff))
+			== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			sscanf(param, "%d=%f", &cam_num, &value);
+
+			lg_command_id++;
+			sprintf(lg_command, "picam360_driver.add_camera_offset_x %d=%f", cam_num, value);
+
+			printf("add_camera_offset_x : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_y", sizeof(buff))
+			== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			sscanf(param, "%d=%f", &cam_num, &value);
+
+			lg_command_id++;
+			sprintf(lg_command, "picam360_driver.add_camera_offset_y %d=%f", cam_num, value);
+
+			printf("add_camera_offset_y : completed\n");
+		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".n", sizeof(buff)) == 0) {
 		struct timeval time;
 		gettimeofday(&time, NULL);
