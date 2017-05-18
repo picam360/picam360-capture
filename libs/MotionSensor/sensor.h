@@ -2,7 +2,7 @@
 #define SENSOR_H
 
 extern "C"{
-int ms_open();
+int ms_open(int i2c_ch);
 int ms_update();
 int ms_close();
 }

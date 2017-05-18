@@ -22,6 +22,8 @@
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
+static int lg_i2c_ch = 1;
+
 static bool lg_is_compass_calib = false;
 static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
@@ -50,7 +52,7 @@ static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
 	do {
-		ms_update();
+		ms_update(lg_i2c_ch);
 
 		{ //compas : calibration
 			float calib[3];
@@ -226,6 +228,8 @@ static void init_options(void *user_data, json_t *options) {
 			json_object_get(options, PLUGIN_NAME ".offset_yaw"));
 	lg_offset_roll = json_number_value(
 			json_object_get(options, PLUGIN_NAME ".offset_roll"));
+	lg_i2c_ch = json_number_value(
+			json_object_get(options, PLUGIN_NAME ".i2c_ch"));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
@@ -244,6 +248,7 @@ static void save_options(void *user_data, json_t *options) {
 			json_real(lg_offset_yaw));
 	json_object_set_new(options, PLUGIN_NAME ".offset_roll",
 			json_real(lg_offset_roll));
+	json_object_set_new(options, PLUGIN_NAME ".i2c_ch", json_real(lg_i2c_ch));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];

@@ -57,7 +57,11 @@ THE SOFTWARE.
 #include <linux/i2c-dev.h>
 #include "I2Cdev.h"
 
-#define I2C_DEVFILE "/dev/i2c-3"
+static char I2C_DEVFILE[256] = "/dev/i2c-3";
+
+ void setDeviceFilePath(char *path) {
+	 strncpy(I2C_DEVFILE, path, sizeof(I2C_DEVFILE));
+ }
 
 /** Default timeout value for read operations.
  * Set this to 0 to disable timeout detection.
