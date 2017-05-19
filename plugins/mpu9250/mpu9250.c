@@ -52,7 +52,7 @@ static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
 	do {
-		ms_update(lg_i2c_ch);
+		ms_update();
 
 		{ //compas : calibration
 			float calib[3];
@@ -161,7 +161,7 @@ static void init() {
 		is_init = true;
 	}
 
-	ms_open();
+	ms_open(lg_i2c_ch);
 
 	//do{
 	//	ms_update();
