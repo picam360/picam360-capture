@@ -72,7 +72,7 @@ static void *threadFunc(void *data) {
 					calib[0] * calib[0] + calib[1] * calib[1]
 							+ calib[2] * calib[2]);
 			for (int i = 0; i < 3; i++) {
-				calib[i] /= norm;
+				calib[i] /= (norm == 0 ? 1 : norm);
 			}
 			//convert from mpu coodinate to opengl coodinate
 			lg_compass.ary[0] = calib[1];
