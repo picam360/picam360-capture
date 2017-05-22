@@ -101,6 +101,7 @@ public:
 		mrevent_init(&frame_ready);
 		mrevent_init(&buffer_ready);
 		active_frame = NULL;
+		last_frame = NULL;
 		memset(egl_buffer, 0, sizeof(egl_buffer));
 		egl_render = NULL;
 		video_decode = NULL;
