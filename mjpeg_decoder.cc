@@ -142,6 +142,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	int cam_num = send_frame_arg->cam_num;
 	int cur = send_frame_arg->fillbufferdone_count % 2;
 	if (lg_plugin_host) {
+		lg_plugin_host->lock_texture();
 		lg_plugin_host->set_cam_texture_cur(cam_num, cur);
 		if (send_frame_arg->last_frame
 				&& send_frame_arg->last_frame->xmp_info) {
@@ -150,6 +151,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 			lg_plugin_host->set_camera_offset(cam_num,
 					send_frame_arg->last_frame->offset);
 		}
+		lg_plugin_host->unlock_texture();
 		lg_plugin_host->send_event(PICAM360_HOST_NODE_ID,
 				PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED + cam_num);
 	}

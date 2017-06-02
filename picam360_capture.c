@@ -725,6 +725,7 @@ void frame_handler() {
 			unsigned char *image_buffer_double = frame->img_buff;
 			img_width = frame->width * 2;
 			img_height = frame->height;
+			state->plugin_host.lock_texture();
 			for (int split = 0; split < 2; split++) {
 				state->split = split + 1;
 				redraw_render_texture(state, frame,
@@ -742,12 +743,14 @@ void frame_handler() {
 							frame->width * 3);
 				}
 			}
+			state->plugin_host.unlock_texture();
 			free(image_buffer);
 		} else {
 			unsigned char *image_buffer = frame->img_buff;
 			img_width = frame->width;
 			img_height = frame->height;
 			state->split = 0;
+			//state->plugin_host.lock_texture();
 			redraw_render_texture(state, frame,
 					&state->model_data[frame->operation_mode]);
 			glFinish();
@@ -755,6 +758,7 @@ void frame_handler() {
 			glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
 					GL_UNSIGNED_BYTE, image_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			//state->plugin_host.unlock_texture();
 		}
 
 		switch (frame->output_mode) {
@@ -1537,7 +1541,6 @@ int main(int argc, char *argv[]) {
  ***********************************************************/
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model) {
-	state->plugin_host.lock_texture();
 
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
@@ -1722,7 +1725,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	state->plugin_host.unlock_texture();
 }
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
