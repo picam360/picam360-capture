@@ -469,6 +469,7 @@ static void *record_thread_func(void* arg) {
 		header[7] = (unsigned char) '\0';
 		write(fd, header, sizeof(header));
 		write(fd, pack->GetPacketData(), pack->GetPacketLength());
+		fsync(fd);//this avoid that file size would be zero after os crash
 #ifdef USE_JRTP
 		lg_sess.DeletePacket(pack);
 #else

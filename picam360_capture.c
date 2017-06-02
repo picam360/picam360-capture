@@ -1648,8 +1648,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 				aspect_ratio);
 	}
 	{
-		float aspect_ratio = (float) frame->width
-				/ (float) frame->height;
+		float aspect_ratio = (float) frame->width / (float) frame->height;
 		glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"),
 				aspect_ratio);
 	}
