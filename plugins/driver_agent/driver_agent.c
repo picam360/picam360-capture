@@ -748,7 +748,7 @@ static void init() {
 	}
 	is_init = true;
 
-	init_rtp(9002, "192.168.4.1", 9004);
+	init_rtp(9002, "192.168.4.1", 9004, 0);
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	set_kokuyoseki_callback((KOKUYOSEKI_CALLBACK) kokuyoseki_callback);

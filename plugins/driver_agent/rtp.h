@@ -9,7 +9,7 @@ extern "C" {
 typedef void (*RTP_LOADING_CALLBACK)(void *user_data, int ret);
 
 int init_rtp(unsigned short portbase, char *destip_str,
-		unsigned short destport);
+		unsigned short destport, float bandwidth_limit);
 int deinit_rtp();
 int rtp_sendpacket(unsigned char *data, int data_len, int pt);
 void rtp_start_recording(char *path);

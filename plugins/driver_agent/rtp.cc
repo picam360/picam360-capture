@@ -34,7 +34,9 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#ifdef USE_JRTP
+//#define USE_SOCKET
+
+#if defined USE_JRTP
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
 #include "rtpipv4address.h"
@@ -48,6 +50,12 @@ using namespace jrtplib;
 static RTPSession lg_sess;
 
 #else
+
+#if defined USE_SOCKET
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#endif
 
 struct RTPHeader {
 #ifdef RTP_BIG_ENDIAN
@@ -156,7 +164,7 @@ static uint64_t lg_play_time = 0;
 static RTP_CALLBACK lg_callback = NULL;
 
 static float lg_bandwidth = 0;
-static float lg_bandwidth_limit = 24 * 1024 * 1024; //24Mbps
+static float lg_bandwidth_limit = 100 * 1024 * 1024; //100Mbps
 
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
@@ -197,6 +205,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 #ifdef USE_JRTP
 		int status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
+#elif defined USE_SOCKET
 #else
 		if (lg_tx_fd < 0) {
 			lg_tx_fd = open("rtp_tx", O_WRONLY);
@@ -229,6 +238,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			delete pack;
 		}
 #endif
+		if(lg_bandwidth_limit > 0)
 		{ //limit bandwidth
 			struct timeval time2 = { };
 			gettimeofday(&time2, NULL);
@@ -585,12 +595,13 @@ static void *load_thread_func(void* arg) {
 
 static bool is_init = false;
 int init_rtp(unsigned short portbase, char *destip_str,
-		unsigned short destport) {
+		unsigned short destport, float bandwidth_limit) {
 	if (is_init) {
 		return -1;
 	}
 	is_init = true;
 
+	lg_bandwidth_limit = bandwidth_limit;
 	lg_receive_run = true;
 
 #ifdef USE_JRTP
