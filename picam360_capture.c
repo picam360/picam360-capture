@@ -13,8 +13,8 @@
 #include <fcntl.h>
 #include <wchar.h>
 #include <pthread.h>
-#include <readline/readline.h>
-#include <readline/history.h>
+#include <editline/readline.h>
+#include <editline/history.h>
 
 #include "bcm_host.h"
 
@@ -1336,8 +1336,6 @@ void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 }
 
 int main(int argc, char *argv[]) {
-	EditLine *el;
-	History *myhistory;
 
 	create_oculus_rift_dk2(NULL, NULL); //this should be first, pthread_create is related
 
