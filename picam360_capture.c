@@ -13,6 +13,8 @@
 #include <fcntl.h>
 #include <wchar.h>
 #include <pthread.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "bcm_host.h"
 
@@ -1059,26 +1061,16 @@ void command_handler(const char *buff) {
 	}
 }
 
-void stdin_command_handler() {
-	while (inputAvailable()) {
-		char buff[256];
-		bool error = false;
-		for (int i = 0; i < sizeof(buff) - 1; i++) {
-			int n = read(STDIN_FILENO, &buff[i], 1);
-			if (n == 0) {
-				error = true;
-				break;
-			}
-			if (buff[i] == '\n') {
-				buff[i + 1] = '\0';
-				break;
-			}
-		}
-		if (error) {
-			break;
-		}
-		command_handler(buff);
+static void *readline_thread_func(void* arg) {
+	char *ptr;
+	using_history();
+	read_history(NULL);
+	while (ptr = readline("picam360>")) {
+		add_history(ptr);
+		command_handler(ptr);
+		free(ptr);
 	}
+	write_history(NULL);
 }
 
 //plugin host methods
@@ -1344,6 +1336,8 @@ void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 }
 
 int main(int argc, char *argv[]) {
+	EditLine *el;
+	History *myhistory;
 
 	create_oculus_rift_dk2(NULL, NULL); //this should be first, pthread_create is related
 
@@ -1474,11 +1468,14 @@ int main(int argc, char *argv[]) {
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
 
+	//readline
+	pthread_t readline_thread;
+	pthread_create(&readline_thread, NULL, readline_thread_func, (void*) NULL);
+
 	while (!terminate) {
 		struct timeval time = { };
 		gettimeofday(&time, NULL);
 
-		stdin_command_handler();
 		if (state->frame_sync) {
 			int res = 0;
 			for (int i = 0; i < state->num_of_cam; i++) {
