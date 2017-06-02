@@ -55,6 +55,12 @@
 #include <opencv/highgui.h>
 
 #define PATH "./"
+#define PICAM360_HISTORY_FILE ".picam360history"
+
+enum COMMAND_STATUS {
+	COMMAND_STATUS_NONE,
+	COMMAND_STATUS_EXIT,
+};
 
 #ifndef M_PI
 #define M_PI 3.141592654
@@ -809,7 +815,8 @@ void frame_handler() {
 
 static double calib_step = 0.01;
 
-void _command_handler(const char *_buff) {
+int _command_handler(const char *_buff) {
+	int ret = 0;
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd = strtok(buff, " \n");
@@ -817,7 +824,7 @@ void _command_handler(const char *_buff) {
 		//do nothing
 	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
 		printf("exit\n");
-		exit(0); //temporary
+		ret = COMMAND_STATUS_EXIT;
 	} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
 		state->active_cam = 0;
 	} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
@@ -1043,34 +1050,40 @@ void _command_handler(const char *_buff) {
 	} else {
 		printf("unknown command : %s\n", buff);
 	}
+	return ret;
 }
 
-void command_handler(const char *buff) {
+int command_handler(const char *buff) {
+	int ret = 0;
 	bool handled = false;
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		int name_len = strlen(state->plugins[i]->name);
 		if (strncmp(buff, state->plugins[i]->name, name_len) == 0
 				&& buff[name_len] == '.') {
-			state->plugins[i]->command_handler(state->plugins[i]->user_data,
-					buff);
+			ret = state->plugins[i]->command_handler(
+					state->plugins[i]->user_data, buff);
 			handled = true;
 		}
 	}
 	if (!handled) {
-		_command_handler(buff);
+		ret = _command_handler(buff);
 	}
+	return ret;
 }
 
 static void *readline_thread_func(void* arg) {
 	char *ptr;
 	using_history();
-	read_history(NULL);
+	read_history(PICAM360_HISTORY_FILE);
 	while (ptr = readline("picam360>")) {
 		add_history(ptr);
-		command_handler(ptr);
+		int status = command_handler(ptr);
 		free(ptr);
+		if (status == COMMAND_STATUS_EXIT) {
+			write_history(PICAM360_HISTORY_FILE);
+			exit(0);
+		}
 	}
-	write_history(NULL);
 }
 
 //plugin host methods
