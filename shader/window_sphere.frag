@@ -5,7 +5,7 @@ uniform mat4 unif_matrix_1;
 uniform sampler2D cam0_texture;
 uniform sampler2D cam1_texture;
 uniform float pixel_size;
-uniform float aspect_ratio;
+uniform float cam_aspect_ratio;
 //options start
 uniform float sharpness_gain;
 uniform float cam0_offset_yaw;
@@ -39,7 +39,7 @@ void main(void) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = yaw + M_PI + cam0_offset_yaw;
-		u = cam0_horizon_r / aspect_ratio * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
+		u = cam0_horizon_r / cam_aspect_ratio * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
 		v = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y;
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
@@ -81,7 +81,7 @@ void main(void) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
 		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
-		u = cam1_horizon_r * r2 / aspect_ratio * cos(yaw2) + 0.5 + cam1_offset_x;
+		u = cam1_horizon_r * r2 / cam_aspect_ratio * cos(yaw2) + 0.5 + cam1_offset_x;
 		v = cam1_horizon_r * r2 * sin(yaw2) + 0.5 + cam1_offset_y;
 		if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 			u = 0.0;
