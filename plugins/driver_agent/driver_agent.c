@@ -47,7 +47,7 @@ enum CALIBRATION_CMD {
 	CALIBRATION_CMD_VEHICLE_COMPASS,
 };
 enum SYSTEM_CMD {
-	SYSTEM_CMD_NONE, SYSTEM_CMD_SHUTDOWN,
+	SYSTEM_CMD_NONE, SYSTEM_CMD_SHUTDOWN, SYSTEM_CMD_REBOOT, SYSTEM_CMD_EXIT,
 };
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
@@ -73,6 +73,8 @@ static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
+
+static bool lg_stereo_enabled = false;
 
 static bool lg_pid_enabled = false;
 static float lg_yaw_diff = 0;
@@ -523,7 +525,8 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%d=%f", &cam_num, &value);
 
 			lg_command_id++;
-			sprintf(lg_command, "picam360_driver.add_camera_offset_x %d=%f", cam_num, value);
+			sprintf(lg_command, "picam360_driver.add_camera_offset_x %d=%f",
+					cam_num, value);
 
 			printf("add_camera_offset_x : completed\n");
 		}
@@ -536,7 +539,8 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%d=%f", &cam_num, &value);
 
 			lg_command_id++;
-			sprintf(lg_command, "picam360_driver.add_camera_offset_y %d=%f", cam_num, value);
+			sprintf(lg_command, "picam360_driver.add_camera_offset_y %d=%f",
+					cam_num, value);
 
 			printf("add_camera_offset_y : completed\n");
 		}
@@ -549,7 +553,8 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%d=%f", &cam_num, &value);
 
 			lg_command_id++;
-			sprintf(lg_command, "picam360_driver.add_camera_offset_yaw %d=%f", cam_num, value);
+			sprintf(lg_command, "picam360_driver.add_camera_offset_yaw %d=%f",
+					cam_num, value);
 
 			printf("add_camera_offset_yaw : completed\n");
 		}
@@ -562,7 +567,8 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%d=%f", &cam_num, &value);
 
 			lg_command_id++;
-			sprintf(lg_command, "picam360_driver.add_camera_horizon_r %d=%f", cam_num, value);
+			sprintf(lg_command, "picam360_driver.add_camera_horizon_r %d=%f",
+					cam_num, value);
 
 			printf("add_camera_horizon_r : completed\n");
 		}
@@ -1056,6 +1062,24 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		lg_stereo_enabled = !(bool) menu->user_data;
+		menu->user_data = (void*) lg_stereo_enabled;
+		if (lg_stereo_enabled) {
+			swprintf(menu->name, 8, L"On");
+		} else {
+			swprintf(menu->name, 8, L"Off");
+		}
+		menu->selected = false;
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
 static void calibration_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -1135,6 +1159,11 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		if ((enum SYSTEM_CMD) menu->user_data == SYSTEM_CMD_SHUTDOWN) {
 			system("sudo shutdown now");
 			exit(1);
+		} else if ((enum SYSTEM_CMD) menu->user_data == SYSTEM_CMD_REBOOT) {
+			system("sudo reboot");
+			exit(1);
+		} else if ((enum SYSTEM_CMD) menu->user_data == SYSTEM_CMD_EXIT) {
+			exit(1);
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
@@ -1165,9 +1194,25 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		MENU_T *menu = lg_plugin_host->get_menu();
 		{
 			MENU_T *function_menu = menu_new(L"Function", NULL, NULL);
-			MENU_T *function_snap_menu = menu_new(L"Snap",
-					function_menu_callback, (void*) 0);
-			menu_add_submenu(function_menu, function_snap_menu, INT_MAX);
+			MENU_T *snap_menu = menu_new(L"Snap", function_menu_callback,
+					(void*) 0);
+			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
+			{
+				MENU_T *off_menu = menu_new(L"Off", pid_menu_callback,
+						(void*) false);
+				off_menu->marked = true;
+				menu_add_submenu(pid_menu, off_menu, INT_MAX);
+			}
+			MENU_T *stereo_menu = menu_new(L"Stereo", NULL, NULL);
+			{
+				MENU_T *off_menu = menu_new(L"Off", stereo_menu_callback,
+						(void*) false);
+				off_menu->marked = true;
+				menu_add_submenu(stereo_menu, off_menu, INT_MAX);
+			}
+			menu_add_submenu(function_menu, snap_menu, INT_MAX);
+			menu_add_submenu(function_menu, pid_menu, INT_MAX);
+			menu_add_submenu(function_menu, stereo_menu, INT_MAX);
 			menu_add_submenu(menu, function_menu, INT_MAX);		//add main menu
 		}
 		{
@@ -1176,16 +1221,8 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					(void*) UI_MODE_LIGHT);
 			MENU_T *mode_fov_menu = menu_new(L"Fov", mode_menu_callback,
 					(void*) UI_MODE_FOV);
-			MENU_T *mode_pid_menu = menu_new(L"PID", NULL, NULL);
-			{
-				MENU_T *pid_off_menu = menu_new(L"Off", pid_menu_callback,
-						(void*) false);
-				pid_off_menu->marked = true;
-				menu_add_submenu(mode_pid_menu, pid_off_menu, INT_MAX);
-			}
 			menu_add_submenu(mode_menu, mode_light_menu, INT_MAX);
 			menu_add_submenu(mode_menu, mode_fov_menu, INT_MAX);
-			menu_add_submenu(mode_menu, mode_pid_menu, INT_MAX);
 			menu_add_submenu(menu, mode_menu, INT_MAX);		//add main menu
 		}
 		{
@@ -1228,7 +1265,13 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			MENU_T *system_menu = menu_new(L"System", NULL, NULL);
 			MENU_T *system_shutdown_menu = menu_new(L"Shutdown",
 					system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN);
+			MENU_T *system_reboot_menu = menu_new(L"Reboot",
+					system_menu_callback, (void*) SYSTEM_CMD_REBOOT);
+			MENU_T *system_exit_menu = menu_new(L"Exit", system_menu_callback,
+					(void*) SYSTEM_CMD_EXIT);
+			menu_add_submenu(system_menu, system_exit_menu, INT_MAX);
 			menu_add_submenu(system_menu, system_shutdown_menu, INT_MAX);
+			menu_add_submenu(system_menu, system_reboot_menu, INT_MAX);
 			menu_add_submenu(menu, system_menu, INT_MAX);		//add main menu
 		}
 	}
