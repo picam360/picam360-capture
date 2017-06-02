@@ -65,7 +65,7 @@ typedef struct _PLUGIN_HOST_T {
 typedef struct _PLUGIN_T {
 	char name[64];
 	void (*release)(void *user_data);
-	void (*command_handler)(void *user_data, const char *cmd);
+	int (*command_handler)(void *user_data, const char *cmd);
 	void (*event_handler)(void *user_data, uint32_t node_id, uint32_t event_id);
 	void (*init_options)(void *user_data, json_t *options);
 	void (*save_options)(void *user_data, json_t *options);

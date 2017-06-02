@@ -92,7 +92,8 @@ static void release(void *user_data) {
 	free(user_data);
 }
 
-static void command_handler(void *user_data, const char *_buff) {
+static int command_handler(void *user_data, const char *_buff) {
+	return 0;
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {

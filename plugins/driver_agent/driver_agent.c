@@ -438,7 +438,7 @@ void *transmit_thread_func(void* arg) {
 	} // end of while
 }
 
-static void command_handler(void *user_data, const char *_buff) {
+static int command_handler(void *user_data, const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd;
@@ -581,6 +581,7 @@ static void command_handler(void *user_data, const char *_buff) {
 	} else {
 		printf(":unknown command : %s\n", buff);
 	}
+	return 0;
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
