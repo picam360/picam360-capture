@@ -1044,7 +1044,7 @@ int _command_handler(const char *_buff) {
 				new_frame->view_mpu = frame->view_mpu;
 				new_frame->operation_mode = frame->operation_mode;
 				pthread_mutex_lock(&state->frame_mutex);
-				state->frame = frame;
+				state->frame = new_frame;
 				pthread_mutex_unlock(&state->frame_mutex);
 
 				delete_frame(frame);
