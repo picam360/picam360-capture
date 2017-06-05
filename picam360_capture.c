@@ -683,6 +683,8 @@ bool delete_frame(FRAME_T *frame) {
 }
 
 void frame_handler() {
+	pthread_mutex_lock(&state->frame_mutex);
+
 	struct timeval s, f;
 	double elapsed_ms;
 	bool snap_finished = false;
@@ -814,6 +816,8 @@ void frame_handler() {
 	}
 	state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
 			PICAM360_CAPTURE_EVENT_AFTER_FRAME);
+
+	pthread_mutex_unlock(&state->frame_mutex);
 }
 
 static double calib_step = 0.01;
@@ -850,7 +854,9 @@ int _command_handler(const char *_buff) {
 			frame->output_mode = OUTPUT_MODE_STILL;
 			frame->view_mpu = state->mpus[0];
 			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
+			pthread_mutex_unlock(&state->frame_mutex);
 		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
@@ -870,7 +876,9 @@ int _command_handler(const char *_buff) {
 			frame->output_mode = OUTPUT_MODE_VIDEO;
 			frame->view_mpu = state->mpus[0];
 			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
+			pthread_mutex_unlock(&state->frame_mutex);
 			printf("start_record id=%d\n", frame->id);
 		}
 	} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
@@ -914,7 +922,9 @@ int _command_handler(const char *_buff) {
 			FRAME_T *frame = create_frame(state, argc, argv);
 			set_auto_calibration(frame);
 			frame->next = state->frame;
+			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
+			pthread_mutex_unlock(&state->frame_mutex);
 
 			printf("start_ac\n");
 		}
@@ -1006,23 +1016,38 @@ int _command_handler(const char *_buff) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			bool value = (param[0] == '1');
-			state->stereo = value;
 			printf("set_stereo %s\n", param);
 			if (value != state->stereo) {
+				state->stereo = value;
+
 				FRAME_T *frame = state->frame;
 				if (value) {
 					frame->width /= 2;
 				} else {
 					frame->width *= 2;
 				}
-				glBindTexture(GL_TEXTURE_2D, frame->texture);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width,
-						frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-				if (glGetError() != GL_NO_ERROR) {
-					printf(
-							"glTexImage2D failed. Could not allocate texture buffer.\n");
+				char create_frame_param[256];
+				sprintf(create_frame_param, "-W %d -H %d", frame->width, frame->height);
+				const int kMaxArgs = 10;
+				int argc = 1;
+				char *argv[kMaxArgs];
+				char *p2 = strtok(create_frame_param, " ");
+				while (p2 && argc < kMaxArgs - 1) {
+					argv[argc++] = p2;
+					p2 = strtok(0, " ");
 				}
-				glBindTexture(GL_TEXTURE_2D, 0);
+				argv[0] = cmd;
+				argv[argc] = 0;
+
+				FRAME_T *new_frame = create_frame(state, argc, argv);
+				new_frame->next = frame->next;
+				new_frame->view_mpu = frame->view_mpu;
+				new_frame->operation_mode = frame->operation_mode;
+				pthread_mutex_lock(&state->frame_mutex);
+				state->frame = frame;
+				pthread_mutex_unlock(&state->frame_mutex);
+
+				delete_frame(frame);
 			}
 		}
 	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
@@ -1456,6 +1481,8 @@ int main(int argc, char *argv[]) {
 		pthread_mutex_init(&state->mutex, 0);
 		//texture mutex init
 		pthread_mutex_init(&state->texture_mutex, 0);
+		//frame mutex init
+		pthread_mutex_init(&state->frame_mutex, 0);
 	}
 
 	bcm_host_init();
