@@ -1072,6 +1072,11 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		} else {
 			swprintf(menu->name, 8, L"Off");
 		}
+		{
+			char cmd[256];
+			snprintf(cmd, 256, "set_stereo %d", lg_stereo_enabled ? 1 : 0);
+			lg_plugin_host->send_command(cmd);
+		}
 		menu->selected = false;
 		break;
 	case MENU_EVENT_DESELECTED:
@@ -1239,7 +1244,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
 		}
 		{
-			MENU_T *calibration_menu = menu_new(L"Clibration", NULL, NULL);
+			MENU_T *calibration_menu = menu_new(L"Calibration", NULL, NULL);
 			MENU_T *calibration_record_menu = menu_new(L"Save",
 					calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE);
 			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",

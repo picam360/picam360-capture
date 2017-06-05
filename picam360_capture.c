@@ -58,8 +58,7 @@
 #define PICAM360_HISTORY_FILE ".picam360history"
 
 enum COMMAND_STATUS {
-	COMMAND_STATUS_NONE,
-	COMMAND_STATUS_EXIT,
+	COMMAND_STATUS_NONE, COMMAND_STATUS_EXIT,
 };
 
 #ifndef M_PI
@@ -1006,8 +1005,25 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			state->stereo = (param[0] == '1');
+			bool value = (param[0] == '1');
+			state->stereo = value;
 			printf("set_stereo %s\n", param);
+			if (value != state->stereo) {
+				FRAME_T *frame = state->frame;
+				if (value) {
+					frame->width /= 2;
+				} else {
+					frame->width *= 2;
+				}
+				glBindTexture(GL_TEXTURE_2D, frame->texture);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width,
+						frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+				if (glGetError() != GL_NO_ERROR) {
+					printf(
+							"glTexImage2D failed. Could not allocate texture buffer.\n");
+				}
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
 		}
 	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
