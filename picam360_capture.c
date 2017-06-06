@@ -1035,6 +1035,14 @@ int _command_handler(const char *_buff) {
 			}
 			printf("add_camera_horizon_r : completed\n");
 		}
+	} else if (strncmp(cmd, "set_camera_horizon_r_bias", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value = 0;
+			sscanf(param, "%f", &value);
+			state->camera_horizon_r_bias = value;
+			printf("set_camera_horizon_r_bias : completed\n");
+		}
 	} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
@@ -1424,6 +1432,7 @@ int main(int argc, char *argv[]) {
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
+	state->camera_horizon_r_bias = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", 64);
 
 	umask(0000);
@@ -1740,7 +1749,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 				state->options.cam_offset_y[i]);
 		sprintf(buff, "cam%d_horizon_r", i);
 		glUniform1f(glGetUniformLocation(program, buff),
-				state->options.cam_horizon_r[i]);
+				state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
 	}
 	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"),
 			state->options.cam_offset_yaw[state->active_cam]);
@@ -1749,7 +1758,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glUniform1f(glGetUniformLocation(program, "cam_offset_y"),
 			state->options.cam_offset_y[state->active_cam]);
 	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"),
-			state->options.cam_horizon_r[state->active_cam]);
+			state->options.cam_horizon_r[state->active_cam]
+					* state->camera_horizon_r_bias);
 	//options end
 
 	//texture start

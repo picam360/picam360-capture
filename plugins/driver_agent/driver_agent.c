@@ -1146,6 +1146,39 @@ static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 		break;
 	}
 }
+static void refraction_menu_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		for (int idx = 0; menu->parent->submenu[idx]; idx++) {
+			menu->parent->submenu[idx]->marked = false;
+		}
+		menu->marked = true;
+		menu->selected = false;
+		{
+			float value = 1.0;
+			switch ((int) menu->user_data) {
+			case 1:
+				value = 1.0;
+				break;
+			case 2:
+				value = 1.1;
+				break;
+			case 3:
+				value = 1.3;
+				break;
+			}
+			char cmd[256];
+			snprintf(cmd, 256, "set_camera_horizon_r_bias %f", value);
+			lg_plugin_host->send_command(cmd);
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
 static void resolution_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -1290,6 +1323,19 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 						(void*) true);
 				on_menu->marked = true;
 				menu_add_submenu(sync_menu, on_menu, INT_MAX);
+			}
+			MENU_T *refraction_menu = menu_new(L"Refraction", NULL, NULL);
+			{
+				menu_add_submenu(refraction_menu,
+						menu_new(L"Air", refraction_menu_callback, (void*) 1),
+						INT_MAX);
+				menu_add_submenu(refraction_menu,
+						menu_new(L"AcrylicDome", refraction_menu_callback,
+								(void*) 2), INT_MAX);
+				menu_add_submenu(refraction_menu,
+						menu_new(L"UnderWater", refraction_menu_callback,
+								(void*) 3), INT_MAX);
+				resolution_menu->submenu[0]->marked = true;
 			}
 			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
 			{
