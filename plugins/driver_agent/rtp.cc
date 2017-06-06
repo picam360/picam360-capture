@@ -170,6 +170,14 @@ void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
 }
 
+void rtp_set_auto_play(bool vlaue) {
+	lg_auto_play = value;
+}
+
+void rtp_set_is_looping(bool vlaue) {
+	lg_is_looping = value;
+}
+
 #ifdef USE_JRTP
 static void checkerror(int rtperr) {
 	if (rtperr < 0) {
@@ -238,8 +246,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			delete pack;
 		}
 #endif
-		if(lg_bandwidth_limit > 0)
-		{ //limit bandwidth
+		if (lg_bandwidth_limit > 0) { //limit bandwidth
 			struct timeval time2 = { };
 			gettimeofday(&time2, NULL);
 			struct timeval diff;
@@ -469,9 +476,9 @@ static void *record_thread_func(void* arg) {
 		header[7] = (unsigned char) '\0';
 		write(fd, header, sizeof(header));
 		write(fd, pack->GetPacketData(), pack->GetPacketLength());
-		fsync(fd);//this avoid that file size would be zero after os crash
+		fsync(fd); //this avoid that file size would be zero after os crash
 #ifdef USE_JRTP
-		lg_sess.DeletePacket(pack);
+				lg_sess.DeletePacket(pack);
 #else
 		delete pack;
 #endif
@@ -595,8 +602,8 @@ static void *load_thread_func(void* arg) {
 }
 
 static bool is_init = false;
-int init_rtp(unsigned short portbase, char *destip_str,
-		unsigned short destport, float bandwidth_limit) {
+int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
+		float bandwidth_limit) {
 	if (is_init) {
 		return -1;
 	}

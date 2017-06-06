@@ -268,11 +268,7 @@ static float sub_angle(float a, float b) {
 static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event);
 static void loading_callback(void *user_data, int ret) {
-	if (lg_is_converting) {
-		MENU_T *menu = (MENU_T*) user_data;
-		menu->selected = false;
-		packet_menu_convert_node_callback(menu, MENU_EVENT_DESELECTED);
-	}
+	lg_is_converting = false;
 	printf("end of loading\n");
 }
 
@@ -816,11 +812,48 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_SELECTED:
 		menu->selected = false;
-		if (rtp_is_recording(NULL)) {
+		if (lg_is_converting) { //stop convert
+			rtp_set_auto_play(true);
+			rtp_set_is_looping(true);
+
+			lg_is_converting = false;
+			printf("stop converting\n");
+			menu->selected = false;
+		} else if (rtp_is_loading(NULL)) { //start convert
+			char src[256];
+			snprintf(src, 256, PACKET_FOLDER_PATH "/%s",
+					(char*) menu->user_data);
+			bool succeeded = rtp_start_loading(src, false, false,
+					(RTP_LOADING_CALLBACK) loading_callback, menu);
+			if (succeeded) {
+				int ret = mkdir(lg_convert_base_path,
+						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
+						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
+						S_IROTH | S_IXOTH | S_IXOTH);
+				if (ret == 0 || errno == EEXIST) {
+					rtp_set_auto_play(false);
+					rtp_set_is_looping(false);
+
+					char dst[256];
+					snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
+							lg_convert_frame_num);
+					lg_plugin_host->snap(lg_resolution * 1024,
+							lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR,
+							dst);
+					lg_is_converting = true;
+
+					swprintf(menu->name, 256, L"StopConverting:%s", dst);
+					printf("start converting %s to %s\n", src,
+							lg_convert_base_path);
+				} else {
+					succeeded = false;
+				}
+			}
+		} else if (rtp_is_recording(NULL)) { //stop record
 			rtp_stop_recording();
 			swprintf(menu->name, 8, L"Record");
 			printf("stop recording\n");
-		} else if (!rtp_is_loading(NULL)) {
+		} else if (!rtp_is_loading(NULL)) { //start record
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
 			snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
@@ -847,7 +880,9 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 	case MENU_EVENT_DEACTIVATED:
 		break;
 	case MENU_EVENT_SELECTED:
-		if (menu->marked) {
+		if (lg_is_converting) {
+			//do nothing
+		} else if (menu->marked) {
 			rtp_stop_loading();
 			printf("stop loading\n");
 			menu->marked = false;
@@ -862,6 +897,10 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			lg_plugin_host->set_menu_visible(false);
 			menu->marked = true;
 			menu->selected = false;
+
+			snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
+					(char*) menu->user_data);
+			lg_convert_frame_num = 0;
 		} else {
 			menu->selected = false;
 		}
@@ -920,109 +959,6 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 	}
 }
 
-static void packet_menu_convert_node_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
-	switch (event) {
-	case MENU_EVENT_ACTIVATED:
-		break;
-	case MENU_EVENT_DEACTIVATED:
-		break;
-	case MENU_EVENT_SELECTED:
-		if (menu->marked) {
-			rtp_stop_loading();
-			lg_is_converting = false;
-			printf("stop converting\n");
-			menu->marked = false;
-			menu->selected = false;
-		} else if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			char src[256];
-			snprintf(src, 256, PACKET_FOLDER_PATH "/%s",
-					(char*) menu->user_data);
-			bool succeeded = rtp_start_loading(src, false, false,
-					(RTP_LOADING_CALLBACK) loading_callback, menu);
-			if (succeeded) {
-				snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
-						(char*) menu->user_data);
-				int ret = mkdir(lg_convert_base_path,
-						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
-						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
-						S_IROTH | S_IXOTH | S_IXOTH);
-				if (ret == 0 || errno == EEXIST) {
-					char dst[256];
-					snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
-							lg_convert_frame_num);
-					lg_plugin_host->snap(lg_resolution * 1024,
-							lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR,
-							dst);
-					lg_is_converting = true;
-
-					printf("start converting %s to %s\n", src,
-							lg_convert_base_path);
-				} else {
-					succeeded = false;
-				}
-			}
-			if (succeeded) {
-				menu->marked = true;
-			}
-			menu->selected = false;
-		} else {
-			menu->selected = false;
-		}
-		break;
-	case MENU_EVENT_DESELECTED:
-		break;
-	case MENU_EVENT_BEFORE_DELETE:
-		if (menu->user_data) {
-			free(menu->user_data);
-		}
-		break;
-	case MENU_EVENT_NONE:
-	default:
-		break;
-	}
-}
-
-static void packet_menu_convert_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
-	switch (event) {
-	case MENU_EVENT_ACTIVATED:
-		if (!rtp_is_loading(NULL)) {
-			struct dirent *d;
-			DIR *dir;
-
-			dir = opendir(PACKET_FOLDER_PATH);
-			while ((d = readdir(dir)) != 0) {
-				if (d->d_name[0] != L'.') {
-					char *name_s = malloc(256);
-					wchar_t name[256];
-					snprintf(name_s, 256, "%s", d->d_name);
-					swprintf(name, 256, L"%s", d->d_name);
-					MENU_T *node_menu = menu_new(name,
-							packet_menu_convert_node_callback, name_s);
-					menu_add_submenu(menu, node_menu, INT_MAX);
-				}
-			}
-		}
-		break;
-	case MENU_EVENT_DEACTIVATED:
-		if (!rtp_is_loading(NULL)) {
-			for (int idx = 0; menu->submenu[idx]; idx++) {
-				menu_delete(&menu->submenu[idx]);
-			}
-		}
-		break;
-	case MENU_EVENT_SELECTED:
-		break;
-	case MENU_EVENT_DESELECTED:
-		break;
-	case MENU_EVENT_BEFORE_DELETE:
-		break;
-	case MENU_EVENT_NONE:
-	default:
-		break;
-	}
-}
 static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1048,6 +984,7 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 		break;
 	}
 }
+
 static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1061,6 +998,7 @@ static void mode_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+
 static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1080,6 +1018,7 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+
 static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1103,6 +1042,7 @@ static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+
 static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1126,6 +1066,7 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+
 static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1146,6 +1087,7 @@ static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 		break;
 	}
 }
+
 static void refraction_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -1179,6 +1121,7 @@ static void refraction_menu_callback(struct _MENU_T *menu,
 		break;
 	}
 }
+
 static void resolution_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -1196,6 +1139,7 @@ static void resolution_menu_callback(struct _MENU_T *menu,
 		break;
 	}
 }
+
 static void calibration_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -1269,6 +1213,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		break;
 	}
 }
+
 static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
