@@ -1019,14 +1019,19 @@ int _command_handler(const char *_buff) {
 			state->stereo = (param[0] == '1');
 			printf("set_stereo %s\n", param);
 		}
+	} else if (strncmp(cmd, "set_sync_conf", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			state->sync_conf = (param[0] == '1');
+			printf("set_sync_conf %s\n", param);
+		}
 	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			state->preview = (param[0] == '1');
 			printf("set_preview %s\n", param);
 		}
-	} else if (strncmp(cmd, "add_camera_horizon_r", sizeof(buff))
-	== 0) {
+	} else if (strncmp(cmd, "add_camera_horizon_r", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int cam_num = 0;
@@ -1162,6 +1167,10 @@ static VECTOR4D_T get_camera_offset(int cam_num) {
 	return ret;
 }
 static void set_camera_offset(int cam_num, VECTOR4D_T value) {
+	if (!state->sync_conf) {
+		return;
+	}
+
 	pthread_mutex_lock(&state->mutex);
 
 	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {

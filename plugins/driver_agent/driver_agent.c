@@ -76,6 +76,7 @@ static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
 
 static int lg_resolution = 4;
 static bool lg_stereo_enabled = false;
+static bool lg_sync_enabled = true;
 
 static bool lg_pid_enabled = false;
 static float lg_yaw_diff = 0;
@@ -1078,6 +1079,29 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		lg_sync_enabled = !(bool) menu->user_data;
+		menu->user_data = (void*) lg_sync_enabled;
+		if (lg_sync_enabled) {
+			swprintf(menu->name, 8, L"On");
+		} else {
+			swprintf(menu->name, 8, L"Off");
+		}
+		{
+			char cmd[256];
+			snprintf(cmd, 256, "set_sync_conf %d", lg_sync_enabled ? 1 : 0);
+			lg_plugin_host->send_command(cmd);
+		}
+		menu->selected = false;
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
 static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -1259,6 +1283,13 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"Config", NULL, NULL);
+			MENU_T *sync_menu = menu_new(L"Sync", NULL, NULL);
+			{
+				MENU_T *on_menu = menu_new(L"On", sync_menu_callback,
+						(void*) true);
+				on_menu->marked = true;
+				menu_add_submenu(sync_menu, on_menu, INT_MAX);
+			}
 			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
 			{
 				MENU_T *off_menu = menu_new(L"Off", pid_menu_callback,
@@ -1294,6 +1325,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					}
 				}
 			}
+			menu_add_submenu(sub_menu, sync_menu, INT_MAX);
 			menu_add_submenu(sub_menu, pid_menu, INT_MAX);
 			menu_add_submenu(sub_menu, stereo_menu, INT_MAX);
 			menu_add_submenu(sub_menu, resolution_menu, INT_MAX);

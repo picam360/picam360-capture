@@ -109,6 +109,7 @@ typedef struct _PICAM360CAPTURE_T {
 	int split;
 	bool preview;
 	bool stereo;
+	bool sync_conf;
 	bool video_direct;
 	enum CODEC_TYPE codec_type;
 	uint32_t screen_width;
