@@ -170,11 +170,11 @@ void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
 }
 
-void rtp_set_auto_play(bool vlaue) {
+void rtp_set_auto_play(bool value) {
 	lg_auto_play = value;
 }
 
-void rtp_set_is_looping(bool vlaue) {
+void rtp_set_is_looping(bool value) {
 	lg_is_looping = value;
 }
 

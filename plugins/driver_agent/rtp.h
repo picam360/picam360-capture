@@ -21,8 +21,8 @@ void rtp_increment_loading(int elapsed_usec);
 void rtp_stop_loading();
 bool rtp_is_loading(char **path);
 float rtp_get_bandwidth();
-void rtp_set_auto_play(bool vlaue);
-void rtp_set_is_looping(bool vlaue);
+void rtp_set_auto_play(bool value);
+void rtp_set_is_looping(bool value);
 
 typedef void (*RTP_CALLBACK)(unsigned char *data, unsigned int data_len,
 		unsigned char pt, unsigned int seq_num);

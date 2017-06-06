@@ -1340,11 +1340,8 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					packet_menu_record_callback, NULL);
 			MENU_T *load_menu = menu_new(L"Load", packet_menu_load_callback,
 					NULL);
-			MENU_T *convert_menu = menu_new(L"Convert",
-					packet_menu_convert_callback, NULL);
 			menu_add_submenu(sub_menu, record_menu, INT_MAX);
 			menu_add_submenu(sub_menu, load_menu, INT_MAX);
-			menu_add_submenu(sub_menu, convert_menu, INT_MAX);
 			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 		{
