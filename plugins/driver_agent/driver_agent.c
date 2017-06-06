@@ -835,9 +835,8 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 						RENDERING_MODE_EQUIRECTANGULAR, dst);
 				lg_is_converting = true;
 
-				swprintf(menu->name, 256, L"StopConverting:%s", dst);
-				printf("start converting %s to %s\n", src,
-						lg_convert_base_path);
+				swprintf(menu->name, 256, L"StopConverting:%s", lg_convert_base_path);
+				printf("start converting to %s\n", lg_convert_base_path);
 			}
 		} else if (rtp_is_recording(NULL)) { //stop record
 			rtp_stop_recording();
