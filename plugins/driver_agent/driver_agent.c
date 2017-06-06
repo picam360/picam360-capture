@@ -1110,6 +1110,7 @@ static void resolution_menu_callback(struct _MENU_T *menu,
 			menu->parent->submenu[idx]->marked = false;
 		}
 		menu->marked = true;
+		menu->selected = false;
 		break;
 	case MENU_EVENT_DESELECTED:
 		break;
