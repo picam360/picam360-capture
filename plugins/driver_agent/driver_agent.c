@@ -861,6 +861,8 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			lg_plugin_host->set_menu_visible(false);
 			menu->marked = true;
 			menu->selected = false;
+		} else {
+			menu->selected = false;
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
@@ -925,7 +927,13 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 	case MENU_EVENT_DEACTIVATED:
 		break;
 	case MENU_EVENT_SELECTED:
-		if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+		if (menu->marked) {
+			rtp_stop_loading();
+			lg_is_converting = false;
+			printf("stop converting\n");
+			menu->marked = false;
+			menu->selected = false;
+		} else if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
 			char src[256];
 			snprintf(src, 256, PACKET_FOLDER_PATH "/%s",
 					(char*) menu->user_data);
@@ -952,22 +960,20 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 					succeeded = false;
 				}
 			}
-			if (!succeeded) {
-				menu->selected = false;
-				packet_menu_convert_node_callback(menu, MENU_EVENT_DESELECTED);
+			if (succeeded) {
+				menu->marked = true;
 			}
+			menu->selected = false;
+		} else {
+			menu->selected = false;
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
-		if (rtp_is_loading(NULL)) {
-			rtp_stop_loading();
-			lg_is_converting = false;
-
-			printf("stop converting\n");
-		}
 		break;
 	case MENU_EVENT_BEFORE_DELETE:
-		free(menu->user_data);
+		if (menu->user_data) {
+			free(menu->user_data);
+		}
 		break;
 	case MENU_EVENT_NONE:
 	default:
@@ -979,7 +985,7 @@ static void packet_menu_convert_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_ACTIVATED:
-		if (1) {
+		if (!rtp_is_loading(NULL)) {
 			struct dirent *d;
 			DIR *dir;
 
@@ -998,8 +1004,10 @@ static void packet_menu_convert_callback(struct _MENU_T *menu,
 		}
 		break;
 	case MENU_EVENT_DEACTIVATED:
-		for (int idx = 0; menu->submenu[idx]; idx++) {
-			menu_delete(&menu->submenu[idx]);
+		if (!rtp_is_loading(NULL)) {
+			for (int idx = 0; menu->submenu[idx]; idx++) {
+				menu_delete(&menu->submenu[idx]);
+			}
 		}
 		break;
 	case MENU_EVENT_SELECTED:
