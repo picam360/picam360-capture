@@ -820,34 +820,24 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 			printf("stop converting\n");
 			menu->selected = false;
 		} else if (rtp_is_loading(NULL)) { //start convert
-			char src[256];
-			snprintf(src, 256, PACKET_FOLDER_PATH "/%s",
-					(char*) menu->user_data);
-			bool succeeded = rtp_start_loading(src, false, false,
-					(RTP_LOADING_CALLBACK) loading_callback, menu);
-			if (succeeded) {
-				int ret = mkdir(lg_convert_base_path,
-						S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
-						S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
-						S_IROTH | S_IXOTH | S_IXOTH);
-				if (ret == 0 || errno == EEXIST) {
-					rtp_set_auto_play(false);
-					rtp_set_is_looping(false);
+			int ret = mkdir(lg_convert_base_path, //
+					S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
+					S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
+					S_IROTH | S_IXOTH | S_IXOTH);
+			if (ret == 0 || errno == EEXIST) {
+				rtp_set_auto_play(false);
+				rtp_set_is_looping(false);
 
-					char dst[256];
-					snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
-							lg_convert_frame_num);
-					lg_plugin_host->snap(lg_resolution * 1024,
-							lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR,
-							dst);
-					lg_is_converting = true;
+				char dst[256];
+				snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
+						lg_convert_frame_num);
+				lg_plugin_host->snap(lg_resolution * 1024, lg_resolution * 512,
+						RENDERING_MODE_EQUIRECTANGULAR, dst);
+				lg_is_converting = true;
 
-					swprintf(menu->name, 256, L"StopConverting:%s", dst);
-					printf("start converting %s to %s\n", src,
-							lg_convert_base_path);
-				} else {
-					succeeded = false;
-				}
+				swprintf(menu->name, 256, L"StopConverting:%s", dst);
+				printf("start converting %s to %s\n", src,
+						lg_convert_base_path);
 			}
 		} else if (rtp_is_recording(NULL)) { //stop record
 			rtp_stop_recording();
