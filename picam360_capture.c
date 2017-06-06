@@ -58,10 +58,6 @@
 #define PICAM360_HISTORY_FILE ".picam360history"
 #define PLUGIN_NAME "picam360"
 
-enum COMMAND_STATUS {
-	COMMAND_STATUS_NONE, COMMAND_STATUS_EXIT,
-};
-
 #ifndef M_PI
 #define M_PI 3.141592654
 #endif
@@ -684,8 +680,6 @@ bool delete_frame(FRAME_T *frame) {
 }
 
 void frame_handler() {
-	pthread_mutex_lock(&state->frame_mutex);
-
 	struct timeval s, f;
 	double elapsed_ms;
 	bool snap_finished = false;
@@ -817,8 +811,6 @@ void frame_handler() {
 	}
 	state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
 			PICAM360_CAPTURE_EVENT_AFTER_FRAME);
-
-	pthread_mutex_unlock(&state->frame_mutex);
 }
 
 static double calib_step = 0.01;
@@ -832,7 +824,7 @@ int _command_handler(const char *_buff) {
 		//do nothing
 	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
 		printf("exit\n");
-		ret = COMMAND_STATUS_EXIT;
+		exit(0);
 	} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
 		state->active_cam = 0;
 	} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
@@ -855,9 +847,7 @@ int _command_handler(const char *_buff) {
 			frame->output_mode = OUTPUT_MODE_STILL;
 			frame->view_mpu = state->mpus[0];
 			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
-			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
-			pthread_mutex_unlock(&state->frame_mutex);
 		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
@@ -877,9 +867,7 @@ int _command_handler(const char *_buff) {
 			frame->output_mode = OUTPUT_MODE_VIDEO;
 			frame->view_mpu = state->mpus[0];
 			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
-			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
-			pthread_mutex_unlock(&state->frame_mutex);
 			printf("start_record id=%d\n", frame->id);
 		}
 	} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
@@ -923,9 +911,7 @@ int _command_handler(const char *_buff) {
 			FRAME_T *frame = create_frame(state, argc, argv);
 			set_auto_calibration(frame);
 			frame->next = state->frame;
-			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
-			pthread_mutex_unlock(&state->frame_mutex);
 
 			printf("start_ac\n");
 		}
@@ -1019,11 +1005,11 @@ int _command_handler(const char *_buff) {
 			state->stereo = (param[0] == '1');
 			printf("set_stereo %s\n", param);
 		}
-	} else if (strncmp(cmd, "set_sync_conf", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_conf_sync", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			state->sync_conf = (param[0] == '1');
-			printf("set_sync_conf %s\n", param);
+			state->conf_sync = (param[0] == '1');
+			printf("set_conf_sync %s\n", param);
 		}
 	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -1091,20 +1077,38 @@ int _command_handler(const char *_buff) {
 	return ret;
 }
 
-int command_handler(const char *buff) {
+int command_handler() {
 	int ret = 0;
-	bool handled = false;
-	for (int i = 0; state->plugins[i] != NULL; i++) {
-		int name_len = strlen(state->plugins[i]->name);
-		if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-				&& buff[name_len] == '.') {
-			ret = state->plugins[i]->command_handler(
-					state->plugins[i]->user_data, buff);
-			handled = true;
+	char *buff = NULL;
+
+	{
+		pthread_mutex_lock(&state->cmd_list_mutex);
+
+		if (state->cmd_list) {
+			LIST_T *cur = state->cmd_list;
+			buff = (char*) cur->value;
+			state->cmd_list = cur->next;
+			free(cur);
 		}
+
+		pthread_mutex_unlock(&state->cmd_list_mutex);
 	}
-	if (!handled) {
-		ret = _command_handler(buff);
+
+	if (buff) {
+		bool handled = false;
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			int name_len = strlen(state->plugins[i]->name);
+			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+					&& buff[name_len] == '.') {
+				ret = state->plugins[i]->command_handler(
+						state->plugins[i]->user_data, buff);
+				handled = true;
+			}
+		}
+		if (!handled) {
+			ret = _command_handler(buff);
+		}
+		free(buff);
 	}
 	return ret;
 }
@@ -1115,12 +1119,10 @@ static void *readline_thread_func(void* arg) {
 	read_history(PICAM360_HISTORY_FILE);
 	while (ptr = readline("picam360>")) {
 		add_history(ptr);
-		int status = command_handler(ptr);
+		state->plugin_host.send_command(ptr);
 		free(ptr);
-		if (status == COMMAND_STATUS_EXIT) {
-			write_history(PICAM360_HISTORY_FILE);
-			exit(0);
-		}
+
+		write_history(PICAM360_HISTORY_FILE);
 	}
 }
 
@@ -1167,7 +1169,7 @@ static VECTOR4D_T get_camera_offset(int cam_num) {
 	return ret;
 }
 static void set_camera_offset(int cam_num, VECTOR4D_T value) {
-	if (!state->sync_conf) {
+	if (!state->conf_sync) {
 		return;
 	}
 
@@ -1273,7 +1275,20 @@ static void set_fov(float value) {
 	state->frame->fov = value;
 }
 static void send_command(const char *cmd) {
-	command_handler(cmd);
+	pthread_mutex_lock(&state->cmd_list_mutex);
+
+	LIST_T **cur = &state->cmd_list;
+	for (; *cur != NULL; cur = &(*cur)->next)
+		;
+	*cur = malloc(sizeof(LIST_T));
+	memset(*cur, 0, sizeof(LIST_T));
+	int slr_len = MIN(strlen(cmd), 256);
+	char *cmd_clone = malloc(slr_len + 1);
+	strncpy(cmd_clone, cmd, slr_len);
+	cmd_clone[slr_len] = '\0';
+	(*cur)->value = cmd_clone;
+
+	pthread_mutex_unlock(&state->cmd_list_mutex);
 }
 static void send_event(uint32_t node_id, uint32_t event_id) {
 	for (int i = 0; state->plugins[i] != NULL; i++) {
@@ -1479,7 +1494,7 @@ int main(int argc, char *argv[]) {
 		//texture mutex init
 		pthread_mutex_init(&state->texture_mutex, 0);
 		//frame mutex init
-		pthread_mutex_init(&state->frame_mutex, 0);
+		pthread_mutex_init(&state->cmd_list_mutex, 0);
 	}
 
 	bcm_host_init();
@@ -1544,6 +1559,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		frame_handler();
+		command_handler();
 		if (state->frame) {
 			for (int i = 0; i < state->num_of_cam; i++) {
 				mrevent_reset(&state->arrived_frame_event[i]);

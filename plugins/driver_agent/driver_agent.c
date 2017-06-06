@@ -1092,7 +1092,7 @@ static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		}
 		{
 			char cmd[256];
-			snprintf(cmd, 256, "set_sync_conf %d", lg_sync_enabled ? 1 : 0);
+			snprintf(cmd, 256, "set_conf_sync %d", lg_sync_enabled ? 1 : 0);
 			lg_plugin_host->send_command(cmd);
 		}
 		menu->selected = false;

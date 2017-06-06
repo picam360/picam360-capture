@@ -67,6 +67,11 @@ typedef struct _OPTIONS_T {
 	float view_offset_roll; // z axis
 } OPTIONS_T;
 
+typedef struct _LIST_T {
+	void *value;
+	struct _LIST_T *next;
+} LIST_T;
+
 typedef struct _FRAME_T {
 	int id;
 	GLuint framebuffer;
@@ -109,7 +114,7 @@ typedef struct _PICAM360CAPTURE_T {
 	int split;
 	bool preview;
 	bool stereo;
-	bool sync_conf;
+	bool conf_sync;
 	bool video_direct;
 	enum CODEC_TYPE codec_type;
 	uint32_t screen_width;
@@ -164,8 +169,10 @@ typedef struct _PICAM360CAPTURE_T {
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
-	pthread_mutex_t frame_mutex;
 	pthread_mutex_t texture_mutex;
+
+	pthread_mutex_t cmd_list_mutex;
+	LIST_T *cmd_list;
 
 	MENU_T *menu;
 	bool menu_visible;
