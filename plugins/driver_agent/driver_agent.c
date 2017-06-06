@@ -74,6 +74,7 @@ static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
 
+static int lg_resolution = 4;
 static bool lg_stereo_enabled = false;
 
 static bool lg_pid_enabled = false;
@@ -602,8 +603,8 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 				char dst[256];
 				snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
 						lg_convert_frame_num);
-				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
-						dst);
+				lg_plugin_host->snap(lg_resolution * 1024, lg_resolution * 512,
+						RENDERING_MODE_EQUIRECTANGULAR, dst);
 			}
 			break;
 		default:
@@ -1009,7 +1010,7 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		switch ((int) menu->user_data) {
-		case 0:
+		case 0: //snap
 			menu->selected = false;
 			{
 				char dst[256];
@@ -1078,6 +1079,22 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 			lg_plugin_host->send_command(cmd);
 		}
 		menu->selected = false;
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
+static void resolution_menu_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		lg_resolution = (int) menu->user_data;
+		for (int idx = 0; menu->parent->submenu[idx]; idx++) {
+			menu->parent->submenu[idx]->marked = false;
+		}
+		menu->marked = true;
 		break;
 	case MENU_EVENT_DESELECTED:
 		break;
@@ -1198,9 +1215,14 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	{			//menu
 		MENU_T *menu = lg_plugin_host->get_menu();
 		{
-			MENU_T *function_menu = menu_new(L"Function", NULL, NULL);
+			MENU_T *sub_menu = menu_new(L"Function", NULL, NULL);
 			MENU_T *snap_menu = menu_new(L"Snap", function_menu_callback,
 					(void*) 0);
+			menu_add_submenu(sub_menu, snap_menu, INT_MAX);
+			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
+		}
+		{
+			MENU_T *sub_menu = menu_new(L"Config", NULL, NULL);
 			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
 			{
 				MENU_T *off_menu = menu_new(L"Off", pid_menu_callback,
@@ -1215,36 +1237,53 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 				off_menu->marked = true;
 				menu_add_submenu(stereo_menu, off_menu, INT_MAX);
 			}
-			menu_add_submenu(function_menu, snap_menu, INT_MAX);
-			menu_add_submenu(function_menu, pid_menu, INT_MAX);
-			menu_add_submenu(function_menu, stereo_menu, INT_MAX);
-			menu_add_submenu(menu, function_menu, INT_MAX);		//add main menu
+			MENU_T *resolution_menu = menu_new(L"Resolution", NULL, NULL);
+			{
+				menu_add_submenu(resolution_menu,
+						menu_new(L"4K", resolution_menu, (void*) 4), INT_MAX);
+				menu_add_submenu(resolution_menu,
+						menu_new(L"3K", resolution_menu, (void*) 3), INT_MAX);
+				menu_add_submenu(resolution_menu,
+						menu_new(L"2K", resolution_menu, (void*) 2), INT_MAX);
+				menu_add_submenu(resolution_menu,
+						menu_new(L"1K", resolution_menu, (void*) 1), INT_MAX);
+				for (int idx = 0; resolution_menu->submenu[idx]; idx++) {
+					if (resolution_menu->submenu[idx]->user_data
+							== (void*) lg_resolution) {
+						resolution_menu->submenu[idx]->marked = true;
+					}
+				}
+			}
+			menu_add_submenu(sub_menu, pid_menu, INT_MAX);
+			menu_add_submenu(sub_menu, stereo_menu, INT_MAX);
+			menu_add_submenu(sub_menu, resolution_menu, INT_MAX);
+			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 		{
-			MENU_T *mode_menu = menu_new(L"Mode", NULL, NULL);
+			MENU_T *sub_menu = menu_new(L"Mode", NULL, NULL);
 			MENU_T *mode_light_menu = menu_new(L"Light", mode_menu_callback,
 					(void*) UI_MODE_LIGHT);
 			MENU_T *mode_fov_menu = menu_new(L"Fov", mode_menu_callback,
 					(void*) UI_MODE_FOV);
-			menu_add_submenu(mode_menu, mode_light_menu, INT_MAX);
-			menu_add_submenu(mode_menu, mode_fov_menu, INT_MAX);
-			menu_add_submenu(menu, mode_menu, INT_MAX);		//add main menu
+			menu_add_submenu(sub_menu, mode_light_menu, INT_MAX);
+			menu_add_submenu(sub_menu, mode_fov_menu, INT_MAX);
+			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 		{
-			MENU_T *packet_menu = menu_new(L"Packet", NULL, NULL);
+			MENU_T *sub_menu = menu_new(L"Packet", NULL, NULL);
 			MENU_T *packet_record_menu = menu_new(L"Record",
 					packet_menu_record_callback, NULL);
 			MENU_T *packet_load_menu = menu_new(L"Load",
 					packet_menu_load_callback, NULL);
 			MENU_T *packet_convert_menu = menu_new(L"Convert",
 					packet_menu_convert_callback, NULL);
-			menu_add_submenu(packet_menu, packet_record_menu, INT_MAX);
-			menu_add_submenu(packet_menu, packet_load_menu, INT_MAX);
-			menu_add_submenu(packet_menu, packet_convert_menu, INT_MAX);
-			menu_add_submenu(menu, packet_menu, INT_MAX);		//add main menu
+			menu_add_submenu(sub_menu, packet_record_menu, INT_MAX);
+			menu_add_submenu(sub_menu, packet_load_menu, INT_MAX);
+			menu_add_submenu(sub_menu, packet_convert_menu, INT_MAX);
+			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 		{
-			MENU_T *calibration_menu = menu_new(L"Calibration", NULL, NULL);
+			MENU_T *sub_menu = menu_new(L"Calibration", NULL, NULL);
 			MENU_T *calibration_record_menu = menu_new(L"Save",
 					calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE);
 			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",
@@ -1256,28 +1295,26 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			MENU_T *calibration_vehicle_compass_menu = menu_new(
 					L"VehicleCompass", calibration_menu_callback,
 					(void*) CALIBRATION_CMD_VEHICLE_COMPASS);
-			menu_add_submenu(calibration_menu, calibration_image_circle_menu,
+			menu_add_submenu(sub_menu, calibration_image_circle_menu, INT_MAX);
+			menu_add_submenu(sub_menu, calibration_viewer_compass_menu,
 					INT_MAX);
-			menu_add_submenu(calibration_menu, calibration_viewer_compass_menu,
+			menu_add_submenu(sub_menu, calibration_vehicle_compass_menu,
 					INT_MAX);
-			menu_add_submenu(calibration_menu, calibration_vehicle_compass_menu,
-					INT_MAX);
-			menu_add_submenu(calibration_menu, calibration_record_menu,
-					INT_MAX);	//save is last
-			menu_add_submenu(menu, calibration_menu, INT_MAX);	//add main menu
+			menu_add_submenu(sub_menu, calibration_record_menu, INT_MAX);//save is last
+			menu_add_submenu(menu, sub_menu, INT_MAX);	//add main menu
 		}
 		{
-			MENU_T *system_menu = menu_new(L"System", NULL, NULL);
+			MENU_T *sub_menu = menu_new(L"System", NULL, NULL);
 			MENU_T *system_shutdown_menu = menu_new(L"Shutdown",
 					system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN);
 			MENU_T *system_reboot_menu = menu_new(L"Reboot",
 					system_menu_callback, (void*) SYSTEM_CMD_REBOOT);
 			MENU_T *system_exit_menu = menu_new(L"Exit", system_menu_callback,
 					(void*) SYSTEM_CMD_EXIT);
-			menu_add_submenu(system_menu, system_exit_menu, INT_MAX);
-			menu_add_submenu(system_menu, system_shutdown_menu, INT_MAX);
-			menu_add_submenu(system_menu, system_reboot_menu, INT_MAX);
-			menu_add_submenu(menu, system_menu, INT_MAX);		//add main menu
+			menu_add_submenu(sub_menu, system_exit_menu, INT_MAX);
+			menu_add_submenu(sub_menu, system_shutdown_menu, INT_MAX);
+			menu_add_submenu(sub_menu, system_reboot_menu, INT_MAX);
+			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 	}
 }
