@@ -1552,14 +1552,15 @@ int main(int argc, char *argv[]) {
  ***********************************************************/
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model) {
+	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_height = frame->height;
 
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 
-	glViewport(0, 0, (state->stereo) ? frame->width / 2 : frame->width,
-			frame->height);
+	glViewport(0, 0, frame_width, frame_height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
@@ -1671,7 +1672,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 				aspect_ratio);
 	}
 	{
-		float aspect_ratio = (float) frame->width / (float) frame->height;
+		float aspect_ratio = (float) frame_width / (float) frame_height;
 		glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"),
 				aspect_ratio);
 	}
@@ -1741,6 +1742,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		MODEL_T *model) {
+	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_height = frame->height;
+
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
 
@@ -1768,19 +1772,19 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	} else if (state->stereo) {
-		int offset_x = (state->screen_width / 2 - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
+		int offset_x = (state->screen_width / 2 - frame_width) / 2;
+		int offset_y = (state->screen_height - frame_height) / 2;
 		for (int i = 0; i < 2; i++) {
 			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
 			glViewport(offset_x + i * state->screen_width / 2, offset_y,
-					(GLsizei) frame->width, (GLsizei) frame->height);
+					(GLsizei) frame_width, (GLsizei) frame_height);
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 		}
 	} else {
-		int offset_x = (state->screen_width - frame->width) / 2;
-		int offset_y = (state->screen_height - frame->height) / 2;
-		glViewport(offset_x, offset_y, (GLsizei) frame->width,
-				(GLsizei) frame->height);
+		int offset_x = (state->screen_width - frame_width) / 2;
+		int offset_y = (state->screen_height - frame_height) / 2;
+		glViewport(offset_x, offset_y, (GLsizei) frame_width,
+				(GLsizei) frame_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	}
 
@@ -1790,6 +1794,8 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 }
 
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
+	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_height = frame->height;
 	int len = 0;
 	const int MAX_INFO_SIZE = 1024;
 	wchar_t disp[MAX_INFO_SIZE];
@@ -1807,6 +1813,6 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		}
 	}
 	menu_redraw(state->menu, disp, state->screen_width, state->screen_height,
-			frame->width, frame->height, state->stereo);
+			frame_width, frame_height, state->stereo);
 }
 
