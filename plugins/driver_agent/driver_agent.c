@@ -813,10 +813,11 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 	case MENU_EVENT_SELECTED:
 		menu->selected = false;
 		if (lg_is_converting) { //stop convert
+			lg_is_converting = false;
+
 			rtp_set_auto_play(true);
 			rtp_set_is_looping(true);
 
-			lg_is_converting = false;
 			swprintf(menu->name, 8, L"Record");
 			printf("stop converting\n");
 			menu->selected = false;

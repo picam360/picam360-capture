@@ -579,7 +579,7 @@ static void *load_thread_func(void* arg) {
 					usleep(MIN(elapsed_usec - diff_usec, 1000000));
 				}
 				last_time = time;
-				lg_play_time += elapsed_usec;
+				lg_play_time = current_play_time;
 			}
 			while (lg_load_fd >= 0) {
 				if (current_play_time <= lg_play_time) {
