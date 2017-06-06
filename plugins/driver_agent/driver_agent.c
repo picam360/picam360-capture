@@ -1105,7 +1105,8 @@ static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		if (1) {
-			float value = ((float) menu->user_data) * 0.01;
+			float value = (int) menu->user_data;
+			value *= 0.01;
 			char cmd[256];
 			snprintf(cmd, 256, "driver_agent.add_camera_horizon_r *=%f", value);
 			lg_plugin_host->send_command(cmd);
@@ -1346,6 +1347,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(sub_menu, image_circle_menu, INT_MAX);
 			menu_add_submenu(sub_menu, viewer_compass_menu, INT_MAX);
 			menu_add_submenu(sub_menu, vehicle_compass_menu, INT_MAX);
+			menu_add_submenu(sub_menu, horizonr_menu, INT_MAX);
 			menu_add_submenu(sub_menu, save_menu, INT_MAX);		//save is last
 			menu_add_submenu(menu, sub_menu, INT_MAX);	//add main menu
 		}
