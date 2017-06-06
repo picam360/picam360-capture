@@ -172,6 +172,9 @@ void rtp_set_callback(RTP_CALLBACK callback) {
 
 void rtp_set_auto_play(bool value) {
 	lg_auto_play = value;
+	if(value){
+		mrevent_trigger(&lg_play_time_updated);
+	}
 }
 
 void rtp_set_is_looping(bool value) {

@@ -817,6 +817,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 			rtp_set_is_looping(true);
 
 			lg_is_converting = false;
+			swprintf(menu->name, 8, L"Record");
 			printf("stop converting\n");
 			menu->selected = false;
 		} else if (rtp_is_loading(NULL)) { //start convert
