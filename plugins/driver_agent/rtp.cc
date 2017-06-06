@@ -581,7 +581,7 @@ static void *load_thread_func(void* arg) {
 				last_time = time;
 				lg_play_time = current_play_time;
 			}
-			while (lg_load_fd >= 0) {
+			while (lg_load_fd >= 0 && !lg_auto_play) {
 				if (current_play_time <= lg_play_time) {
 					break;
 				} else {
