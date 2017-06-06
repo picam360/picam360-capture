@@ -899,8 +899,8 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 		}
 		break;
 	case MENU_EVENT_DEACTIVATED:
-		for (int idx = 0; menu->submenu[idx]; idx++) {
-			if (!menu->submenu[idx]->marked) {
+		if (!rtp_is_loading(NULL)) {
+			for (int idx = 0; menu->submenu[idx]; idx++) {
 				menu_delete(&menu->submenu[idx]);
 			}
 		}
