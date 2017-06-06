@@ -951,8 +951,9 @@ static void packet_menu_convert_node_callback(struct _MENU_T *menu,
 					char dst[256];
 					snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
 							lg_convert_frame_num);
-					lg_plugin_host->snap(4096, 2048,
-							RENDERING_MODE_EQUIRECTANGULAR, dst);
+					lg_plugin_host->snap(lg_resolution * 1024,
+							lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR,
+							dst);
 					lg_is_converting = true;
 
 					printf("start converting %s to %s\n", src,
@@ -1032,8 +1033,8 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 				char dst[256];
 				int last_id = get_last_id(STILL_FOLDER_PATH);
 				snprintf(dst, 256, STILL_FOLDER_PATH "/%d.jpeg", last_id + 1);
-				lg_plugin_host->snap(4096, 2048, RENDERING_MODE_EQUIRECTANGULAR,
-						dst);
+				lg_plugin_host->snap(lg_resolution * 1024, lg_resolution * 512,
+						RENDERING_MODE_EQUIRECTANGULAR, dst);
 			}
 			break;
 		default:
