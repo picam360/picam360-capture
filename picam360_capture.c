@@ -1432,6 +1432,7 @@ int main(int argc, char *argv[]) {
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
+	state->conf_sync = true;
 	state->camera_horizon_r_bias = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", 64);
 

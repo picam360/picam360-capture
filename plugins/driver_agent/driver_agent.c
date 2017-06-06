@@ -1335,7 +1335,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 				menu_add_submenu(refraction_menu,
 						menu_new(L"UnderWater", refraction_menu_callback,
 								(void*) 3), INT_MAX);
-				resolution_menu->submenu[0]->marked = true;
+				refraction_menu->submenu[0]->marked = true;
 			}
 			MENU_T *pid_menu = menu_new(L"PID", NULL, NULL);
 			{
@@ -1375,6 +1375,7 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			menu_add_submenu(sub_menu, sync_menu, INT_MAX);
 			menu_add_submenu(sub_menu, pid_menu, INT_MAX);
 			menu_add_submenu(sub_menu, stereo_menu, INT_MAX);
+			menu_add_submenu(sub_menu, refraction_menu, INT_MAX);
 			menu_add_submenu(sub_menu, resolution_menu, INT_MAX);
 			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
