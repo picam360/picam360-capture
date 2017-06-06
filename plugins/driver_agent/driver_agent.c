@@ -1255,13 +1255,13 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			MENU_T *resolution_menu = menu_new(L"Resolution", NULL, NULL);
 			{
 				menu_add_submenu(resolution_menu,
-						menu_new(L"4K", resolution_menu, (void*) 4), INT_MAX);
+						menu_new(L"4K", resolution_menu_callback, (void*) 4), INT_MAX);
 				menu_add_submenu(resolution_menu,
-						menu_new(L"3K", resolution_menu, (void*) 3), INT_MAX);
+						menu_new(L"3K", resolution_menu_callback, (void*) 3), INT_MAX);
 				menu_add_submenu(resolution_menu,
-						menu_new(L"2K", resolution_menu, (void*) 2), INT_MAX);
+						menu_new(L"2K", resolution_menu_callback, (void*) 2), INT_MAX);
 				menu_add_submenu(resolution_menu,
-						menu_new(L"1K", resolution_menu, (void*) 1), INT_MAX);
+						menu_new(L"1K", resolution_menu_callback, (void*) 1), INT_MAX);
 				for (int idx = 0; resolution_menu->submenu[idx]; idx++) {
 					if (resolution_menu->submenu[idx]->user_data
 							== (void*) lg_resolution) {
