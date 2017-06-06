@@ -1101,6 +1101,23 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		break;
 	}
 }
+static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		{
+			float value = ((float)menu->user_data)*0.01;
+			char cmd[256];
+			snprintf(cmd, 256, "driver_agent.add_camera_horizon_r *=%f", value);
+			lg_plugin_host->send_command(cmd);
+		}
+		menu->selected = false;
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
 static void resolution_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -1277,59 +1294,68 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"Mode", NULL, NULL);
-			MENU_T *mode_light_menu = menu_new(L"Light", mode_menu_callback,
+			MENU_T *light_menu = menu_new(L"Light", mode_menu_callback,
 					(void*) UI_MODE_LIGHT);
-			MENU_T *mode_fov_menu = menu_new(L"Fov", mode_menu_callback,
+			MENU_T *fov_menu = menu_new(L"Fov", mode_menu_callback,
 					(void*) UI_MODE_FOV);
-			menu_add_submenu(sub_menu, mode_light_menu, INT_MAX);
-			menu_add_submenu(sub_menu, mode_fov_menu, INT_MAX);
+			menu_add_submenu(sub_menu, light_menu, INT_MAX);
+			menu_add_submenu(sub_menu, fov_menu, INT_MAX);
 			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"Packet", NULL, NULL);
-			MENU_T *packet_record_menu = menu_new(L"Record",
+			MENU_T *record_menu = menu_new(L"Record",
 					packet_menu_record_callback, NULL);
-			MENU_T *packet_load_menu = menu_new(L"Load",
+			MENU_T *load_menu = menu_new(L"Load",
 					packet_menu_load_callback, NULL);
-			MENU_T *packet_convert_menu = menu_new(L"Convert",
+			MENU_T *convert_menu = menu_new(L"Convert",
 					packet_menu_convert_callback, NULL);
-			menu_add_submenu(sub_menu, packet_record_menu, INT_MAX);
-			menu_add_submenu(sub_menu, packet_load_menu, INT_MAX);
-			menu_add_submenu(sub_menu, packet_convert_menu, INT_MAX);
+			menu_add_submenu(sub_menu, record_menu, INT_MAX);
+			menu_add_submenu(sub_menu, load_menu, INT_MAX);
+			menu_add_submenu(sub_menu, convert_menu, INT_MAX);
 			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"Calibration", NULL, NULL);
-			MENU_T *calibration_record_menu = menu_new(L"Save",
+			MENU_T *save_menu = menu_new(L"Save",
 					calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE);
-			MENU_T *calibration_image_circle_menu = menu_new(L"ImageCircle",
+			MENU_T *image_circle_menu = menu_new(L"ImageCircle",
 					calibration_menu_callback,
 					(void*) CALIBRATION_CMD_IMAGE_CIRCLE);
-			MENU_T *calibration_viewer_compass_menu = menu_new(L"ViewerCompass",
+			MENU_T *viewer_compass_menu = menu_new(L"ViewerCompass",
 					calibration_menu_callback,
 					(void*) CALIBRATION_CMD_VIEWER_COMPASS);
-			MENU_T *calibration_vehicle_compass_menu = menu_new(
-					L"VehicleCompass", calibration_menu_callback,
+			MENU_T *vehicle_compass_menu = menu_new(
+					L"VehicleCompass", calibratlback,
 					(void*) CALIBRATION_CMD_VEHICLE_COMPASS);
-			menu_add_submenu(sub_menu, calibration_image_circle_menu, INT_MAX);
-			menu_add_submenu(sub_menu, calibration_viewer_compass_menu,
+			MENU_T *horizonr_menu = menu_new(L"HorizonR", NULL, NULL);
+			{
+				MENU_T *minus_menu = menu_new(L"-", horizonr_menu_callback,
+						(void*) -1);
+				MENU_T *plus_menu = menu_new(L"+", horizonr_menu_callback,
+						(void*) 1);
+				menu_add_submenu(horizonr_menu, minus_menu, INT_MAX);
+				menu_add_submenu(horizonr_menu, plus_menu, INT_MAX);
+			}
+			menu_add_submenu(sub_menu, image_circle_menu, INT_MAX);
+			menu_add_submenu(sub_menu, viewer_compass_menu,
 					INT_MAX);
-			menu_add_submenu(sub_menu, calibration_vehicle_compass_menu,
+			menu_add_submenu(sub_menu, vehicle_compass_menu,
 					INT_MAX);
-			menu_add_submenu(sub_menu, calibration_record_menu, INT_MAX);//save is last
+			menu_add_submenu(sub_menu, save_menu, INT_MAX);//save is last
 			menu_add_submenu(menu, sub_menu, INT_MAX);	//add main menu
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"System", NULL, NULL);
-			MENU_T *system_shutdown_menu = menu_new(L"Shutdown",
+			MENU_T *shutdown_menu = menu_new(L"Shutdown",
 					system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN);
-			MENU_T *system_reboot_menu = menu_new(L"Reboot",
+			MENU_T *reboot_menu = menu_new(L"Reboot",
 					system_menu_callback, (void*) SYSTEM_CMD_REBOOT);
-			MENU_T *system_exit_menu = menu_new(L"Exit", system_menu_callback,
+			MENU_T *exit_menu = menu_new(L"Exit", system_menu_callback,
 					(void*) SYSTEM_CMD_EXIT);
-			menu_add_submenu(sub_menu, system_exit_menu, INT_MAX);
-			menu_add_submenu(sub_menu, system_shutdown_menu, INT_MAX);
-			menu_add_submenu(sub_menu, system_reboot_menu, INT_MAX);
+			menu_add_submenu(sub_menu, exit_menu, INT_MAX);
+			menu_add_submenu(sub_menu, shutdown_menu, INT_MAX);
+			menu_add_submenu(sub_menu, reboot_menu, INT_MAX);
 			menu_add_submenu(menu, sub_menu, INT_MAX);		//add main menu
 		}
 	}
