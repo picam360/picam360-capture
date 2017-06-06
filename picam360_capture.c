@@ -1033,12 +1033,12 @@ int _command_handler(const char *_buff) {
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
-				for (int i = 0; i < CAMERA_NUM; i++) {
+				for (int i = 0; i < MAX_CAM_NUM; i++) {
 					state->options.cam_horizon_r[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < CAMERA_NUM) {
+				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
 					state->options.cam_horizon_r[cam_num] += value;
 				}
 			}

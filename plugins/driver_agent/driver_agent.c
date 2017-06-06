@@ -1104,8 +1104,8 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
-		{
-			float value = ((float)menu->user_data)*0.01;
+		if (1) {
+			float value = ((float) menu->user_data) * 0.01;
 			char cmd[256];
 			snprintf(cmd, 256, "driver_agent.add_camera_horizon_r *=%f", value);
 			lg_plugin_host->send_command(cmd);
@@ -1275,13 +1275,17 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			MENU_T *resolution_menu = menu_new(L"Resolution", NULL, NULL);
 			{
 				menu_add_submenu(resolution_menu,
-						menu_new(L"4K", resolution_menu_callback, (void*) 4), INT_MAX);
+						menu_new(L"4K", resolution_menu_callback, (void*) 4),
+						INT_MAX);
 				menu_add_submenu(resolution_menu,
-						menu_new(L"3K", resolution_menu_callback, (void*) 3), INT_MAX);
+						menu_new(L"3K", resolution_menu_callback, (void*) 3),
+						INT_MAX);
 				menu_add_submenu(resolution_menu,
-						menu_new(L"2K", resolution_menu_callback, (void*) 2), INT_MAX);
+						menu_new(L"2K", resolution_menu_callback, (void*) 2),
+						INT_MAX);
 				menu_add_submenu(resolution_menu,
-						menu_new(L"1K", resolution_menu_callback, (void*) 1), INT_MAX);
+						menu_new(L"1K", resolution_menu_callback, (void*) 1),
+						INT_MAX);
 				for (int idx = 0; resolution_menu->submenu[idx]; idx++) {
 					if (resolution_menu->submenu[idx]->user_data
 							== (void*) lg_resolution) {
@@ -1308,8 +1312,8 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			MENU_T *sub_menu = menu_new(L"Packet", NULL, NULL);
 			MENU_T *record_menu = menu_new(L"Record",
 					packet_menu_record_callback, NULL);
-			MENU_T *load_menu = menu_new(L"Load",
-					packet_menu_load_callback, NULL);
+			MENU_T *load_menu = menu_new(L"Load", packet_menu_load_callback,
+					NULL);
 			MENU_T *convert_menu = menu_new(L"Convert",
 					packet_menu_convert_callback, NULL);
 			menu_add_submenu(sub_menu, record_menu, INT_MAX);
@@ -1319,16 +1323,16 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"Calibration", NULL, NULL);
-			MENU_T *save_menu = menu_new(L"Save",
-					calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE);
+			MENU_T *save_menu = menu_new(L"Save", calibration_menu_callback,
+					(void*) CALIBRATION_CMD_SAVE);
 			MENU_T *image_circle_menu = menu_new(L"ImageCircle",
 					calibration_menu_callback,
 					(void*) CALIBRATION_CMD_IMAGE_CIRCLE);
 			MENU_T *viewer_compass_menu = menu_new(L"ViewerCompass",
 					calibration_menu_callback,
 					(void*) CALIBRATION_CMD_VIEWER_COMPASS);
-			MENU_T *vehicle_compass_menu = menu_new(
-					L"VehicleCompass", calibratlback,
+			MENU_T *vehicle_compass_menu = menu_new(L"VehicleCompass",
+					calibration_menu_callback,
 					(void*) CALIBRATION_CMD_VEHICLE_COMPASS);
 			MENU_T *horizonr_menu = menu_new(L"HorizonR", NULL, NULL);
 			{
@@ -1340,19 +1344,17 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 				menu_add_submenu(horizonr_menu, plus_menu, INT_MAX);
 			}
 			menu_add_submenu(sub_menu, image_circle_menu, INT_MAX);
-			menu_add_submenu(sub_menu, viewer_compass_menu,
-					INT_MAX);
-			menu_add_submenu(sub_menu, vehicle_compass_menu,
-					INT_MAX);
-			menu_add_submenu(sub_menu, save_menu, INT_MAX);//save is last
+			menu_add_submenu(sub_menu, viewer_compass_menu, INT_MAX);
+			menu_add_submenu(sub_menu, vehicle_compass_menu, INT_MAX);
+			menu_add_submenu(sub_menu, save_menu, INT_MAX);		//save is last
 			menu_add_submenu(menu, sub_menu, INT_MAX);	//add main menu
 		}
 		{
 			MENU_T *sub_menu = menu_new(L"System", NULL, NULL);
-			MENU_T *shutdown_menu = menu_new(L"Shutdown",
-					system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN);
-			MENU_T *reboot_menu = menu_new(L"Reboot",
-					system_menu_callback, (void*) SYSTEM_CMD_REBOOT);
+			MENU_T *shutdown_menu = menu_new(L"Shutdown", system_menu_callback,
+					(void*) SYSTEM_CMD_SHUTDOWN);
+			MENU_T *reboot_menu = menu_new(L"Reboot", system_menu_callback,
+					(void*) SYSTEM_CMD_REBOOT);
 			MENU_T *exit_menu = menu_new(L"Exit", system_menu_callback,
 					(void*) SYSTEM_CMD_EXIT);
 			menu_add_submenu(sub_menu, exit_menu, INT_MAX);
