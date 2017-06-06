@@ -1015,40 +1015,8 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			bool value = (param[0] == '1');
+			state->stereo = (param[0] == '1');
 			printf("set_stereo %s\n", param);
-			if (value != state->stereo) {
-				state->stereo = value;
-
-				FRAME_T *frame = state->frame;
-				if (value) {
-					frame->width /= 2;
-				} else {
-					frame->width *= 2;
-				}
-				char create_frame_param[256];
-				sprintf(create_frame_param, "-W %d -H %d", frame->width, frame->height);
-				const int kMaxArgs = 10;
-				int argc = 1;
-				char *argv[kMaxArgs];
-				char *p2 = strtok(create_frame_param, " ");
-				while (p2 && argc < kMaxArgs - 1) {
-					argv[argc++] = p2;
-					p2 = strtok(0, " ");
-				}
-				argv[0] = cmd;
-				argv[argc] = 0;
-
-				FRAME_T *new_frame = create_frame(state, argc, argv);
-				new_frame->next = frame->next;
-				new_frame->view_mpu = frame->view_mpu;
-				new_frame->operation_mode = frame->operation_mode;
-				pthread_mutex_lock(&state->frame_mutex);
-				state->frame = new_frame;
-				pthread_mutex_unlock(&state->frame_mutex);
-
-				delete_frame(frame);
-			}
 		}
 	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -1590,7 +1558,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 
-	glViewport(0, 0, frame->width, frame->height);
+	glViewport(0, 0, (state->stereo) ? frame->width / 2 : frame->width,
+			frame->height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
@@ -1784,6 +1753,8 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 //Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	glUniform1f(glGetUniformLocation(program, "tex_scalex"),
+			(state->stereo) ? 0.5 : 1.0);
 
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
