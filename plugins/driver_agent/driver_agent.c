@@ -1109,6 +1109,8 @@ static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 			char cmd[256];
 			snprintf(cmd, 256, "driver_agent.add_camera_horizon_r *=%f", value);
 			lg_plugin_host->send_command(cmd);
+			snprintf(cmd, 256, "add_camera_horizon_r *=%f", value);
+			lg_plugin_host->send_command(cmd);
 		}
 		menu->selected = false;
 		break;

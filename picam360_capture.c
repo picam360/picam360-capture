@@ -56,6 +56,7 @@
 
 #define PATH "./"
 #define PICAM360_HISTORY_FILE ".picam360history"
+#define PLUGIN_NAME "picam360"
 
 enum COMMAND_STATUS {
 	COMMAND_STATUS_NONE, COMMAND_STATUS_EXIT,
@@ -1023,6 +1024,25 @@ int _command_handler(const char *_buff) {
 		if (param != NULL) {
 			state->preview = (param[0] == '1');
 			printf("set_preview %s\n", param);
+		}
+	} else if (strncmp(cmd, "add_camera_horizon_r", sizeof(buff))
+	== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			if (param[0] == '*') {
+				sscanf(param, "*=%f", &value);
+				for (int i = 0; i < CAMERA_NUM; i++) {
+					state->options.cam_horizon_r[i] += value;
+				}
+			} else {
+				sscanf(param, "%d=%f", &cam_num, &value);
+				if (cam_num >= 0 && cam_num < CAMERA_NUM) {
+					state->options.cam_horizon_r[cam_num] += value;
+				}
+			}
+			printf("add_camera_horizon_r : completed\n");
 		}
 	} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
