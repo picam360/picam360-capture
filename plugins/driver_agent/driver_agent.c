@@ -595,11 +595,11 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 		case PICAM360_CAPTURE_EVENT_AFTER_SNAP:
 			if (lg_is_converting) {
 				rtp_increment_loading(100 * 1000); //10 fps
-				lg_convert_frame_num++;
 
 				char dst[256];
 				snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
 						lg_convert_frame_num);
+				lg_convert_frame_num++;
 				lg_plugin_host->snap(lg_resolution * 1024, lg_resolution * 512,
 						RENDERING_MODE_EQUIRECTANGULAR, dst);
 			}
@@ -833,6 +833,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 				char dst[256];
 				snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
 						lg_convert_frame_num);
+				lg_convert_frame_num++;
 				lg_plugin_host->snap(lg_resolution * 1024, lg_resolution * 512,
 						RENDERING_MODE_EQUIRECTANGULAR, dst);
 				lg_is_converting = true;
