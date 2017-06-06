@@ -265,8 +265,6 @@ static float sub_angle(float a, float b) {
 	return v;
 }
 
-static void packet_menu_convert_node_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event);
 static void loading_callback(void *user_data, int ret) {
 	lg_is_converting = false;
 	printf("end of loading\n");
