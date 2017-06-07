@@ -352,40 +352,71 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  * Returns: void
  *
  ***********************************************************/
+static void** create_egl_images(int cam_num, int width, int height,
+		int buff_num) {
+	for (int j = 0; j < buff_num; j++) {
+		glGenTextures(1, &state->cam_texture[cam_num][j]);
+
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[cam_num][j]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+				GL_UNSIGNED_BYTE, NULL);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		/* Create EGL Image */
+		state->egl_image[cam_num][j] = eglCreateImageKHR(state->display,
+				state->context, EGL_GL_TEXTURE_2D_KHR,
+				(EGLClientBuffer) state->cam_texture[cam_num][j], 0);
+
+		if (state->egl_image[cam_num][j] == EGL_NO_IMAGE_KHR) {
+			printf("eglCreateImageKHR failed.\n");
+			exit(1);
+		}
+	}
+	state->cam_texture[cam_num][buff_num] = 0;
+	state->egl_image[cam_num][buff_num] = 0;
+}
 static void init_textures(PICAM360CAPTURE_T *state) {
 
 	load_texture("img/calibration_img.png", &state->calibration_texture);
 	load_texture("img/logo_img.png", &state->logo_texture);
 
 	for (int i = 0; i < state->num_of_cam; i++) {
-		for (int j = 0; j < 2; j++) {
-			//// load three texture buffers but use them on six OGL|ES texture surfaces
-			glGenTextures(1, &state->cam_texture[i][j]);
-
-			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
-					state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-			/* Create EGL Image */
-			state->egl_image[i][j] = eglCreateImageKHR(state->display,
-					state->context, EGL_GL_TEXTURE_2D_KHR,
-					(EGLClientBuffer) state->cam_texture[i][j], 0);
-
-			if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
-				printf("eglCreateImageKHR failed.\n");
-				exit(1);
-			}
-		}
-
 		// Start rendering
 		if (state->codec_type == MJPEG) {
-			init_mjpeg_decoder(&state->plugin_host, i, state->egl_image[i]);
+			init_mjpeg_decoder(&state->plugin_host, i, state->egl_image[i],
+					create_egl_images);
 		} else {
+			for (int j = 0; j < 2; j++) {
+				glGenTextures(1, &state->cam_texture[i][j]);
+
+				glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
+						state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+						GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+						GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+						GL_CLAMP_TO_EDGE);
+
+				/* Create EGL Image */
+				state->egl_image[i][j] = eglCreateImageKHR(state->display,
+						state->context, EGL_GL_TEXTURE_2D_KHR,
+						(EGLClientBuffer) state->cam_texture[i][j], 0);
+
+				if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
+					printf("eglCreateImageKHR failed.\n");
+					exit(1);
+				}
+			}
+
 			void **args = malloc(sizeof(void*) * 3);
 			args[0] = (void*) i;
 			args[1] = (void*) state->egl_image[i];

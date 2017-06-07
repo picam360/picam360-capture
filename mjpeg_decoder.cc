@@ -89,7 +89,8 @@ public:
 class _SENDFRAME_ARG_T {
 public:
 	_SENDFRAME_ARG_T() {
-		user_data = NULL;
+		create_egl_images = NULL;
+		egl_images = NULL;
 		cam_run = false;
 		cam_num = 0;
 		framecount = 0;
@@ -109,7 +110,8 @@ public:
 		memset(tunnel, 0, sizeof(tunnel));
 		fillbufferdone_count = 0;
 	}
-	void *user_data;
+	MJPEG_DECODER_CREATE_EGL_IMAGES create_egl_images;
+	void **egl_images;
 	bool cam_run;
 	int cam_num;
 	int framecount;
@@ -180,8 +182,8 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
 	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
 
-	uint32_t texture_width = 0;
-	uint32_t texture_height = 0;
+	uint32_t texture_width = MIN(MIN(image_width,image_height), 2048);
+	uint32_t texture_height = MIN(MIN(image_width,image_height), 2048);
 	lg_plugin_host->get_texture_size(&texture_width, &texture_height);
 
 	// tell resizer input what the decoder output will be providing
@@ -297,6 +299,9 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 		exit(1);
 	}
 
+	send_frame_arg->egl_images = send_frame_arg->create_egl_images(
+			send_frame_arg->cam_num, texture_width, texture_height, 2);
+
 	for (int i = 0; i < 2; i++) {
 		OMX_STATETYPE state;
 		OMX_GetState(ILC_GET_HANDLE(send_frame_arg->egl_render), &state);
@@ -310,7 +315,7 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 		}
 		omx_err = OMX_UseEGLImage(ILC_GET_HANDLE(send_frame_arg->egl_render),
 				&send_frame_arg->egl_buffer[i], 221, (void*) i,
-				((void**) send_frame_arg->user_data)[i]);
+				send_frame_arg->egl_images[i]);
 		if (omx_err != OMX_ErrorNone) {
 			printf("OMX_UseEGLImage failed. 0x%x\n", omx_err);
 			exit(1);
@@ -643,7 +648,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 
 }
 void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
-		void *user_data) {
+		MJPEG_DECODER_CREATE_EGL_IMAGES create_egl_images) {
 	lg_plugin_host = plugin_host;
 
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
@@ -652,7 +657,7 @@ void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
 	}
 	lg_send_frame_arg[cam_num] = new _SENDFRAME_ARG_T;
 	lg_send_frame_arg[cam_num]->cam_num = cam_num;
-	lg_send_frame_arg[cam_num]->user_data = user_data;
+	lg_send_frame_arg[cam_num]->create_egl_images = create_egl_images;
 
 	lg_send_frame_arg[cam_num]->cam_run = true;
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
