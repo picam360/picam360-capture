@@ -1,5 +1,6 @@
 varying vec2 tcoord;
 uniform mat4 unif_matrix;
+uniform mat4 unif_matrix_1;
 uniform sampler2D cam0_texture;
 uniform sampler2D cam1_texture;
 uniform float pixel_size;
@@ -24,7 +25,7 @@ const float color_factor = 1.0 / (1.0 - color_offset);
 void main(void) {
 	float u = 0.0;
 	float v = 0.0;
-	vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
+	vec4 position = vec4(0.0, 0.0, 0.0, 1.0);
 	float pitch_orig = -M_PI / 2.0 + M_PI * tcoord.y;
 	float yaw_orig;
 	if (split == 0.0) {
@@ -32,16 +33,15 @@ void main(void) {
 	} else {
 		yaw_orig = 2.0 * M_PI * (tcoord.x / 2.0 + 0.5 * (split - 1.0)) - M_PI;
 	}
-	pos.x = cos(pitch_orig) * sin(yaw_orig); //yaw starts from z
-	pos.y = sin(pitch_orig);
-	pos.z = cos(pitch_orig) * cos(yaw_orig); //yaw starts from z
-	pos = unif_matrix * pos;
+	position.x = cos(pitch_orig) * sin(yaw_orig); //yaw starts from z
+	position.y = sin(pitch_orig);
+	position.z = cos(pitch_orig) * cos(yaw_orig); //yaw starts from z
+	vec4 pos = unif_matrix * position;
 	float pitch = asin(pos.y);
 	float yaw = atan(pos.x, pos.z); //yaw starts from z
-
-	vec4 fc0;
-	vec4 fc1;
 	float r = (M_PI / 2.0 - pitch) / M_PI;
+	
+	vec4 fc0;
 	if (r < 0.5 + overlap) {
 		float r2 = r;
 		if (r2 >= 0.40) {
@@ -78,6 +78,13 @@ void main(void) {
 			fc0 = fc;
 		}
 	}
+	
+	pos = unif_matrix_1 * position;
+	pitch = asin(pos.y);
+	yaw = atan(pos.x, pos.z);
+	r = (M_PI / 2.0 - pitch) / M_PI;
+	
+	vec4 fc1;
 	if (r > 0.5 - overlap) {
 		float r2 = 1.0 - r;
 		if (r2 >= 0.40) {
