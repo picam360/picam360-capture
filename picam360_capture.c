@@ -353,9 +353,6 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  *
  ***********************************************************/
 static void destroy_egl_images(PICAM360CAPTURE_T *state) {
-	if (state->plugin_host.lock_texture) {
-		state->plugin_host.lock_texture();
-	}
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 			if (state->cam_texture[i][j] != 0) {
@@ -371,15 +368,9 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 			}
 		}
 	}
-	if (state->plugin_host.unlock_texture) {
-		state->plugin_host.unlock_texture();
-	}
 }
 static void update_egl_images(PICAM360CAPTURE_T *state) {
 	destroy_egl_images(state);
-	if (state->plugin_host.lock_texture) {
-		state->plugin_host.lock_texture();
-	}
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 			glGenTextures(1, &state->cam_texture[i][j]);
@@ -403,9 +394,6 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 				exit(1);
 			}
 		}
-	}
-	if (state->plugin_host.unlock_texture) {
-		state->plugin_host.unlock_texture();
 	}
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
@@ -1293,13 +1281,18 @@ static void get_texture_size(uint32_t *width_out, uint32_t *height_out) {
 	}
 }
 static void set_texture_size(uint32_t width, uint32_t height) {
+	pthread_mutex_lock(&state->texture_size_mutex);
 	if (state->cam_width == width && state->cam_height == height) {
-		return;
+		//do nothing
+	} else {
+		state->cam_width = width;
+		state->cam_height = height;
+		state->create_egl_image_required = true;
+		while (state->create_egl_image_required) {
+			usleep(1000); //this is not time critical implementation
+		}
 	}
-	state->create_egl_image_required = true;
-	while (state->create_egl_image_required) {
-		usleep(1000); //this is not time critical implementation
-	}
+	pthread_mutex_unlock(&state->texture_size_mutex);
 }
 static MENU_T *get_menu() {
 	return state->menu;
@@ -1538,6 +1531,8 @@ int main(int argc, char *argv[]) {
 		pthread_mutex_init(&state->mutex, 0);
 		//texture mutex init
 		pthread_mutex_init(&state->texture_mutex, 0);
+		//texture size mutex init
+		pthread_mutex_init(&state->texture_size_mutex, 0);
 		//frame mutex init
 		pthread_mutex_init(&state->cmd_list_mutex, 0);
 	}
