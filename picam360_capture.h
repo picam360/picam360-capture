@@ -35,7 +35,7 @@
 
 #include "picam360_capture_plugin.h"
 
-#define MAX_TEXTURE_BUFFER_NUM 2
+#define TEXTURE_BUFFER_NUM 2
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
 
@@ -129,8 +129,9 @@ typedef struct _PICAM360CAPTURE_T {
 	int active_cam;
 	int num_of_cam;
 	pthread_t thread[MAX_CAM_NUM];
-	void* egl_image[MAX_CAM_NUM][MAX_TEXTURE_BUFFER_NUM + 1]; //double buffer
-	GLuint cam_texture[MAX_CAM_NUM][MAX_TEXTURE_BUFFER_NUM + 1]; //double buffer
+	bool create_egl_image_required;
+	void* egl_image[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
+	GLuint cam_texture[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
 	int cam_texture_cur[MAX_CAM_NUM];
 	GLuint logo_texture;
 	GLuint calibration_texture;

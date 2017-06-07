@@ -352,32 +352,33 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  * Returns: void
  *
  ***********************************************************/
-static void** create_egl_images(int cam_num, int width, int height,
-		int buff_num) {
-	for (int j = 0; j < buff_num; j++) {
-		glGenTextures(1, &state->cam_texture[cam_num][j]);
+static void update_egl_images(PICAM360CAPTURE_T *state) {
+	state->plugin_host.lock_texture();
+	for (int i = 0; i < state->num_of_cam; i++) {
+		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
+			glGenTextures(1, &state->cam_texture[i][j]);
 
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[cam_num][j]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-				GL_UNSIGNED_BYTE, NULL);
+			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+					GL_UNSIGNED_BYTE, NULL);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-		/* Create EGL Image */
-		state->egl_image[cam_num][j] = eglCreateImageKHR(state->display,
-				state->context, EGL_GL_TEXTURE_2D_KHR,
-				(EGLClientBuffer) state->cam_texture[cam_num][j], 0);
+			/* Create EGL Image */
+			state->egl_image[i][j] = eglCreateImageKHR(state->display,
+					state->context, EGL_GL_TEXTURE_2D_KHR,
+					(EGLClientBuffer) state->cam_texture[i][j], 0);
 
-		if (state->egl_image[cam_num][j] == EGL_NO_IMAGE_KHR) {
-			printf("eglCreateImageKHR failed.\n");
-			exit(1);
+			if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
+				printf("eglCreateImageKHR failed.\n");
+				exit(1);
+			}
 		}
 	}
-	state->cam_texture[cam_num][buff_num] = 0;
-	state->egl_image[cam_num][buff_num] = 0;
+	state->plugin_host.unlock_texture();
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
 
@@ -388,9 +389,9 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		// Start rendering
 		if (state->codec_type == MJPEG) {
 			init_mjpeg_decoder(&state->plugin_host, i, state->egl_image[i],
-					create_egl_images);
+					TEXTURE_BUFFER_NUM);
 		} else {
-			for (int j = 0; j < 2; j++) {
+			for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 				glGenTextures(1, &state->cam_texture[i][j]);
 
 				glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
@@ -1298,6 +1299,15 @@ static void get_texture_size(uint32_t *width_out, uint32_t *height_out) {
 		*height_out = state->cam_height;
 	}
 }
+static void set_texture_size(uint32_t width, uint32_t height) {
+	if (state->cam_width == width && state->cam_height == height) {
+		return;
+	}
+	state->create_egl_image_required = true;
+	while (state->create_egl_image_required) {
+		usleep(1000); //this is not time critical implementation
+	}
+}
 static MENU_T *get_menu() {
 	return state->menu;
 }
@@ -1403,6 +1413,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.unlock_texture = unlock_texture;
 		state->plugin_host.set_cam_texture_cur = set_cam_texture_cur;
 		state->plugin_host.get_texture_size = get_texture_size;
+		state->plugin_host.set_texture_size = set_texture_size;
 
 		state->plugin_host.get_menu = get_menu;
 		state->plugin_host.get_menu_visible = get_menu_visible;
@@ -1598,6 +1609,10 @@ int main(int argc, char *argv[]) {
 			if (res != 0) {
 				continue; // skip
 			}
+		}
+		if (state->create_egl_image_required) {
+			update_egl_images(state);
+			state->create_egl_image_required = false;
 		}
 		frame_handler();
 		command_handler();

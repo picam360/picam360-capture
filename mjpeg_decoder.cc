@@ -89,8 +89,8 @@ public:
 class _SENDFRAME_ARG_T {
 public:
 	_SENDFRAME_ARG_T() {
-		create_egl_images = NULL;
 		egl_images = NULL;
+		egl_image_num = 0;
 		cam_run = false;
 		cam_num = 0;
 		framecount = 0;
@@ -110,8 +110,8 @@ public:
 		memset(tunnel, 0, sizeof(tunnel));
 		fillbufferdone_count = 0;
 	}
-	MJPEG_DECODER_CREATE_EGL_IMAGES create_egl_images;
 	void **egl_images;
+	int egl_image_num;
 	bool cam_run;
 	int cam_num;
 	int framecount;
@@ -142,7 +142,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 
 	//printf("buffer done \n");
 	int cam_num = send_frame_arg->cam_num;
-	int cur = send_frame_arg->fillbufferdone_count % 2;
+	int cur = send_frame_arg->fillbufferdone_count
+			% send_frame_arg->egl_image_num;
 	if (lg_plugin_host) {
 		lg_plugin_host->lock_texture();
 		lg_plugin_host->set_cam_texture_cur(cam_num, cur);
@@ -158,7 +159,7 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 				PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED + cam_num);
 	}
 	send_frame_arg->fillbufferdone_count++;
-	cur = send_frame_arg->fillbufferdone_count % 2;
+	cur = send_frame_arg->fillbufferdone_count % send_frame_arg->egl_image_num;
 	if (OMX_FillThisBuffer(ilclient_get_handle(send_frame_arg->egl_render),
 			send_frame_arg->egl_buffer[cur]) != OMX_ErrorNone) {
 		printf("test  OMX_FillThisBuffer failed in callback\n");
@@ -184,7 +185,10 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 
 	uint32_t texture_width = MIN(MIN(image_width,image_height), 2048);
 	uint32_t texture_height = MIN(MIN(image_width,image_height), 2048);
-	lg_plugin_host->get_texture_size(&texture_width, &texture_height);
+
+	if (lg_plugin_host) {
+		lg_plugin_host->set_texture_size(texture_width, texture_height);
+	}
 
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
@@ -299,10 +303,7 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 		exit(1);
 	}
 
-	send_frame_arg->egl_images = send_frame_arg->create_egl_images(
-			send_frame_arg->cam_num, texture_width, texture_height, 2);
-
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < send_frame_arg->egl_imagenum; i++) {
 		OMX_STATETYPE state;
 		OMX_GetState(ILC_GET_HANDLE(send_frame_arg->egl_render), &state);
 		if (state != OMX_StateIdle) {
@@ -648,7 +649,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 
 }
 void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
-		MJPEG_DECODER_CREATE_EGL_IMAGES create_egl_images) {
+		void **egl_images, int egl_image_num) {
 	lg_plugin_host = plugin_host;
 
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
@@ -657,7 +658,8 @@ void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
 	}
 	lg_send_frame_arg[cam_num] = new _SENDFRAME_ARG_T;
 	lg_send_frame_arg[cam_num]->cam_num = cam_num;
-	lg_send_frame_arg[cam_num]->create_egl_images = create_egl_images;
+	lg_send_frame_arg[cam_num]->egl_images = egl_images;
+	lg_send_frame_arg[cam_num]->egl_image_num = egl_image_num;
 
 	lg_send_frame_arg[cam_num]->cam_run = true;
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,

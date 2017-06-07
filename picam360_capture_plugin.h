@@ -47,6 +47,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*unlock_texture)();
 	void (*set_cam_texture_cur)(int cam_num, int cur);
 	void (*get_texture_size)(uint32_t *width_out, uint32_t *height_out);
+	void (*set_texture_size)(uint32_t width, uint32_t height);
 
 	MENU_T *(*get_menu)();
 	bool (*get_menu_visible)();
