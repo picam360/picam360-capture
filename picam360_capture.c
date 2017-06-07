@@ -352,8 +352,34 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  * Returns: void
  *
  ***********************************************************/
+static void destroy_egl_images(PICAM360CAPTURE_T *state) {
+	if (state->plugin_host) {
+		state->plugin_host.lock_texture();
+	}
+	for (int i = 0; i < state->num_of_cam; i++) {
+		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
+			if (state->cam_texture[i][j] != 0) {
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glDeleteTextures(1, &state->cam_texture[i][j]);
+				state->cam_texture[i][j] = 0;
+			}
+			if (state->egl_image[i][j] != 0) {
+				if (!eglDestroyImageKHR(state->display,
+						(EGLImageKHR) state->egl_image[i][j]))
+					printf("eglDestroyImageKHR failed.");
+				state->egl_image[i][j] = NULL;
+			}
+		}
+	}
+	if (state->plugin_host) {
+		state->plugin_host.unlock_texture();
+	}
+}
 static void update_egl_images(PICAM360CAPTURE_T *state) {
-	state->plugin_host.lock_texture();
+	destroy_egl_images(state);
+	if (state->plugin_host) {
+		state->plugin_host.lock_texture();
+	}
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 			glGenTextures(1, &state->cam_texture[i][j]);
@@ -378,46 +404,22 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			}
 		}
 	}
-	state->plugin_host.unlock_texture();
+	if (state->plugin_host) {
+		state->plugin_host.unlock_texture();
+	}
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
 
 	load_texture("img/calibration_img.png", &state->calibration_texture);
 	load_texture("img/logo_img.png", &state->logo_texture);
 
+	update_egl_images();
 	for (int i = 0; i < state->num_of_cam; i++) {
 		// Start rendering
 		if (state->codec_type == MJPEG) {
 			init_mjpeg_decoder(&state->plugin_host, i, state->egl_image[i],
 			TEXTURE_BUFFER_NUM);
 		} else {
-			for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
-				glGenTextures(1, &state->cam_texture[i][j]);
-
-				glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
-						state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-						GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-						GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-						GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-						GL_CLAMP_TO_EDGE);
-
-				/* Create EGL Image */
-				state->egl_image[i][j] = eglCreateImageKHR(state->display,
-						state->context, EGL_GL_TEXTURE_2D_KHR,
-						(EGLClientBuffer) state->cam_texture[i][j], 0);
-
-				if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
-					printf("eglCreateImageKHR failed.\n");
-					exit(1);
-				}
-			}
-
 			void **args = malloc(sizeof(void*) * 3);
 			args[0] = (void*) i;
 			args[1] = (void*) state->egl_image[i];
@@ -545,16 +547,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 static void exit_func(void)
 // Function to be passed to atexit().
 {
-	for (int i = 0; i < state->num_of_cam; i++) {
-		for (int j = 0; j < 2; j++) {
-			if (state->egl_image[i][j] != 0) {
-				if (!eglDestroyImageKHR(state->display,
-						(EGLImageKHR) state->egl_image[i][j]))
-					printf("eglDestroyImageKHR failed.");
-				state->egl_image[i][j] = NULL;
-			}
-		}
-	}
+	destroy_egl_images();
 
 	// clear screen
 	glClear(GL_COLOR_BUFFER_BIT);
