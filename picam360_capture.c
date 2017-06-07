@@ -353,7 +353,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  *
  ***********************************************************/
 static void destroy_egl_images(PICAM360CAPTURE_T *state) {
-	if (state->plugin_host) {
+	if (state->plugin_host.lock_texture) {
 		state->plugin_host.lock_texture();
 	}
 	for (int i = 0; i < state->num_of_cam; i++) {
@@ -371,13 +371,13 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 			}
 		}
 	}
-	if (state->plugin_host) {
+	if (state->plugin_host.unlock_texture) {
 		state->plugin_host.unlock_texture();
 	}
 }
 static void update_egl_images(PICAM360CAPTURE_T *state) {
 	destroy_egl_images(state);
-	if (state->plugin_host) {
+	if (state->plugin_host.lock_texture) {
 		state->plugin_host.lock_texture();
 	}
 	for (int i = 0; i < state->num_of_cam; i++) {
@@ -404,7 +404,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			}
 		}
 	}
-	if (state->plugin_host) {
+	if (state->plugin_host.unlock_texture) {
 		state->plugin_host.unlock_texture();
 	}
 }
@@ -413,7 +413,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 	load_texture("img/calibration_img.png", &state->calibration_texture);
 	load_texture("img/logo_img.png", &state->logo_texture);
 
-	update_egl_images();
+	update_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		// Start rendering
 		if (state->codec_type == MJPEG) {
@@ -547,7 +547,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 static void exit_func(void)
 // Function to be passed to atexit().
 {
-	destroy_egl_images();
+	destroy_egl_images(state);
 
 	// clear screen
 	glClear(GL_COLOR_BUFFER_BIT);
