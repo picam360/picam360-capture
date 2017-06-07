@@ -285,7 +285,7 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 		exit(1);
 	}
 
-	port_format.nBufferCountActual = 2;
+	port_format.nBufferCountActual = send_frame_arg->egl_image_num;
 	omx_err = OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->egl_render),
 			OMX_IndexParamPortDefinition, &port_format);
 	if (omx_err != OMX_ErrorNone) {
@@ -303,7 +303,7 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 		exit(1);
 	}
 
-	for (int i = 0; i < send_frame_arg->egl_imagenum; i++) {
+	for (int i = 0; i < send_frame_arg->egl_image_num; i++) {
 		OMX_STATETYPE state;
 		OMX_GetState(ILC_GET_HANDLE(send_frame_arg->egl_render), &state);
 		if (state != OMX_StateIdle) {
