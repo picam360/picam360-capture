@@ -187,17 +187,16 @@ static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
 	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
 	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
 
-	uint32_t texture_width = MIN(MIN(image_width,image_height), 2048);
-	uint32_t texture_height = MIN(MIN(image_width,image_height), 2048);
+	uint32_t texture_width;
+	uint32_t texture_height;
+	if (lg_plugin_host) {
+		lg_plugin_host->get_texture_size(&texture_width, &texture_height);
+	}
 
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
 	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexParamPortDefinition, &portdef);
-
-	// put resizer in idle state (this allows the outport of the decoder
-	// to become enabled)
-	ilclient_change_component_state(send_frame_arg->resize, OMX_StateIdle);
 
 	OMX_CONFIG_RECTTYPE omx_crop_req;
 	OMX_INIT_STRUCTURE(omx_crop_req);
@@ -221,37 +220,13 @@ static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
 	//printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
 	//		omx_crop_req.nWidth, omx_crop_req.nHeight);
 
-	// query output buffer requirements for resizer
-	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
-	portdef.nVersion.nVersion = OMX_VERSION;
-	portdef.nPortIndex = 61;
-	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
-			OMX_IndexParamPortDefinition, &portdef);
+	// enable output of decoder and input of resizer (ie enable tunnel)
+	ilclient_enable_port(send_frame_arg->video_decode, 131);
+	ilclient_enable_port(send_frame_arg->resize, 60);
 
-	// change output color format and dimensions to match input
-	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
-	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
-	portdef.format.image.nFrameWidth = texture_width;
-	portdef.format.image.nFrameHeight = texture_height;
-	portdef.format.image.nStride = 0;
-	portdef.format.image.nSliceHeight = 16;
-	portdef.format.image.bFlagErrorConcealment = OMX_FALSE;
-
-	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
-			OMX_IndexParamPortDefinition, &portdef);
-
-	// grab output requirements again to get actual buffer size
-	// requirement (and buffer count requirement!)
-	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
-			OMX_IndexParamPortDefinition, &portdef);
-
-	// show some logging so user knows it's working
-	printf("Width: %u Height: %u Output Color Format: 0x%x Buffer Size: %u\n",
-			(unsigned int) portdef.format.image.nFrameWidth,
-			(unsigned int) portdef.format.image.nFrameHeight,
-			(unsigned int) portdef.format.image.eColorFormat,
-			(unsigned int) portdef.nBufferSize);
-	fflush (stdout);
+	// need to wait for this event
+	ilclient_wait_for_event(send_frame_arg->video_decode,
+			OMX_EventPortSettingsChanged, 131, 1, 0, 0, 0, TIMEOUT_MS);
 }
 
 static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
