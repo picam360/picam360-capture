@@ -262,6 +262,13 @@ static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexParamPortDefinition, &portdef);
 
+	uint32_t texture_width = 2048;
+	uint32_t texture_height = 2048;
+
+	if (lg_plugin_host) {
+		lg_plugin_host->get_texture_size(&texture_width, &texture_height);
+	}
+
 	// change output color format and dimensions to match input
 	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
 	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
