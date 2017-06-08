@@ -262,9 +262,9 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
 
 	vector_delete(vVector);
 }
-void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
+MENU_T *menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
 	if (parent == NULL || child == NULL) {
-		return;
+		return NULL;
 	}
 	int last_idx = 0;
 	for (last_idx = 0; parent->submenu[last_idx]; last_idx++) {
@@ -276,6 +276,7 @@ void menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
 	}
 	parent->submenu[idx] = child;
 	child->parent = parent;
+	return child;
 }
 void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 	if (root == NULL) {
