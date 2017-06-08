@@ -169,8 +169,8 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
 	ilclient_disable_port(send_frame_arg->video_decode, 131);
 	ilclient_disable_port(send_frame_arg->resize, 60);
-	ilclient_disable_port(send_frame_arg->resize, 61);
-	ilclient_disable_port(send_frame_arg->egl_render, 220);
+	//ilclient_disable_port(send_frame_arg->resize, 61);
+	//ilclient_disable_port(send_frame_arg->egl_render, 220);
 
 	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
@@ -187,8 +187,56 @@ static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
 	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
 	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
 
+	uint32_t texture_width = MIN(MIN(image_width,image_height), 2048);
+	uint32_t texture_height = MIN(MIN(image_width,image_height), 2048);
+
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
+	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
+
+	// put resizer in idle state (this allows the outport of the decoder
+	// to become enabled)
+	ilclient_change_component_state(send_frame_arg->resize, OMX_StateIdle);
+
+	OMX_CONFIG_RECTTYPE omx_crop_req;
+	OMX_INIT_STRUCTURE(omx_crop_req);
+	omx_crop_req.nPortIndex = 60;
+	if (image_width > texture_width) {
+		omx_crop_req.nLeft = (image_width - texture_width) / 2;
+		omx_crop_req.nWidth = texture_width;
+	} else {
+		omx_crop_req.nLeft = 0;
+		omx_crop_req.nWidth = image_width;
+	}
+	if (image_height > texture_height) {
+		omx_crop_req.nTop = (image_height - texture_height) / 2;
+		omx_crop_req.nHeight = texture_height;
+	} else {
+		omx_crop_req.nTop = 0;
+		omx_crop_req.nHeight = image_height;
+	}
+	OMX_SetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
+	//printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
+	//		omx_crop_req.nWidth, omx_crop_req.nHeight);
+
+	// query output buffer requirements for resizer
+	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	portdef.nVersion.nVersion = OMX_VERSION;
+	portdef.nPortIndex = 61;
+	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
+
+	// change output color format and dimensions to match input
+	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
+	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
+	portdef.format.image.nFrameWidth = texture_width;
+	portdef.format.image.nFrameHeight = texture_height;
+	portdef.format.image.nStride = 0;
+	portdef.format.image.nSliceHeight = 16;
+	portdef.format.image.bFlagErrorConcealment = OMX_FALSE;
+
 	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexParamPortDefinition, &portdef);
 
