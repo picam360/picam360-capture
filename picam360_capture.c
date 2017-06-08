@@ -1451,8 +1451,8 @@ int main(int argc, char *argv[]) {
 
 	// Clear application state
 	memset(state, 0, sizeof(*state));
-	state->cam_width = 1024;
-	state->cam_height = 1024;
+	state->cam_width = 2048;
+	state->cam_height = 2048;
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
