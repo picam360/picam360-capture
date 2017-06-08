@@ -187,6 +187,8 @@ static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
 	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
 	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
 
+	uint32_t image_inner_width = MIN(image_width,image_height);
+
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
 	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
@@ -195,10 +197,10 @@ static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
 	OMX_CONFIG_RECTTYPE omx_crop_req;
 	OMX_INIT_STRUCTURE(omx_crop_req);
 	omx_crop_req.nPortIndex = 60;
-	omx_crop_req.nLeft = (image_width - MIN(image_width, image_height)) / 2;
+	omx_crop_req.nLeft = (image_width - image_inner_width) / 2;
 	omx_crop_req.nWidth = image_inner_width;
-	omx_crop_req.nTop = (image_height - MIN(image_width, image_height)) / 2;
-	omx_crop_req.nHeight = texture_height;
+	omx_crop_req.nTop = (image_height - image_inner_width) / 2;
+	omx_crop_req.nHeight = image_inner_width;
 	OMX_SetConfig(ILC_GET_HANDLE(send_frame_arg->resize),
 			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
 	//printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
