@@ -162,12 +162,51 @@ static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	cur = send_frame_arg->fillbufferdone_count % send_frame_arg->egl_image_num;
 	if (OMX_FillThisBuffer(ilclient_get_handle(send_frame_arg->egl_render),
 			send_frame_arg->egl_buffer[cur]) != OMX_ErrorNone) {
-		printf("test  OMX_FillThisBuffer failed in callback\n");
-		exit(1);
+		printf("OMX_FillThisBuffer failed in callback\n");
+		//exit(1);
 	}
 }
-static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
+static int port_setting_changed_again(_SENDFRAME_ARG_T *send_frame_arg) {
+	ilclient_disable_port(send_frame_arg->video_decode, 131);
+	ilclient_disable_port(send_frame_arg->resize, 60);
+	ilclient_disable_port(send_frame_arg->resize, 61);
+	ilclient_disable_port(send_frame_arg->egl_render, 220);
 
+	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
+
+	OMX_PARAM_PORTDEFINITIONTYPE portdef;
+
+	// need to setup the input for the resizer with the output of the
+	// decoder
+	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	portdef.nVersion.nVersion = OMX_VERSION;
+	portdef.nPortIndex = 131;
+	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->video_decode),
+			OMX_IndexParamPortDefinition, &portdef);
+
+	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
+	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
+
+	// tell resizer input what the decoder output will be providing
+	portdef.nPortIndex = 60;
+	OMX_SetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
+
+	// grab output requirements again to get actual buffer size
+	// requirement (and buffer count requirement!)
+	OMX_GetParameter(ILC_GET_HANDLE(send_frame_arg->resize),
+			OMX_IndexParamPortDefinition, &portdef);
+
+	// show some logging so user knows it's working
+	printf("Width: %u Height: %u Output Color Format: 0x%x Buffer Size: %u\n",
+			(unsigned int) portdef.format.image.nFrameWidth,
+			(unsigned int) portdef.format.image.nFrameHeight,
+			(unsigned int) portdef.format.image.eColorFormat,
+			(unsigned int) portdef.nBufferSize);
+	fflush (stdout);
+}
+
+static int port_setting_changed(_SENDFRAME_ARG_T *send_frame_arg) {
 	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
 	OMX_PARAM_PORTDEFINITIONTYPE portdef;
@@ -497,14 +536,16 @@ static void *sendframe_thread_func(void* arg) {
 				data_len = MIN((int )buf->nAllocLen, packet->len);
 				memcpy(buf->pBuffer, packet->data, data_len);
 
-				if (port_settings_changed == 0
-						&& ilclient_remove_event(send_frame_arg->video_decode,
-								OMX_EventPortSettingsChanged, 131, 0, 0, 1)
-								== 0) {
-					port_settings_changed = 1;
+				if (ilclient_remove_event(send_frame_arg->video_decode,
+						OMX_EventPortSettingsChanged, 131, 0, 0, 1) == 0) {
 					printf("port changed %d\n", cam_num);
 
-					status = port_setting_changed(send_frame_arg);
+					if (port_settings_changed) {
+						status = port_setting_changed_again(send_frame_arg);
+					} else {
+						status = port_setting_changed(send_frame_arg);
+						port_settings_changed = 1;
+					}
 
 					if (status != 0) {
 						status = -7;
