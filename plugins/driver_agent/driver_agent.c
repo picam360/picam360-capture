@@ -1085,8 +1085,12 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		if (1) {
-			float value = (int) menu->user_data;
-			lg_light_strength += value;
+			int value = (int) menu->user_data;
+			if (value == -1 || value == 1) {
+				lg_light_strength += value;
+			} else {
+				lg_plugin_host->set_fov(MIN(MAX(value, 0), 100));
+			}
 		}
 		menu->selected = false;
 		break;
@@ -1101,8 +1105,12 @@ static void fov_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		if (1) {
-			float value = (int) menu->user_data;
-			lg_plugin_host->set_fov(lg_plugin_host->get_fov() - value);
+			int value = (int) menu->user_data;
+			if (value == -1 || value == 1) {
+				lg_plugin_host->set_fov(lg_plugin_host->get_fov() - value);
+			} else {
+				lg_plugin_host->set_fov(MIN(MAX(value, 60), 120));
+			}
 		}
 		menu->selected = false;
 		break;
@@ -1305,21 +1313,35 @@ void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 					menu_new(L"Light", NULL, NULL), INT_MAX);
 			{
 				MENU_T *sub_menu = light_menu;
-				MENU_T *minus_menu = menu_add_submenu(sub_menu,
+				menu_add_submenu(sub_menu,
+						menu_new(L"MIN", light_menu_callback, (void*) 0),
+						INT_MAX);
+				menu_add_submenu(sub_menu,
 						menu_new(L"-", light_menu_callback, (void*) -1),
 						INT_MAX);
-				MENU_T *plus_menu = menu_add_submenu(sub_menu,
+				menu_add_submenu(sub_menu,
 						menu_new(L"+", light_menu_callback, (void*) 1),
+						INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"MAX", light_menu_callback, (void*) 100),
 						INT_MAX);
 			}
 			MENU_T *fov_menu = menu_add_submenu(sub_menu,
 					menu_new(L"Fov", NULL, NULL), INT_MAX);
 			{
 				MENU_T *sub_menu = fov_menu;
-				MENU_T *minus_menu = menu_add_submenu(sub_menu,
+				menu_add_submenu(sub_menu,
 						menu_new(L"-", fov_menu_callback, (void*) -1), INT_MAX);
-				MENU_T *plus_menu = menu_add_submenu(sub_menu,
+				menu_add_submenu(sub_menu,
 						menu_new(L"+", fov_menu_callback, (void*) 1), INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"60", fov_menu_callback, (void*) 60),
+						INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"90", fov_menu_callback, (void*) 9), INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"120", fov_menu_callback, (void*) 120),
+						INT_MAX);
 			}
 		}
 		{
