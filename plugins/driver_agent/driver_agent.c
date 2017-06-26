@@ -943,13 +943,19 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
+		lg_thrust = 0;
+		memset(lg_motor_value, 0, sizeof(lg_motor_value));
+		lg_yaw_diff = 0;
+		lg_pitch_diff = 0;
+		memset(lg_pid_value, 0, sizeof(lg_pid_value));
+		memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
+		memset(lg_delta_pid_time, 0, sizeof(lg_delta_pid_time));
 		lg_pid_enabled = !(bool) menu->user_data;
 		menu->user_data = (void*) lg_pid_enabled;
 		if (lg_pid_enabled) {
 			swprintf(menu->name, 8, L"On");
 		} else {
 			swprintf(menu->name, 8, L"Off");
-			memset(lg_pid_value, 0, sizeof(lg_pid_value));
 		}
 		menu->selected = false;
 		break;
