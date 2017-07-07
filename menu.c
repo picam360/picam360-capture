@@ -13,6 +13,7 @@
 #include <linux/input.h>
 #include <fcntl.h>
 #include <wchar.h>
+#include <limits.h>
 
 #include "GLES2/gl2.h"
 #include "EGL/egl.h"
@@ -277,6 +278,18 @@ MENU_T *menu_add_submenu(MENU_T *parent, MENU_T *child, int idx) {
 	parent->submenu[idx] = child;
 	child->parent = parent;
 	return child;
+}
+MENU_T *menu_get_submenu(MENU_T *parent, wchar_t *name, bool create_new) {
+	for (int idx = 0; parent->submenu[idx]; idx++) {
+		if (wcsncmp(parent->submenu[idx]->name, name, 256) == 0) {
+			return parent->submenu[idx];
+		}
+	}
+	if (create_new) {
+		return menu_add_submenu(parent, menu_new(name, NULL, NULL), INT_MAX);
+	} else {
+		return NULL;
+	}
 }
 void menu_operate(MENU_T *root, enum MENU_OPERATE operate) {
 	if (root == NULL) {

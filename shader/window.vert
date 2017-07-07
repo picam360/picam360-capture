@@ -43,6 +43,7 @@ void main(void) {
 	
 		r0 = (M_PI / 2.0 - pitch) / M_PI;
 		float r2 = r0;
+		//r2 = sin(M_PI*180.0/240.0*r2)/2.0;
 		if (r2 >= 0.40) {
 			r2 = pow(r2 - 0.4, 1.09) + 0.4;
 		}
@@ -51,9 +52,9 @@ void main(void) {
 		v0 = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y;
 	}
 	{	
-		pos = unif_matrix_1 * position;
-		pitch = asin(pos.y);
-		yaw = atan(pos.x, pos.z);
+		vec4 pos = unif_matrix_1 * position;
+		float pitch = asin(pos.y);
+		float yaw = atan(pos.x, pos.z);
 		r1 = (M_PI / 2.0 - pitch) / M_PI;
 	
 		float r2 = 1.0 - r1;

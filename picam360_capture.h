@@ -177,11 +177,14 @@ typedef struct _PICAM360CAPTURE_T {
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;
+	LIST_T *cmd2upstream_list;
 
 	MENU_T *menu;
 	bool menu_visible;
 
 	PLUGIN_T **plugins;
 	MPU_T **mpus;
+	STATUS_T **statuses;
+	STATUS_T **watches;
 	struct _OPTIONS_T options;
 } PICAM360CAPTURE_T;

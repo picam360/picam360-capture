@@ -38,3 +38,5 @@ typedef void (*KOKUYOSEKI_CALLBACK)(struct timeval time, int button, int value);
 void set_kokuyoseki_callback(KOKUYOSEKI_CALLBACK callback);
 void open_kokuyoseki();
 void close_kokuyoseki();
+
+void create_kokuyoseki(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin);

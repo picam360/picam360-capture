@@ -7,13 +7,26 @@
 #include "quaternion.h"
 
 enum PICAM360_CAPTURE_EVENT {
-	PICAM360_CAPTURE_EVENT_AFTER_FRAME, PICAM360_CAPTURE_EVENT_AFTER_SNAP, PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED,PICAM360_CAPTURE_EVENT_TEXTURE1_UPDATED,
+	PICAM360_CAPTURE_EVENT_AFTER_FRAME,
+	PICAM360_CAPTURE_EVENT_AFTER_SNAP,
+	PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED,
+	PICAM360_CAPTURE_EVENT_TEXTURE1_UPDATED,
 };
 enum RENDERING_MODE {
-	RENDERING_MODE_WINDOW, RENDERING_MODE_EQUIRECTANGULAR, RENDERING_MODE_FISHEYE,
+	RENDERING_MODE_WINDOW,
+	RENDERING_MODE_EQUIRECTANGULAR,
+	RENDERING_MODE_FISHEYE,
 };
 
-#define PICAM360_HOST_NODE_ID 0
+//0x00** is reserved by system
+#define PICAM360_HOST_NODE_ID 0x0000
+#define PICAM360_CONTROLLER_NODE_ID 0x0001
+
+enum PICAM360_CONTROLLER_EVENT {
+	PICAM360_CONTROLLER_EVENT_NONE,
+	PICAM360_CONTROLLER_EVENT_NEXT,
+	PICAM360_CONTROLLER_EVENT_BACK,
+};
 
 typedef struct _MPU_T {
 	char name[64];
@@ -24,6 +37,14 @@ typedef struct _MPU_T {
 	float (*get_north)(void *user_data);
 	void *user_data;
 } MPU_T;
+
+typedef struct _STATUS_T {
+	char name[64];
+	void (*get_value)(void *user_data, char *buff, int buff_len);
+	void (*set_value)(void *user_data, const char *value);
+	void (*release)(void *user_data);
+	void *user_data;
+} STATUS_T;
 
 typedef struct _PLUGIN_HOST_T {
 	VECTOR4D_T (*get_view_quaternion)();
@@ -59,8 +80,11 @@ typedef struct _PLUGIN_HOST_T {
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
 	void (*add_mpu)(MPU_T *mpu);
+	void (*add_status)(STATUS_T *status);
+	void (*add_watch)(STATUS_T *status);
 
-	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode, const char *path);
+	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
+			const char *path);
 } PLUGIN_HOST_T;
 
 typedef struct _PLUGIN_T {
