@@ -6,9 +6,9 @@ CFLAGS+=-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POS
 		-Wall -g -DHAVE_LIBOPENMAX=2 -DOMX -DOMX_SKIP64BIT -ftree-vectorize -pipe -DUSE_EXTERNAL_OMX \
 		-DHAVE_LIBBCM_HOST -DUSE_EXTERNAL_LIBBCM_HOST -DUSE_VCHIQ_ARM -Wno-psabi
 
-LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/ -lstdc++ \
+LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/ -lstdc++ -ldl\
 		-lopencv_core -lopencv_highgui -lopencv_imgproc \
-		-lovr_nsb -lgl_matrix -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lfreetype -ledit\
+		-lovr_nsb -lgl_matrix -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lilclient -lfreetype -ledit -ljansson\
 		-lpthread -lrt -lm -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont \
 		-Wl,-rpath,/usr/local/lib
 		
@@ -17,16 +17,9 @@ LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/ -lstdc++ \
 INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads \
 		-I$(SDKSTAGE)/opt/vc/include/interface/vmcs_host/linux -I./ -I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient \
 		-I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont -I./include \
-		-I./libs/freetypeGlesRpi/src -I./libs/MotionSensor -I/usr/local/include/jrtplib3
+		-I./libs/freetypeGlesRpi/src -I/usr/local/include/jrtplib3
 
-all: $(BIN) $(LIB)
-
-
-libs/MotionSensor/libMotionSensor.a:
-	$(MAKE) -C libs/MotionSensor
-
-libs/libI2Cdev.a:
-	$(MAKE) -C libs/I2Cdev
+all: $(BIN) $(LIB) $(PLUGINS)
 
 libs/freetypeGlesRpi/libFreetypeGlesRpi.a:
 	$(MAKE) -C libs/freetypeGlesRpi
@@ -45,9 +38,14 @@ libs/freetypeGlesRpi/libFreetypeGlesRpi.a:
 %.a: $(OBJS)
 	$(AR) r $@ $^
 
+$(PLUGINS):
+	$(MAKE) -C $@
+
 clean:
 	for i in $(OBJS); do (if test -e "$$i"; then ( rm $$i ); fi ); done
+	for i in $(PLUGINS); do (if test -e "$$i"; then ( make -C $$i clean ); fi ); done
 	@rm -f $(BIN) $(LIB)
 
 .PRECIOUS: $(OBJS)
+.PHONY: all $(PLUGINS)
 

@@ -42,4 +42,5 @@ void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback, void *user_data);
 void menu_delete(MENU_T **menu);
 MENU_T *menu_add_submenu(MENU_T *parent, MENU_T *child, int idx);
+MENU_T *menu_get_submenu(MENU_T *parent, wchar_t *name, bool create_new);
 void menu_operate(MENU_T *root, enum MENU_OPERATE operate);
