@@ -21,12 +21,12 @@ MODE=
 DIRECT=
 FPS=30
 CODEC=H264
-STREAM=false
-STREAM_PARAM=
+STREAM=
 AUTO_CALIBRATION=
 VIEW_COODINATE=MANUAL
+DEBUG=false
 
-while getopts ac:n:w:h:W:H:psCEFf:rDSv: OPT
+while getopts ac:n:w:h:W:H:psCEFf:rDSv:g OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
@@ -59,26 +59,16 @@ do
             ;;
         D)  DIRECT="-D"
             ;;
-        S)  STREAM=true
+        S)  STREAM=-S
             ;;
         v)  VIEW_COODINATE=$OPTARG
+            ;;
+        g)  DEBUG=true
             ;;
         \?) usage_exit
             ;;
     esac
 done
-
-if [ $STREAM = true ]; then
-	if [ -e /tmp/stream ]; then
-		rm /tmp/stream
-	fi
-	mkdir /tmp/stream
-	chmod 0777 /tmp/stream
-	export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-	sudo killall mjpg_streamer 
-	mjpg_streamer -i "input_file.so -f /tmp/stream" &
-	STREAM_PARAM="-o /tmp/stream/steam.jpeg"
-fi
 
 if [ -e status ]; then
 	rm status
@@ -110,6 +100,18 @@ fi
 mkfifo rtp_tx
 chmod 0666 rtp_tx
 
+if [ -e rtcp_rx ]; then
+	rm rtcp_rx
+fi
+mkfifo rtcp_rx
+chmod 0666 rtcp_rx
+
+if [ -e rtcp_tx ]; then
+	rm rtcp_tx
+fi
+mkfifo rtcp_tx
+chmod 0666 rtcp_tx
+
 if [ $REMOTE = true ]; then
 
 #use tcp
@@ -117,9 +119,10 @@ if [ $REMOTE = true ]; then
 #   nc 192.168.4.1 9006 < rtp_tx > rtp_rx &
 
 	sudo killall socat
-#	socat tcp-listen:9002 PIPE:rtp_rx &
 	socat -u udp-recv:9002 - > rtp_rx &
-	socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.1:9004 &
+	socat PIPE:rtcp_tx UDP-DATAGRAM:192.168.4.1:9003 &
+	
+#	socat tcp-listen:9002 PIPE:rtp_rx &
 #	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
 	sudo killall raspivid
@@ -131,5 +134,17 @@ elif [ $DIRECT = ]; then
 	fi
 fi
 
+#picam360-capture
+
 sudo killall picam360-capture.bin
-./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM -v $VIEW_COODINATE"
+if [ $DEBUG = "true" ]; then
+
+echo b main > gdbcmd
+echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM -v $VIEW_COODINATE\" >> gdbcmd
+gdb ./picam360-capture.bin -x gdbcmd
+
+else
+
+./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM -v $VIEW_COODINATE"
+
+fi
