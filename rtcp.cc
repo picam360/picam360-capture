@@ -19,7 +19,7 @@
 #include <string>
 #include <list>
 
-#include "rtp.h"
+#include "rtcp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -161,20 +161,20 @@ static bool lg_is_looping = false;
 static MREVENT_T lg_play_time_updated;
 static uint64_t lg_play_time = 0;
 
-static RTP_CALLBACK lg_callback = NULL;
+static RTCP_CALLBACK lg_callback = NULL;
 
 static float lg_bandwidth = 0;
 static float lg_bandwidth_limit = 100 * 1024 * 1024; //100Mbps
 
-void rtp_set_callback(RTP_CALLBACK callback) {
+void rtcp_set_callback(RTCP_CALLBACK callback) {
 	lg_callback = callback;
 }
 
-void rtp_set_auto_play(bool value) {
+void rtcp_set_auto_play(bool value) {
 	lg_auto_play = value;
 }
 
-void rtp_set_is_looping(bool value) {
+void rtcp_set_is_looping(bool value) {
 	lg_is_looping = value;
 }
 
@@ -187,11 +187,11 @@ static void checkerror(int rtperr) {
 }
 #endif
 
-float rtp_get_bandwidth() {
+float rtcp_get_bandwidth() {
 	return lg_bandwidth;
 }
 
-int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
+int rtcp_sendpacket(unsigned char *data, int data_len, int pt) {
 	pthread_mutex_lock(&lg_mlock);
 	{
 		static int last_data_len = 0;
@@ -216,7 +216,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 #elif defined USE_SOCKET
 #else
 		if (lg_tx_fd < 0) {
-			lg_tx_fd = open("rtp_tx", O_WRONLY);
+			lg_tx_fd = open("rtcp_tx", O_WRONLY);
 		}
 		if (lg_tx_fd >= 0) {
 			unsigned char header[8];
@@ -270,7 +270,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 static void *buffering_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP BUFFERING");
 
-	int rx_fd = open("rtp_rx", O_RDONLY);
+	int rx_fd = open("rtcp_rx", O_RDONLY);
 	if (rx_fd < 0) {
 		return NULL;
 	}
@@ -512,11 +512,11 @@ static void *load_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP LOAD");
 
 	void **args = (void**) arg;
-	RTP_LOADING_CALLBACK callback = (RTP_LOADING_CALLBACK) args[0];
+	RTCP_LOADING_CALLBACK callback = (RTCP_LOADING_CALLBACK) args[0];
 	void *user_data = args[1];
 	free(arg);
 
-	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
+	unsigned char buff[RTCP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
 	unsigned int last_timestamp = 0;
 	uint64_t current_play_time = 0;
 	struct timeval last_time = { };
@@ -612,7 +612,7 @@ static void *load_thread_func(void* arg) {
 }
 
 static bool is_init = false;
-int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
+int init_rtcp(unsigned short portbase, char *destip_str, unsigned short destport,
 		float bandwidth_limit) {
 	if (is_init) {
 		return -1;
@@ -642,7 +642,7 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
 
 	sessparams.SetOwnTimestampUnit(1.0 / 1E6);//micro sec
 	sessparams.SetMaximumPacketSize(
-			RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader));
+			RTCP_MAXPAYLOADSIZE + sizeof(struct RTPHeader));
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
 
@@ -667,7 +667,7 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
 	return 0;
 }
 
-int deinit_rtp() {
+int deinit_rtcp() {
 	if (!is_init) {
 		return -1;
 	}
@@ -686,14 +686,14 @@ int deinit_rtp() {
 	return 0;
 }
 
-void rtp_start_recording(char *path) {
-	rtp_stop_recording();
+void rtcp_start_recording(char *path) {
+	rtcp_stop_recording();
 	strcpy(lg_record_path, path);
 	lg_record_fd = open(lg_record_path, O_CREAT | O_WRONLY | O_TRUNC);
 	pthread_create(&lg_record_thread, NULL, record_thread_func, (void*) NULL);
 }
 
-void rtp_stop_recording() {
+void rtcp_stop_recording() {
 	if (lg_record_fd > 0) {
 		int fd = lg_record_fd;
 		lg_record_fd = -1;
@@ -702,16 +702,16 @@ void rtp_stop_recording() {
 	}
 }
 
-bool rtp_is_recording(char **path) {
+bool rtcp_is_recording(char **path) {
 	if (path) {
 		*path = lg_record_path;
 	}
 	return (lg_record_fd > 0);
 }
 
-bool rtp_start_loading(char *path, bool auto_play, bool is_looping,
-		RTP_LOADING_CALLBACK callback, void *user_data) {
-	rtp_stop_loading();
+bool rtcp_start_loading(char *path, bool auto_play, bool is_looping,
+		RTCP_LOADING_CALLBACK callback, void *user_data) {
+	rtcp_stop_loading();
 	strcpy(lg_load_path, path);
 	lg_auto_play = auto_play;
 	lg_is_looping = is_looping;
@@ -728,12 +728,12 @@ bool rtp_start_loading(char *path, bool auto_play, bool is_looping,
 	}
 }
 
-void rtp_increment_loading(int elapsed_usec) {
+void rtcp_increment_loading(int elapsed_usec) {
 	lg_play_time += elapsed_usec;
 	mrevent_trigger(&lg_play_time_updated);
 }
 
-void rtp_stop_loading() {
+void rtcp_stop_loading() {
 	if (lg_load_fd > 0) {
 		int fd = lg_load_fd;
 		lg_load_fd = -1;
@@ -742,7 +742,7 @@ void rtp_stop_loading() {
 	}
 }
 
-bool rtp_is_loading(char **path) {
+bool rtcp_is_loading(char **path) {
 	if (path) {
 		*path = lg_load_path;
 	}

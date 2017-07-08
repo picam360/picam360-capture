@@ -53,9 +53,10 @@ using std::chrono::duration_cast;
  * @param [in] fpsden The FPS denominator.
  */
 OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
-		int fpsnum, int fpsden) :
+		int fpsnum, int fpsden, OMXCV_CALLBACK callback, void *user_data) :
 		m_width(width), m_height(height), m_stride(((width + 31) & ~31) * 3), m_bitrate(
-				bitrate), m_filename(name), m_stop { false } {
+				bitrate), m_filename(name), m_stop { false }, m_callback(
+				callback), m_user_data(user_data) {
 	int ret;
 	bcm_host_init();
 
@@ -225,7 +226,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 			OMX_StateExecuting);
 	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
 
-	if (mcodec_type == JPEG) {
+	if (m_callback || mcodec_type == JPEG) {
 	} else {
 		m_ofstream.open(m_filename, std::ios::out);
 	}
@@ -321,7 +322,11 @@ void OmxCvImpl::input_worker() {
 bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 
 	if (out->nFilledLen != 0) {
-		if (mcodec_type == JPEG) {
+		if (m_callback) {
+			unsigned char *buff = out->pBuffer;
+			int data_len = out->nFilledLen;
+			m_callback(out->pBuffer, data_len, m_user_data);
+		} else if (mcodec_type == JPEG) {
 			unsigned char *buff = out->pBuffer;
 			int data_len = out->nFilledLen;
 			for (int i = 0; i < data_len; i++) {
@@ -437,8 +442,8 @@ bool OmxCvImpl::process(const unsigned char *in_data) {
  * @param [in] fpsden The FPS denominator.
  */
 OmxCv::OmxCv(const char *name, int width, int height, int bitrate, int fpsnum,
-		int fpsden) {
-	m_impl = new OmxCvImpl(name, width, height, bitrate, fpsnum, fpsden);
+		int fpsden, OMXCV_CALLBACK callback, void *user_data) {
+	m_impl = new OmxCvImpl(name, width, height, bitrate, fpsnum, fpsden, callback, user_data);
 }
 
 /**

@@ -33,6 +33,7 @@
 #include "auto_calibration.h"
 #include "manual_mpu.h"
 #include "rtp.h"
+#include "rtcp.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -634,7 +635,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S")) != -1) {
 		switch (opt) {
 		case 'W':
 			sscanf(optarg, "%d", &render_width);
@@ -663,6 +664,11 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 					frame->view_mpu = state->mpus[i];
 				}
 			}
+			break;
+		case 'S':
+			frame->output_mode = OUTPUT_MODE_STREAM;
+			strncpy(frame->output_filepath, "stream.mjpeg",
+					sizeof(frame->output_filepath));
 			break;
 		default:
 			break;
@@ -748,6 +754,9 @@ bool delete_frame(FRAME_T *frame) {
 	return true;
 }
 
+static void stream_callback(unsigned char *data, unsigned int data_len,
+		void *user_data);
+
 void frame_handler() {
 	struct timeval s, f;
 	double elapsed_ms;
@@ -773,8 +782,19 @@ void frame_handler() {
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio);
+					frame->output_filepath, 4000 * ratio, NULL, NULL);
 			frame->output_mode = OUTPUT_MODE_VIDEO;
+			frame->frame_num = 0;
+			frame->frame_elapsed = 0;
+			frame->is_recording = true;
+			printf("start_record saved to %s\n", frame->output_filepath);
+		}
+		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_STREAM) {
+			int ratio = frame->double_size ? 2 : 1;
+			frame->recorder = StartRecord(frame->width * ratio, frame->height,
+					frame->output_filepath, 4000 * ratio, stream_callback,
+					frame);
+			frame->output_mode = OUTPUT_MODE_STREAM;
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -843,6 +863,7 @@ void frame_handler() {
 			snap_finished = true;
 			break;
 		case OUTPUT_MODE_VIDEO:
+		case OUTPUT_MODE_STREAM:
 			AddFrame(frame->recorder, frame->img_buff);
 
 			gettimeofday(&f, NULL);
@@ -1431,7 +1452,7 @@ static void event_handler(uint32_t node_id, uint32_t event_id) {
 
 static void send_event(uint32_t node_id, uint32_t event_id) {
 	event_handler(node_id, event_id);
-	for (int i = 0; state->plugins[i] != NULL; i++) {
+	for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]) {
 			state->plugins[i]->event_handler(state->plugins[i]->user_data,
 					node_id, event_id);
@@ -1631,10 +1652,25 @@ static char lg_command[256] = { };
 static int lg_command_id = 0;
 static int lg_ack_command_id = 0;
 
+static void stream_callback(unsigned char *data, unsigned int data_len,
+		void *user_data) {
+	FRAME_T *frame = (FRAME_T*) user_data;
+	for (int i = 0; i < data_len;) {
+		int len;
+		if (i + RTP_MAXPAYLOADSIZE < data_len) {
+			len = RTP_MAXPAYLOADSIZE;
+		} else {
+			len = data_len - (i + RTP_MAXPAYLOADSIZE);
+		}
+		rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
+		i += len;
+	}
+}
+
 static int command2upstream_handler() {
 	int len = strlen(lg_command);
 	if (len != 0 && lg_command_id != lg_ack_command_id) {
-		rtp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
+		rtcp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
 		return 0;
 	} else {
 		memset(lg_command, 0, sizeof(lg_command));
@@ -1692,7 +1728,32 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	}
 	static unsigned int last_seq_num = 0;
 	if (seq_num != last_seq_num + 1) {
-		printf("packet lost : from %d to %d\n", last_seq_num, seq_num);
+		printf("rtp : packet lost : from %d to %d\n", last_seq_num, seq_num);
+	}
+	last_seq_num = seq_num;
+
+	if (pt == PT_STATUS) {
+		status_handler((char*) data, data_len);
+	} else if (pt == PT_CAM_BASE + 0) {
+		if (state->plugin_host.decode_video) {
+			state->plugin_host.decode_video(0, (unsigned char*) data, data_len);
+		}
+	} else if (pt == PT_CAM_BASE + 1) {
+		if (state->plugin_host.decode_video) {
+			state->plugin_host.decode_video(1, (unsigned char*) data, data_len);
+		}
+	}
+	return 0;
+}
+
+static int rtcp_callback(unsigned char *data, unsigned int data_len,
+		unsigned char pt, unsigned int seq_num) {
+	if (data_len == 0) {
+		return -1;
+	}
+	static unsigned int last_seq_num = 0;
+	if (seq_num != last_seq_num + 1) {
+		printf("rtcp : packet lost : from %d to %d\n", last_seq_num, seq_num);
 	}
 	last_seq_num = seq_num;
 
@@ -1705,16 +1766,6 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 		if (num == 2 && id != lg_ack_command_id) {
 			lg_ack_command_id = id;
 			state->plugin_host.send_command(value);
-		}
-	} else if (pt == PT_STATUS) {
-		status_handler((char*) data, data_len);
-	} else if (pt == PT_CAM_BASE + 0) {
-		if (state->plugin_host.decode_video) {
-			state->plugin_host.decode_video(0, (unsigned char*) data, data_len);
-		}
-	} else if (pt == PT_CAM_BASE + 1) {
-		if (state->plugin_host.decode_video) {
-			state->plugin_host.decode_video(1, (unsigned char*) data, data_len);
 		}
 	}
 	return 0;
@@ -1790,6 +1841,9 @@ static void init_status() {
 static void _init_rtp() {
 	init_rtp(9002, "192.168.4.1", 9004, 0);
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
+
+	init_rtcp(9003, "192.168.4.1", 9005, 0);
+	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
 
 	init_status();
 }
@@ -2869,7 +2923,7 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
 		len +=
 				swprintf(disp + len, MAX_INFO_SIZE - len,
-						L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
+						L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %.0f:%.0f",
 						state->plugin_host.get_camera_temperature(),
 						north * 180 / M_PI, lg_cam_bandwidth, lg_cam_fps[0],
 						lg_cam_fps[1], lg_cam_frameskip[0],

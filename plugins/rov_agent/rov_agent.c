@@ -311,10 +311,10 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 			if (value == -1 || value == 1) {
 				value = lg_light_strength + value;
 			}
-			value = MIN(MAX(value, 0), 100);
+			lg_light_strength = MIN(MAX(value, 0), 100);
 			{
 				char cmd[256];
-				sprintf(cmd, "rov_agent.set_light_strength %f", value);
+				sprintf(cmd, "rov_agent.set_light_strength %f", lg_light_strength);
 				lg_plugin_host->send_command(cmd);
 			}
 		}

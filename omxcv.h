@@ -8,6 +8,9 @@
 
 #include <opencv2/opencv.hpp>
 
+typedef void (*OMXCV_CALLBACK)(unsigned char *data, unsigned int data_len,
+		void *user_data);
+
 namespace omxcv {
     /* Forward declaration of our H.264 implementation. */
     class OmxCvImpl;
@@ -19,7 +22,7 @@ namespace omxcv {
      */
     class OmxCv {
         public:
-            OmxCv(const char *name, int width, int height, int bitrate=3000, int fpsnum=25, int fpsden=1);
+            OmxCv(const char *name, int width, int height, int bitrate=3000, int fpsnum=25, int fpsden=1, OMXCV_CALLBACK callback=NULL, void *user_data=NULL);
             bool Encode(const unsigned char *in_data);
             virtual ~OmxCv();
         private:
