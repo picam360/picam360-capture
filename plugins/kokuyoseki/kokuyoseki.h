@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#include "../../picam360_capture_plugin.h"
+
 
 #define KOKUYOSEKI_VENDOR 0x062a
 #define KOKUYOSEKI_PRODUCT 0x412c
@@ -39,4 +41,4 @@ void set_kokuyoseki_callback(KOKUYOSEKI_CALLBACK callback);
 void open_kokuyoseki();
 void close_kokuyoseki();
 
-void create_kokuyoseki(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin);
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin);

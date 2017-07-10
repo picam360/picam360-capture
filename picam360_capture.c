@@ -33,11 +33,6 @@
 #include "manual_mpu.h"
 #include "rtp.h"
 
-//these plugin should be got out to shared object
-#include "plugins/driver_agent/driver_agent.h"
-#include "plugins/mpu9250/mpu9250.h"
-#include "plugins/oculus_rift_dk2/oculus_rift_dk2.h"
-
 #include <mat4/type.h>
 #include <mat4/create.h>
 #include <mat4/identity.h>
@@ -469,6 +464,48 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				state->options.cam_horizon_r[i] = 0.8;
 			}
 		}
+		{
+			json_t *plugin_paths = json_object_get(options, "plugin_paths");
+			if (json_is_array(plugin_paths)) {
+				int size = json_array_size(plugin_paths);
+				state->plugin_paths = (char**) malloc(
+						sizeof(char*) * (size + 1));
+				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
+
+				for (int i = 0; i < size; i++) {
+					json_t *value = json_array_get(plugin_paths, i);
+					int len = json_string_length(value);
+					state->plugin_paths[i] = (char*) malloc(
+							sizeof(char) * (len + 1));
+					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
+					strncpy(state->plugin_paths[i], json_string_value(value),
+							len);
+					if (len > 0) {
+						void *handle = dlopen(state->plugin_paths[i],
+								RTLD_LAZY);
+						if (!handle) {
+							fprintf(stderr, "%s\n", dlerror());
+							continue;
+						}
+						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(
+								handle, "create_plugin");
+						if (!create_plugin) {
+							fprintf(stderr, "%s\n", dlerror());
+							dlclose(handle);
+							continue;
+						}
+						PLUGIN_T *plugin = NULL;
+						create_plugin(&state->plugin_host, &plugin);
+						if (!plugin) {
+							fprintf(stderr, "%s\n", "create_plugin fail.");
+							dlclose(handle);
+							continue;
+						}
+						state->plugin_host.add_plugin(plugin);
+					}
+				}
+			}
+		}
 
 		if (state->plugins) {
 			for (int i = 0; state->plugins[i] != NULL; i++) {
@@ -520,6 +557,15 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		sprintf(buff, "cam%d_horizon_r", i);
 		json_object_set_new(options, buff,
 				json_real(state->options.cam_horizon_r[i]));
+	}
+
+	if (state->plugin_paths) {
+		json_t *plugin_paths = json_array();
+		for (int i = 0; state->plugin_paths[i] != NULL; i++) {
+			json_array_append_new(plugin_paths,
+					json_string(state->plugin_paths[i]));
+		}
+		json_object_set_new(options, "plugin_paths", plugin_paths);
 	}
 
 	if (state->plugins) {
@@ -840,7 +886,9 @@ int _command_handler(const char *_buff) {
 	char *cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0
+			|| strncmp(cmd, "q", sizeof(buff)) == 0
+			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
 		printf("exit\n");
 		exit(0);
 	} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
@@ -1163,7 +1211,7 @@ static void *readline_thread_func(void* arg) {
 	char *ptr;
 	using_history();
 	read_history(PICAM360_HISTORY_FILE);
-	while (ptr = readline("picam360-capture>")) {
+	while ((ptr = readline("picam360-capture>")) != NULL) {
 		add_history(ptr);
 		state->plugin_host.send_command(ptr);
 		free(ptr);
@@ -1339,12 +1387,12 @@ static void set_fov(float value) {
 static void send_command(const char *_cmd) {
 	pthread_mutex_lock(&state->cmd_list_mutex);
 
-	const char *UPSTREAM_DOMAIN = "upstream.";
+	const int UPSTREAM_DOMAIN_SIZE = sizeof(UPSTREAM_DOMAIN) - 1;//minus null character
 	char *cmd = _cmd;
 	LIST_T **cur = NULL;
-	if (strcmp(cmd, UPSTREAM_DOMAIN) == 0) {
+	if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
 		cur = &state->cmd2upstream_list;
-		cmd += strlen(UPSTREAM_DOMAIN);
+		cmd += UPSTREAM_DOMAIN_SIZE;
 	} else {
 		cur = &state->cmd_list;
 	}
@@ -1470,6 +1518,34 @@ static void add_watch(STATUS_T *watch) {
 	}
 }
 
+static void add_plugin(PLUGIN_T *plugin) {
+	if (state->plugins == NULL) {
+		const int INITIAL_SPACE = 16;
+		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
+		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
+		state->plugins[INITIAL_SPACE - 1] = (void*) -1;
+	}
+
+	for (int i = 0; state->plugins[i] != (void*) -1; i++) {
+		if (state->plugins[i] == NULL) {
+			state->plugins[i] = plugin;
+			return;
+		}
+		if (state->plugins[i + 1] == (void*) -1) {
+			int space = (i + 2) * 2;
+			if (space > 256) {
+				fprintf(stderr, "error on add_mpu\n");
+				return;
+			}
+			PLUGIN_T **current = state->plugins;
+			state->plugins = malloc(sizeof(PLUGIN_T*) * space);
+			memcpy(state->plugins, current, sizeof(PLUGIN_T*) * (i + 1));
+			state->plugins[space - 1] = (void*) -1;
+			free(current);
+		}
+	}
+}
+
 static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 		const char *path) {
 	char cmd[512];
@@ -1523,6 +1599,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.add_mpu = add_mpu;
 		state->plugin_host.add_status = add_status;
 		state->plugin_host.add_watch = add_watch;
+		state->plugin_host.add_plugin = add_plugin;
 
 		state->plugin_host.snap = snap;
 	}
@@ -1532,21 +1609,6 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		create_manual_mpu(&mpu);
 		state->plugin_host.add_mpu(mpu);
 	}
-
-	const int INITIAL_SPACE = 16;
-	CREATE_PLUGIN create_plugin_funcs[] = { //
-			create_driver_agent, //
-					create_mpu9250, //
-					create_oculus_rift_dk2, //
-			};
-	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
-	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
-	memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
-	for (int i = 0; i < num_of_plugins; i++) {
-		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
-		state->plugins[i]->node_id = i + 100;
-	}
-	state->plugins[INITIAL_SPACE - 1] = (void*) -1;
 }
 
 #endif //plugin block
@@ -1601,13 +1663,11 @@ static int command2upstream_handler() {
 }
 
 static void status_handler(char *data, int data_len) {
-	for (char *cur = data; cur != NULL;) {
-		char name[64];
-		char value[256];
-		char *start_str = strstr(cur, "<status");
-		char *cur = strstr(cur, ">");
-		if (start_str != NULL) {
-			int num = sscanf(start_str,
+	for (int i = 0; i < data_len; i++) {
+		if (data[i] == '<') {
+			char name[64];
+			char value[256];
+			int num = sscanf(&data[i],
 					"<status name=\"%63[^\"]\" value=\"%255[^\"]\" />", name,
 					value);
 			if (num == 2) {
@@ -2154,13 +2214,12 @@ static void _init_menu() {
 	init_menu(state->screen_height / 32);
 	state->menu = menu_new(L"Menu", menu_callback, NULL);
 
-	MENU_T *menu = state->plugin_host.get_menu();
+	MENU_T *menu = state->menu;
 	{
 		MENU_T *sub_menu = menu_add_submenu(menu,
 				menu_new(L"Function", NULL, NULL), INT_MAX);
 		menu_add_submenu(sub_menu,
-						menu_new(L"Snap", function_menu_callback, (void*) 0),
-						INT_MAX);
+				menu_new(L"Snap", function_menu_callback, (void*) 0), INT_MAX);
 	}
 	{
 		MENU_T *sub_menu = menu_add_submenu(menu,
@@ -2290,7 +2349,7 @@ static void _init_menu() {
 
 int main(int argc, char *argv[]) {
 
-	create_oculus_rift_dk2(NULL, NULL); //this should be first, pthread_create is related
+	//create_oculus_rift_dk2(NULL, NULL); //this should be first, pthread_create is related
 
 	bool input_file_mode = false;
 	int opt;

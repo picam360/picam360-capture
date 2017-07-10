@@ -14,7 +14,7 @@
 #include <dirent.h>
 #include <pthread.h>
 
-#include "driver_agent.h"
+#include "rov_agent.h"
 
 #include <mat4/identity.h>
 #include <mat4/rotateY.h>
@@ -188,7 +188,7 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 		}
 		{
 			char cmd[256];
-			VECTOR4D_T quat = lg_plugin_host->get_quaternion();
+			VECTOR4D_T quat = lg_plugin_host->get_view_quaternion();
 			sprintf(cmd, "upstream.picam360_driver.set_thrust %f %f,%f,%f,%f",
 					lg_thrust, quat.x, quat.y, quat.z, quat.w);
 			lg_plugin_host->send_command(cmd);
@@ -372,7 +372,7 @@ static void init() {
 	init_status();
 }
 
-void create_driver_agent(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	lg_plugin_host = plugin_host;
 	init();
 

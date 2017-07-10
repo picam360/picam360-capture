@@ -11,6 +11,9 @@
 
 static KOKUYOSEKI_CALLBACK lg_kokuyoseki_callback = NULL;
 
+
+#define PLUGIN_NAME "kokuyoseki"
+
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 void set_kokuyoseki_callback(KOKUYOSEKI_CALLBACK callback) {
@@ -144,10 +147,10 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	if (!menu->activated) {
 		switch (button) {
 		case NEXT_BUTTON:
-			lg_plugin_host->send_event(PICAM360_CONTROLLER_NODE_ID, CONTROLLER_EVENT_NEXT);
+			lg_plugin_host->send_event(PICAM360_CONTROLLER_NODE_ID, PICAM360_CONTROLLER_EVENT_NEXT);
 			break;
 		case BACK_BUTTON:
-			lg_plugin_host->send_event(PICAM360_CONTROLLER_NODE_ID, CONTROLLER_EVENT_BACK);
+			lg_plugin_host->send_event(PICAM360_CONTROLLER_NODE_ID, PICAM360_CONTROLLER_EVENT_BACK);
 			break;
 		case BLACKOUT_BUTTON:
 			if (!lg_plugin_host->get_menu_visible()) {
@@ -197,7 +200,7 @@ static void init() {
 	open_kokuyoseki();
 }
 
-void create_kokuyoseki(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
 	{

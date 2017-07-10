@@ -276,7 +276,7 @@ static wchar_t *get_info(void *user_data) {
 	return lg_info;
 }
 
-void create_mpu9250(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
 

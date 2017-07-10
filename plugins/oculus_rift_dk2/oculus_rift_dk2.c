@@ -115,7 +115,7 @@ static wchar_t *get_info(void *user_data) {
 	return NULL;
 }
 
-void create_oculus_rift_dk2(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
 

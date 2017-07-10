@@ -182,6 +182,7 @@ typedef struct _PICAM360CAPTURE_T {
 	MENU_T *menu;
 	bool menu_visible;
 
+	char **plugin_paths;
 	PLUGIN_T **plugins;
 	MPU_T **mpus;
 	STATUS_T **statuses;

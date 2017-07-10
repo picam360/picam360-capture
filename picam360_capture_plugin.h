@@ -6,6 +6,12 @@
 #include "menu.h"
 #include "quaternion.h"
 
+//0x00** is reserved by system
+#define PICAM360_HOST_NODE_ID 0x0000
+#define PICAM360_CONTROLLER_NODE_ID 0x0001
+
+#define UPSTREAM_DOMAIN "upstream."
+
 enum PICAM360_CAPTURE_EVENT {
 	PICAM360_CAPTURE_EVENT_AFTER_FRAME,
 	PICAM360_CAPTURE_EVENT_AFTER_SNAP,
@@ -17,10 +23,6 @@ enum RENDERING_MODE {
 	RENDERING_MODE_EQUIRECTANGULAR,
 	RENDERING_MODE_FISHEYE,
 };
-
-//0x00** is reserved by system
-#define PICAM360_HOST_NODE_ID 0x0000
-#define PICAM360_CONTROLLER_NODE_ID 0x0001
 
 enum PICAM360_CONTROLLER_EVENT {
 	PICAM360_CONTROLLER_EVENT_NONE,
@@ -45,6 +47,18 @@ typedef struct _STATUS_T {
 	void (*release)(void *user_data);
 	void *user_data;
 } STATUS_T;
+
+typedef struct _PLUGIN_T {
+	char name[64];
+	void (*release)(void *user_data);
+	int (*command_handler)(void *user_data, const char *cmd);
+	void (*event_handler)(void *user_data, uint32_t node_id, uint32_t event_id);
+	void (*init_options)(void *user_data, json_t *options);
+	void (*save_options)(void *user_data, json_t *options);
+	wchar_t *(*get_info)(void *user_data);
+	void *user_data;
+	uint32_t node_id;
+} PLUGIN_T;
 
 typedef struct _PLUGIN_HOST_T {
 	VECTOR4D_T (*get_view_quaternion)();
@@ -82,22 +96,11 @@ typedef struct _PLUGIN_HOST_T {
 	void (*add_mpu)(MPU_T *mpu);
 	void (*add_status)(STATUS_T *status);
 	void (*add_watch)(STATUS_T *status);
+	void (*add_plugin)(PLUGIN_T *plugin);
 
 	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
 			const char *path);
 } PLUGIN_HOST_T;
-
-typedef struct _PLUGIN_T {
-	char name[64];
-	void (*release)(void *user_data);
-	int (*command_handler)(void *user_data, const char *cmd);
-	void (*event_handler)(void *user_data, uint32_t node_id, uint32_t event_id);
-	void (*init_options)(void *user_data, json_t *options);
-	void (*save_options)(void *user_data, json_t *options);
-	wchar_t *(*get_info)(void *user_data);
-	void *user_data;
-	uint32_t node_id;
-} PLUGIN_T;
 
 typedef void (*CREATE_PLUGIN)(PLUGIN_HOST_T *plugin_host, PLUGIN_T **plugin);
 
