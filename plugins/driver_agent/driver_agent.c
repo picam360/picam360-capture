@@ -188,7 +188,9 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 		}
 		{
 			char cmd[256];
-			sprintf(cmd, "upstream.picam360_driver.set_thrust %f", lg_thrust);
+			VECTOR4D_T quat = lg_plugin_host->get_quaternion();
+			sprintf(cmd, "upstream.picam360_driver.set_thrust %f %f,%f,%f,%f",
+					lg_thrust, quat.x, quat.y, quat.z, quat.w);
 			lg_plugin_host->send_command(cmd);
 		}
 		break;

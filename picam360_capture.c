@@ -1163,7 +1163,7 @@ static void *readline_thread_func(void* arg) {
 	char *ptr;
 	using_history();
 	read_history(PICAM360_HISTORY_FILE);
-	while (ptr = readline("picam360-viewer>")) {
+	while (ptr = readline("picam360-capture>")) {
 		add_history(ptr);
 		state->plugin_host.send_command(ptr);
 		free(ptr);
