@@ -16,17 +16,10 @@
 
 #include "rov_agent.h"
 
-#include <mat4/identity.h>
-#include <mat4/rotateY.h>
-#include <mat4/multiply.h>
-#include <mat4/transpose.h>
-#include <mat4/fromQuat.h>
-#include <mat4/invert.h>
-
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define PLUGIN_NAME "driver_agent"
+#define PLUGIN_NAME "rov_agent"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
@@ -59,7 +52,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			== 0) {
 		lg_is_compass_calib = true;
 		char cmd[256];
-		sprintf(cmd, "upstream.picam360_driver.start_compass_calib");
+		sprintf(cmd, "upstream.mpu9250.start_compass_calib");
 		lg_plugin_host->send_command(cmd);
 
 		printf("start_compass_calib : completed\n");
@@ -67,32 +60,67 @@ static int command_handler(void *user_data, const char *_buff) {
 			== 0) {
 		lg_is_compass_calib = false;
 		char cmd[256];
-		sprintf(cmd, "upstream.picam360_driver.stop_compass_calib");
+		sprintf(cmd, "upstream.mpu9250.stop_compass_calib");
 		lg_plugin_host->send_command(cmd);
 
 		printf("stop_compass_calib : completed\n");
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_pid_enabled", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
 			sscanf(param, "%f", &value);
 
-			lg_light_value[0] = value;
-			lg_light_value[1] = value;
-			printf("set_light_value : completed\n");
+			lg_pid_enabled = (value != 0);
+			{
+				char cmd[256];
+				sprintf(cmd, "upstream.rov_driver.set_pid_enabled %d",
+						lg_pid_enabled ? 1 : 0);
+				lg_plugin_host->send_command(cmd);
+			}
+			printf("set_pid_enabled : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			int id = 0;
-			float value = 0;
-			sscanf(param, "%d=%f", &id, &value);
-			if (id < MOTOR_NUM) {
-				lg_motor_value[id] = value;
+			float value;
+			sscanf(param, "%f", &value);
+
+			lg_light_strength = value;
+			{
+				char cmd[256];
+				sprintf(cmd, "upstream.rov_driver.set_light_strength %f",
+						lg_light_strength);
+				lg_plugin_host->send_command(cmd);
 			}
-			printf("set_motor_value : completed\n");
+			printf("set_light_strength : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float v, x, y, z, w;
+			int num = sscanf(param, "%f %f,%f,%f,%f", &v, &x, &y, &z, &w);
+
+			if (num == 1) {
+				lg_thrust = v;
+				{
+					char cmd[256];
+					sprintf(cmd, "upstream.rov_driver.set_thrust %f",
+							lg_thrust);
+					lg_plugin_host->send_command(cmd);
+				}
+			} else if (num == 5) {
+				lg_thrust = v;
+				{
+					char cmd[256];
+					sprintf(cmd,
+							"upstream.rov_driver.set_thrust %f %f,%f,%f,%f",
+							lg_thrust, x, y, z, w);
+					lg_plugin_host->send_command(cmd);
+				}
+			}
+			printf("set_thrust : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff))
 			== 0) {
@@ -189,8 +217,8 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 		{
 			char cmd[256];
 			VECTOR4D_T quat = lg_plugin_host->get_view_quaternion();
-			sprintf(cmd, "upstream.picam360_driver.set_thrust %f %f,%f,%f,%f",
-					lg_thrust, quat.x, quat.y, quat.z, quat.w);
+			sprintf(cmd, "rov_agent.set_thrust %f %f,%f,%f,%f", lg_thrust,
+					quat.x, quat.y, quat.z, quat.w);
 			lg_plugin_host->send_command(cmd);
 		}
 		break;
@@ -263,6 +291,12 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		} else {
 			swprintf(menu->name, 8, L"Off");
 		}
+		{
+			char cmd[256];
+			sprintf(cmd, "rov_agent.set_pid_enabled %d",
+					lg_pid_enabled ? 1 : 0);
+			lg_plugin_host->send_command(cmd);
+		}
 		menu->selected = false;
 		break;
 	case MENU_EVENT_DESELECTED:
@@ -281,6 +315,11 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 				value = lg_light_strength + value;
 			}
 			lg_light_strength = MIN(MAX(value, 0), 100);
+		}
+		{
+			char cmd[256];
+			sprintf(cmd, "rov_agent.set_light_strength %f", lg_light_strength);
+			lg_plugin_host->send_command(cmd);
 		}
 		menu->selected = false;
 		break;

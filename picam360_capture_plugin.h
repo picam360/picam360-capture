@@ -2,9 +2,10 @@
 
 #include <stdint.h>
 #include <pthread.h>
+#include <wchar.h>
 #include <jansson.h>//json parser
-#include "menu.h"
 #include "quaternion.h"
+#include "menu.h"
 
 //0x00** is reserved by system
 #define PICAM360_HOST_NODE_ID 0x0000

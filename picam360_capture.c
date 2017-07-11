@@ -16,6 +16,7 @@
 #include <editline/readline.h>
 #include <editline/history.h>
 #include <dirent.h>
+#include <dlfcn.h>
 
 #include "bcm_host.h"
 
@@ -1387,7 +1388,7 @@ static void set_fov(float value) {
 static void send_command(const char *_cmd) {
 	pthread_mutex_lock(&state->cmd_list_mutex);
 
-	const int UPSTREAM_DOMAIN_SIZE = sizeof(UPSTREAM_DOMAIN) - 1;//minus null character
+	const int UPSTREAM_DOMAIN_SIZE = sizeof(UPSTREAM_DOMAIN) - 1; //minus null character
 	char *cmd = _cmd;
 	LIST_T **cur = NULL;
 	if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
@@ -1624,16 +1625,14 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 static float lg_camera_fps[NUM_OF_CAM] = { };
 static int lg_camera_frameskip[NUM_OF_CAM] = { };
 
-static char lg_command[256];
+static char lg_command[256] = { };
 static int lg_command_id = 0;
 static int lg_ack_command_id = 0;
 
 static int command2upstream_handler() {
-	if (lg_command_id != lg_ack_command_id) {
-		int len = strlen(lg_command);
-		if (len != 0) {
-			rtp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
-		}
+	int len = strlen(lg_command);
+	if (len != 0 && lg_command_id != lg_ack_command_id) {
+		rtp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
 		return 0;
 	} else {
 		memset(lg_command, 0, sizeof(lg_command));
@@ -1643,7 +1642,7 @@ static int command2upstream_handler() {
 	{
 		pthread_mutex_lock(&state->cmd_list_mutex);
 
-		if (state->cmd_list) {
+		if (state->cmd2upstream_list) {
 			LIST_T *cur = state->cmd2upstream_list;
 			buff = (char*) cur->value;
 			state->cmd2upstream_list = cur->next;
@@ -1654,10 +1653,11 @@ static int command2upstream_handler() {
 	}
 
 	if (buff) {
-		strncpy(lg_command, buff, sizeof(lg_command));
-		lg_command[sizeof(lg_command) - 1] = '\0';
-		free(buff);
 		lg_command_id++;
+		snprintf(lg_command, sizeof(lg_command),
+				"<picam360:command id=\"%d\" value=\"%s\" />", lg_command_id,
+				buff);
+		free(buff);
 	}
 	return 0;
 }
@@ -1668,8 +1668,8 @@ static void status_handler(char *data, int data_len) {
 			char name[64];
 			char value[256];
 			int num = sscanf(&data[i],
-					"<status name=\"%63[^\"]\" value=\"%255[^\"]\" />", name,
-					value);
+					"<picam360:status name=\"%63[^\"]\" value=\"%255[^\"]\" />",
+					name, value);
 			if (num == 2) {
 				for (int i = 0; state->watches[i] != NULL; i++) {
 					if (strncmp(state->watches[i]->name, name, 64) == 0) {
@@ -1694,7 +1694,17 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	}
 	last_seq_num = seq_num;
 
-	if (pt == PT_STATUS) {
+	if (pt == PT_CMD) {
+		int id;
+		char value[256];
+		int num = sscanf(data,
+				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
+				value);
+		if (num == 2 && id != lg_ack_command_id) {
+			lg_ack_command_id = id;
+			state->plugin_host.send_command(value);
+		}
+	} else if (pt == PT_STATUS) {
 		status_handler((char*) data, data_len);
 	} else if (pt == PT_CAM_BASE + 0) {
 		if (state->plugin_host.decode_video) {
@@ -1731,6 +1741,7 @@ static void _init_rtp() {
 		status->get_value = status_get_value;
 		status->set_value = status_set_value;
 		status->release = status_release;
+		status->user_data = status;
 
 		state->plugin_host.add_watch(status);
 	}
