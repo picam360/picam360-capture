@@ -81,6 +81,10 @@ static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
 static float lg_fps = 0;
 
+static float lg_cam_fps[MAX_CAM_NUM] = { };
+static float lg_cam_frameskip[MAX_CAM_NUM] = { };
+static float lg_cam_bandwidth = 0;
+
 /***********************************************************
  * Name: init_ogl
  *
@@ -1388,7 +1392,6 @@ static void set_fov(float value) {
 static void send_command(const char *_cmd) {
 	pthread_mutex_lock(&state->cmd_list_mutex);
 
-	const int UPSTREAM_DOMAIN_SIZE = sizeof(UPSTREAM_DOMAIN) - 1; //minus null character
 	char *cmd = _cmd;
 	LIST_T **cur = NULL;
 	if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
@@ -1621,10 +1624,6 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 #define PT_CMD 101
 #define PT_CAM_BASE 110
 
-#define NUM_OF_CAM 2
-static float lg_camera_fps[NUM_OF_CAM] = { };
-static int lg_camera_frameskip[NUM_OF_CAM] = { };
-
 static char lg_command[256] = { };
 static int lg_command_id = 0;
 static int lg_ack_command_id = 0;
@@ -1665,11 +1664,11 @@ static int command2upstream_handler() {
 static void status_handler(char *data, int data_len) {
 	for (int i = 0; i < data_len; i++) {
 		if (data[i] == '<') {
-			char name[64];
+			char name[64] = UPSTREAM_DOMAIN;
 			char value[256];
 			int num = sscanf(&data[i],
 					"<picam360:status name=\"%63[^\"]\" value=\"%255[^\"]\" />",
-					name, value);
+					name + UPSTREAM_DOMAIN_SIZE, value);
 			if (num == 2) {
 				for (int i = 0; state->watches[i] != NULL; i++) {
 					if (strncmp(state->watches[i]->name, name, 64) == 0) {
@@ -1697,7 +1696,7 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	if (pt == PT_CMD) {
 		int id;
 		char value[256];
-		int num = sscanf(data,
+		int num = sscanf((char*) data,
 				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
 				value);
 		if (num == 2 && id != lg_ack_command_id) {
@@ -1718,6 +1717,20 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	return 0;
 }
 
+#if (1) //status block
+
+#define STATUS_VAR(name) lg_status_ ## name
+#define WATCH_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_watch(STATUS_VAR(name));
+
+static STATUS_T *STATUS_VAR(ack_command_id);
+static STATUS_T *STATUS_VAR(quaternion);
+static STATUS_T *STATUS_VAR(compass);
+static STATUS_T *STATUS_VAR(temperature);
+static STATUS_T *STATUS_VAR(bandwidth);
+static STATUS_T *STATUS_VAR(cam_fps);
+static STATUS_T *STATUS_VAR(cam_frameskip);
+
 static void status_release(void *user_data) {
 	free(user_data);
 }
@@ -1726,25 +1739,56 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 }
 static void status_set_value(void *user_data, const char *value) {
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (strcmp(status->name, "ack_command_id") == 0) {
+	if (status == STATUS_VAR(ack_command_id)) {
 		sscanf(value, "%d", &lg_ack_command_id);
+	} else if (status == STATUS_VAR(quaternion)) {
+		VECTOR4D_T vec = { };
+		sscanf(value, "%f,%f,%f,%f", &vec.x, &vec.y, &vec.z, &vec.w);
+		state->plugin_host.set_camera_quaternion(-1, vec);
+	} else if (status == STATUS_VAR(compass)) {
+		VECTOR4D_T vec = { };
+		sscanf(value, "%f,%f,%f,%f", &vec.x, &vec.y, &vec.z, &vec.w);
+		state->plugin_host.set_camera_compass(vec);
+	} else if (status == STATUS_VAR(temperature)) {
+		float temperature = 0;
+		sscanf(value, "%f", &temperature);
+		state->plugin_host.set_camera_temperature(temperature);
+	} else if (status == STATUS_VAR(bandwidth)) {
+		sscanf(value, "%f", &lg_cam_bandwidth);
+	} else if (status == STATUS_VAR(cam_fps)) {
+		sscanf(value, "%f,%f", &lg_cam_fps[0], &lg_cam_fps[1]);
+	} else if (status == STATUS_VAR(cam_frameskip)) {
+		sscanf(value, "%f,%f", &lg_cam_frameskip[0], &lg_cam_frameskip[1]);
 	}
 }
+
+static STATUS_T *new_status(const char *name) {
+	STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
+	strcpy(status->name, name);
+	status->get_value = status_get_value;
+	status->set_value = status_set_value;
+	status->release = status_release;
+	status->user_data = status;
+	return status;
+}
+
+static void init_status() {
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, quaternion);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, compass);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, temperature);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, bandwidth);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, cam_fps);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, cam_frameskip);
+}
+
+#endif //status block
 
 static void _init_rtp() {
 	init_rtp(9002, "192.168.4.1", 9004, 0);
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
-	{
-		STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
-		strcpy(status->name, "ack_command_id");
-		status->get_value = status_get_value;
-		status->set_value = status_set_value;
-		status->release = status_release;
-		status->user_data = status;
-
-		state->plugin_host.add_watch(status);
-	}
+	init_status();
 }
 
 #endif //rtp block
@@ -2301,7 +2345,7 @@ static void _init_menu() {
 			menu_add_submenu(sub_menu,
 					menu_new(L"60", fov_menu_callback, (void*) 60), INT_MAX);
 			menu_add_submenu(sub_menu,
-					menu_new(L"90", fov_menu_callback, (void*) 9), INT_MAX);
+					menu_new(L"90", fov_menu_callback, (void*) 90), INT_MAX);
 			menu_add_submenu(sub_menu,
 					menu_new(L"120", fov_menu_callback, (void*) 120), INT_MAX);
 		}
@@ -2758,14 +2802,14 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
 
-// Start with a clear screen
+	// Start with a clear screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, frame->texture);
 
-//Load in the texture and thresholding parameters.
+	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 	glUniform1f(glGetUniformLocation(program, "tex_scalex"),
 			(state->stereo) ? 0.5 : 1.0);
@@ -2809,9 +2853,27 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	int len = 0;
 	const int MAX_INFO_SIZE = 1024;
 	wchar_t disp[MAX_INFO_SIZE];
-	len += swprintf(disp, MAX_INFO_SIZE, L"Temp %.1f degC",
-			state->plugin_host.get_camera_temperature());
-	len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\nfps %.1f", lg_fps);
+	{ //View
+		float north;
+		VECTOR4D_T quat = state->plugin_host.get_view_quaternion();
+		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
+		len += swprintf(disp + len, MAX_INFO_SIZE - len,
+				L"\nView: Tmp %.1f degC, N %.1f, fps %.1f",
+				state->plugin_host.get_view_temperature(), north * 180 / M_PI,
+				lg_fps);
+	}
+	{ //Vehicle
+		float north;
+		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
+		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
+		len +=
+				swprintf(disp + len, MAX_INFO_SIZE - len,
+						L"Vehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
+						state->plugin_host.get_camera_temperature(),
+						north * 180 / M_PI, lg_bandwidth, lg_cam_fps[0],
+						lg_cam_fps[1], lg_cam_frameskip[0],
+						lg_cam_frameskip[1]);
+	}
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]->get_info) {
 			wchar_t *info = state->plugins[i]->get_info(

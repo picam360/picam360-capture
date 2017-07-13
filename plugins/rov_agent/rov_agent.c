@@ -25,17 +25,24 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 #define LIGHT_NUM 2
 #define MOTOR_NUM 4
-static int lg_light_value[LIGHT_NUM] = { 0, 0 };
-static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static float lg_light_value[LIGHT_NUM] = { 0, 0 };
+static float lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
-//static float lg_brake_ps = 5; // percent
+static float lg_brake_ps = 5; // percent
+static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
 
 static bool lg_is_compass_calib = false;
 static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 
+static bool lg_lowlevel_control = false;
 static bool lg_pid_enabled = false;
+static float lg_yaw_diff = 0;
+static float lg_pitch_diff = 0;
+static float lg_p_gain = 1.0;
+static float lg_i_gain = 1.0;
+static float lg_d_gain = 1.0;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -360,6 +367,27 @@ static void _init_menu() {
 
 #if (1) //status block
 
+#define STATUS_VAR(name) lg_status_ ## name
+#define WATCH_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_watch(STATUS_VAR(name));
+
+static STATUS_T *STATUS_VAR(is_compass_calib);
+static STATUS_T *STATUS_VAR(compass_min);
+static STATUS_T *STATUS_VAR(compass_max);
+static STATUS_T *STATUS_VAR(light_value);
+static STATUS_T *STATUS_VAR(motor_value);
+static STATUS_T *STATUS_VAR(light_strength);
+static STATUS_T *STATUS_VAR(brake_ps);
+static STATUS_T *STATUS_VAR(thrust);
+static STATUS_T *STATUS_VAR(target_quaternion);
+static STATUS_T *STATUS_VAR(lowlevel_control);
+static STATUS_T *STATUS_VAR(pid_enabled);
+static STATUS_T *STATUS_VAR(yaw_diff);
+static STATUS_T *STATUS_VAR(pitch_diff);
+static STATUS_T *STATUS_VAR(p_gain);
+static STATUS_T *STATUS_VAR(i_gain);
+static STATUS_T *STATUS_VAR(d_gain);
+
 static void status_release(void *user_data) {
 	free(user_data);
 }
@@ -368,52 +396,98 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 }
 static void status_set_value(void *user_data, const char *value) {
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (strcmp(status->name, "compass_min") == 0) {
+	if (status == STATUS_VAR(is_compass_calib)) {
+		int v = 0;
+		sscanf(value, "%d", &v);
+		lg_is_compass_calib = (v != 0);
+	} else if (status == STATUS_VAR(compass_min)) {
 		sscanf(value, "%f,%f,%f", &lg_compass_min[0], &lg_compass_min[1],
 				&lg_compass_min[2]);
-	} else if (strcmp(status->name, "compass_max") == 0) {
+	} else if (status == STATUS_VAR(compass_max)) {
 		sscanf(value, "%f,%f,%f", &lg_compass_max[0], &lg_compass_max[1],
 				&lg_compass_max[2]);
+	} else if (status == STATUS_VAR(light_value)) {
+		sscanf(value, "%f,%f", &lg_light_value[0], &lg_light_value[1]);
+	} else if (status == STATUS_VAR(motor_value)) {
+		sscanf(value, "%f,%f,%f,%f", &lg_motor_value[0], &lg_motor_value[1],
+				&lg_motor_value[2], &lg_motor_value[3]);
+	} else if (status == STATUS_VAR(light_strength)) {
+		sscanf(value, "%f", &lg_light_strength);
+	} else if (status == STATUS_VAR(brake_ps)) {
+		sscanf(value, "%f", &lg_brake_ps);
+	} else if (status == STATUS_VAR(thrust)) {
+		sscanf(value, "%f", &lg_thrust);
+	} else if (status == STATUS_VAR(target_quaternion)) {
+		sscanf(value, "%f,%f,%f,%f", &lg_target_quaternion.x,
+				&lg_target_quaternion.y, &lg_target_quaternion.z,
+				&lg_target_quaternion.w);
+	} else if (status == STATUS_VAR(lowlevel_control)) {
+		int v = 0;
+		sscanf(value, "%d", &v);
+		lg_lowlevel_control = (v != 0);
+	} else if (status == STATUS_VAR(pid_enabled)) {
+		int v = 0;
+		sscanf(value, "%d", &v);
+		lg_pid_enabled = (v != 0);
+	} else if (status == STATUS_VAR(yaw_diff)) {
+		sscanf(value, "%f", &lg_yaw_diff);
+	} else if (status == STATUS_VAR(pitch_diff)) {
+		sscanf(value, "%f", &lg_pitch_diff);
+	} else if (status == STATUS_VAR(p_gain)) {
+		sscanf(value, "%f", &lg_p_gain);
+	} else if (status == STATUS_VAR(i_gain)) {
+		sscanf(value, "%f", &lg_i_gain);
+	} else if (status == STATUS_VAR(d_gain)) {
+		sscanf(value, "%f", &lg_d_gain);
 	}
 }
 
+static STATUS_T *new_status(const char *name) {
+	STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
+	strcpy(status->name, name);
+	status->get_value = status_get_value;
+	status->set_value = status_set_value;
+	status->release = status_release;
+	status->user_data = status;
+	return status;
+}
+
 static void init_status() {
-	{
-		STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
-		strcpy(status->name, "compass_min");
-		status->get_value = status_get_value;
-		status->set_value = status_set_value;
-		status->release = status_release;
-
-		lg_plugin_host->add_watch(status);
-	}
-	{
-		STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
-		strcpy(status->name, "compass_max");
-		status->get_value = status_get_value;
-		status->set_value = status_set_value;
-		status->release = status_release;
-
-		lg_plugin_host->add_watch(status);
-	}
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "mpu9250.", is_compass_calib);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "mpu9250.", compass_min);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "mpu9250.", compass_max);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", light_value);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", motor_value);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", light_strength);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", brake_ps);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", thrust);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", target_quaternion);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", lowlevel_control);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", pid_enabled);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", yaw_diff);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", pitch_diff);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", p_gain);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", i_gain);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", d_gain);
 }
 
 #endif //status block
 
 static bool is_init = false;
-static void init() {
+static void init(PLUGIN_HOST_T *plugin_host) {
 	if (is_init) {
 		return;
 	}
 	is_init = true;
+
+	lg_plugin_host = plugin_host;
 
 	_init_menu();
 	init_status();
 }
 
 void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
-	lg_plugin_host = plugin_host;
-	init();
+	init(plugin_host);
 
 	{
 		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
