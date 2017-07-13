@@ -57,7 +57,6 @@ static int command_handler(void *user_data, const char *_buff) {
 		//do nothing
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
 			== 0) {
-		lg_is_compass_calib = true;
 		char cmd[256];
 		sprintf(cmd, "upstream.mpu9250.start_compass_calib");
 		lg_plugin_host->send_command(cmd);
@@ -65,7 +64,6 @@ static int command_handler(void *user_data, const char *_buff) {
 		printf("start_compass_calib : completed\n");
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
 			== 0) {
-		lg_is_compass_calib = false;
 		char cmd[256];
 		sprintf(cmd, "upstream.mpu9250.stop_compass_calib");
 		lg_plugin_host->send_command(cmd);
@@ -77,12 +75,10 @@ static int command_handler(void *user_data, const char *_buff) {
 		if (param != NULL) {
 			float value;
 			sscanf(param, "%f", &value);
-
-			lg_pid_enabled = (value != 0);
 			{
 				char cmd[256];
 				sprintf(cmd, "upstream.rov_driver.set_pid_enabled %d",
-						lg_pid_enabled ? 1 : 0);
+						value ? 1 : 0);
 				lg_plugin_host->send_command(cmd);
 			}
 			printf("set_pid_enabled : completed\n");
@@ -93,12 +89,10 @@ static int command_handler(void *user_data, const char *_buff) {
 		if (param != NULL) {
 			float value;
 			sscanf(param, "%f", &value);
-
-			lg_light_strength = value;
 			{
 				char cmd[256];
 				sprintf(cmd, "upstream.rov_driver.set_light_strength %f",
-						lg_light_strength);
+						value);
 				lg_plugin_host->send_command(cmd);
 			}
 			printf("set_light_strength : completed\n");
@@ -106,24 +100,25 @@ static int command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float v, x, y, z, w;
-			int num = sscanf(param, "%f %f,%f,%f,%f", &v, &x, &y, &z, &w);
+			float v;
+			int num = sscanf(param, "%f", &v);
 
 			if (num == 1) {
-				lg_thrust = v;
-				{
+				param = strtok(NULL, " \n");
+				if (param != NULL) {
+					float x, y, z, w;
+					int num = sscanf(param, "%f,%f,%f,%f", &x, &y, &z, &w);
+
+					if (num == 4) {
+						char cmd[256];
+						sprintf(cmd,
+								"upstream.rov_driver.set_thrust %f %f,%f,%f,%f",
+								v, x, y, z, w);
+						lg_plugin_host->send_command(cmd);
+					}
+				} else {
 					char cmd[256];
-					sprintf(cmd, "upstream.rov_driver.set_thrust %f",
-							lg_thrust);
-					lg_plugin_host->send_command(cmd);
-				}
-			} else if (num == 5) {
-				lg_thrust = v;
-				{
-					char cmd[256];
-					sprintf(cmd,
-							"upstream.rov_driver.set_thrust %f %f,%f,%f,%f",
-							lg_thrust, x, y, z, w);
+					sprintf(cmd, "upstream.rov_driver.set_thrust %f", v);
 					lg_plugin_host->send_command(cmd);
 				}
 			}
@@ -244,13 +239,6 @@ static void save_options(void *user_data, json_t *options) {
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
-	float north;
-	VECTOR4D_T quat = lg_plugin_host->get_camera_quaternion(-1);
-	quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-//	cur += swprintf(lg_info, MAX_INFO_LEN,
-//			L"N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
-//			north * 180 / M_PI, lg_bandwidth, lg_fps[0], lg_fps[1],
-//			lg_frameskip[0], lg_frameskip[1]);
 //	if (rtp_is_recording(NULL)) {
 //		char *path;
 //		rtp_is_recording(&path);
@@ -261,16 +249,19 @@ static wchar_t *get_info(void *user_data) {
 //		rtp_is_loading(&path);
 //		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", from %hs", path);
 //	}
-//	if (lg_pid_enabled) {
+	cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"thr %.1f", lg_thrust);
+	for (int i = 0; i < MOTOR_NUM; i++) {
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", m%d=%.1f", i,
+				lg_motor_value[i]);
+	}
+	if (lg_pid_enabled) {
 //		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
 //				L"\npitch=%fyaw=%f,\t\tpid_value=%f\tdelta_value=%f\n",
 //				lg_pitch_diff, lg_yaw_diff, lg_pid_value[0],
 //				lg_delta_pid_target[0][0]);
-//		for (int i = 0; i < MOTOR_NUM; i++) {
-//			cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"m%d=%d, ", i,
-//					lg_motor_value[i]);
-//		}
-//	}
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
+				L"\npitch=%fyaw=%f\n", lg_pitch_diff, lg_yaw_diff);
+	}
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
 				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
@@ -286,23 +277,19 @@ static wchar_t *get_info(void *user_data) {
 static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
-		lg_thrust = 0;
-		memset(lg_motor_value, 0, sizeof(lg_motor_value));
-//		lg_yaw_diff = 0;
-//		lg_pitch_diff = 0;
-//		memset(lg_pid_value, 0, sizeof(lg_pid_value));
-		lg_pid_enabled = !(bool) menu->user_data;
-		menu->user_data = (void*) lg_pid_enabled;
-		if (lg_pid_enabled) {
-			swprintf(menu->name, 8, L"On");
-		} else {
-			swprintf(menu->name, 8, L"Off");
-		}
-		{
-			char cmd[256];
-			sprintf(cmd, "rov_agent.set_pid_enabled %d",
-					lg_pid_enabled ? 1 : 0);
-			lg_plugin_host->send_command(cmd);
+		if (1) {
+			bool value = !(bool) menu->user_data;
+			menu->user_data = (void*) value;
+			if (value) {
+				swprintf(menu->name, 8, L"On");
+			} else {
+				swprintf(menu->name, 8, L"Off");
+			}
+			{
+				char cmd[256];
+				sprintf(cmd, "rov_agent.set_pid_enabled %d", value ? 1 : 0);
+				lg_plugin_host->send_command(cmd);
+			}
 		}
 		menu->selected = false;
 		break;
@@ -321,12 +308,12 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 			if (value == -1 || value == 1) {
 				value = lg_light_strength + value;
 			}
-			lg_light_strength = MIN(MAX(value, 0), 100);
-		}
-		{
-			char cmd[256];
-			sprintf(cmd, "rov_agent.set_light_strength %f", lg_light_strength);
-			lg_plugin_host->send_command(cmd);
+			value = MIN(MAX(value, 0), 100);
+			{
+				char cmd[256];
+				sprintf(cmd, "rov_agent.set_light_strength %f", value);
+				lg_plugin_host->send_command(cmd);
+			}
 		}
 		menu->selected = false;
 		break;
