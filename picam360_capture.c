@@ -1459,6 +1459,7 @@ static void add_mpu(MPU_T *mpu) {
 			}
 			MPU_T **current = state->mpus;
 			state->mpus = malloc(sizeof(MPU_T*) * space);
+			memset(state->mpus, 0, sizeof(STATUS_T*) * space);
 			memcpy(state->mpus, current, sizeof(MPU_T*) * (i + 1));
 			state->mpus[space - 1] = (void*) -1;
 			free(current);
@@ -1487,6 +1488,7 @@ static void add_status(STATUS_T *status) {
 			}
 			STATUS_T **current = state->statuses;
 			state->statuses = malloc(sizeof(STATUS_T*) * space);
+			memset(state->statuses, 0, sizeof(STATUS_T*) * space);
 			memcpy(state->statuses, current, sizeof(STATUS_T*) * (i + 1));
 			state->statuses[space - 1] = (void*) -1;
 			free(current);
@@ -1515,6 +1517,7 @@ static void add_watch(STATUS_T *watch) {
 			}
 			STATUS_T **current = state->watches;
 			state->watches = malloc(sizeof(STATUS_T*) * space);
+			memset(state->watches, 0, sizeof(STATUS_T*) * space);
 			memcpy(state->watches, current, sizeof(STATUS_T*) * (i + 1));
 			state->watches[space - 1] = (void*) -1;
 			free(current);
@@ -1812,7 +1815,6 @@ enum CALIBRATION_CMD {
 #define STILL_FOLDER_PATH "/media/usbdisk/still"
 #define VIDEO_FOLDER_PATH "/media/usbdisk/video"
 
-static float lg_bandwidth = 0.0;
 static int lg_resolution = 4;
 static bool lg_stereo_enabled = false;
 static bool lg_sync_enabled = true;
@@ -2858,7 +2860,7 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		VECTOR4D_T quat = state->plugin_host.get_view_quaternion();
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
 		len += swprintf(disp + len, MAX_INFO_SIZE - len,
-				L"\nView: Tmp %.1f degC, N %.1f, fps %.1f",
+				L"View   : Tmp %.1f degC, N %.1f, fps %.1f",
 				state->plugin_host.get_view_temperature(), north * 180 / M_PI,
 				lg_fps);
 	}
@@ -2868,9 +2870,9 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
 		len +=
 				swprintf(disp + len, MAX_INFO_SIZE - len,
-						L"Vehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
+						L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
 						state->plugin_host.get_camera_temperature(),
-						north * 180 / M_PI, lg_bandwidth, lg_cam_fps[0],
+						north * 180 / M_PI, lg_cam_bandwidth, lg_cam_fps[0],
 						lg_cam_fps[1], lg_cam_frameskip[0],
 						lg_cam_frameskip[1]);
 	}

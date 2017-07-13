@@ -316,9 +316,6 @@ static void save_options(void *user_data, json_t *options) {
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
-	float north;
-	quaternion_get_euler(lg_quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-	cur += swprintf(lg_info, MAX_INFO_LEN, L"N %.1f", north * 180 / M_PI);
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
 				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
