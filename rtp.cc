@@ -444,6 +444,10 @@ static void *receive_thread_func(void* arg) {
 static void *record_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP RECORD");
 
+	uint64_t num_of_bytes = 0;
+	uint64_t last_sync_bytes = 0;
+	const uint64_t MB = 1024 * 1024; // 64MB
+	const uint64_t SYNC_THRESHOLD = 64 * MB; // 64MB
 	RTPPacket *pack;
 	while (lg_record_fd >= 0) {
 		int res = mrevent_wait(&lg_record_packet_ready, 1000);
@@ -476,9 +480,15 @@ static void *record_thread_func(void* arg) {
 		header[7] = (unsigned char) '\0';
 		write(fd, header, sizeof(header));
 		write(fd, pack->GetPacketData(), pack->GetPacketLength());
-		fsync(fd); //this avoid that file size would be zero after os crash
+
+		num_of_bytes += len;
+		if (num_of_bytes - last_sync_bytes > SYNC_THRESHOLD) {
+			printf("fsync %lluMB\n", num_of_bytes / MB);
+			last_sync_bytes = num_of_bytes;
+			fsync(fd); //this avoid that file size would be zero after os crash
+		}
 #ifdef USE_JRTP
-				lg_sess.DeletePacket(pack);
+		lg_sess.DeletePacket(pack);
 #else
 		delete pack;
 #endif

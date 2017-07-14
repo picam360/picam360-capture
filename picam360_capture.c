@@ -2869,7 +2869,7 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
 		len +=
 				swprintf(disp + len, MAX_INFO_SIZE - len,
-						L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %d:%d",
+						L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %.0f:%.0f",
 						state->plugin_host.get_camera_temperature(),
 						north * 180 / M_PI, lg_cam_bandwidth, lg_cam_fps[0],
 						lg_cam_fps[1], lg_cam_frameskip[0],
