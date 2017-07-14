@@ -43,6 +43,8 @@ static float lg_pitch_diff = 0;
 static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
+static float lg_pid_value[3] = { }; //x, z, delta yaw
+static float lg_delta_pid_target[3] = { }; //x, z, delta yaw
 
 static void release(void *user_data) {
 	free(user_data);
@@ -249,18 +251,19 @@ static wchar_t *get_info(void *user_data) {
 //		rtp_is_loading(&path);
 //		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", from %hs", path);
 //	}
-	cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"thr %.1f", lg_thrust);
-	for (int i = 0; i < MOTOR_NUM; i++) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", m%d=%.1f", i,
+	cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
+			L"thr %.1f, pch=%.1f, yaw=%.1f, mtr=%.1f", lg_thrust, lg_pitch_diff,
+			lg_yaw_diff, lg_motor_value[0]);
+	for (int i = 1; i < MOTOR_NUM; i++) {
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L",%.1f",
 				lg_motor_value[i]);
 	}
 	if (lg_pid_enabled) {
-//		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-//				L"\npitch=%fyaw=%f,\t\tpid_value=%f\tdelta_value=%f\n",
-//				lg_pitch_diff, lg_yaw_diff, lg_pid_value[0],
-//				lg_delta_pid_target[0][0]);
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-				L"\npitch=%fyaw=%f\n", lg_pitch_diff, lg_yaw_diff);
+				L"\npid_value=%.1f,%.1f,%.1f\tdelta_value=%.1f,%.1f,%.1f",
+				lg_pid_value[0], lg_pid_value[1], lg_pid_value[2],
+				lg_delta_pid_target[0], lg_delta_pid_target[1],
+				lg_delta_pid_target[2]);
 	}
 	if (lg_is_compass_calib) {
 		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
@@ -308,10 +311,10 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 			if (value == -1 || value == 1) {
 				value = lg_light_strength + value;
 			}
-			value = MIN(MAX(value, 0), 100);
+			lg_light_strength = MIN(MAX(value, 0), 100);
 			{
 				char cmd[256];
-				sprintf(cmd, "rov_agent.set_light_strength %f", value);
+				sprintf(cmd, "rov_agent.set_light_strength %f", lg_light_strength);
 				lg_plugin_host->send_command(cmd);
 			}
 		}
@@ -374,6 +377,8 @@ static STATUS_T *STATUS_VAR(pitch_diff);
 static STATUS_T *STATUS_VAR(p_gain);
 static STATUS_T *STATUS_VAR(i_gain);
 static STATUS_T *STATUS_VAR(d_gain);
+static STATUS_T *STATUS_VAR(pid_value);
+static STATUS_T *STATUS_VAR(delta_pid_target);
 
 static void status_release(void *user_data) {
 	free(user_data);
@@ -426,6 +431,12 @@ static void status_set_value(void *user_data, const char *value) {
 		sscanf(value, "%f", &lg_i_gain);
 	} else if (status == STATUS_VAR(d_gain)) {
 		sscanf(value, "%f", &lg_d_gain);
+	} else if (status == STATUS_VAR(pid_value)) {
+		sscanf(value, "%f,%f,%f", &lg_pid_value[0], &lg_pid_value[1],
+				&lg_pid_value[2]);
+	} else if (status == STATUS_VAR(delta_pid_target)) {
+		sscanf(value, "%f,%f,%f", &lg_delta_pid_target[0],
+				&lg_delta_pid_target[1], &lg_pid_value[2]);
 	}
 }
 
@@ -456,6 +467,8 @@ static void init_status() {
 	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", p_gain);
 	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", i_gain);
 	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", d_gain);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", pid_value);
+	WATCH_INIT(lg_plugin_host, UPSTREAM_DOMAIN "rov_driver.", delta_pid_target);
 }
 
 #endif //status block
