@@ -1942,7 +1942,6 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			rtp_start_loading(name, true, true,
 					(RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start loading %s\n", name);
-			state->plugin_host.set_menu_visible(false);
 			menu->marked = true;
 			menu->selected = false;
 
@@ -2205,7 +2204,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		case CALIBRATION_CMD_VEHICLE_COMPASS:
 			if (1) { //this should be in plugin
 				char cmd[256];
-				snprintf(cmd, 256, "driver_agent.start_compass_calib");
+				snprintf(cmd, 256, "rov_agent.start_compass_calib");
 				state->plugin_host.send_command(cmd);
 			}
 			break;
@@ -2234,7 +2233,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		case CALIBRATION_CMD_VEHICLE_COMPASS:
 			if (1) {
 				char cmd[256];
-				snprintf(cmd, 256, "driver_agent.stop_compass_calib");
+				snprintf(cmd, 256, "rov_agent.stop_compass_calib");
 				state->plugin_host.send_command(cmd);
 			}
 			break;
