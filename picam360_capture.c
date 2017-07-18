@@ -635,7 +635,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S")) != -1) {
 		switch (opt) {
 		case 'W':
 			sscanf(optarg, "%d", &render_width);
@@ -664,6 +664,11 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 					frame->view_mpu = state->mpus[i];
 				}
 			}
+			break;
+		case 'S':
+			frame->output_mode = OUTPUT_MODE_STREAM;
+			strncpy(frame->output_filepath, "stream.mjpeg",
+					sizeof(frame->output_filepath));
 			break;
 		default:
 			break;
@@ -749,6 +754,9 @@ bool delete_frame(FRAME_T *frame) {
 	return true;
 }
 
+static void stream_callback(unsigned char *data, unsigned int data_len,
+		void *user_data);
+
 void frame_handler() {
 	struct timeval s, f;
 	double elapsed_ms;
@@ -774,8 +782,19 @@ void frame_handler() {
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio);
+					frame->output_filepath, 4000 * ratio, NULL, NULL);
 			frame->output_mode = OUTPUT_MODE_VIDEO;
+			frame->frame_num = 0;
+			frame->frame_elapsed = 0;
+			frame->is_recording = true;
+			printf("start_record saved to %s\n", frame->output_filepath);
+		}
+		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_STREAM) {
+			int ratio = frame->double_size ? 2 : 1;
+			frame->recorder = StartRecord(frame->width * ratio, frame->height,
+					frame->output_filepath, 4000 * ratio, stream_callback,
+					frame);
+			frame->output_mode = OUTPUT_MODE_STREAM;
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -844,6 +863,7 @@ void frame_handler() {
 			snap_finished = true;
 			break;
 		case OUTPUT_MODE_VIDEO:
+		case OUTPUT_MODE_STREAM:
 			AddFrame(frame->recorder, frame->img_buff);
 
 			gettimeofday(&f, NULL);
@@ -1631,6 +1651,21 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 static char lg_command[256] = { };
 static int lg_command_id = 0;
 static int lg_ack_command_id = 0;
+
+static void stream_callback(unsigned char *data, unsigned int data_len,
+		void *user_data) {
+	FRAME_T *frame = (FRAME_T*) user_data;
+	for (int i = 0; i < data_len;) {
+		int len;
+		if (i + RTP_MAXPAYLOADSIZE < data_len) {
+			len = RTP_MAXPAYLOADSIZE;
+		} else {
+			len = data_len - (i + RTP_MAXPAYLOADSIZE);
+		}
+		rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
+		i += len;
+	}
+}
 
 static int command2upstream_handler() {
 	int len = strlen(lg_command);

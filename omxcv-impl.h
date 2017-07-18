@@ -68,12 +68,14 @@ namespace omxcv {
      */
     class OmxCvImpl {
         public:
-            OmxCvImpl(const char *name, int width, int height, int bitrate, int fpsnum=-1, int fpsden=-1);
+            OmxCvImpl(const char *name, int width, int height, int bitrate, int fpsnum=-1, int fpsden=-1, OMXCV_CALLBACK callback=NULL, void *user_data=NULL);
             virtual ~OmxCvImpl();
 
             bool process(const unsigned char *in_data);
         private:
             int m_width, m_height, m_stride, m_bitrate, m_fpsnum, m_fpsden;
+            OMXCV_CALLBACK m_callback;
+            void *m_user_data;
 
             enum CODEC_TYPE mcodec_type;
             std::string m_filename;

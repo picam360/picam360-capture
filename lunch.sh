@@ -21,8 +21,7 @@ MODE=
 DIRECT=
 FPS=30
 CODEC=H264
-STREAM=false
-STREAM_PARAM=
+STREAM=
 AUTO_CALIBRATION=
 VIEW_COODINATE=MANUAL
 DEBUG=false
@@ -60,7 +59,7 @@ do
             ;;
         D)  DIRECT="-D"
             ;;
-        S)  STREAM=true
+        S)  STREAM=-S
             ;;
         v)  VIEW_COODINATE=$OPTARG
             ;;
@@ -70,18 +69,6 @@ do
             ;;
     esac
 done
-
-if [ $STREAM = true ]; then
-	if [ -e /tmp/stream ]; then
-		rm /tmp/stream
-	fi
-	mkdir /tmp/stream
-	chmod 0777 /tmp/stream
-	export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-	sudo killall mjpg_streamer 
-	mjpg_streamer -i "input_file.so -f /tmp/stream" &
-	STREAM_PARAM="-o /tmp/stream/steam.jpeg"
-fi
 
 if [ -e status ]; then
 	rm status
@@ -152,12 +139,12 @@ fi
 sudo killall picam360-capture.bin
 if [ $DEBUG = "true" ]; then
 
-echo main > gdbcmd
-echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM -v $VIEW_COODINATE\" >> gdbcmd
+echo b main > gdbcmd
+echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM -v $VIEW_COODINATE\" >> gdbcmd
 gdb ./picam360-capture.bin -x gdbcmd
 
 else
 
-./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM_PARAM -v $VIEW_COODINATE"
+./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM -v $VIEW_COODINATE"
 
 fi
