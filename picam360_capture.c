@@ -1660,7 +1660,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len,
 		if (i + RTP_MAXPAYLOADSIZE < data_len) {
 			len = RTP_MAXPAYLOADSIZE;
 		} else {
-			len = data_len - i);
+			len = data_len - i;
 		}
 		rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
 		i += len;
