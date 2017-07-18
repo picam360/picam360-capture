@@ -33,6 +33,7 @@
 #include "auto_calibration.h"
 #include "manual_mpu.h"
 #include "rtp.h"
+#include "rtcp.h"
 
 #include <mat4/type.h>
 #include <mat4/create.h>
@@ -1634,7 +1635,7 @@ static int lg_ack_command_id = 0;
 static int command2upstream_handler() {
 	int len = strlen(lg_command);
 	if (len != 0 && lg_command_id != lg_ack_command_id) {
-		rtp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
+		rtcp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
 		return 0;
 	} else {
 		memset(lg_command, 0, sizeof(lg_command));
@@ -1692,7 +1693,32 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	}
 	static unsigned int last_seq_num = 0;
 	if (seq_num != last_seq_num + 1) {
-		printf("packet lost : from %d to %d\n", last_seq_num, seq_num);
+		printf("rtp : packet lost : from %d to %d\n", last_seq_num, seq_num);
+	}
+	last_seq_num = seq_num;
+
+	if (pt == PT_STATUS) {
+		status_handler((char*) data, data_len);
+	} else if (pt == PT_CAM_BASE + 0) {
+		if (state->plugin_host.decode_video) {
+			state->plugin_host.decode_video(0, (unsigned char*) data, data_len);
+		}
+	} else if (pt == PT_CAM_BASE + 1) {
+		if (state->plugin_host.decode_video) {
+			state->plugin_host.decode_video(1, (unsigned char*) data, data_len);
+		}
+	}
+	return 0;
+}
+
+static int rtcp_callback(unsigned char *data, unsigned int data_len,
+		unsigned char pt, unsigned int seq_num) {
+	if (data_len == 0) {
+		return -1;
+	}
+	static unsigned int last_seq_num = 0;
+	if (seq_num != last_seq_num + 1) {
+		printf("rtcp : packet lost : from %d to %d\n", last_seq_num, seq_num);
 	}
 	last_seq_num = seq_num;
 
@@ -1705,16 +1731,6 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 		if (num == 2 && id != lg_ack_command_id) {
 			lg_ack_command_id = id;
 			state->plugin_host.send_command(value);
-		}
-	} else if (pt == PT_STATUS) {
-		status_handler((char*) data, data_len);
-	} else if (pt == PT_CAM_BASE + 0) {
-		if (state->plugin_host.decode_video) {
-			state->plugin_host.decode_video(0, (unsigned char*) data, data_len);
-		}
-	} else if (pt == PT_CAM_BASE + 1) {
-		if (state->plugin_host.decode_video) {
-			state->plugin_host.decode_video(1, (unsigned char*) data, data_len);
 		}
 	}
 	return 0;
@@ -1790,6 +1806,9 @@ static void init_status() {
 static void _init_rtp() {
 	init_rtp(9002, "192.168.4.1", 9004, 0);
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
+
+	init_rtcp(9003, "192.168.4.1", 9005, 0);
+	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
 
 	init_status();
 }
