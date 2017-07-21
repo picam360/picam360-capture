@@ -28,6 +28,10 @@ static VECTOR4D_T get_quaternion() {
 	return lg_quat;
 }
 
+static void set_quaternion(void *user_data, VECTOR4D_T value) {
+	lg_quat = value;
+}
+
 static VECTOR4D_T get_compass() {
 	return lg_compass;
 }
@@ -46,9 +50,11 @@ static void release(void *user_data) {
 
 void create_manual_mpu(MPU_T **_mpu) {
 	MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
+	memset(mpu, 0, sizeof(MPU_T));
 	strcpy(mpu->name, MPU_NAME);
 	mpu->release = release;
 	mpu->get_quaternion = get_quaternion;
+	mpu->set_quaternion = set_quaternion;
 	mpu->get_compass = get_compass;
 	mpu->get_temperature = get_temperature;
 	mpu->get_north = get_north;

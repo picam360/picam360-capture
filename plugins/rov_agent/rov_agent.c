@@ -491,6 +491,7 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 
 	{
 		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
+		memset(plugin, 0, sizeof(PLUGIN_T));
 		strcpy(plugin->name, PLUGIN_NAME);
 		plugin->release = release;
 		plugin->command_handler = command_handler;

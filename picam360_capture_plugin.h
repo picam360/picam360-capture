@@ -36,6 +36,7 @@ typedef struct _MPU_T {
 	char name[64];
 	void (*release)(void *user_data);
 	VECTOR4D_T (*get_quaternion)(void *user_data);
+	void (*set_quaternion)(void *user_data, VECTOR4D_T value);
 	VECTOR4D_T (*get_compass)(void *user_data);
 	float (*get_temperature)(void *user_data);
 	float (*get_north)(void *user_data);

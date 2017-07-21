@@ -1078,21 +1078,24 @@ int _command_handler(const char *_buff) {
 			state->camera_roll = roll * M_PI / 180.0;
 			printf("set_camera_orientation\n");
 		}
-	} else if (strncmp(cmd, "set_view_orientation", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_view_quaternion", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int id;
-			float pitch;
-			float yaw;
-			float roll;
-			sscanf(param, "%i=%f,%f,%f", &id, &pitch, &yaw, &roll);
-			for (FRAME_T *frame = state->frame; frame != NULL;
-					frame = frame->next) {
-				if (frame->id == id) {
-					manual_mpu_set(frame->view_mpu, pitch * M_PI / 180.0,
-							yaw * M_PI / 180.0, roll * M_PI / 180.0);
-					printf("set_view_orientation\n");
-					break;
+			float x, y, z, w;
+			int num = sscanf(param, "%i=%f,%f,%f,%f", &id, &x, &y, &z, &w);
+
+			if (num == 5) {
+				for (FRAME_T *frame = state->frame; frame != NULL;
+						frame = frame->next) {
+					if (frame->id == id && frame->view_mpu
+							&& frame->view_mpu->set_quaternion) {
+						VECTOR4D_T value = { .ary = { x, y, z, w } };
+						frame->view_mpu->set_quaternion(
+								frame->view_mpu->user_data, value);
+						//printf("set_view_quaternion\n");
+						break;
+					}
 				}
 			}
 		}
