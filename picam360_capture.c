@@ -813,10 +813,11 @@ void frame_handler() {
 			state->plugin_host.lock_texture();
 			for (int split = 0; split < 2; split++) {
 				state->split = split + 1;
+
+				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 				redraw_render_texture(state, frame,
 						&state->model_data[frame->operation_mode]);
 				glFinish();
-				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
 						GL_UNSIGNED_BYTE, image_buffer);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -836,10 +837,14 @@ void frame_handler() {
 			img_height = frame->height;
 			state->split = 0;
 			//state->plugin_host.lock_texture();
+
+			glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 			redraw_render_texture(state, frame,
 					&state->model_data[frame->operation_mode]);
+			if (state->menu_visible) {
+				redraw_info(state, frame);
+			}
 			glFinish();
-			glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 			glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
 					GL_UNSIGNED_BYTE, image_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -889,9 +894,6 @@ void frame_handler() {
 		//preview
 		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
-			if (state->menu_visible) {
-				redraw_info(state, frame);
-			}
 			eglSwapBuffers(state->display, state->surface);
 		}
 	}
@@ -1665,7 +1667,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len,
 	if (lg_debug_dump) {
 		if (data[0] == 0xFF && data[1] == 0xD8) { //
 			char path[256];
-			sprintf(path, "/tmp/debug_%3d.jpeg", lg_debug_dump_num++);
+			sprintf(path, "/tmp/debug_%03d.jpeg", lg_debug_dump_num++);
 			lg_debug_dump_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
 		}
 		if (lg_debug_dump_fd > 0) {
@@ -2689,8 +2691,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-
 	glViewport(0, 0, frame_width, frame_height);
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
@@ -2868,7 +2868,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 }
 
@@ -2963,6 +2962,6 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		}
 	}
 	menu_redraw(state->menu, disp, state->screen_width, state->screen_height,
-			frame_width, frame_height, state->stereo);
+			frame_width, frame_height, false);
 }
 
