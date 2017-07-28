@@ -635,7 +635,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S:")) != -1) {
 		switch (opt) {
 		case 'W':
 			sscanf(optarg, "%d", &render_width);
@@ -667,8 +667,14 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			break;
 		case 'S':
 			frame->output_mode = OUTPUT_MODE_STREAM;
-			strncpy(frame->output_filepath, "stream.mjpeg",
-					sizeof(frame->output_filepath));
+			//h264 or mjpeg
+			if (strcmp(optarg, "h264") == 0) {
+				strncpy(frame->output_filepath, "stream.h264",
+						sizeof(frame->output_filepath));
+			} else {
+				strncpy(frame->output_filepath, "stream.mjpeg",
+						sizeof(frame->output_filepath));
+			}
 			break;
 		default:
 			break;
@@ -1664,7 +1670,7 @@ static int lg_debug_dump_fd = -1;
 static void stream_callback(unsigned char *data, unsigned int data_len,
 		void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
-	if (lg_debug_dump) {
+	if (lg_debug_dump && strcmp(frame->output_filepath, "stream.mjpeg") == 0) {
 		if (data[0] == 0xFF && data[1] == 0xD8) { //
 			char path[256];
 			sprintf(path, "/tmp/debug_%03d.jpeg", lg_debug_dump_num++);
