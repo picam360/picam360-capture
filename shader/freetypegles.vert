@@ -7,5 +7,6 @@ varying vec4 v_color;
 void main(void) {
 	v_frag_uv = a_st;
 	gl_Position = u_mvp * vec4(a_position, 1);
+	gl_Position.y = -gl_Position.y;//for jpeg coordinate
 	v_color = a_color;
 }

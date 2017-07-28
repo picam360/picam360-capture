@@ -8,7 +8,7 @@ CFLAGS+=-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POS
 
 LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/ -lstdc++ -ldl\
 		-lopencv_core -lopencv_highgui -lopencv_imgproc \
-		-lovr_nsb -lgl_matrix -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lilclient -lfreetype -ledit -ljansson\
+		-lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lilclient -lfreetype -ledit -ljansson\
 		-lpthread -lrt -lm -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont \
 		-Wl,-rpath,/usr/local/lib
 		

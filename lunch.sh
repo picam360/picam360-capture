@@ -26,7 +26,7 @@ AUTO_CALIBRATION=
 VIEW_COODINATE=MANUAL
 DEBUG=false
 
-while getopts ac:n:w:h:W:H:psCEFf:rDSv:g OPT
+while getopts ac:n:w:h:W:H:psCEFf:rDS:v:g OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
@@ -59,7 +59,7 @@ do
             ;;
         D)  DIRECT="-D"
             ;;
-        S)  STREAM=-S
+        S)  STREAM="-S $OPTARG"
             ;;
         v)  VIEW_COODINATE=$OPTARG
             ;;

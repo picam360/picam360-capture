@@ -1670,31 +1670,50 @@ static int lg_debug_dump_fd = -1;
 static void stream_callback(unsigned char *data, unsigned int data_len,
 		void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
-	if (lg_debug_dump && strcmp(frame->output_filepath, "stream.mjpeg") == 0) {
-		if (data[0] == 0xFF && data[1] == 0xD8) { //
-			char path[256];
-			sprintf(path, "/tmp/debug_%03d.jpeg", lg_debug_dump_num++);
-			lg_debug_dump_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
+	if (strcmp(frame->output_filepath, "stream.h264") == 0) {
+		const unsigned char soi[] = { 0xFF, 0xD8 };
+		const unsigned char eoi[] = { 0xFF, 0xD9 };
+		int nul_len = data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3];
+
+		rtp_sendpacket(soi, sizeof(soi), PT_CAM_BASE + frame->id);
+		for (int i = 0; i < data_len;) {
+			int len;
+			if (i + RTP_MAXPAYLOADSIZE < data_len) {
+				len = RTP_MAXPAYLOADSIZE;
+			} else {
+				len = data_len - i;
+			}
+			rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
+			i += len;
 		}
-		if (lg_debug_dump_fd > 0) {
-			write(lg_debug_dump_fd, data, data_len);
-		}
-		if (data[data_len - 2] == 0xFF && data[data_len - 1] == 0xD9) {
+		rtp_sendpacket(eoi, sizeof(eoi), PT_CAM_BASE + frame->id);
+	} else if (strcmp(frame->output_filepath, "stream.mjpeg") == 0) {
+		if (lg_debug_dump) {
+			if (data[0] == 0xFF && data[1] == 0xD8) { //
+				char path[256];
+				sprintf(path, "/tmp/debug_%03d.jpeg", lg_debug_dump_num++);
+				lg_debug_dump_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
+			}
 			if (lg_debug_dump_fd > 0) {
-				close(lg_debug_dump_fd);
-				lg_debug_dump_fd = -1;
+				write(lg_debug_dump_fd, data, data_len);
+			}
+			if (data[data_len - 2] == 0xFF && data[data_len - 1] == 0xD9) {
+				if (lg_debug_dump_fd > 0) {
+					close(lg_debug_dump_fd);
+					lg_debug_dump_fd = -1;
+				}
 			}
 		}
-	}
-	for (int i = 0; i < data_len;) {
-		int len;
-		if (i + RTP_MAXPAYLOADSIZE < data_len) {
-			len = RTP_MAXPAYLOADSIZE;
-		} else {
-			len = data_len - i;
+		for (int i = 0; i < data_len;) {
+			int len;
+			if (i + RTP_MAXPAYLOADSIZE < data_len) {
+				len = RTP_MAXPAYLOADSIZE;
+			} else {
+				len = data_len - i;
+			}
+			rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
+			i += len;
 		}
-		rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
-		i += len;
 	}
 }
 
