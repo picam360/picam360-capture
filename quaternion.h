@@ -21,8 +21,9 @@ typedef union _VECTOR4D_T {
 		float y;
 		float z;
 		float w;
+		float t;
 	};
-	float ary[4];
+	float ary[5];
 } VECTOR4D_T;
 
 VECTOR4D_T quaternion_init();
