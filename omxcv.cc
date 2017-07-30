@@ -156,7 +156,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	if (format.eCompressionFormat == OMX_VIDEO_CodingAVC) {
 		//Set the output profile level of the encoder
-		OMX_VIDEO_PARAM_PROFILELEVELTYPE profileLevel; // OMX_IndexParamVideoProfileLevelCurrent
+		OMX_VIDEO_PARAM_PROFILELEVELTYPE profileLevel = { }; // OMX_IndexParamVideoProfileLevelCurrent
 		profileLevel.nSize = sizeof(OMX_VIDEO_PARAM_PROFILELEVELTYPE);
 		profileLevel.nVersion.nVersion = OMX_VERSION;
 		profileLevel.nPortIndex = OMX_ENCODE_PORT_OUT;
@@ -169,7 +169,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 		//I think this decreases the chance of NALUs being split across buffers.
 		/*
-		 OMX_CONFIG_BOOLEANTYPE frg = {0};
+		 OMX_CONFIG_BOOLEANTYPE frg = {};
 		 frg.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
 		 frg.nVersion.nVersion = OMX_VERSION;
 		 frg.bEnabled = OMX_TRUE;
@@ -178,8 +178,6 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 		 CHECKED(ret != 0, "OMX_SetParameter failed for setting fragmentation minimisation.");
 		 */
 
-		CHECKED(ret != OMX_ErrorNone,
-				"OMX_SetParameter failed for setting encoder output format.");
 		//We want at most one NAL per output buffer that we receive.
 		OMX_CONFIG_BOOLEANTYPE nal = { };
 		nal.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
@@ -199,6 +197,17 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
 				(OMX_INDEXTYPE) OMX_IndexParamNalStreamFormatSelect, &nal2);
 		CHECKED(ret != 0, "OMX_SetParameter failed for setting NALU format.");
+
+		//Inline SPS/PPS
+		OMX_CONFIG_PORTBOOLEANTYPE inlineHeader = { };
+		inlineHeader.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
+		inlineHeader.nVersion.nVersion = OMX_VERSION;
+		inlineHeader.nPortIndex = OMX_ENCODE_PORT_OUT;
+		inlineHeader.bEnabled = OMX_TRUE;
+		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+				OMX_IndexParamBrcmVideoAVCInlineHeaderEnable, &inlineHeader);
+		CHECKED(ret != 0,
+				"OMX_SetParameter failed for setting inline sps/pps.");
 	}
 
 	ret = ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
