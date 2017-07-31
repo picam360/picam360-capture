@@ -1172,8 +1172,20 @@ int _command_handler(const char *_buff) {
 			state->frame_sync = (param[0] == '1');
 			printf("set_frame_sync %s\n", param);
 		}
-	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
-		save_options(state);
+	} else if (strncmp(cmd, "set_menu_visible", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			state->menu_visible = (param[0] == '1');
+			printf("set_menu_visible %s\n", param);
+		}
+	} else if (strncmp(cmd, "select_active_menu", sizeof(buff)) == 0) {
+		menu_operate(state->menu, MENU_OPERATE_SELECT);
+	} else if (strncmp(cmd, "deselect_active_menu", sizeof(buff)) == 0) {
+		menu_operate(state->menu, MENU_OPERATE_DESELECT);
+	} else if (strncmp(cmd, "go2next_menu", sizeof(buff)) == 0) {
+		menu_operate(state->menu, MENU_OPERATE_ACTIVE_NEXT);
+	} else if (strncmp(cmd, "back2previouse_menu", sizeof(buff)) == 0) {
+		menu_operate(state->menu, MENU_OPERATE_ACTIVE_BACK);
 	} else if (state->frame != NULL
 			&& state->frame->operation_mode == CALIBRATION) {
 		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
@@ -1210,36 +1222,40 @@ int _command_handler(const char *_buff) {
 
 int command_handler() {
 	int ret = 0;
-	char *buff = NULL;
 
-	{
-		pthread_mutex_lock(&state->cmd_list_mutex);
+	for (int i = 0; i < 10; i++) {
+		char *buff = NULL;
+		{
+			pthread_mutex_lock(&state->cmd_list_mutex);
 
-		if (state->cmd_list) {
-			LIST_T *cur = state->cmd_list;
-			buff = (char*) cur->value;
-			state->cmd_list = cur->next;
-			free(cur);
-		}
-
-		pthread_mutex_unlock(&state->cmd_list_mutex);
-	}
-
-	if (buff) {
-		bool handled = false;
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			int name_len = strlen(state->plugins[i]->name);
-			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-					&& buff[name_len] == '.') {
-				ret = state->plugins[i]->command_handler(
-						state->plugins[i]->user_data, buff);
-				handled = true;
+			if (state->cmd_list) {
+				LIST_T *cur = state->cmd_list;
+				buff = (char*) cur->value;
+				state->cmd_list = cur->next;
+				free(cur);
 			}
+
+			pthread_mutex_unlock(&state->cmd_list_mutex);
 		}
-		if (!handled) {
-			ret = _command_handler(buff);
+
+		if (buff) {
+			bool handled = false;
+			for (int i = 0; state->plugins[i] != NULL; i++) {
+				int name_len = strlen(state->plugins[i]->name);
+				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+						&& buff[name_len] == '.') {
+					ret = state->plugins[i]->command_handler(
+							state->plugins[i]->user_data, buff);
+					handled = true;
+				}
+			}
+			if (!handled) {
+				ret = _command_handler(buff);
+			}
+			free(buff);
+		} else {
+			break;
 		}
-		free(buff);
 	}
 	return ret;
 }
@@ -2986,7 +3002,7 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			}
 		}
 	}
-	menu_redraw(state->menu, disp, frame_width, frame_height,
-			frame_width, frame_height, false);
+	menu_redraw(state->menu, disp, frame_width, frame_height, frame_width,
+			frame_height, false);
 }
 

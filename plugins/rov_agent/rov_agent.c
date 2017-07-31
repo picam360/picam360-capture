@@ -99,7 +99,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_light_strength : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".increment_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v;
@@ -114,17 +114,17 @@ static int command_handler(void *user_data, const char *_buff) {
 					if (num == 4) {
 						char cmd[256];
 						sprintf(cmd,
-								"upstream.rov_driver.set_thrust %f %f,%f,%f,%f",
+								"upstream.rov_driver.increment_thrust %f %f,%f,%f,%f",
 								v, x, y, z, w);
 						lg_plugin_host->send_command(cmd);
 					}
 				} else {
 					char cmd[256];
-					sprintf(cmd, "upstream.rov_driver.set_thrust %f", v);
+					sprintf(cmd, "upstream.rov_driver.increment_thrust %f", v);
 					lg_plugin_host->send_command(cmd);
 				}
 			}
-			printf("set_thrust : completed\n");
+			printf("increment_thrust : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff))
 			== 0) {
@@ -206,14 +206,15 @@ static int command_handler(void *user_data, const char *_buff) {
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
+	float increment = 0;
 	switch (node_id) {
 	case PICAM360_CONTROLLER_NODE_ID:
 		switch (event_id) {
 		case PICAM360_CONTROLLER_EVENT_NEXT:
-			lg_thrust++;
+			increment = 1;
 			break;
 		case PICAM360_CONTROLLER_EVENT_BACK:
-			lg_thrust--;
+			increment = -1;
 			break;
 		default:
 			break;
@@ -221,7 +222,7 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 		{
 			char cmd[256];
 			VECTOR4D_T quat = lg_plugin_host->get_view_quaternion();
-			sprintf(cmd, "rov_agent.set_thrust %f %f,%f,%f,%f", lg_thrust,
+			sprintf(cmd, "rov_agent.increment_thrust %f %f,%f,%f,%f", increment,
 					quat.x, quat.y, quat.z, quat.w);
 			lg_plugin_host->send_command(cmd);
 		}
@@ -314,7 +315,8 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 			lg_light_strength = MIN(MAX(value, 0), 100);
 			{
 				char cmd[256];
-				sprintf(cmd, "rov_agent.set_light_strength %f", lg_light_strength);
+				sprintf(cmd, "rov_agent.set_light_strength %f",
+						lg_light_strength);
 				lg_plugin_host->send_command(cmd);
 			}
 		}
