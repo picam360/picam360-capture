@@ -2986,7 +2986,7 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 			}
 		}
 	}
-	menu_redraw(state->menu, disp, state->screen_width, state->screen_height,
+	menu_redraw(state->menu, disp, frame_width, frame_height,
 			frame_width, frame_height, false);
 }
 

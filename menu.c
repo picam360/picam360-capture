@@ -152,14 +152,12 @@ void expand_menu(MENU_T *menu, vector_t * vVector, int *line_inout,
 	}
 }
 
-void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t _screen_width,
+void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
 		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
 		bool stereo) {
 
 	int program = GLProgram_GetId(lg_freetypegles.model.program);
 	glUseProgram(program);
-
-	uint32_t screen_width = (stereo) ? _screen_width / 2 : _screen_width;
 
 	vector_t * vVector = vector_new(sizeof(GLfloat));
 	int line = 0;
