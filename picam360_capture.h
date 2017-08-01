@@ -86,6 +86,12 @@ typedef struct _FRAME_T {
 	bool is_recording;
 	void *recorder;
 
+	//h264
+	bool in_nal;
+	uint32_t nal_len;
+	uint8_t *nal_buff;
+	uint32_t nal_pos;
+
 	enum OPERATION_MODE operation_mode;
 	enum OUTPUT_MODE output_mode;
 	char output_filepath[256];

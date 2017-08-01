@@ -1702,22 +1702,61 @@ static void stream_callback(unsigned char *data, unsigned int data_len,
 		void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
 	if (strcmp(frame->output_filepath, "stream.h264") == 0) {
-		const unsigned char soi[] = { 0xFF, 0xD8 };
-		const unsigned char eoi[] = { 0xFF, 0xD9 };
-		int nul_len = data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3];
-
-		rtp_sendpacket(soi, sizeof(soi), PT_CAM_BASE + frame->id);
+		const unsigned char soi[] = { 0x4E, 0x41 }; //'N', 'A'
+		const unsigned char eoi[] = { 0x4C, 0x55 }; //'L', 'U'
 		for (int i = 0; i < data_len;) {
-			int len;
-			if (i + RTP_MAXPAYLOADSIZE < data_len) {
-				len = RTP_MAXPAYLOADSIZE;
+			if (!frame->in_nal) {
+				frame->in_nal = true;
+				frame->nal_len = data[0] << 24 | data[1] << 16 | data[2] << 8
+						| data[3];
+				frame->nal_len += 4; //start code
+				if (frame->nal_len > 1024 * 1024) {
+					printf("something wrong in h264 stream at %d\n", i);
+					frame->in_nal = false;
+					return;
+				}
+				if (i + frame->nal_len <= data_len) {
+					rtp_sendpacket(soi, sizeof(soi), PT_CAM_BASE + frame->id);
+					rtp_sendpacket(data + i, frame->nal_len,
+					PT_CAM_BASE + frame->id);
+					rtp_sendpacket(eoi, sizeof(eoi), PT_CAM_BASE + frame->id);
+					i += frame->nal_len;
+					frame->in_nal = false;
+				} else {
+					frame->nal_pos = 0;
+					frame->nal_buff = malloc(frame->nal_len);
+				}
 			} else {
-				len = data_len - i;
+				int rest = frame->nal_len - frame->nal_pos;
+				if (i + rest <= data_len) {
+					memcpy(frame->nal_buff + frame->nal_pos, data + i, rest);
+
+					rtp_sendpacket(soi, sizeof(soi), PT_CAM_BASE + frame->id);
+					for (int j = 0; j < frame->nal_len;) {
+						int len;
+						if (j + RTP_MAXPAYLOADSIZE < frame->nal_len) {
+							len = RTP_MAXPAYLOADSIZE;
+						} else {
+							len = frame->nal_len - j;
+						}
+						rtp_sendpacket(frame->nal_buff + j, len,
+						PT_CAM_BASE + frame->id);
+						j += len;
+					}
+					rtp_sendpacket(eoi, sizeof(eoi), PT_CAM_BASE + frame->id);
+					free(frame->nal_buff);
+					frame->nal_buff = NULL;
+
+					i += rest;
+					frame->in_nal = false;
+				} else {
+					int len = data_len - i;
+					memcpy(frame->nal_buff + frame->nal_pos, data + i, len);
+					frame->nal_pos += len;
+					i += len;
+				}
 			}
-			rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
-			i += len;
 		}
-		rtp_sendpacket(eoi, sizeof(eoi), PT_CAM_BASE + frame->id);
 	} else if (strcmp(frame->output_filepath, "stream.mjpeg") == 0) {
 		if (lg_debug_dump) {
 			if (data[0] == 0xFF && data[1] == 0xD8) { //

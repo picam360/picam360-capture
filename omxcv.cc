@@ -43,6 +43,26 @@ using std::chrono::duration_cast;
 //#endif
 //}
 
+void OmxCvImpl::my_fill_buffer_done(void* data, COMPONENT_T* comp) {
+	OmxCvImpl *_this = (OmxCvImpl*) data;
+	OMX_BUFFERHEADERTYPE *output_buffer = ilclient_get_output_buffer(comp,
+	OMX_ENCODE_PORT_OUT, 0);
+
+	//printf("omxcv done!\n");
+
+	if (output_buffer->nFilledLen == 0) {
+		return;
+	} else {
+		// Do something with outBuf
+		_this->write_data(output_buffer, 0);
+		output_buffer->nFilledLen = 0;
+	}
+	OMX_ERRORTYPE r = OMX_FillThisBuffer(ILC_GET_HANDLE(comp), output_buffer);
+	if (r != OMX_ErrorNone) {
+		printf("Error filling buffer\n");
+	}
+}
+
 /**
  * Constructor.
  * @param [in] name The file to save to.
@@ -64,11 +84,11 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	std::transform(extention.cbegin(), extention.cend(), extention.begin(),
 			tolower);
 	if (extention == "jpeg" || extention == "jpg") {
-		mcodec_type = JPEG;
+		m_codec_type = JPEG;
 	} else if (extention == "mjpeg" || extention == "mjpg") {
-		mcodec_type = MJPEG;
+		m_codec_type = MJPEG;
 	} else {
-		mcodec_type = H264;
+		m_codec_type = H264;
 	}
 
 	if (fpsden <= 0 || fpsnum <= 0) {
@@ -82,6 +102,9 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	CHECKED(OMX_Init() != OMX_ErrorNone, "OMX_Init failed.");
 	m_ilclient = ilclient_init();
 	CHECKED(m_ilclient == NULL, "ILClient initialisation failed.");
+
+	ilclient_set_fill_buffer_done_callback(m_ilclient, my_fill_buffer_done,
+			(void*) this);
 
 	ret = ilclient_create_component(m_ilclient, &m_encoder_component,
 			(char*) "video_encode",
@@ -102,7 +125,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	def.format.video.nFrameWidth = m_width;
 	def.format.video.nFrameHeight = m_height;
-	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+	if (m_codec_type == JPEG || m_codec_type == MJPEG) {
 		def.format.video.xFramerate = 10 << 16;
 	} else {
 		def.format.video.xFramerate = 30 << 16;
@@ -127,7 +150,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
 	format.nVersion.nVersion = OMX_VERSION;
 	format.nPortIndex = OMX_ENCODE_PORT_OUT;
-	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+	if (m_codec_type == JPEG || m_codec_type == MJPEG) {
 		format.eCompressionFormat = OMX_VIDEO_CodingMJPEG;
 	} else {
 		format.eCompressionFormat = OMX_VIDEO_CodingAVC;
@@ -143,7 +166,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
 	bitrate_type.nVersion.nVersion = OMX_VERSION;
 	bitrate_type.eControlRate = OMX_Video_ControlRateVariable;
-	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+	if (m_codec_type == JPEG || m_codec_type == MJPEG) {
 		bitrate_type.nTargetBitrate = 8 * 1000 * 1000;
 	} else {
 		bitrate_type.nTargetBitrate = bitrate * 1000;
@@ -167,26 +190,25 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 		CHECKED(ret != 0,
 				"OMX_SetParameter failed for setting avc profile & level.");
 
-		//I think this decreases the chance of NALUs being split across buffers.
-		/*
-		 OMX_CONFIG_BOOLEANTYPE frg = {};
-		 frg.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
-		 frg.nVersion.nVersion = OMX_VERSION;
-		 frg.bEnabled = OMX_TRUE;
-		 ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
-		 OMX_IndexConfigMinimiseFragmentation, &frg);
-		 CHECKED(ret != 0, "OMX_SetParameter failed for setting fragmentation minimisation.");
-		 */
+//		//I think this decreases the chance of NALUs being split across buffers.
+//		OMX_CONFIG_BOOLEANTYPE frg = { };
+//		frg.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
+//		frg.nVersion.nVersion = OMX_VERSION;
+//		frg.bEnabled = OMX_TRUE;
+//		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+//				OMX_IndexConfigMinimiseFragmentation, &frg);
+//		CHECKED(ret != 0,
+//				"OMX_SetParameter failed for setting fragmentation minimisation.");
 
-		//We want at most one NAL per output buffer that we receive.
-		OMX_CONFIG_BOOLEANTYPE nal = { };
-		nal.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
-		nal.nVersion.nVersion = OMX_VERSION;
-		nal.bEnabled = OMX_TRUE;
-		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
-				OMX_IndexParamBrcmNALSSeparate, &nal);
-		CHECKED(ret != 0,
-				"OMX_SetParameter failed for setting separate NALUs.");
+//		//We want at most one NAL per output buffer that we receive.
+//		OMX_CONFIG_BOOLEANTYPE nal = { };
+//		nal.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
+//		nal.nVersion.nVersion = OMX_VERSION;
+//		nal.bEnabled = OMX_TRUE;
+//		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+//				OMX_IndexParamBrcmNALSSeparate, &nal);
+//		CHECKED(ret != 0,
+//				"OMX_SetParameter failed for setting separate NALUs.");
 
 		//We want the encoder to write the NALU length instead start codes.
 		OMX_NALSTREAMFORMATTYPE nal2 = { };
@@ -237,7 +259,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 			OMX_StateExecuting);
 	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
 
-	if (m_callback || mcodec_type == JPEG) {
+	if (m_callback || m_codec_type == JPEG) {
 	} else {
 		m_ofstream.open(m_filename, std::ios::out);
 	}
@@ -253,6 +275,9 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	data_len_total = 0;
 	marker = 0;
 	soicount = 0;
+
+	output_buffer->nFilledLen = 0;
+	OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), output_buffer);
 }
 
 /**
@@ -309,21 +334,16 @@ void OmxCvImpl::input_worker() {
 //static int framecounter = 0;
 
 		OMX_EmptyThisBuffer(ILC_GET_HANDLE(m_encoder_component), frame.first);
-//fflush(stdout);
-//printf("Encoding time (ms): %d [%d]\r", (int)TIMEDIFF(conv_start), ++framecounter);
-		do {
-			output_buffer->nFilledLen = 0; //I don't think this is necessary, but whatever.
+
+		if (m_codec_type == JPEG || m_codec_type == MJPEG) {
+			output_buffer->nFilledLen = 0;
 			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component),
 					output_buffer);
-		} while (!write_data(output_buffer, frame.second));
+		}
 
 		lock.lock();
 //printf("Total processing time (ms): %d\n", (int)TIMEDIFF(proc_start));
 	}
-
-	//Needed because we call ilclient_get_output_buffer last.
-	//Otherwise ilclient waits forever for the buffer to be filled.
-	OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), output_buffer);
 }
 
 /**
@@ -339,7 +359,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 			unsigned char *buff = out->pBuffer;
 			int data_len = out->nFilledLen;
 			m_callback(out->pBuffer, data_len, m_user_data);
-		} else if (mcodec_type == JPEG) {
+		} else if (m_codec_type == JPEG) {
 			unsigned char *buff = out->pBuffer;
 			int data_len = out->nFilledLen;
 			for (int i = 0; i < data_len; i++) {
