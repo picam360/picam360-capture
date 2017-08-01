@@ -91,6 +91,8 @@ typedef struct _FRAME_T {
 	char output_filepath[256];
 	bool double_size;
 
+	float fps;
+	struct timeval last_updated;
 	float fov;
 	//for unif matrix
 	MPU_T *view_mpu;

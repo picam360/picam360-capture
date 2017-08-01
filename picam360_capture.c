@@ -635,7 +635,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S:f:")) != -1) {
 		switch (opt) {
 		case 'W':
 			sscanf(optarg, "%d", &render_width);
@@ -675,6 +675,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 				strncpy(frame->output_filepath, "stream.mjpeg",
 						sizeof(frame->output_filepath));
 			}
+			break;
+		case 'f':
+			sscanf(optarg, "%f", &frame->fps);
 			break;
 		default:
 			break;
@@ -771,6 +774,17 @@ void frame_handler() {
 	while (*frame_pp) {
 		FRAME_T *frame = *frame_pp;
 		gettimeofday(&s, NULL);
+
+		if (frame->fps > 0) {
+			struct timeval diff;
+			timersub(&s, &frame->last_updated, &diff);
+			float diff_sec = (float) diff.tv_sec
+					+ (float) diff.tv_usec / 1000000;
+			if (diff_sec < 1.0 / frame->fps) {
+				frame_pp = &frame->next;
+				continue;
+			}
+		}
 
 		//start & stop recording
 		if (frame->is_recording && frame->output_mode == OUTPUT_MODE_NONE) { //stop record
@@ -902,6 +916,7 @@ void frame_handler() {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
 			eglSwapBuffers(state->display, state->surface);
 		}
+		frame->last_updated = s;
 	}
 	if (snap_finished) {
 		state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
@@ -932,7 +947,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			const int kMaxArgs = 10;
+			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
 			char *p2 = strtok(param, " ");
@@ -952,7 +967,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			const int kMaxArgs = 10;
+			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
 			char *p2 = strtok(param, " ");
@@ -997,7 +1012,7 @@ int _command_handler(const char *_buff) {
 			char param[256];
 			strncpy(param, "-W 256 -H 256 -F", 256);
 
-			const int kMaxArgs = 10;
+			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
 			char *p2 = strtok(param, " ");
@@ -2646,7 +2661,7 @@ int main(int argc, char *argv[]) {
 	//frame id=0
 	if (frame_param[0]) {
 		char *param = frame_param;
-		const int kMaxArgs = 10;
+		const int kMaxArgs = 32;
 		int argc = 1;
 		char *argv[kMaxArgs];
 		char *p2 = strtok(param, " ");
