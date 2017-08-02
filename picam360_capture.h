@@ -97,6 +97,7 @@ typedef struct _FRAME_T {
 	char output_filepath[256];
 	bool double_size;
 
+	float kbps;
 	float fps;
 	struct timeval last_updated;
 	float fov;

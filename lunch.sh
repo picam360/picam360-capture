@@ -23,10 +23,12 @@ FPS=30
 CODEC=H264
 STREAM=
 AUTO_CALIBRATION=
-VIEW_COODINATE=MANUAL
+VIEW_COODINATE=manual
 DEBUG=false
+KBPS=
+FRAME0_PARAM=
 
-while getopts ac:n:w:h:W:H:psCEFf:rDS:v:g OPT
+while getopts ac:n:w:h:psf:rDv:g0: OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
@@ -39,19 +41,9 @@ do
             ;;
         h)  CAM_HEIGHT=$OPTARG
             ;;
-        W)  RENDER_WIDTH=$OPTARG
-            ;;
-        H)  RENDER_HEIGHT=$OPTARG
-            ;;
         p)  PREVIEW="-p"
             ;;
         s)  STEREO="-s"
-            ;;
-        C)  MODE="-C"
-            ;;
-        E)  MODE="-E"
-            ;;
-        F)  MODE="-F"
             ;;
         f)  FPS=$OPTARG
             ;;
@@ -59,11 +51,11 @@ do
             ;;
         D)  DIRECT="-D"
             ;;
-        S)  STREAM="-S $OPTARG"
-            ;;
         v)  VIEW_COODINATE=$OPTARG
             ;;
         g)  DEBUG=true
+            ;;
+        0)  FRAME0_PARAM=$OPTARG
             ;;
         \?) usage_exit
             ;;
@@ -120,11 +112,11 @@ if [ $REMOTE = true ]; then
 
 	sudo killall socat
 	socat -u udp-recv:9002 - > rtp_rx &
-	socat PIPE:rtcp_tx UDP-DATAGRAM:192.168.4.1:9003 &    
+	socat PIPE:rtcp_tx UDP-DATAGRAM:192.168.4.1:9003 &
     socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9004 &
     socat -u udp-recv:9005 - > rtcp_rx &
-	
-	
+
+
 #	socat tcp-listen:9002 PIPE:rtp_rx &
 #	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
@@ -143,11 +135,11 @@ sudo killall picam360-capture.bin
 if [ $DEBUG = "true" ]; then
 
 echo b main > gdbcmd
-echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM -v $VIEW_COODINATE -f 10\" >> gdbcmd
+echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"$FRAME0_PARAM\" >> gdbcmd
 gdb ./picam360-capture.bin -x gdbcmd
 
 else
 
-./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "-W $RENDER_WIDTH -H $RENDER_HEIGHT $MODE $STREAM -v $VIEW_COODINATE -f 10"
+./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "$FRAME0_PARAM"
 
 fi

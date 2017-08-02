@@ -635,12 +635,12 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psW:H:ECFDo:i:r:v:S:f:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:ECFo:s:v:f:k:")) != -1) {
 		switch (opt) {
-		case 'W':
+		case 'w':
 			sscanf(optarg, "%d", &render_width);
 			break;
-		case 'H':
+		case 'h':
 			sscanf(optarg, "%d", &render_height);
 			break;
 		case 'E':
@@ -665,10 +665,10 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 				}
 			}
 			break;
-		case 'S':
+		case 's':
 			frame->output_mode = OUTPUT_MODE_STREAM;
 			//h264 or mjpeg
-			if (strcmp(optarg, "h264") == 0) {
+			if (strcasecmp(optarg, "h264") == 0) {
 				strncpy(frame->output_filepath, "stream.h264",
 						sizeof(frame->output_filepath));
 			} else {
@@ -678,6 +678,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			break;
 		case 'f':
 			sscanf(optarg, "%f", &frame->fps);
+			break;
+		case 'k':
+			sscanf(optarg, "%f", &frame->kbps);
 			break;
 		default:
 			break;
@@ -801,8 +804,10 @@ void frame_handler() {
 		}
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
+			float fps = MAX(frame->fps, 1);
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio, NULL, NULL);
+					frame->output_filepath, 4000 * ratio, fps, NULL,
+					NULL);
 			frame->output_mode = OUTPUT_MODE_VIDEO;
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
@@ -811,14 +816,31 @@ void frame_handler() {
 		}
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_STREAM) {
 			int ratio = frame->double_size ? 2 : 1;
+			float fps = MAX(frame->fps, 1);
+			float kbps = frame->kbps;
+			if (kbps == 0) {
+				float ave_sq = sqrt(
+						(float) frame->width * (float) frame->height) / 1.2;
+				if (ave_sq <= 240) {
+					kbps = 200;
+				} else if (ave_sq <= 320) {
+					kbps = 400;
+				} else if (ave_sq <= 480) {
+					kbps = 800;
+				} else if (ave_sq <= 640) {
+					kbps = 1600;
+				} else if (ave_sq <= 960) {
+					kbps = 3200;
+				}
+			}
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio, stream_callback,
+					frame->output_filepath, kbps * ratio, fps, stream_callback,
 					frame);
 			frame->output_mode = OUTPUT_MODE_STREAM;
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
-			printf("start_record saved to %s\n", frame->output_filepath);
+			printf("start_record saved to %s : %d kbps\n", frame->output_filepath, (int)kbps);
 		}
 
 		//rendering to buffer
@@ -2605,7 +2627,7 @@ int main(int argc, char *argv[]) {
 	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'c':
-			if (strcmp(optarg, "MJPEG") == 0) {
+			if (strcasecmp(optarg, "mjpeg") == 0) {
 				state->codec_type = MJPEG;
 			}
 			break;
