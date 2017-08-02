@@ -80,7 +80,6 @@ static void convert_snap_handler();
 
 static volatile int terminate;
 static PICAM360CAPTURE_T _state, *state = &_state;
-static float lg_fps = 0;
 
 static float lg_cam_fps[MAX_CAM_NUM] = { };
 static float lg_cam_frameskip[MAX_CAM_NUM] = { };
@@ -806,8 +805,7 @@ void frame_handler() {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio, fps, NULL,
-					NULL);
+					frame->output_filepath, 4000 * ratio, fps, NULL, NULL);
 			frame->output_mode = OUTPUT_MODE_VIDEO;
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
@@ -840,7 +838,8 @@ void frame_handler() {
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
-			printf("start_record saved to %s : %d kbps\n", frame->output_filepath, (int)kbps);
+			printf("start_record saved to %s : %d kbps\n",
+					frame->output_filepath, (int) kbps);
 		}
 
 		//rendering to buffer
@@ -2779,9 +2778,10 @@ int main(int argc, char *argv[]) {
 		struct timeval diff;
 		timersub(&time, &last_time, &diff);
 		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-		float frame_sec = (((lg_fps != 0) ? 1.0 / lg_fps : 0) * 0.9
-				+ diff_sec * 0.1);
-		lg_fps = (frame_sec != 0) ? 1.0 / frame_sec : 0;
+		if (diff_sec < 0.010) { //10msec
+			int delay = 10 - (int) (diff_sec * 1000);
+			usleep(delay);
+		}
 		last_time = time;
 	}
 	exit_func();
@@ -3052,9 +3052,8 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		VECTOR4D_T quat = state->plugin_host.get_view_quaternion();
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
 		len += swprintf(disp + len, MAX_INFO_SIZE - len,
-				L"View   : Tmp %.1f degC, N %.1f, fps %.1f",
-				state->plugin_host.get_view_temperature(), north * 180 / M_PI,
-				lg_fps);
+				L"View   : Tmp %.1f degC, N %.1f",
+				state->plugin_host.get_view_temperature(), north * 180 / M_PI);
 	}
 	{ //Vehicle
 		float north;
