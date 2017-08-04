@@ -113,8 +113,8 @@ if [ $REMOTE = true ]; then
 	sudo killall socat
 	socat -u udp-recv:9002 - > rtp_rx &
 	socat PIPE:rtcp_tx UDP-DATAGRAM:192.168.4.1:9003 &
-    socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9004 &
-    socat -u udp-recv:9005 - > rtcp_rx &
+	socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9004 &
+	socat -u udp-recv:9005 - > rtcp_rx &
 
 
 #	socat tcp-listen:9002 PIPE:rtp_rx &

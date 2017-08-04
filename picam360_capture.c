@@ -1294,13 +1294,15 @@ int command_handler() {
 
 		if (buff) {
 			bool handled = false;
-			for (int i = 0; state->plugins[i] != NULL; i++) {
-				int name_len = strlen(state->plugins[i]->name);
-				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-						&& buff[name_len] == '.') {
-					ret = state->plugins[i]->command_handler(
-							state->plugins[i]->user_data, buff);
-					handled = true;
+			if (state->plugins) {
+				for (int i = 0; state->plugins[i] != NULL; i++) {
+					int name_len = strlen(state->plugins[i]->name);
+					if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+							&& buff[name_len] == '.') {
+						ret = state->plugins[i]->command_handler(
+								state->plugins[i]->user_data, buff);
+						handled = true;
+					}
 				}
 			}
 			if (!handled) {
@@ -1533,10 +1535,12 @@ static void event_handler(uint32_t node_id, uint32_t event_id) {
 
 static void send_event(uint32_t node_id, uint32_t event_id) {
 	event_handler(node_id, event_id);
-	for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
-		if (state->plugins[i]) {
-			state->plugins[i]->event_handler(state->plugins[i]->user_data,
-					node_id, event_id);
+	if (state->plugins) {
+		for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]) {
+				state->plugins[i]->event_handler(state->plugins[i]->user_data,
+						node_id, event_id);
+			}
 		}
 	}
 }
@@ -3085,13 +3089,15 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 						lg_cam_fps[1], lg_cam_frameskip[0],
 						lg_cam_frameskip[1]);
 	}
-	for (int i = 0; state->plugins[i] != NULL; i++) {
-		if (state->plugins[i]->get_info) {
-			wchar_t *info = state->plugins[i]->get_info(
-					state->plugins[i]->user_data);
-			if (info) {
-				len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls",
-						info);
+	if (state->plugins) {
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]->get_info) {
+				wchar_t *info = state->plugins[i]->get_info(
+						state->plugins[i]->user_data);
+				if (info) {
+					len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls",
+							info);
+				}
 			}
 		}
 	}
