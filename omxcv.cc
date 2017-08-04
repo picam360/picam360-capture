@@ -47,12 +47,6 @@ void OmxCvImpl::my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	OmxCvImpl *_this = (OmxCvImpl*) data;
 	OMX_BUFFERHEADERTYPE *output_buffer = _this->output_buffer;
 
-	if (_this->m_codec_type == MJPEG) {
-		output_buffer = _this->output_buffer;
-	} else {
-		output_buffer = ilclient_get_output_buffer(comp,
-		OMX_ENCODE_PORT_OUT, 1);
-	}
 	//printf("omxcv done!\n");
 
 	if (output_buffer->nFilledLen == 0) {
@@ -169,11 +163,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
 	bitrate_type.nVersion.nVersion = OMX_VERSION;
 	bitrate_type.eControlRate = OMX_Video_ControlRateConstantSkipFrames;
-	if (m_codec_type == JPEG || m_codec_type == MJPEG) {
-		bitrate_type.nTargetBitrate = 8 * 1000 * 1000;
-	} else {
-		bitrate_type.nTargetBitrate = bitrate * 1000;
-	}
+	bitrate_type.nTargetBitrate = bitrate * 1000;
 	bitrate_type.nPortIndex = OMX_ENCODE_PORT_OUT;
 	ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
 			OMX_IndexParamVideoBitrate, &bitrate_type);
@@ -253,23 +243,16 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 			NULL, NULL, NULL);
 	CHECKED(ret != 0, "ILClient failed to enable input buffers.");
 
-	if (m_codec_type == MJPEG) {
-		OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component),
-				OMX_CommandPortEnable,
-				OMX_ENCODE_PORT_OUT, NULL);
-		ilclient_wait_for_event(m_encoder_component, OMX_EventCmdComplete,
-				OMX_CommandPortEnable, 1,
-				OMX_ENCODE_PORT_OUT, 1, 0, 1000);
+	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
+	OMX_ENCODE_PORT_OUT, NULL);
+	ilclient_wait_for_event(m_encoder_component, OMX_EventCmdComplete,
+			OMX_CommandPortEnable, 1,
+			OMX_ENCODE_PORT_OUT, 1, 0, 1000);
 
-		ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component),
-				&output_buffer,
-				OMX_ENCODE_PORT_OUT, NULL, 1024 * 1024);
-		CHECKED(ret != 0, "OMX_AllocateBuffer output");
-	} else {
-		ret = ilclient_enable_port_buffers(m_encoder_component,
-		OMX_ENCODE_PORT_OUT, NULL, NULL, NULL);
-		CHECKED(ret != 0, "ILClient failed to enable output buffers.");
-	}
+	ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component),
+			&output_buffer,
+			OMX_ENCODE_PORT_OUT, NULL, 1024 * 1024);
+	CHECKED(ret != 0, "OMX_AllocateBuffer output");
 
 	ret = ilclient_change_component_state(m_encoder_component,
 			OMX_StateExecuting);
@@ -347,11 +330,6 @@ void OmxCvImpl::input_worker() {
 				== 0) {
 			printf("port changed encode\n");
 
-			if (m_codec_type == MJPEG) {
-			} else {
-				output_buffer = ilclient_get_output_buffer(m_encoder_component,
-				OMX_ENCODE_PORT_OUT, 1);
-			}
 			output_buffer->nFilledLen = 0;
 			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component),
 					output_buffer);

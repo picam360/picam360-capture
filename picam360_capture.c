@@ -819,16 +819,34 @@ void frame_handler() {
 			if (kbps == 0) {
 				float ave_sq = sqrt(
 						(float) frame->width * (float) frame->height) / 1.2;
-				if (ave_sq <= 240) {
-					kbps = 200;
-				} else if (ave_sq <= 320) {
-					kbps = 400;
-				} else if (ave_sq <= 480) {
-					kbps = 800;
-				} else if (ave_sq <= 640) {
-					kbps = 1600;
-				} else if (ave_sq <= 960) {
-					kbps = 3200;
+				if (strcmp(frame->output_filepath, "stream.h264") == 0) {
+					if (ave_sq <= 240) {
+						kbps = 200;
+					} else if (ave_sq <= 320) {
+						kbps = 400;
+					} else if (ave_sq <= 480) {
+						kbps = 800;
+					} else if (ave_sq <= 640) {
+						kbps = 1600;
+					} else if (ave_sq <= 960) {
+						kbps = 3200;
+					} else {
+						kbps = 6400;
+					}
+				} else {
+					if (ave_sq <= 240) {
+						kbps = 800;
+					} else if (ave_sq <= 320) {
+						kbps = 1600;
+					} else if (ave_sq <= 480) {
+						kbps = 3200;
+					} else if (ave_sq <= 640) {
+						kbps = 6400;
+					} else if (ave_sq <= 960) {
+						kbps = 12800;
+					} else {
+						kbps = 25600;
+					}
 				}
 			}
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
