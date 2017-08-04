@@ -104,6 +104,7 @@ private:
 	int marker;
 	int soicount;
 	bool first_packet;
+	OMX_BUFFERHEADERTYPE *output_buffer;
 
 	void input_worker();
 	bool write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp);
