@@ -16,7 +16,7 @@ varying float u1;
 varying float v1;
 
 void main(void) {
-	if (r0 < 0.65) {
+	if (r0 < 0.7) {
 		if (u0 <= 0.0 || u0 > 1.0 || v0 <= 0.0 || v0 > 1.0) {
 			gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 		} else {

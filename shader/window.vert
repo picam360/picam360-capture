@@ -43,10 +43,7 @@ void main(void) {
 	
 		r0 = (M_PI / 2.0 - pitch) / M_PI;
 		float r2 = r0;
-		//r2 = sin(M_PI*180.0/240.0*r2)/2.0;
-		if (r2 >= 0.40) {
-			r2 = pow(r2 - 0.4, 1.09) + 0.4;
-		}
+		r2 = sin(M_PI*180.0/270.0*r2)/2.0;
 		float yaw2 = yaw + M_PI + cam0_offset_yaw;
 		u0 = cam0_horizon_r / cam_aspect_ratio * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
 		v0 = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y;
@@ -58,9 +55,7 @@ void main(void) {
 		r1 = (M_PI / 2.0 - pitch) / M_PI;
 	
 		float r2 = 1.0 - r1;
-		if (r2 >= 0.40) {
-			r2 = pow(r2 - 0.4, 1.09) + 0.4;
-		}
+		r2 = sin(M_PI*180.0/270.0*r2)/2.0;
 		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
 		u1 = cam1_horizon_r * r2 / cam_aspect_ratio * cos(yaw2) + 0.5 + cam1_offset_x;
 		v1 = cam1_horizon_r * r2 * sin(yaw2) + 0.5 + cam1_offset_y;
