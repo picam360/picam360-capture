@@ -13,7 +13,7 @@
  * @param {vec3} axis the axis to rotate around
  * @returns {mat4} out
  */
-mat4 mat4_rotate(mat4 out, mat4 a, float rad, float axis[3]) {
+static mat4 mat4_rotate(mat4 out, mat4 a, float rad, float axis[3]) {
     float x = axis[0], y = axis[1], z = axis[2],
         len = sqrt(x * x + y * y + z * z),
         s, c, t,

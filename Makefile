@@ -1,6 +1,8 @@
-OBJS=picam360_capture.o mrevent.o video.o video_mjpeg.o video_direct.o gl_program.o device.o omxcv_jpeg.o omxcv.o picam360_tools.o MotionSensor/libMotionSensor.a libs/libI2Cdev.a
+OBJS=picam360_capture.o mrevent.o quaternion.o video.o mjpeg_decoder.o video_direct.o gl_program.o auto_calibration.o \
+	omxcv_jpeg.o omxcv.o manual_mpu.o picam360_tools.o menu.o rtp.o rtcp.o \
+	libs/freetypeGlesRpi/libFreetypeGlesRpi.a
+PLUGINS=plugins/oculus_rift_dk2 plugins/mpu9250 plugins/kokuyoseki plugins/rov_agent
 BIN=picam360-capture.bin
-LDFLAGS+=-lilclient -ljansson
 
 include Makefile.include
 

@@ -1,0 +1,37 @@
+CC=gcc
+CXX=g++
+
+CFLAGS+=-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POSIX -D_LINUX -D_GNU_SOURCE \
+		-fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -U_FORTIFY_SOURCE \
+		-Wall -g -ftree-vectorize -pipe -Wno-psabi
+
+INCLUDES+=-I$(SDK_PATH)include
+
+all: $(BIN) $(LIB)
+
+MotionSensor/libMotionSensor.a:
+	$(MAKE) -C MotionSensor
+
+libI2Cdev.a:
+	$(MAKE) -C I2Cdev
+	
+%.o: %.c
+	@rm -f $@ 
+	$(CC) -std=gnu11 $(CFLAGS) $(INCLUDES) -g -c $< -o $@ -Wno-deprecated-declarations
+
+%.o: %.cc
+	@rm -f $@ 
+	$(CXX) -std=c++11 $(CFLAGS) $(INCLUDES) -g -c $< -o $@ -Wno-deprecated-declarations
+
+%.so: $(OBJS)
+	$(CC) -shared -o $@ $(OBJS)
+
+%.a: $(OBJS)
+	$(AR) r $@ $^
+
+clean:
+	for i in $(OBJS); do (if test -e "$$i"; then ( rm $$i ); fi ); done
+	@rm -f $(BIN) $(LIB)
+
+.PRECIOUS: $(OBJS)
+

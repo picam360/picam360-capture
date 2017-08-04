@@ -1,0 +1,28 @@
+{
+    "cam0_offset_pitch": 0.0,
+    "cam1_offset_y": -0.029999999329447746,
+    "mpu9250.compass_min_0": -1124.0,
+    "sharpness_gain": 0.0,
+    "cam1_horizon_r": 0.83999902009963989,
+    "cam0_offset_yaw": 0.0,
+    "mpu9250.offset_pitch": 0.0,
+    "mpu9250.offset_roll": 0.0,
+    "cam0_offset_roll": 0.0,
+    "cam1_offset_roll": 0.0,
+    "cam0_offset_y": -0.02500000037252903,
+    "mpu9250.compass_max_1": 314.0,
+    "cam0_offset_x": 0.0,
+    "mpu9250.compass_max_2": 211.0,
+    "cam0_horizon_r": 0.83999800682067871,
+    "cam1_offset_x": 0.0,
+    "cam1_offset_pitch": -0.0015625059604644775,
+    "cam1_offset_yaw": 0.0,
+    "plugin_paths": [
+        "plugins/mpu9250.so"
+    ],
+    "mpu9250.offset_yaw": 0.0,
+    "mpu9250.i2c_ch": 1.0,
+    "mpu9250.compass_max_0": -550.0,
+    "mpu9250.compass_min_1": -98.0,
+    "mpu9250.compass_min_2": -199.0
+}

@@ -11,7 +11,7 @@
  * @param {mat4} a the source matrix
  * @returns {mat4} out
  */
-mat4 mat4_transpose(mat4 out, mat4 a) {
+static mat4 mat4_transpose(mat4 out, mat4 a) {
     // If we are transposing ourselves we can skip a few steps but have to cache some values
     if (out == a) {
         float a01 = a[1], a02 = a[2], a03 = a[3],

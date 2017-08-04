@@ -11,7 +11,7 @@
  * @param {quat4} q Rotation quaternion
  * @returns {mat4} out
  */
-mat4 mat4_fromQuat(mat4 out, float q[4]) {
+static mat4 mat4_fromQuat(mat4 out, float q[4]) {
     float x = q[0], y = q[1], z = q[2], w = q[3],
         x2 = x + x,
         y2 = y + y,

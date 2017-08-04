@@ -16,7 +16,7 @@
  * @param {number} far Far bound of the frustum
  * @returns {mat4} out
  */
-mat4 mat4_ortho(mat4 out, float left, float right, float bottom, float top, float near, float far) {
+static mat4 mat4_ortho(mat4 out, float left, float right, float bottom, float top, float near, float far) {
     float lr = 1 / (left - right),
         bt = 1 / (bottom - top),
         nf = 1 / (near - far);

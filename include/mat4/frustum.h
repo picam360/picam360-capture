@@ -16,7 +16,7 @@
  * @param {Number} far Far bound of the frustum
  * @returns {mat4} out
  */
-mat4 mat4_frustum(mat4 out, float left, float right, float bottom, float top, float near, float far) {
+static mat4 mat4_frustum(mat4 out, float left, float right, float bottom, float top, float near, float far) {
     float rl = 1 / (right - left),
         tb = 1 / (top - bottom),
         nf = 1 / (near - far);

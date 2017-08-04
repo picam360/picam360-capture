@@ -13,7 +13,7 @@ uniform float cam_horizon_r;
 void main(void) {
 	vec4 fc;
 	float u = tcoord.x + cam_offset_x;
-	float v = tcoord.y - cam_offset_y;
+	float v = tcoord.y + cam_offset_y;
 	if (sharpness_gain == 0.0) {
 		fc = texture2D(cam_texture, vec2(u, v));
 	} else {

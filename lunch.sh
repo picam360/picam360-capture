@@ -9,8 +9,8 @@ usage_exit() {
 }
 
 CAM_NUM=1
-CAM_WIDTH=1024
-CAM_HEIGHT=1024
+CAM_WIDTH=2048
+CAM_HEIGHT=2048
 BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
@@ -21,12 +21,18 @@ MODE=
 DIRECT=
 FPS=30
 CODEC=H264
-STREAM=false
-STREAM_PARAM=
+STREAM=
+AUTO_CALIBRATION=
+VIEW_COODINATE=manual
+DEBUG=false
+KBPS=
+FRAME0_PARAM=
 
-while getopts c:n:w:h:W:H:psCEFf:rDS OPT
+while getopts ac:n:w:h:psf:rDv:g0: OPT
 do
     case $OPT in
+        a)  AUTO_CALIBRATION="-a"
+            ;;
         c)  CODEC=$OPTARG
             ;;
         n)  CAM_NUM=$OPTARG
@@ -35,19 +41,9 @@ do
             ;;
         h)  CAM_HEIGHT=$OPTARG
             ;;
-        W)  RENDER_WIDTH=$OPTARG
-            ;;
-        H)  RENDER_HEIGHT=$OPTARG
-            ;;
         p)  PREVIEW="-p"
             ;;
         s)  STEREO="-s"
-            ;;
-        C)  MODE="-C"
-            ;;
-        E)  MODE="-E"
-            ;;
-        F)  MODE="-F"
             ;;
         f)  FPS=$OPTARG
             ;;
@@ -55,25 +51,22 @@ do
             ;;
         D)  DIRECT="-D"
             ;;
-        S)  STREAM=true
+        v)  VIEW_COODINATE=$OPTARG
+            ;;
+        g)  DEBUG=true
+            ;;
+        0)  FRAME0_PARAM=$OPTARG
             ;;
         \?) usage_exit
             ;;
     esac
 done
 
-if [ $STREAM = true ]; then
-	if [ -e /tmp/stream ]; then
-		rm /tmp/stream
-	fi
-	mkdir /tmp/stream
-	chmod 0777 /tmp/stream
-	export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-	sudo killall mjpg_streamer 
-	mjpg_streamer -i "input_file.so -f /tmp/stream" &
-	STREAM_PARAM="-o /tmp/stream/steam.jpeg"
+if [ -e status ]; then
+	rm status
 fi
-
+mkfifo status
+chmod 0666 status
 
 if [ -e cam0 ]; then
 	rm cam0
@@ -87,9 +80,47 @@ fi
 mkfifo cam1
 chmod 0666 cam1
 
+if [ -e rtp_rx ]; then
+	rm rtp_rx
+fi
+mkfifo rtp_rx
+chmod 0666 rtp_rx
+
+if [ -e rtp_tx ]; then
+	rm rtp_tx
+fi
+mkfifo rtp_tx
+chmod 0666 rtp_tx
+
+if [ -e rtcp_rx ]; then
+	rm rtcp_rx
+fi
+mkfifo rtcp_rx
+chmod 0666 rtcp_rx
+
+if [ -e rtcp_tx ]; then
+	rm rtcp_tx
+fi
+mkfifo rtcp_tx
+chmod 0666 rtcp_tx
+
 if [ $REMOTE = true ]; then
-	socat -u udp-recv:9000 - > cam0 & socat -u udp-recv:9001 - > cam1 &
+
+#use tcp
+#	sudo killall nc
+#   nc 192.168.4.1 9006 < rtp_tx > rtp_rx &
+
+	sudo killall socat
+	socat -u udp-recv:9002 - > rtp_rx &
+	socat PIPE:rtcp_tx UDP-DATAGRAM:192.168.4.1:9003 &
+    socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9004 &
+    socat -u udp-recv:9005 - > rtcp_rx &
+
+
+#	socat tcp-listen:9002 PIPE:rtp_rx &
+#	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
+	sudo killall raspivid
 	if [ $CODEC = "MJPEG" ]; then
 #		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -b $BITRATE -fps $FPS -o - > cam0 &
 		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -b $BITRATE -fps $FPS -o - > cam0 &
@@ -98,4 +129,17 @@ elif [ $DIRECT = ]; then
 	fi
 fi
 
-./picam360-capture.bin -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT -W $RENDER_WIDTH -H $RENDER_HEIGHT $DIRECT $MODE $STEREO $STREAM_PARAM $PREVIEW
+#picam360-capture
+
+sudo killall picam360-capture.bin
+if [ $DEBUG = "true" ]; then
+
+echo b main > gdbcmd
+echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"$FRAME0_PARAM\" >> gdbcmd
+gdb ./picam360-capture.bin -x gdbcmd
+
+else
+
+./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "$FRAME0_PARAM"
+
+fi

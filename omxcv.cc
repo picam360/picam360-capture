@@ -43,6 +43,26 @@ using std::chrono::duration_cast;
 //#endif
 //}
 
+void OmxCvImpl::my_fill_buffer_done(void* data, COMPONENT_T* comp) {
+	OmxCvImpl *_this = (OmxCvImpl*) data;
+	OMX_BUFFERHEADERTYPE *output_buffer = _this->output_buffer;
+
+	//printf("omxcv done!\n");
+
+	if (output_buffer->nFilledLen == 0) {
+		printf("output_buffer->nFilledLen = 0\n");
+	} else {
+		// Do something with outBuf
+		_this->write_data(output_buffer, 0);
+		output_buffer->nFilledLen = 0;
+	}
+
+	OMX_ERRORTYPE r = OMX_FillThisBuffer(ILC_GET_HANDLE(comp), output_buffer);
+	if (r != OMX_ErrorNone) {
+		printf("Error filling buffer\n");
+	}
+}
+
 /**
  * Constructor.
  * @param [in] name The file to save to.
@@ -53,9 +73,10 @@ using std::chrono::duration_cast;
  * @param [in] fpsden The FPS denominator.
  */
 OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
-		int fpsnum, int fpsden) :
+		int fpsnum, int fpsden, OMXCV_CALLBACK callback, void *user_data) :
 		m_width(width), m_height(height), m_stride(((width + 31) & ~31) * 3), m_bitrate(
-				bitrate), m_filename(name), m_stop { false } {
+				bitrate), m_filename(name), m_stop { false }, m_callback(
+				callback), m_user_data(user_data) {
 	int ret;
 	bcm_host_init();
 
@@ -63,11 +84,11 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	std::transform(extention.cbegin(), extention.cend(), extention.begin(),
 			tolower);
 	if (extention == "jpeg" || extention == "jpg") {
-		mcodec_type = JPEG;
+		m_codec_type = JPEG;
 	} else if (extention == "mjpeg" || extention == "mjpg") {
-		mcodec_type = MJPEG;
+		m_codec_type = MJPEG;
 	} else {
-		mcodec_type = H264;
+		m_codec_type = H264;
 	}
 
 	if (fpsden <= 0 || fpsnum <= 0) {
@@ -81,6 +102,9 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	CHECKED(OMX_Init() != OMX_ErrorNone, "OMX_Init failed.");
 	m_ilclient = ilclient_init();
 	CHECKED(m_ilclient == NULL, "ILClient initialisation failed.");
+
+	ilclient_set_fill_buffer_done_callback(m_ilclient, my_fill_buffer_done,
+			(void*) this);
 
 	ret = ilclient_create_component(m_ilclient, &m_encoder_component,
 			(char*) "video_encode",
@@ -101,11 +125,8 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 
 	def.format.video.nFrameWidth = m_width;
 	def.format.video.nFrameHeight = m_height;
-	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
-		def.format.video.xFramerate = 10 << 16;
-	} else {
-		def.format.video.xFramerate = 30 << 16;
-	}
+	def.format.video.xFramerate = fpsnum << 16;
+
 	//Must be a multiple of 16
 	def.format.video.nSliceHeight = (m_height + 15) & ~15;
 	//Must be a multiple of 32
@@ -126,7 +147,7 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
 	format.nVersion.nVersion = OMX_VERSION;
 	format.nPortIndex = OMX_ENCODE_PORT_OUT;
-	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
+	if (m_codec_type == JPEG || m_codec_type == MJPEG) {
 		format.eCompressionFormat = OMX_VIDEO_CodingMJPEG;
 	} else {
 		format.eCompressionFormat = OMX_VIDEO_CodingAVC;
@@ -141,44 +162,50 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 	OMX_VIDEO_PARAM_BITRATETYPE bitrate_type = { };
 	bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
 	bitrate_type.nVersion.nVersion = OMX_VERSION;
-	bitrate_type.eControlRate = OMX_Video_ControlRateVariable;
-	if (mcodec_type == JPEG || mcodec_type == MJPEG) {
-		bitrate_type.nTargetBitrate = 8 * 1000 * 1000;
-	} else {
-		bitrate_type.nTargetBitrate = bitrate * 1000;
-	}
+	bitrate_type.eControlRate = OMX_Video_ControlRateConstantSkipFrames;
+	bitrate_type.nTargetBitrate = bitrate * 1000;
 	bitrate_type.nPortIndex = OMX_ENCODE_PORT_OUT;
 	ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
 			OMX_IndexParamVideoBitrate, &bitrate_type);
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for setting encoder bitrate.");
 
-//	if (format.eCompressionFormat == OMX_VIDEO_CodingAVC) {
-////		//Set the output profile level of the encoder
-////		OMX_VIDEO_PARAM_PROFILELEVELTYPE profileLevel; // OMX_IndexParamVideoProfileLevelCurrent
-////		profileLevel.nSize = sizeof(OMX_VIDEO_PARAM_PROFILELEVELTYPE);
-////		profileLevel.nVersion.nVersion = OMX_VERSION;
-////		profileLevel.nPortIndex = OMX_ENCODE_PORT_OUT;
-////		profileLevel.eProfile = OMX_VIDEO_AVCProfileMain;
-////		profileLevel.eLevel = OMX_VIDEO_AVCLevel31;
-////		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
-////				OMX_IndexParamVideoProfileLevelCurrent, &profileLevel);
-//
+	if (format.eCompressionFormat == OMX_VIDEO_CodingAVC) {
+		//Set the output profile level of the encoder
+		OMX_VIDEO_PARAM_PROFILELEVELTYPE profileLevel = { }; // OMX_IndexParamVideoProfileLevelCurrent
+		profileLevel.nSize = sizeof(OMX_VIDEO_PARAM_PROFILELEVELTYPE);
+		profileLevel.nVersion.nVersion = OMX_VERSION;
+		profileLevel.nPortIndex = OMX_ENCODE_PORT_OUT;
+		profileLevel.eProfile = OMX_VIDEO_AVCProfileBaseline;
+		if (m_width <= 352 && m_height <= 576 && fpsnum <= 25) {
+			profileLevel.eLevel = OMX_VIDEO_AVCLevel21;
+		} else if (m_width <= 720 && m_height <= 576 && fpsnum <= 15) {
+			profileLevel.eLevel = OMX_VIDEO_AVCLevel22;
+		} else if (m_width <= 1280 && m_height <= 720 && fpsnum <= 30) {
+			profileLevel.eLevel = OMX_VIDEO_AVCLevel31;
+		} else if (m_width <= 1920 && m_height <= 1088 && fpsnum <= 30) {
+			profileLevel.eLevel = OMX_VIDEO_AVCLevel4;
+		} else {
+			profileLevel.eLevel = OMX_VIDEO_AVCLevel42;
+		}
+
+		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+				OMX_IndexParamVideoProfileLevelCurrent, &profileLevel);
+		CHECKED(ret != 0,
+				"OMX_SetParameter failed for setting avc profile & level.");
+
 //		//I think this decreases the chance of NALUs being split across buffers.
-//		/*
-//		 OMX_CONFIG_BOOLEANTYPE frg = {0};
-//		 frg.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
-//		 frg.nVersion.nVersion = OMX_VERSION;
-//		 frg.bEnabled = OMX_TRUE;
-//		 ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
-//		 OMX_IndexConfigMinimiseFragmentation, &frg);
-//		 CHECKED(ret != 0, "OMX_SetParameter failed for setting fragmentation minimisation.");
-//		 */
-//
-//		CHECKED(ret != OMX_ErrorNone,
-//				"OMX_SetParameter failed for setting encoder output format.");
+//		OMX_CONFIG_BOOLEANTYPE frg = { };
+//		frg.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
+//		frg.nVersion.nVersion = OMX_VERSION;
+//		frg.bEnabled = OMX_TRUE;
+//		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+//				OMX_IndexConfigMinimiseFragmentation, &frg);
+//		CHECKED(ret != 0,
+//				"OMX_SetParameter failed for setting fragmentation minimisation.");
+
 //		//We want at most one NAL per output buffer that we receive.
-//		OMX_CONFIG_BOOLEANTYPE nal = {};
+//		OMX_CONFIG_BOOLEANTYPE nal = { };
 //		nal.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
 //		nal.nVersion.nVersion = OMX_VERSION;
 //		nal.bEnabled = OMX_TRUE;
@@ -186,46 +213,52 @@ OmxCvImpl::OmxCvImpl(const char *name, int width, int height, int bitrate,
 //				OMX_IndexParamBrcmNALSSeparate, &nal);
 //		CHECKED(ret != 0,
 //				"OMX_SetParameter failed for setting separate NALUs.");
-//
-//		//We want the encoder to write the NALU length instead start codes.
-//		OMX_NALSTREAMFORMATTYPE nal2 = {};
-//		nal2.nSize = sizeof(OMX_NALSTREAMFORMATTYPE);
-//		nal2.nVersion.nVersion = OMX_VERSION;
-//		nal2.nPortIndex = OMX_ENCODE_PORT_OUT;
-//		nal2.eNaluFormat = OMX_NaluFormatFourByteInterleaveLength;
-//		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
-//				(OMX_INDEXTYPE) OMX_IndexParamNalStreamFormatSelect, &nal2);
-//		CHECKED(ret != 0, "OMX_SetParameter failed for setting NALU format.");
-//	}
+
+		//We want the encoder to write the NALU length instead start codes.
+		OMX_NALSTREAMFORMATTYPE nal2 = { };
+		nal2.nSize = sizeof(OMX_NALSTREAMFORMATTYPE);
+		nal2.nVersion.nVersion = OMX_VERSION;
+		nal2.nPortIndex = OMX_ENCODE_PORT_OUT;
+		nal2.eNaluFormat = OMX_NaluFormatFourByteInterleaveLength;
+		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+				(OMX_INDEXTYPE) OMX_IndexParamNalStreamFormatSelect, &nal2);
+		CHECKED(ret != 0, "OMX_SetParameter failed for setting NALU format.");
+
+		//Inline SPS/PPS
+		OMX_CONFIG_PORTBOOLEANTYPE inlineHeader = { };
+		inlineHeader.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
+		inlineHeader.nVersion.nVersion = OMX_VERSION;
+		inlineHeader.nPortIndex = OMX_ENCODE_PORT_OUT;
+		inlineHeader.bEnabled = OMX_TRUE;
+		ret = OMX_SetParameter(ILC_GET_HANDLE(m_encoder_component),
+				OMX_IndexParamBrcmVideoAVCInlineHeaderEnable, &inlineHeader);
+		CHECKED(ret != 0,
+				"OMX_SetParameter failed for setting inline sps/pps.");
+	}
 
 	ret = ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
 	CHECKED(ret != 0, "ILClient failed to change encoder to idle state.");
 
-	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
-	OMX_ENCODE_PORT_IN, NULL);
-	ilclient_wait_for_event(m_encoder_component, OMX_EventCmdComplete,
-			OMX_CommandPortEnable, 1,
-			OMX_ENCODE_PORT_IN, 1, 0, 1000);
+	ret = ilclient_enable_port_buffers(m_encoder_component, OMX_ENCODE_PORT_IN,
+			NULL, NULL, NULL);
+	CHECKED(ret != 0, "ILClient failed to enable input buffers.");
+
 	OMX_SendCommand(ILC_GET_HANDLE(m_encoder_component), OMX_CommandPortEnable,
 	OMX_ENCODE_PORT_OUT, NULL);
 	ilclient_wait_for_event(m_encoder_component, OMX_EventCmdComplete,
 			OMX_CommandPortEnable, 1,
 			OMX_ENCODE_PORT_OUT, 1, 0, 1000);
 
-	ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component), &input_buffer,
-	OMX_ENCODE_PORT_IN, NULL, def.nBufferSize);
-	CHECKED(ret != 0, "OMX_AllocateBuffer input");
-
 	ret = OMX_AllocateBuffer(ILC_GET_HANDLE(m_encoder_component),
 			&output_buffer,
-			OMX_ENCODE_PORT_OUT, NULL, def.nBufferSize);
+			OMX_ENCODE_PORT_OUT, NULL, 1024 * 1024);
 	CHECKED(ret != 0, "OMX_AllocateBuffer output");
 
 	ret = ilclient_change_component_state(m_encoder_component,
 			OMX_StateExecuting);
 	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
 
-	if (mcodec_type == JPEG) {
+	if (m_callback || m_codec_type == JPEG) {
 	} else {
 		m_ofstream.open(m_filename, std::ios::out);
 	}
@@ -255,8 +288,8 @@ OmxCvImpl::~OmxCvImpl() {
 	//Teardown similar to hello_encode
 	ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
 
-	OMX_FreeBuffer(ILC_GET_HANDLE(m_encoder_component), OMX_ENCODE_PORT_IN, input_buffer);
-	OMX_FreeBuffer(ILC_GET_HANDLE(m_encoder_component), OMX_ENCODE_PORT_OUT, output_buffer);
+	OMX_FreeBuffer(ILC_GET_HANDLE(m_encoder_component), OMX_ENCODE_PORT_OUT,
+			output_buffer);
 
 	//ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
 	ilclient_change_component_state(m_encoder_component, OMX_StateLoaded);
@@ -285,31 +318,28 @@ void OmxCvImpl::input_worker() {
 			}
 		}
 
-//auto proc_start = steady_clock::now();
 		std::pair<OMX_BUFFERHEADERTYPE *, int64_t> frame =
 				m_input_queue.front();
 		m_input_queue.pop_front();
 		lock.unlock();
 
-//auto conv_start = steady_clock::now();
-//static int framecounter = 0;
-
 		OMX_EmptyThisBuffer(ILC_GET_HANDLE(m_encoder_component), frame.first);
-//fflush(stdout);
-//printf("Encoding time (ms): %d [%d]\r", (int)TIMEDIFF(conv_start), ++framecounter);
-		do {
-			output_buffer->nFilledLen = 0; //I don't think this is necessary, but whatever.
+
+		if (ilclient_remove_event(m_encoder_component,
+				OMX_EventPortSettingsChanged, OMX_ENCODE_PORT_OUT, 0, 0, 1)
+				== 0) {
+			printf("port changed encode\n");
+
+			output_buffer->nFilledLen = 0;
 			OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component),
 					output_buffer);
-		} while (!write_data(output_buffer, frame.second));
+
+			printf("start fill buffer\n");
+		}
 
 		lock.lock();
 //printf("Total processing time (ms): %d\n", (int)TIMEDIFF(proc_start));
 	}
-
-	//Needed because we call ilclient_get_output_buffer last.
-	//Otherwise ilclient waits forever for the buffer to be filled.
-	OMX_FillThisBuffer(ILC_GET_HANDLE(m_encoder_component), output_buffer);
 }
 
 /**
@@ -321,7 +351,11 @@ void OmxCvImpl::input_worker() {
 bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 
 	if (out->nFilledLen != 0) {
-		if (mcodec_type == JPEG) {
+		if (m_callback) {
+			unsigned char *buff = out->pBuffer;
+			int data_len = out->nFilledLen;
+			m_callback(buff, data_len, m_user_data);
+		} else if (m_codec_type == JPEG) {
 			unsigned char *buff = out->pBuffer;
 			int data_len = out->nFilledLen;
 			for (int i = 0; i < data_len; i++) {
@@ -388,7 +422,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 		}
 		return true;
 	} else {
-		printf("write data : return false\n");
+		//printf("write data : return false\n");
 		return true;
 	}
 	out->nFilledLen = 0;
@@ -400,9 +434,13 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
  * @return true iff enqueued.
  */
 bool OmxCvImpl::process(const unsigned char *in_data) {
-	if (m_input_queue.size() > 0) {
+	OMX_BUFFERHEADERTYPE *input_buffer = ilclient_get_input_buffer(
+			m_encoder_component, OMX_ENCODE_PORT_IN, 0);
+	if (input_buffer == NULL) {
+		printf("No free buffer; dropping frame!\n");
 		return false;
 	}
+
 	auto now = steady_clock::now();
 	memcpy(input_buffer->pBuffer, in_data, m_stride * m_height);
 	//BGR2RGB(mat, in->pBuffer, m_stride);
@@ -437,8 +475,9 @@ bool OmxCvImpl::process(const unsigned char *in_data) {
  * @param [in] fpsden The FPS denominator.
  */
 OmxCv::OmxCv(const char *name, int width, int height, int bitrate, int fpsnum,
-		int fpsden) {
-	m_impl = new OmxCvImpl(name, width, height, bitrate, fpsnum, fpsden);
+		int fpsden, OMXCV_CALLBACK callback, void *user_data) {
+	m_impl = new OmxCvImpl(name, width, height, bitrate, fpsnum, fpsden,
+			callback, user_data);
 }
 
 /**

@@ -15,7 +15,7 @@
  * @param {number} far Far bound of the frustum
  * @returns {mat4} out
  */
-mat4 mat4_perspectiveFromFieldOfView(mat4 out, float fov[4], float near, float far) {
+static mat4 mat4_perspectiveFromFieldOfView(mat4 out, float fov[4], float near, float far) {
     float upTan = tanf(fov[0] * M_PI/180.0),
         downTan = tanf(fov[1] * M_PI/180.0),
         leftTan = tanf(fov[2] * M_PI/180.0),

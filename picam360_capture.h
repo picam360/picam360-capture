@@ -33,6 +33,9 @@
 #include <pthread.h>
 #include "mrevent.h"
 
+#include "picam360_capture_plugin.h"
+
+#define TEXTURE_BUFFER_NUM 2
 #define MAX_CAM_NUM 2
 #define MAX_OPERATION_NUM 5
 
@@ -40,7 +43,7 @@ enum INPUT_MODE {
 	INPUT_MODE_NONE, INPUT_MODE_CAM, INPUT_MODE_FILE
 };
 enum OUTPUT_MODE {
-	OUTPUT_MODE_NONE, OUTPUT_MODE_STILL, OUTPUT_MODE_VIDEO
+	OUTPUT_MODE_NONE, OUTPUT_MODE_STILL, OUTPUT_MODE_VIDEO, OUTPUT_MODE_STREAM
 };
 enum OPERATION_MODE {
 	BOARD, WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
@@ -48,10 +51,33 @@ enum OPERATION_MODE {
 enum CODEC_TYPE {
 	H264, MJPEG
 };
+
+struct _PICAM360CAPTURE_T;
+
+typedef struct _OPTIONS_T {
+	float sharpness_gain;
+	float cam_offset_pitch[MAX_CAM_NUM]; // x axis
+	float cam_offset_yaw[MAX_CAM_NUM]; // y axis
+	float cam_offset_roll[MAX_CAM_NUM]; // z axis
+	float cam_offset_x[MAX_CAM_NUM];
+	float cam_offset_y[MAX_CAM_NUM];
+	float cam_horizon_r[MAX_CAM_NUM];
+
+	float view_offset_pitch; // x axis
+	float view_offset_yaw; // y axis
+	float view_offset_roll; // z axis
+} OPTIONS_T;
+
+typedef struct _LIST_T {
+	void *value;
+	struct _LIST_T *next;
+} LIST_T;
+
 typedef struct _FRAME_T {
 	int id;
 	GLuint framebuffer;
 	GLuint texture;
+	uint8_t *img_buff;
 	uint32_t width;
 	uint32_t height;
 	bool delete_after_processed;
@@ -60,18 +86,30 @@ typedef struct _FRAME_T {
 	bool is_recording;
 	void *recorder;
 
+	//h264
+	bool in_nal;
+	uint32_t nal_len;
+	uint8_t *nal_buff;
+	uint32_t nal_pos;
+
 	enum OPERATION_MODE operation_mode;
 	enum OUTPUT_MODE output_mode;
 	char output_filepath[256];
 	bool double_size;
 
+	float kbps;
+	float fps;
+	struct timeval last_updated;
 	float fov;
 	//for unif matrix
-	//euler angles
-	float view_pitch;
-	float view_yaw;
-	float view_roll;
-	bool view_coordinate_from_device;
+	MPU_T *view_mpu;
+
+	void *custom_data;
+	//event
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *,
+			struct _FRAME_T *);
+	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *,
+			struct _FRAME_T *);
 
 	struct _FRAME_T *next;
 } FRAME_T;
@@ -80,25 +118,30 @@ typedef struct {
 	GLuint vbo;
 	GLuint vbo_nop;
 } MODEL_T;
-typedef struct {
+typedef struct _PICAM360CAPTURE_T {
+	PLUGIN_HOST_T plugin_host;
+	pthread_mutex_t mutex;
 	int split;
 	bool preview;
 	bool stereo;
+	bool conf_sync;
 	bool video_direct;
 	enum CODEC_TYPE codec_type;
 	uint32_t screen_width;
 	uint32_t screen_height;
 	uint32_t cam_width;
 	uint32_t cam_height;
-	uint32_t active_cam;
 // OpenGL|ES objects
 	EGLDisplay display;
 	EGLSurface surface;
 	EGLContext context;
+	int active_cam;
 	int num_of_cam;
-	void* egl_image[MAX_CAM_NUM];
 	pthread_t thread[MAX_CAM_NUM];
-	GLuint cam_texture[MAX_CAM_NUM];
+	bool create_egl_image_required;
+	void* egl_image[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
+	GLuint cam_texture[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
+	int cam_texture_cur[MAX_CAM_NUM];
 	GLuint logo_texture;
 	GLuint calibration_texture;
 // model rotation vector and direction
@@ -125,10 +168,33 @@ typedef struct {
 
 	//for unif matrix
 	//euler angles
-	float camera_pitch;
-	float camera_yaw;
-	float camera_roll;
+	float camera_pitch; // x axis
+	float camera_yaw; // y axis
+	float camera_roll; // z axis
+	VECTOR4D_T camera_quaternion[MAX_CAM_NUM + 1];
+	VECTOR4D_T camera_compass;
+	float camera_horizon_r_bias;
+	float camera_temperature;
+	float camera_north;
+	bool camera_coordinate_from_device;
+	char default_view_coordinate_mode[64];
 
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
+	pthread_mutex_t texture_mutex;
+	pthread_mutex_t texture_size_mutex;
+
+	pthread_mutex_t cmd_list_mutex;
+	LIST_T *cmd_list;
+	LIST_T *cmd2upstream_list;
+
+	MENU_T *menu;
+	bool menu_visible;
+
+	char **plugin_paths;
+	PLUGIN_T **plugins;
+	MPU_T **mpus;
+	STATUS_T **statuses;
+	STATUS_T **watches;
+	struct _OPTIONS_T options;
 } PICAM360CAPTURE_T;

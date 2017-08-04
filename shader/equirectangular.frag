@@ -13,7 +13,7 @@ uniform float cam_horizon_r;
 //options end
 
 const float M_PI = 3.1415926535;
-const float color_offset = 0.15;
+const float color_offset = 0.10;
 const float color_factor = 1.0 / (1.0 - color_offset);
 
 void main(void) {
@@ -52,7 +52,7 @@ void main(void) {
 
 	float yaw2 = yaw + M_PI + cam_offset_yaw;
 	u = cam_horizon_r * r * cos(yaw2) + 0.5 + cam_offset_x;
-	v = cam_horizon_r * r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+	v = cam_horizon_r * r * sin(yaw2) + 0.5 + cam_offset_y;
 	if (u <= 0.0 || u > 1.0 || v <= 0.0 || v > 1.0) {
 		u = 0.0;
 		v = 0.0;
@@ -65,7 +65,7 @@ void main(void) {
 			fc = texture2D(cam_texture, vec2(u, v));
 		} else {
 			//sharpness
-			float gain = sharpness_gain + r;
+			float gain = sharpness_gain + r/2.0;
 			fc = texture2D(cam_texture, vec2(u, v))
 					* (1.0 + 4.0 * gain);
 			fc -= texture2D(cam_texture, vec2(u - 1.0 * pixel_size, v))
@@ -80,17 +80,17 @@ void main(void) {
 
 		fc = (fc - color_offset) * color_factor;
 		if (r >= 0.45) {
-			float r_r = pow(r - 0.45, 1.015) + 0.45;
+			float r_r = pow(r - 0.45, 1.006) + 0.45;
 			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
-			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 + cam_offset_y;
 			vec4 fc_b = texture2D(cam_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
 			fc.z = fc_b.z;
 
-			r_r = pow(r - 0.45, 1.0075) + 0.45;
+			r_r = pow(r - 0.45, 1.003) + 0.45;
 			u = cam_horizon_r * r_r * cos(yaw2) + 0.5 + cam_offset_x;
-			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 - cam_offset_y; //cordinate is different
+			v = cam_horizon_r * r_r * sin(yaw2) + 0.5 + cam_offset_y;
 			fc_b = texture2D(cam_texture, vec2(u, v));
 
 			fc_b = (fc_b - color_offset) * color_factor;
