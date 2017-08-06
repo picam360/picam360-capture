@@ -335,8 +335,8 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
 				"shader/window.frag");
 	} else {
-		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
-				"shader/window_sphere.frag");
+		state->model_data[WINDOW].program = GLProgram_new(
+				"shader/window_sphere.vert", "shader/window_sphere.frag");
 	}
 
 	board_mesh(&state->model_data[BOARD].vbo,
@@ -979,6 +979,13 @@ int _command_handler(const char *_buff) {
 			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
 		printf("exit\n");
 		exit(0);
+	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
+		save_options(state);
+		{ //send upstream
+			char cmd[256];
+			sprintf(cmd, "upstream.save");
+			state->plugin_host.send_command(cmd);
+		}
 	} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
 		state->active_cam = 0;
 	} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
@@ -1210,6 +1217,13 @@ int _command_handler(const char *_buff) {
 					state->options.cam_horizon_r[cam_num] += value;
 				}
 			}
+			{ //send upstream
+				char cmd[256];
+				sprintf(cmd, "upstream.picam360_driver.add_camera_horizon_r %s",
+						param);
+				state->plugin_host.send_command(cmd);
+			}
+
 			printf("add_camera_horizon_r : completed\n");
 		}
 	} else if (strncmp(cmd, "set_camera_horizon_r_bias", sizeof(buff)) == 0) {
@@ -2289,10 +2303,10 @@ static void refraction_menu_callback(struct _MENU_T *menu,
 				value = 1.0;
 				break;
 			case 2:
-				value = 1.1;
+				value = 1.02;
 				break;
 			case 3:
-				value = 1.3;
+				value = 1.08;
 				break;
 			}
 			char cmd[256];
@@ -2356,8 +2370,6 @@ static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 			float value = (int) menu->user_data;
 			value *= 0.01;
 			char cmd[256];
-			snprintf(cmd, 256, "driver_agent.add_camera_horizon_r *=%f", value);
-			state->plugin_host.send_command(cmd);
 			snprintf(cmd, 256, "add_camera_horizon_r *=%f", value);
 			state->plugin_host.send_command(cmd);
 		}

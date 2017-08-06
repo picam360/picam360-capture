@@ -184,21 +184,6 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			printf("add_camera_offset_yaw : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_horizon_r", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int cam_num = 0;
-			float value = 0;
-			sscanf(param, "%d=%f", &cam_num, &value);
-
-			char cmd[256];
-			sprintf(cmd, "upstream.picam360_driver.add_camera_horizon_r %d=%f",
-					cam_num, value);
-			lg_plugin_host->send_command(cmd);
-
-			printf("add_camera_horizon_r : completed\n");
-		}
 	} else {
 		printf(":unknown command : %s\n", buff);
 	}
