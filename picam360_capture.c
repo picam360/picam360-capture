@@ -955,7 +955,9 @@ void frame_handler() {
 			redraw_scene(state, frame, &state->model_data[BOARD]);
 			eglSwapBuffers(state->display, state->surface);
 		}
-		frame->last_updated = s;
+		if (frame) {
+			frame->last_updated = s;
+		}
 	}
 	if (snap_finished) {
 		state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
@@ -1056,7 +1058,11 @@ int _command_handler(const char *_buff) {
 		}
 		if (!checkAcMode) {
 			char param[256];
-			strncpy(param, "-W 256 -H 256 -F", 256);
+			if (state->frame->output_mode = OUTPUT_MODE_STREAM) {
+				strncpy(param, "-w 256 -h 256 -F -s mjpeg", 256);
+			} else {
+				strncpy(param, "-w 256 -h 256 -F", 256);
+			}
 
 			const int kMaxArgs = 32;
 			int argc = 1;
@@ -1225,6 +1231,82 @@ int _command_handler(const char *_buff) {
 			}
 
 			printf("add_camera_horizon_r : completed\n");
+		}
+	} else if (strncmp(cmd, "add_camera_offset_x", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			if (param[0] == '*') {
+				sscanf(param, "*=%f", &value);
+				for (int i = 0; i < MAX_CAM_NUM; i++) {
+					state->options.cam_offset_x[i] += value;
+				}
+			} else {
+				sscanf(param, "%d=%f", &cam_num, &value);
+				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+					state->options.cam_offset_x[cam_num] += value;
+				}
+			}
+			{ //send upstream
+				char cmd[256];
+				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_x %s",
+						param);
+				state->plugin_host.send_command(cmd);
+			}
+
+			printf("add_camera_offset_x : completed\n");
+		}
+	} else if (strncmp(cmd, "add_camera_offset_y", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			if (param[0] == '*') {
+				sscanf(param, "*=%f", &value);
+				for (int i = 0; i < MAX_CAM_NUM; i++) {
+					state->options.cam_offset_y[i] += value;
+				}
+			} else {
+				sscanf(param, "%d=%f", &cam_num, &value);
+				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+					state->options.cam_offset_y[cam_num] += value;
+				}
+			}
+			{ //send upstream
+				char cmd[256];
+				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_y %s",
+						param);
+				state->plugin_host.send_command(cmd);
+			}
+
+			printf("add_camera_offset_y : completed\n");
+		}
+	} else if (strncmp(cmd, "add_camera_offset_yaw", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			if (param[0] == '*') {
+				sscanf(param, "*=%f", &value);
+				for (int i = 0; i < MAX_CAM_NUM; i++) {
+					state->options.cam_offset_yaw[i] += value;
+				}
+			} else {
+				sscanf(param, "%d=%f", &cam_num, &value);
+				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+					state->options.cam_offset_yaw[cam_num] += value;
+				}
+			}
+			{ //send upstream
+				char cmd[256];
+				sprintf(cmd,
+						"upstream.picam360_driver.add_camera_offset_yaw %s",
+						param);
+				state->plugin_host.send_command(cmd);
+			}
+
+			printf("add_camera_offset_yaw : completed\n");
 		}
 	} else if (strncmp(cmd, "set_camera_horizon_r_bias", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -2416,9 +2498,9 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 			break;
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
-				char cmd[256];
-				snprintf(cmd, 256, "start_ac");
-				state->plugin_host.send_command(cmd);
+				if (state->frame) {
+					state->frame->operation_mode = CALIBRATION;
+				}
 			}
 			break;
 		case CALIBRATION_CMD_VIEWER_COMPASS:
@@ -2433,7 +2515,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		case CALIBRATION_CMD_VEHICLE_COMPASS:
 			if (1) { //this should be in plugin
 				char cmd[256];
-				snprintf(cmd, 256, "rov_agent.start_compass_calib");
+				snprintf(cmd, 256, "upstream.mpu9250.start_compass_calib");
 				state->plugin_host.send_command(cmd);
 			}
 			break;
@@ -2445,9 +2527,9 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		switch ((int) menu->user_data) {
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
-				char cmd[256];
-				snprintf(cmd, 256, "stop_ac");
-				state->plugin_host.send_command(cmd);
+				if (state->frame) {
+					state->frame->operation_mode = WINDOW;
+				}
 			}
 			break;
 		case CALIBRATION_CMD_VIEWER_COMPASS:
@@ -2462,7 +2544,104 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		case CALIBRATION_CMD_VEHICLE_COMPASS:
 			if (1) {
 				char cmd[256];
-				snprintf(cmd, 256, "rov_agent.stop_compass_calib");
+				snprintf(cmd, 256, "upstream.mpu9250.stop_compass_calib");
+				state->plugin_host.send_command(cmd);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	const float GAIN = 0.005;
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		switch ((int) menu->user_data) {
+		case 0:				//cam
+			break;
+		case 1:				//cam0
+			if (1) {
+				state->plugin_host.send_command("0");
+			}
+			menu->selected = false;
+			break;
+		case 2:				//cam1
+			if (1) {
+				state->plugin_host.send_command("1");
+			}
+			menu->selected = false;
+			break;
+		case 10:				//x
+			break;
+		case 11:				//decrement x
+			if (1) {
+				float value = (int) 1;
+				value *= GAIN;
+				char cmd[256];
+				snprintf(cmd, 256, "add_camera_offset_x %d=%f",
+						state->active_cam, value);
+				state->plugin_host.send_command(cmd);
+			}
+			menu->selected = false;
+			break;
+		case 12:				//increment x
+			if (1) {
+				float value = (int) -1;
+				value *= GAIN;
+				char cmd[256];
+				snprintf(cmd, 256, "add_camera_offset_x %d=%f",
+						state->active_cam, value);
+				state->plugin_host.send_command(cmd);
+			}
+			menu->selected = false;
+			break;
+		case 20:				//y
+			break;
+		case 21:				//decrement y
+			if (1) {
+				float value = (int) 1;
+				value *= GAIN;
+				char cmd[256];
+				snprintf(cmd, 256, "add_camera_offset_y %d=%f",
+						state->active_cam, value);
+				state->plugin_host.send_command(cmd);
+			}
+			menu->selected = false;
+			break;
+		case 22:				//increment y
+			if (1) {
+				float value = (int) -1;
+				value *= GAIN;
+				char cmd[256];
+				snprintf(cmd, 256, "add_camera_offset_y %d=%f",
+						state->active_cam, value);
+				state->plugin_host.send_command(cmd);
+			}
+			menu->selected = false;
+			break;
+		case 30:				//start ac
+			if (1) {
+				char cmd[256];
+				snprintf(cmd, 256, "start_ac");
+				state->plugin_host.send_command(cmd);
+			}
+			break;
+		default:
+			break;
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		switch ((int) menu->user_data) {
+		case 30:
+			if (1) {
+				char cmd[256];
+				snprintf(cmd, 256, "stop_ac");
 				state->plugin_host.send_command(cmd);
 			}
 			break;
@@ -2592,9 +2771,51 @@ static void _init_menu() {
 	{
 		MENU_T *sub_menu = menu_add_submenu(menu,
 				menu_new(L"Calibration", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu,
+		MENU_T *image_circle_menu = menu_add_submenu(sub_menu,
 				menu_new(L"ImageCircle", calibration_menu_callback,
 						(void*) CALIBRATION_CMD_IMAGE_CIRCLE), INT_MAX);
+		{
+			MENU_T *sub_menu = image_circle_menu;
+			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu,
+					menu_new(L"cam", image_circle_calibration_menu_callback,
+							(void*) 0), INT_MAX);
+			{
+				MENU_T *sub_menu = image_circle_cam_menu;
+				menu_add_submenu(sub_menu,
+						menu_new(L"0", image_circle_calibration_menu_callback,
+								(void*) 1), INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"1", image_circle_calibration_menu_callback,
+								(void*) 2), INT_MAX);
+			}
+			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu,
+					menu_new(L"x", image_circle_calibration_menu_callback,
+							(void*) 10), INT_MAX);
+			{
+				MENU_T *sub_menu = image_circle_x_menu;
+				menu_add_submenu(sub_menu,
+						menu_new(L"-", image_circle_calibration_menu_callback,
+								(void*) 11), INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"+", image_circle_calibration_menu_callback,
+								(void*) 12), INT_MAX);
+			}
+			MENU_T *image_circle_y_menu = menu_add_submenu(sub_menu,
+					menu_new(L"y", image_circle_calibration_menu_callback,
+							(void*) 20), INT_MAX);
+			{
+				MENU_T *sub_menu = image_circle_y_menu;
+				menu_add_submenu(sub_menu,
+						menu_new(L"-", image_circle_calibration_menu_callback,
+								(void*) 21), INT_MAX);
+				menu_add_submenu(sub_menu,
+						menu_new(L"+", image_circle_calibration_menu_callback,
+								(void*) 22), INT_MAX);
+			}
+			menu_add_submenu(sub_menu,
+					menu_new(L"ac", image_circle_calibration_menu_callback,
+							(void*) 30), INT_MAX);
+		}
 		menu_add_submenu(sub_menu,
 				menu_new(L"ViewerCompass", calibration_menu_callback,
 						(void*) CALIBRATION_CMD_VIEWER_COMPASS), INT_MAX);

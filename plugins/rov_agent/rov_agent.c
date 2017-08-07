@@ -57,20 +57,6 @@ static int command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
-			== 0) {
-		char cmd[256];
-		sprintf(cmd, "upstream.mpu9250.start_compass_calib");
-		lg_plugin_host->send_command(cmd);
-
-		printf("start_compass_calib : completed\n");
-	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
-			== 0) {
-		char cmd[256];
-		sprintf(cmd, "upstream.mpu9250.stop_compass_calib");
-		lg_plugin_host->send_command(cmd);
-
-		printf("stop_compass_calib : completed\n");
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_pid_enabled", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
@@ -138,51 +124,6 @@ static int command_handler(void *user_data, const char *_buff) {
 			lg_plugin_host->send_command(cmd);
 
 			printf("set_video_delay : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_x", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int cam_num = 0;
-			float value = 0;
-			sscanf(param, "%d=%f", &cam_num, &value);
-
-			char cmd[256];
-			sprintf(cmd, "upstream.picam360_driver.add_camera_offset_x %d=%f",
-					cam_num, value);
-			lg_plugin_host->send_command(cmd);
-
-			printf("add_camera_offset_x : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_y", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int cam_num = 0;
-			float value = 0;
-			sscanf(param, "%d=%f", &cam_num, &value);
-
-			char cmd[256];
-			sprintf(cmd, "upstream.picam360_driver.add_camera_offset_y %d=%f",
-					cam_num, value);
-			lg_plugin_host->send_command(cmd);
-
-			printf("add_camera_offset_y : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_yaw", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int cam_num = 0;
-			float value = 0;
-			sscanf(param, "%d=%f", &cam_num, &value);
-
-			char cmd[256];
-			sprintf(cmd, "upstream.picam360_driver.add_camera_offset_yaw %d=%f",
-					cam_num, value);
-			lg_plugin_host->send_command(cmd);
-
-			printf("add_camera_offset_yaw : completed\n");
 		}
 	} else {
 		printf(":unknown command : %s\n", buff);
