@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ~/.picam360rc
+
 CURRENT=$(cd $(dirname $0) && pwd)
 cd $CURRENT
 
