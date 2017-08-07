@@ -106,14 +106,22 @@ chmod 0666 rtcp_tx
 
 if [ $REMOTE = true ]; then
 
+if [ "$DRIVER_IP" = "" ]; then
+	DRIVER_IP="192.168.4.1"
+fi
+
+if [ "$SERVER_IP" = "" ]; then
+	SERVER_IP="192.168.4.2"
+fi
+
 #use tcp
 #	sudo killall nc
 #   nc 192.168.4.1 9006 < rtp_tx > rtp_rx &
 
 	sudo killall socat
 	socat -u udp-recv:9002 - > rtp_rx &
-	socat PIPE:rtcp_tx UDP-DATAGRAM:192.168.4.1:9003 &
-	socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9004 &
+	socat PIPE:rtcp_tx UDP-DATAGRAM:$DRIVER_IP:9003 &
+	socat PIPE:rtp_tx UDP-DATAGRAM:$SERVER_IP:9004 &
 	socat -u udp-recv:9005 - > rtcp_rx &
 
 
