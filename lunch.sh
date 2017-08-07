@@ -108,27 +108,29 @@ chmod 0666 rtcp_tx
 
 if [ $REMOTE = true ]; then
 
-if [ "$DRIVER_IP" = "" ]; then
-	DRIVER_IP="192.168.4.1"
-fi
-
-if [ "$SERVER_IP" = "" ]; then
-	SERVER_IP="192.168.4.2"
-fi
+	if [ "$DRIVER_IP" = "" ]; then
+		DRIVER_IP="192.168.4.1"
+	fi
+	
+	if [ "$SERVER_IP" = "" ]; then
+		SERVER_IP="192.168.4.2"
+	fi
 
 #use tcp
 #	sudo killall nc
 #   nc 192.168.4.1 9006 < rtp_tx > rtp_rx &
 
-	sudo killall socat
-	socat -u udp-recv:9002 - > rtp_rx &
-	socat PIPE:rtcp_tx UDP-DATAGRAM:$DRIVER_IP:9003 &
-	socat PIPE:rtp_tx UDP-DATAGRAM:$SERVER_IP:9004 &
-	socat -u udp-recv:9005 - > rtcp_rx &
+	SOCAT=socat
+	if type socat2 >/dev/null 2>&1; then
+		SOCAT=socat2
+	fi
 
+	sudo killall $SOCAT
+	$SOCAT -u udp-recv:9002 - > rtp_rx &
+	$SOCAT PIPE:rtcp_tx UDP-DATAGRAM:$DRIVER_IP:9003 &
+	$SOCAT PIPE:rtp_tx UDP-DATAGRAM:$SERVER_IP:9004 &
+	$SOCAT -u udp-recv:9005 - > rtcp_rx &
 
-#	socat tcp-listen:9002 PIPE:rtp_rx &
-#	socat -u udp-recv:9000 - > status & socat -u udp-recv:9100 - > cam0 & socat -u udp-recv:9101 - > cam1 &
 elif [ $DIRECT = ]; then
 	sudo killall raspivid
 	if [ $CODEC = "MJPEG" ]; then
