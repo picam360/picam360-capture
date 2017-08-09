@@ -85,6 +85,16 @@ static float lg_cam_fps[MAX_CAM_NUM] = { };
 static float lg_cam_frameskip[MAX_CAM_NUM] = { };
 static float lg_cam_bandwidth = 0;
 
+static int end_width(const char *str, const char *suffix) {
+	if (!str || !suffix)
+		return 0;
+	size_t lenstr = strlen(str);
+	size_t lensuffix = strlen(suffix);
+	if (lensuffix > lenstr)
+		return 0;
+	return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
 /***********************************************************
  * Name: init_ogl
  *
@@ -512,12 +522,10 @@ static void init_options(PICAM360CAPTURE_T *state) {
 			}
 		}
 
-		if (state->plugins) {
-			for (int i = 0; state->plugins[i] != NULL; i++) {
-				if (state->plugins[i]->init_options) {
-					state->plugins[i]->init_options(
-							state->plugins[i]->user_data, options);
-				}
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]->init_options) {
+				state->plugins[i]->init_options(state->plugins[i]->user_data,
+						options);
 			}
 		}
 
@@ -573,12 +581,10 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, "plugin_paths", plugin_paths);
 	}
 
-	if (state->plugins) {
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			if (state->plugins[i]->save_options) {
-				state->plugins[i]->save_options(state->plugins[i]->user_data,
-						options);
-			}
+	for (int i = 0; state->plugins[i] != NULL; i++) {
+		if (state->plugins[i]->save_options) {
+			state->plugins[i]->save_options(state->plugins[i]->user_data,
+					options);
 		}
 	}
 
@@ -631,6 +637,8 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->id = next_frame_id++;
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
+	frame->output_type = OUTPUT_TYPE_NONE;
+	frame->output_fd = -1;
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
@@ -668,11 +676,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			frame->output_mode = OUTPUT_MODE_STREAM;
 			//h264 or mjpeg
 			if (strcasecmp(optarg, "h264") == 0) {
-				strncpy(frame->output_filepath, "stream.h264",
-						sizeof(frame->output_filepath));
+				frame->output_type = OUTPUT_TYPE_H264;
 			} else {
-				strncpy(frame->output_filepath, "stream.mjpeg",
-						sizeof(frame->output_filepath));
+				frame->output_type = OUTPUT_TYPE_MJPEG;
 			}
 			break;
 		case 'f':
@@ -805,21 +811,29 @@ void frame_handler() {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio, fps, NULL, NULL);
-			frame->output_mode = OUTPUT_MODE_VIDEO;
+					frame->output_filepath, 4000 * ratio, fps, stream_callback,
+					NULL);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
+			frame->output_fd = open(frame->output_filepath,
+					O_CREAT | O_WRONLY | O_TRUNC, /*  */
+					S_IRUSR | S_IWUSR | /* rw */
+					S_IRGRP | S_IWGRP | /* rw */
+					S_IROTH | S_IXOTH);
 			printf("start_record saved to %s\n", frame->output_filepath);
 		}
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_STREAM) {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
 			float kbps = frame->kbps;
+			char *dummy_path =
+					(frame->output_type == OUTPUT_TYPE_H264) ?
+							"stream.h264" : "stream.mjpeg";
 			if (kbps == 0) {
 				float ave_sq = sqrt(
 						(float) frame->width * (float) frame->height) / 1.2;
-				if (strcmp(frame->output_filepath, "stream.h264") == 0) {
+				if (frame->output_type == OUTPUT_TYPE_H264) {
 					if (ave_sq <= 240) {
 						kbps = 200;
 					} else if (ave_sq <= 320) {
@@ -850,9 +864,7 @@ void frame_handler() {
 				}
 			}
 			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, kbps * ratio, fps, stream_callback,
-					frame);
-			frame->output_mode = OUTPUT_MODE_STREAM;
+					dummy_path, kbps * ratio, fps, stream_callback, frame);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -927,6 +939,19 @@ void frame_handler() {
 			snap_finished = true;
 			break;
 		case OUTPUT_MODE_VIDEO:
+			if (frame->output_fd > 0) {
+				AddFrame(frame->recorder, frame->img_buff);
+
+				gettimeofday(&f, NULL);
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
+						+ (f.tv_usec - s.tv_usec) / 1000.0;
+				frame->frame_num++;
+				frame->frame_elapsed += elapsed_ms;
+			} else {
+				frame->output_mode = OUTPUT_MODE_NONE;
+				frame->delete_after_processed = true;
+			}
+			break;
 		case OUTPUT_MODE_STREAM:
 			AddFrame(frame->recorder, frame->img_buff);
 
@@ -935,6 +960,37 @@ void frame_handler() {
 					+ (f.tv_usec - s.tv_usec) / 1000.0;
 			frame->frame_num++;
 			frame->frame_elapsed += elapsed_ms;
+
+			if (end_width(frame->output_filepath, ".jpeg")) {
+				SaveJpeg(frame->img_buff, img_width, img_height,
+						frame->output_filepath, 70);
+				printf("snap saved to %s\n", frame->output_filepath);
+				frame->output_filepath[0] = '\0';
+			} else if (end_width(frame->output_filepath, ".h264")) {
+				if (frame->output_type == OUTPUT_TYPE_H264) {
+					frame->output_fd = open(frame->output_filepath,
+							O_CREAT | O_WRONLY | O_TRUNC, /*  */
+							S_IRUSR | S_IWUSR | /* rw */
+							S_IRGRP | S_IWGRP | /* rw */
+							S_IROTH | S_IXOTH);
+					printf("start record to %s\n", frame->output_filepath);
+				} else {
+					printf("error type : %s\n", frame->output_filepath);
+				}
+				frame->output_filepath[0] = '\0';
+			} else if (end_width(frame->output_filepath, ".mjpeg")) {
+				if (frame->output_type == OUTPUT_TYPE_MJPEG) {
+					frame->output_fd = open(frame->output_filepath,
+							O_CREAT | O_WRONLY | O_TRUNC, /*  */
+							S_IRUSR | S_IWUSR | /* rw */
+							S_IRGRP | S_IWGRP | /* rw */
+							S_IROTH | S_IXOTH);
+					printf("start record to %s\n", frame->output_filepath);
+				} else {
+					printf("error type : %s\n", frame->output_filepath);
+				}
+				frame->output_filepath[0] = '\0';
+			}
 			break;
 		default:
 			break;
@@ -970,6 +1026,7 @@ void frame_handler() {
 static double calib_step = 0.01;
 
 int _command_handler(const char *_buff) {
+	int opt;
 	int ret = 0;
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
@@ -995,6 +1052,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
+			int target_frame = -1;
 			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
@@ -1005,16 +1063,45 @@ int _command_handler(const char *_buff) {
 			}
 			argv[0] = cmd;
 			argv[argc] = 0;
-			FRAME_T *frame = create_frame(state, argc, argv);
-			frame->next = state->frame;
-			frame->output_mode = OUTPUT_MODE_STILL;
-			frame->view_mpu = state->mpus[0];
-			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
-			state->frame = frame;
+			optind = 1; // reset getopt
+			while ((opt = getopt(argc, argv, "0o:")) != -1) {
+				switch (opt) {
+				case '0':
+					target_frame = 0;
+					break;
+				}
+			}
+			if (target_frame < 0) {
+				FRAME_T *frame = create_frame(state, argc, argv);
+				frame->next = state->frame;
+				frame->output_mode = OUTPUT_MODE_STILL;
+				frame->view_mpu = state->mpus[0];
+				manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+				state->frame = frame;
+			} else {
+				optind = 1; // reset getopt
+				while ((opt = getopt(argc, argv, "0o:")) != -1) {
+					switch (opt) {
+					case 'o':
+						for (FRAME_T *frame = state->frame; frame != NULL;
+								frame = frame->next) {
+							if (frame->id == target_frame) {
+								strncpy(frame->output_filepath, optarg,
+										sizeof(frame->output_filepath));
+								printf("snap %d : %s\n", frame->id,
+										frame->output_filepath);
+								break;
+							}
+						}
+						break;
+					}
+				}
+			}
 		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
+			int target_frame = -1;
 			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
@@ -1025,25 +1112,79 @@ int _command_handler(const char *_buff) {
 			}
 			argv[0] = cmd;
 			argv[argc] = 0;
-			FRAME_T *frame = create_frame(state, argc, argv);
-			frame->next = state->frame;
-			frame->output_mode = OUTPUT_MODE_VIDEO;
-			frame->view_mpu = state->mpus[0];
-			manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
-			state->frame = frame;
-			printf("start_record id=%d\n", frame->id);
+			optind = 1; // reset getopt
+			while ((opt = getopt(argc, argv, "0o:")) != -1) {
+				switch (opt) {
+				case '0':
+					target_frame = 0;
+					break;
+				}
+			}
+			if (target_frame < 0) {
+				FRAME_T *frame = create_frame(state, argc, argv);
+				frame->next = state->frame;
+				frame->output_mode = OUTPUT_MODE_VIDEO;
+				frame->view_mpu = state->mpus[0];
+				manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+				state->frame = frame;
+				printf("start_record id=%d\n", frame->id);
+			} else {
+				optind = 1; // reset getopt
+				while ((opt = getopt(argc, argv, "0o:")) != -1) {
+					switch (opt) {
+					case 'o':
+						for (FRAME_T *frame = state->frame; frame != NULL;
+								frame = frame->next) {
+							if (frame->id == target_frame) {
+								strncpy(frame->output_filepath, optarg,
+										sizeof(frame->output_filepath));
+								printf("start_record %d : %s\n", frame->id,
+										frame->output_filepath);
+								break;
+							}
+						}
+						break;
+					}
+				}
+			}
 		}
 	} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			int id = 0;
-			sscanf(param, "%d", &id);
-			for (FRAME_T *frame = state->frame; frame != NULL;
-					frame = frame->next) {
-				if (frame->id == id) {
-					frame->output_mode = OUTPUT_MODE_NONE;
-					printf("stop_record\n");
+			int target_frame = -1;
+			const int kMaxArgs = 32;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+			optind = 1; // reset getopt
+			while ((opt = getopt(argc, argv, "0")) != -1) {
+				switch (opt) {
+				case '0':
+					target_frame = 0;
 					break;
+				}
+			}
+			if (target_frame < 0) {
+				//do nothing
+			} else {
+				for (FRAME_T *frame = state->frame; frame != NULL;
+						frame = frame->next) {
+					if (frame->id == target_frame) {
+						if (frame->output_fd > 0) {
+							close(frame->output_fd);
+							frame->output_fd = -1;
+							printf("stop_record %d\n", frame->id);
+						} else {
+							printf("error at stop_record %d\n", frame->id);
+						}
+						break;
+					}
 				}
 			}
 		}
@@ -1390,15 +1531,13 @@ int command_handler() {
 
 		if (buff) {
 			bool handled = false;
-			if (state->plugins) {
-				for (int i = 0; state->plugins[i] != NULL; i++) {
-					int name_len = strlen(state->plugins[i]->name);
-					if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-							&& buff[name_len] == '.') {
-						ret = state->plugins[i]->command_handler(
-								state->plugins[i]->user_data, buff);
-						handled = true;
-					}
+			for (int i = 0; state->plugins[i] != NULL; i++) {
+				int name_len = strlen(state->plugins[i]->name);
+				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+						&& buff[name_len] == '.') {
+					ret = state->plugins[i]->command_handler(
+							state->plugins[i]->user_data, buff);
+					handled = true;
 				}
 			}
 			if (!handled) {
@@ -1631,126 +1770,97 @@ static void event_handler(uint32_t node_id, uint32_t event_id) {
 
 static void send_event(uint32_t node_id, uint32_t event_id) {
 	event_handler(node_id, event_id);
-	if (state->plugins) {
-		for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
-			if (state->plugins[i]) {
-				state->plugins[i]->event_handler(state->plugins[i]->user_data,
-						node_id, event_id);
-			}
+	for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
+		if (state->plugins[i]) {
+			state->plugins[i]->event_handler(state->plugins[i]->user_data,
+					node_id, event_id);
 		}
 	}
 }
 static void add_mpu(MPU_T *mpu) {
-	if (state->mpus == NULL) {
-		const int INITIAL_SPACE = 16;
-		state->mpus = malloc(sizeof(MPU_T*) * INITIAL_SPACE);
-		memset(state->mpus, 0, sizeof(MPU_T*) * INITIAL_SPACE);
-		state->mpus[INITIAL_SPACE - 1] = (void*) -1;
-	}
-
 	for (int i = 0; state->mpus[i] != (void*) -1; i++) {
 		if (state->mpus[i] == NULL) {
 			state->mpus[i] = mpu;
-			return;
-		}
-		if (state->mpus[i + 1] == (void*) -1) {
-			int space = (i + 2) * 2;
-			if (space > 256) {
-				fprintf(stderr, "error on add_mpu\n");
-				return;
+			if (state->mpus[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_mpu\n");
+					return;
+				}
+				MPU_T **current = state->mpus;
+				state->mpus = malloc(sizeof(MPU_T*) * space);
+				memset(state->mpus, 0, sizeof(STATUS_T*) * space);
+				memcpy(state->mpus, current, sizeof(MPU_T*) * i);
+				state->mpus[space - 1] = (void*) -1;
+				free(current);
 			}
-			MPU_T **current = state->mpus;
-			state->mpus = malloc(sizeof(MPU_T*) * space);
-			memset(state->mpus, 0, sizeof(STATUS_T*) * space);
-			memcpy(state->mpus, current, sizeof(MPU_T*) * (i + 1));
-			state->mpus[space - 1] = (void*) -1;
-			free(current);
+			return;
 		}
 	}
 }
 
 static void add_status(STATUS_T *status) {
-	if (state->statuses == NULL) {
-		const int INITIAL_SPACE = 16;
-		state->statuses = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
-		memset(state->statuses, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
-		state->statuses[INITIAL_SPACE - 1] = (void*) -1;
-	}
-
 	for (int i = 0; state->statuses[i] != (void*) -1; i++) {
 		if (state->statuses[i] == NULL) {
 			state->statuses[i] = status;
-			return;
-		}
-		if (state->statuses[i + 1] == (void*) -1) {
-			int space = (i + 2) * 2;
-			if (space > 256) {
-				fprintf(stderr, "error on add_mpu\n");
-				return;
+			if (state->statuses[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_status\n");
+					return;
+				}
+				STATUS_T **current = state->statuses;
+				state->statuses = malloc(sizeof(STATUS_T*) * space);
+				memset(state->statuses, 0, sizeof(STATUS_T*) * space);
+				memcpy(state->statuses, current, sizeof(STATUS_T*) * i);
+				state->statuses[space - 1] = (void*) -1;
+				free(current);
 			}
-			STATUS_T **current = state->statuses;
-			state->statuses = malloc(sizeof(STATUS_T*) * space);
-			memset(state->statuses, 0, sizeof(STATUS_T*) * space);
-			memcpy(state->statuses, current, sizeof(STATUS_T*) * (i + 1));
-			state->statuses[space - 1] = (void*) -1;
-			free(current);
+			return;
 		}
 	}
 }
 
 static void add_watch(STATUS_T *watch) {
-	if (state->watches == NULL) {
-		const int INITIAL_SPACE = 16;
-		state->watches = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
-		memset(state->watches, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
-		state->watches[INITIAL_SPACE - 1] = (void*) -1;
-	}
-
 	for (int i = 0; state->watches[i] != (void*) -1; i++) {
 		if (state->watches[i] == NULL) {
 			state->watches[i] = watch;
-			return;
-		}
-		if (state->watches[i + 1] == (void*) -1) {
-			int space = (i + 2) * 2;
-			if (space > 256) {
-				fprintf(stderr, "error on add_mpu\n");
-				return;
+			if (state->watches[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_watch\n");
+					return;
+				}
+				STATUS_T **current = state->watches;
+				state->watches = malloc(sizeof(STATUS_T*) * space);
+				memset(state->watches, 0, sizeof(STATUS_T*) * space);
+				memcpy(state->watches, current, sizeof(STATUS_T*) * i);
+				state->watches[space - 1] = (void*) -1;
+				free(current);
 			}
-			STATUS_T **current = state->watches;
-			state->watches = malloc(sizeof(STATUS_T*) * space);
-			memset(state->watches, 0, sizeof(STATUS_T*) * space);
-			memcpy(state->watches, current, sizeof(STATUS_T*) * (i + 1));
-			state->watches[space - 1] = (void*) -1;
-			free(current);
+			return;
 		}
 	}
 }
 
 static void add_plugin(PLUGIN_T *plugin) {
-	if (state->plugins == NULL) {
-		const int INITIAL_SPACE = 16;
-		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
-		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
-		state->plugins[INITIAL_SPACE - 1] = (void*) -1;
-	}
-
 	for (int i = 0; state->plugins[i] != (void*) -1; i++) {
 		if (state->plugins[i] == NULL) {
 			state->plugins[i] = plugin;
-			return;
-		}
-		if (state->plugins[i + 1] == (void*) -1) {
-			int space = (i + 2) * 2;
-			if (space > 256) {
-				fprintf(stderr, "error on add_mpu\n");
-				return;
+			if (state->plugins[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_plugin\n");
+					return;
+				}
+				PLUGIN_T **current = state->plugins;
+				state->plugins = malloc(sizeof(PLUGIN_T*) * space);
+				memset(state->plugins, 0, sizeof(PLUGIN_T*) * space);
+				memcpy(state->plugins, current, sizeof(PLUGIN_T*) * i);
+				state->plugins[space - 1] = (void*) -1;
+				free(current);
 			}
-			PLUGIN_T **current = state->plugins;
-			state->plugins = malloc(sizeof(PLUGIN_T*) * space);
-			memcpy(state->plugins, current, sizeof(PLUGIN_T*) * (i + 1));
-			state->plugins[space - 1] = (void*) -1;
-			free(current);
+			return;
 		}
 	}
 }
@@ -1840,88 +1950,122 @@ static int lg_debug_dump_fd = -1;
 static void stream_callback(unsigned char *data, unsigned int data_len,
 		void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
-	if (strcmp(frame->output_filepath, "stream.h264") == 0) {
-		const unsigned char soi[] = { 0x4E, 0x41 }; //'N', 'A'
-		const unsigned char eoi[] = { 0x4C, 0x55 }; //'L', 'U'
-		for (int i = 0; i < data_len;) {
-			if (!frame->in_nal) {
-				frame->in_nal = true;
-				frame->nal_len = data[0] << 24 | data[1] << 16 | data[2] << 8
-						| data[3];
-				frame->nal_len += 4; //start code
-				if (frame->nal_len > 1024 * 1024) {
-					printf("something wrong in h264 stream at %d\n", i);
-					frame->in_nal = false;
-					return;
-				}
-				if (i + frame->nal_len <= data_len) {
-					rtp_sendpacket(soi, sizeof(soi), PT_CAM_BASE + frame->id);
-					rtp_sendpacket(data + i, frame->nal_len,
-					PT_CAM_BASE + frame->id);
-					rtp_sendpacket(eoi, sizeof(eoi), PT_CAM_BASE + frame->id);
-					i += frame->nal_len;
-					frame->in_nal = false;
-				} else {
-					frame->nal_pos = 0;
-					frame->nal_buff = malloc(frame->nal_len);
-				}
-			} else {
-				int rest = frame->nal_len - frame->nal_pos;
-				if (i + rest <= data_len) {
-					memcpy(frame->nal_buff + frame->nal_pos, data + i, rest);
-
-					rtp_sendpacket(soi, sizeof(soi), PT_CAM_BASE + frame->id);
-					for (int j = 0; j < frame->nal_len;) {
-						int len;
-						if (j + RTP_MAXPAYLOADSIZE < frame->nal_len) {
-							len = RTP_MAXPAYLOADSIZE;
-						} else {
-							len = frame->nal_len - j;
-						}
-						rtp_sendpacket(frame->nal_buff + j, len,
-						PT_CAM_BASE + frame->id);
-						j += len;
+	if (frame->output_mode == OUTPUT_MODE_STREAM) {
+		if (frame->output_type == OUTPUT_TYPE_H264) {
+			const unsigned char SC[] = { 0x00, 0x00, 0x00, 0x01 };
+			const unsigned char SOI[] = { 0x4E, 0x41 }; //'N', 'A'
+			const unsigned char EOI[] = { 0x4C, 0x55 }; //'L', 'U'
+			for (int i = 0; i < data_len;) {
+				if (!frame->in_nal) {
+					frame->in_nal = true;
+					frame->nal_len = data[i] << 24 | data[i + 1] << 16
+							| data[i + 2] << 8 | data[i + 3];
+					frame->nal_len += 4; //start code
+					if (frame->nal_len > 1024 * 1024) {
+						printf("something wrong in h264 stream at %d\n", i);
+						frame->in_nal = false;
+						return;
 					}
-					rtp_sendpacket(eoi, sizeof(eoi), PT_CAM_BASE + frame->id);
-					free(frame->nal_buff);
-					frame->nal_buff = NULL;
-
-					i += rest;
-					frame->in_nal = false;
+					if (i + frame->nal_len <= data_len) {
+						rtp_sendpacket(SOI, sizeof(SOI),
+						PT_CAM_BASE + frame->id);
+						if (frame->output_fd > 0) {
+							write(frame->output_fd, SC, 4);
+							write(frame->output_fd, data + i + 4,
+									frame->nal_len - 4);
+						}
+						for (int j = 0; j < frame->nal_len;) {
+							int len;
+							if (j + RTP_MAXPAYLOADSIZE < frame->nal_len) {
+								len = RTP_MAXPAYLOADSIZE;
+							} else {
+								len = frame->nal_len - j;
+							}
+							rtp_sendpacket(data + i + j, len,
+							PT_CAM_BASE + frame->id);
+							j += len;
+						}
+						rtp_sendpacket(EOI, sizeof(EOI),
+						PT_CAM_BASE + frame->id);
+						i += frame->nal_len;
+						frame->in_nal = false;
+					} else {
+						frame->nal_pos = 0;
+						frame->nal_buff = malloc(frame->nal_len);
+					}
 				} else {
-					int len = data_len - i;
-					memcpy(frame->nal_buff + frame->nal_pos, data + i, len);
-					frame->nal_pos += len;
-					i += len;
+					int rest = frame->nal_len - frame->nal_pos;
+					if (i + rest <= data_len) {
+						memcpy(frame->nal_buff + frame->nal_pos, data + i,
+								rest);
+
+						rtp_sendpacket(SOI, sizeof(SOI),
+						PT_CAM_BASE + frame->id);
+						if (frame->output_fd > 0) {
+							write(frame->output_fd, SC, 4);
+							write(frame->output_fd, frame->nal_buff + 4,
+									frame->nal_len - 4);
+						}
+						for (int j = 0; j < frame->nal_len;) {
+							int len;
+							if (j + RTP_MAXPAYLOADSIZE < frame->nal_len) {
+								len = RTP_MAXPAYLOADSIZE;
+							} else {
+								len = frame->nal_len - j;
+							}
+							rtp_sendpacket(frame->nal_buff + j, len,
+							PT_CAM_BASE + frame->id);
+							j += len;
+						}
+						rtp_sendpacket(EOI, sizeof(EOI),
+						PT_CAM_BASE + frame->id);
+						free(frame->nal_buff);
+						frame->nal_buff = NULL;
+
+						i += rest;
+						frame->in_nal = false;
+					} else {
+						int len = data_len - i;
+						memcpy(frame->nal_buff + frame->nal_pos, data + i, len);
+						frame->nal_pos += len;
+						i += len;
+					}
 				}
 			}
-		}
-	} else if (strcmp(frame->output_filepath, "stream.mjpeg") == 0) {
-		if (lg_debug_dump) {
-			if (data[0] == 0xFF && data[1] == 0xD8) { //
-				char path[256];
-				sprintf(path, "/tmp/debug_%03d.jpeg", lg_debug_dump_num++);
-				lg_debug_dump_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
-			}
-			if (lg_debug_dump_fd > 0) {
-				write(lg_debug_dump_fd, data, data_len);
-			}
-			if (data[data_len - 2] == 0xFF && data[data_len - 1] == 0xD9) {
+		} else if (frame->output_type == OUTPUT_TYPE_MJPEG) {
+			if (lg_debug_dump) {
+				if (data[0] == 0xFF && data[1] == 0xD8) { //
+					char path[256];
+					sprintf(path, "/tmp/debug_%03d.jpeg", lg_debug_dump_num++);
+					lg_debug_dump_fd = open(path, //
+							O_CREAT | O_WRONLY | O_TRUNC, /*  */
+							S_IRUSR | S_IWUSR | /* rw */
+							S_IRGRP | S_IWGRP | /* rw */
+							S_IROTH | S_IXOTH);
+				}
 				if (lg_debug_dump_fd > 0) {
-					close(lg_debug_dump_fd);
-					lg_debug_dump_fd = -1;
+					write(lg_debug_dump_fd, data, data_len);
+				}
+				if (data[data_len - 2] == 0xFF && data[data_len - 1] == 0xD9) {
+					if (lg_debug_dump_fd > 0) {
+						close(lg_debug_dump_fd);
+						lg_debug_dump_fd = -1;
+					}
 				}
 			}
-		}
-		for (int i = 0; i < data_len;) {
-			int len;
-			if (i + RTP_MAXPAYLOADSIZE < data_len) {
-				len = RTP_MAXPAYLOADSIZE;
-			} else {
-				len = data_len - i;
+			for (int i = 0; i < data_len;) {
+				int len;
+				if (i + RTP_MAXPAYLOADSIZE < data_len) {
+					len = RTP_MAXPAYLOADSIZE;
+				} else {
+					len = data_len - i;
+				}
+				rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
+				i += len;
 			}
-			rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
-			i += len;
+			if (frame->output_fd > 0) {
+				write(frame->output_fd, data, data_len);
+			}
 		}
 	}
 }
@@ -2862,6 +3006,7 @@ int main(int argc, char *argv[]) {
 	char frame_param[256] = { };
 
 	// Clear application state
+	const int INITIAL_SPACE = 16;
 	memset(state, 0, sizeof(*state));
 	state->cam_width = 2048;
 	state->cam_height = 2048;
@@ -2875,9 +3020,30 @@ int main(int argc, char *argv[]) {
 	state->conf_sync = true;
 	state->camera_horizon_r_bias = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", 64);
+	{
+		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
+		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
+		state->plugins[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
+		state->mpus = malloc(sizeof(MPU_T*) * INITIAL_SPACE);
+		memset(state->mpus, 0, sizeof(MPU_T*) * INITIAL_SPACE);
+		state->mpus[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
+		state->watches = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
+		memset(state->watches, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
+		state->watches[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
+		state->statuses = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
+		memset(state->statuses, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
+		state->statuses[INITIAL_SPACE - 1] = (void*) -1;
+	}
 
 	umask(0000);
 
+	optind = 1; // reset getopt
 	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'c':
@@ -3322,15 +3488,13 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 						lg_cam_fps[1], lg_cam_frameskip[0],
 						lg_cam_frameskip[1]);
 	}
-	if (state->plugins) {
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			if (state->plugins[i]->get_info) {
-				wchar_t *info = state->plugins[i]->get_info(
-						state->plugins[i]->user_data);
-				if (info) {
-					len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls",
-							info);
-				}
+	for (int i = 0; state->plugins[i] != NULL; i++) {
+		if (state->plugins[i]->get_info) {
+			wchar_t *info = state->plugins[i]->get_info(
+					state->plugins[i]->user_data);
+			if (info) {
+				len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls",
+						info);
 			}
 		}
 	}

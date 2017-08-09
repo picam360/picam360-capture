@@ -45,6 +45,9 @@ enum INPUT_MODE {
 enum OUTPUT_MODE {
 	OUTPUT_MODE_NONE, OUTPUT_MODE_STILL, OUTPUT_MODE_VIDEO, OUTPUT_MODE_STREAM
 };
+enum OUTPUT_TYPE {
+	OUTPUT_TYPE_NONE, OUTPUT_TYPE_JPEG, OUTPUT_TYPE_MJPEG, OUTPUT_TYPE_H264
+};
 enum OPERATION_MODE {
 	BOARD, WINDOW, EQUIRECTANGULAR, FISHEYE, CALIBRATION
 };
@@ -94,7 +97,9 @@ typedef struct _FRAME_T {
 
 	enum OPERATION_MODE operation_mode;
 	enum OUTPUT_MODE output_mode;
+	enum OUTPUT_TYPE output_type;
 	char output_filepath[256];
+	int output_fd;
 	bool double_size;
 
 	float kbps;
