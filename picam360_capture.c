@@ -54,7 +54,7 @@
 #include <opencv/highgui.h>
 
 #define PATH "./"
-#define PICAM360_HISTORY_FILE ".picam360history"
+#define PICAM360_HISTORY_FILE ".picam360_history"
 #define PLUGIN_NAME "picam360"
 
 #ifndef M_PI
