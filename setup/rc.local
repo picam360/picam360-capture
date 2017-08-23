@@ -71,7 +71,7 @@ if [ $(($2&0x02)) != 0 ]; then
 	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 800 -h 480 -v mpu9250\" -p &"
 else
 	echo "NO HDMI"
-	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 320 -h 320 -s h264 -f 5\" &"
+	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 544 -h 640 -s h264 -f 5\" &"
 	su -l pi -c "bash /home/pi/picam360/picam360-server/sh/start-app.sh &"
 fi
 
