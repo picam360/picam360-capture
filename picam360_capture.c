@@ -3120,6 +3120,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam]);
 	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"), state->options.cam_horizon_r[state->active_cam] * state->camera_horizon_r_bias);
 	glUniform1f(glGetUniformLocation(program, "color_offset"), state->options.color_offset);
+	glUniform1f(glGetUniformLocation(program, "color_factor"), 1.0 / (1.0 - state->options.color_offset));
 	glUniform1f(glGetUniformLocation(program, "overlap"), state->options.overlap);
 	//options end
 
