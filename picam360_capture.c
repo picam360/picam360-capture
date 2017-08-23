@@ -69,10 +69,8 @@ static void init_textures(PICAM360CAPTURE_T *state);
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
 static void exit_func(void);
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
-		MODEL_T *model);
-static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
-		MODEL_T *model);
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
+static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
 
 static void loading_callback(void *user_data, int ret);
@@ -119,12 +117,10 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	VC_RECT_T dst_rect;
 	VC_RECT_T src_rect;
 
-	static const EGLint attribute_list[] = { EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
-			EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 16,
-			//EGL_SAMPLES, 4,
+	static const EGLint attribute_list[] = { EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 16,
+	//EGL_SAMPLES, 4,
 			EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_NONE };
-	static const EGLint context_attributes[] = { EGL_CONTEXT_CLIENT_VERSION, 2,
-			EGL_NONE };
+	static const EGLint context_attributes[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
 
 	EGLConfig config;
 
@@ -138,8 +134,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	// get an appropriate EGL frame buffer configuration
 	// this uses a BRCM extension that gets the closest match, rather than standard which returns anything that matches
-	result = eglSaneChooseConfigBRCM(state->display, attribute_list, &config, 1,
-			&num_config);
+	result = eglSaneChooseConfigBRCM(state->display, attribute_list, &config, 1, &num_config);
 	assert(EGL_FALSE != result);
 
 	//Bind to the right EGL API.
@@ -147,13 +142,11 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	assert(result != EGL_FALSE);
 
 	// create an EGL rendering context
-	state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT,
-			context_attributes);
+	state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT, context_attributes);
 	assert(state->context != EGL_NO_CONTEXT);
 
 	// create an EGL window surface
-	success = graphics_get_display_size(0 /* LCD */, &state->screen_width,
-			&state->screen_height);
+	success = graphics_get_display_size(0 /* LCD */, &state->screen_width, &state->screen_height);
 	assert(success >= 0);
 
 	dst_rect.x = 0;
@@ -171,18 +164,14 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 		dispman_display = vc_dispmanx_display_open(0 /* LCD */);
 		dispman_update = vc_dispmanx_update_start(0);
 
-		dispman_element = vc_dispmanx_element_add(dispman_update,
-				dispman_display, 0/*layer*/, &dst_rect, 0/*src*/, &src_rect,
-				DISPMANX_PROTECTION_NONE, 0 /*alpha*/, 0/*clamp*/,
-				0/*transform*/);
+		dispman_element = vc_dispmanx_element_add(dispman_update, dispman_display, 0/*layer*/, &dst_rect, 0/*src*/, &src_rect, DISPMANX_PROTECTION_NONE, 0 /*alpha*/, 0/*clamp*/, 0/*transform*/);
 
 		nativewindow.element = dispman_element;
 		nativewindow.width = state->screen_width;
 		nativewindow.height = state->screen_height;
 		vc_dispmanx_update_submit_sync(dispman_update);
 
-		state->surface = eglCreateWindowSurface(state->display, config,
-				&nativewindow, NULL);
+		state->surface = eglCreateWindowSurface(state->display, config, &nativewindow, NULL);
 	}
 //	else {
 //		//Create an offscreen rendering surface
@@ -194,8 +183,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	assert(state->surface != EGL_NO_SURFACE);
 
 	// connect the context to the surface
-	result = eglMakeCurrent(state->display, state->surface, state->surface,
-			state->context);
+	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
 	assert(EGL_FALSE != result);
 
 	// Enable back face culling.
@@ -210,8 +198,7 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width, iplImage->height, 0,
-			GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width, iplImage->height, 0, GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.");
 	}
@@ -224,14 +211,11 @@ int load_texture(const char *filename, GLuint *tex_out) {
 
 int board_mesh(GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
-	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f,
-			1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-			1.0f };
+	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex_positions),
-			quad_vertex_positions, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex_positions), quad_vertex_positions, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	if (vbo_out != NULL)
 		*vbo_out = vbo;
@@ -241,8 +225,7 @@ int board_mesh(GLuint *vbo_out, GLuint *n_out) {
 	return 0;
 }
 
-int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
-		GLuint *vbo_out, GLuint *n_out) {
+int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
@@ -293,8 +276,7 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points,
-			GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
 
 	if (vbo_out != NULL)
 		*vbo_out = vbo;
@@ -318,41 +300,28 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps,
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 	float maxfov = 150.0;
 
-	board_mesh(&state->model_data[EQUIRECTANGULAR].vbo,
-			&state->model_data[EQUIRECTANGULAR].vbo_nop);
+	board_mesh(&state->model_data[EQUIRECTANGULAR].vbo, &state->model_data[EQUIRECTANGULAR].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[EQUIRECTANGULAR].program = GLProgram_new(
-				"shader/equirectangular.vert", "shader/equirectangular.frag");
+		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
 	} else {
-		state->model_data[EQUIRECTANGULAR].program = GLProgram_new(
-				"shader/equirectangular.vert",
-				"shader/equirectangular_sphere.frag");
+		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(&state->model_data[FISHEYE].vbo,
-			&state->model_data[FISHEYE].vbo_nop);
-	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert",
-			"shader/fisheye.frag");
+	board_mesh(&state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
+	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert", "shader/fisheye.frag");
 
-	board_mesh(&state->model_data[CALIBRATION].vbo,
-			&state->model_data[CALIBRATION].vbo_nop);
-	state->model_data[CALIBRATION].program = GLProgram_new(
-			"shader/calibration.vert", "shader/calibration.frag");
+	board_mesh(&state->model_data[CALIBRATION].vbo, &state->model_data[CALIBRATION].vbo_nop);
+	state->model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert", "shader/calibration.frag");
 
-	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[WINDOW].vbo,
-			&state->model_data[WINDOW].vbo_nop);
+	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[WINDOW].vbo, &state->model_data[WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert",
-				"shader/window.frag");
+		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert", "shader/window.frag");
 	} else {
-		state->model_data[WINDOW].program = GLProgram_new(
-				"shader/window_sphere.vert", "shader/window_sphere.frag");
+		state->model_data[WINDOW].program = GLProgram_new("shader/window_sphere.vert", "shader/window_sphere.frag");
 	}
 
-	board_mesh(&state->model_data[BOARD].vbo,
-			&state->model_data[BOARD].vbo_nop);
-	state->model_data[BOARD].program = GLProgram_new("shader/board.vert",
-			"shader/board.frag");
+	board_mesh(&state->model_data[BOARD].vbo, &state->model_data[BOARD].vbo_nop);
+	state->model_data[BOARD].program = GLProgram_new("shader/board.vert", "shader/board.frag");
 }
 
 /***********************************************************
@@ -376,8 +345,7 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 				state->cam_texture[i][j] = 0;
 			}
 			if (state->egl_image[i][j] != 0) {
-				if (!eglDestroyImageKHR(state->display,
-						(EGLImageKHR) state->egl_image[i][j]))
+				if (!eglDestroyImageKHR(state->display, (EGLImageKHR) state->egl_image[i][j]))
 					printf("eglDestroyImageKHR failed.");
 				state->egl_image[i][j] = NULL;
 			}
@@ -391,8 +359,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			glGenTextures(1, &state->cam_texture[i][j]);
 
 			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width,
-					state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width, state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -400,9 +367,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 			/* Create EGL Image */
-			state->egl_image[i][j] = eglCreateImageKHR(state->display,
-					state->context, EGL_GL_TEXTURE_2D_KHR,
-					(EGLClientBuffer) state->cam_texture[i][j], 0);
+			state->egl_image[i][j] = eglCreateImageKHR(state->display, state->context, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i][j], 0);
 
 			if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
 				printf("eglCreateImageKHR failed.\n");
@@ -427,9 +392,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 			args[0] = (void*) i;
 			args[1] = (void*) state->egl_image[i];
 			args[2] = (void*) state;
-			pthread_create(&state->thread[i], NULL,
-					(state->video_direct) ? video_direct : video_decode_test,
-					args);
+			pthread_create(&state->thread[i], NULL, (state->video_direct) ? video_direct : video_decode_test, args);
 		}
 	}
 }
@@ -452,28 +415,23 @@ static void init_options(PICAM360CAPTURE_T *state) {
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
-		state->options.sharpness_gain = json_number_value(
-				json_object_get(options, "sharpness_gain"));
+		state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
+		state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
+		state->options.overlap = json_number_value(json_object_get(options, "overlap"));
 		for (int i = 0; i < MAX_CAM_NUM; i++) {
 			char buff[256];
 			sprintf(buff, "cam%d_offset_pitch", i);
-			state->options.cam_offset_pitch[i] = json_number_value(
-					json_object_get(options, buff));
+			state->options.cam_offset_pitch[i] = json_number_value(json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_yaw", i);
-			state->options.cam_offset_yaw[i] = json_number_value(
-					json_object_get(options, buff));
+			state->options.cam_offset_yaw[i] = json_number_value(json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_roll", i);
-			state->options.cam_offset_roll[i] = json_number_value(
-					json_object_get(options, buff));
+			state->options.cam_offset_roll[i] = json_number_value(json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_x", i);
-			state->options.cam_offset_x[i] = json_number_value(
-					json_object_get(options, buff));
+			state->options.cam_offset_x[i] = json_number_value(json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_y", i);
-			state->options.cam_offset_y[i] = json_number_value(
-					json_object_get(options, buff));
+			state->options.cam_offset_y[i] = json_number_value(json_object_get(options, buff));
 			sprintf(buff, "cam%d_horizon_r", i);
-			state->options.cam_horizon_r[i] = json_number_value(
-					json_object_get(options, buff));
+			state->options.cam_horizon_r[i] = json_number_value(json_object_get(options, buff));
 
 			if (state->options.cam_horizon_r[i] == 0) {
 				state->options.cam_horizon_r[i] = 0.8;
@@ -483,27 +441,22 @@ static void init_options(PICAM360CAPTURE_T *state) {
 			json_t *plugin_paths = json_object_get(options, "plugin_paths");
 			if (json_is_array(plugin_paths)) {
 				int size = json_array_size(plugin_paths);
-				state->plugin_paths = (char**) malloc(
-						sizeof(char*) * (size + 1));
+				state->plugin_paths = (char**) malloc(sizeof(char*) * (size + 1));
 				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
 
 				for (int i = 0; i < size; i++) {
 					json_t *value = json_array_get(plugin_paths, i);
 					int len = json_string_length(value);
-					state->plugin_paths[i] = (char*) malloc(
-							sizeof(char) * (len + 1));
+					state->plugin_paths[i] = (char*) malloc(sizeof(char) * (len + 1));
 					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
-					strncpy(state->plugin_paths[i], json_string_value(value),
-							len);
+					strncpy(state->plugin_paths[i], json_string_value(value), len);
 					if (len > 0) {
-						void *handle = dlopen(state->plugin_paths[i],
-								RTLD_LAZY);
+						void *handle = dlopen(state->plugin_paths[i], RTLD_LAZY);
 						if (!handle) {
 							fprintf(stderr, "%s\n", dlerror());
 							continue;
 						}
-						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(
-								handle, "create_plugin");
+						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(handle, "create_plugin");
 						if (!create_plugin) {
 							fprintf(stderr, "%s\n", dlerror());
 							dlclose(handle);
@@ -524,8 +477,7 @@ static void init_options(PICAM360CAPTURE_T *state) {
 
 		for (int i = 0; state->plugins[i] != NULL; i++) {
 			if (state->plugins[i]->init_options) {
-				state->plugins[i]->init_options(state->plugins[i]->user_data,
-						options);
+				state->plugins[i]->init_options(state->plugins[i]->user_data, options);
 			}
 		}
 
@@ -548,43 +500,36 @@ static void init_options(PICAM360CAPTURE_T *state) {
 static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
-	json_object_set_new(options, "sharpness_gain",
-			json_real(state->options.sharpness_gain));
+	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
+	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
+	json_object_set_new(options, "overlap", json_real(state->options.overlap));
 	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_pitch", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_pitch[i]));
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_pitch[i]));
 		sprintf(buff, "cam%d_offset_yaw", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_yaw[i]));
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_yaw[i]));
 		sprintf(buff, "cam%d_offset_roll", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_roll[i]));
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_roll[i]));
 		sprintf(buff, "cam%d_offset_x", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_x[i]));
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_x[i]));
 		sprintf(buff, "cam%d_offset_y", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_y[i]));
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_y[i]));
 		sprintf(buff, "cam%d_horizon_r", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_horizon_r[i]));
+		json_object_set_new(options, buff, json_real(state->options.cam_horizon_r[i]));
 	}
 
 	if (state->plugin_paths) {
 		json_t *plugin_paths = json_array();
 		for (int i = 0; state->plugin_paths[i] != NULL; i++) {
-			json_array_append_new(plugin_paths,
-					json_string(state->plugin_paths[i]));
+			json_array_append_new(plugin_paths, json_string(state->plugin_paths[i]));
 		}
 		json_object_set_new(options, "plugin_paths", plugin_paths);
 	}
 
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]->save_options) {
-			state->plugins[i]->save_options(state->plugins[i]->user_data,
-					options);
+			state->plugins[i]->save_options(state->plugins[i]->user_data, options);
 		}
 	}
 
@@ -604,8 +549,7 @@ static void exit_func(void)
 	eglSwapBuffers(state->display, state->surface);
 
 	// Release OpenGL resources
-	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE,
-			EGL_NO_CONTEXT);
+	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	eglDestroySurface(state->display, state->surface);
 	eglDestroyContext(state->display, state->context);
 	eglTerminate(state->display);
@@ -661,8 +605,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			break;
 		case 'o':
 			frame->output_mode = OUTPUT_MODE_VIDEO;
-			strncpy(frame->output_filepath, optarg,
-					sizeof(frame->output_filepath));
+			strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 			break;
 		case 'v':
 			frame->view_mpu = state->mpus[0];
@@ -694,8 +637,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 
 	if (frame->view_mpu == NULL) {
 		for (int i = 0; state->mpus[i] != NULL; i++) {
-			if (strncmp(state->mpus[i]->name,
-					state->default_view_coordinate_mode, 64) == 0) {
+			if (strncmp(state->mpus[i]->name, state->default_view_coordinate_mode, 64) == 0) {
 				frame->view_mpu = state->mpus[i];
 			}
 		}
@@ -717,19 +659,16 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	glBindTexture(GL_TEXTURE_2D, frame->texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0,
-			GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if (glGetError() != GL_NO_ERROR) {
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-			frame->texture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frame->texture, 0);
 	if (glGetError() != GL_NO_ERROR) {
-		printf(
-				"glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
+		printf("glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
 	}
 
 	// Set background color and clear buffers
@@ -771,8 +710,7 @@ bool delete_frame(FRAME_T *frame) {
 	return true;
 }
 
-static void stream_callback(unsigned char *data, unsigned int data_len,
-		void *user_data);
+static void stream_callback(unsigned char *data, unsigned int data_len, void *user_data);
 
 void frame_handler() {
 	struct timeval s, f;
@@ -786,8 +724,7 @@ void frame_handler() {
 		if (frame->fps > 0) {
 			struct timeval diff;
 			timersub(&s, &frame->last_updated, &diff);
-			float diff_sec = (float) diff.tv_sec
-					+ (float) diff.tv_usec / 1000000;
+			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 			if (diff_sec < 1.0 / frame->fps) {
 				frame_pp = &frame->next;
 				continue;
@@ -800,8 +737,7 @@ void frame_handler() {
 			frame->recorder = NULL;
 
 			frame->frame_elapsed /= frame->frame_num;
-			printf("stop record : frame num : %d : fps %.3lf\n",
-					frame->frame_num, 1000.0 / frame->frame_elapsed);
+			printf("stop record : frame num : %d : fps %.3lf\n", frame->frame_num, 1000.0 / frame->frame_elapsed);
 
 			frame->output_mode = OUTPUT_MODE_NONE;
 			frame->is_recording = false;
@@ -810,29 +746,23 @@ void frame_handler() {
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
-			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					frame->output_filepath, 4000 * ratio, fps, stream_callback,
-					NULL);
+			frame->recorder = StartRecord(frame->width * ratio, frame->height, frame->output_filepath, 4000 * ratio, fps, stream_callback, NULL);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
-			frame->output_fd = open(frame->output_filepath,
-					O_CREAT | O_WRONLY | O_TRUNC, /*  */
-					S_IRUSR | S_IWUSR | /* rw */
-					S_IRGRP | S_IWGRP | /* rw */
-					S_IROTH | S_IXOTH);
+			frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
+			S_IRUSR | S_IWUSR | /* rw */
+			S_IRGRP | S_IWGRP | /* rw */
+			S_IROTH | S_IXOTH);
 			printf("start_record saved to %s\n", frame->output_filepath);
 		}
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_STREAM) {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
 			float kbps = frame->kbps;
-			char *dummy_path =
-					(frame->output_type == OUTPUT_TYPE_H264) ?
-							"stream.h264" : "stream.mjpeg";
+			char *dummy_path = (frame->output_type == OUTPUT_TYPE_H264) ? "stream.h264" : "stream.mjpeg";
 			if (kbps == 0) {
-				float ave_sq = sqrt(
-						(float) frame->width * (float) frame->height) / 1.2;
+				float ave_sq = sqrt((float) frame->width * (float) frame->height) / 1.2;
 				if (frame->output_type == OUTPUT_TYPE_H264) {
 					if (ave_sq <= 240) {
 						kbps = 200;
@@ -863,13 +793,11 @@ void frame_handler() {
 					}
 				}
 			}
-			frame->recorder = StartRecord(frame->width * ratio, frame->height,
-					dummy_path, kbps * ratio, fps, stream_callback, frame);
+			frame->recorder = StartRecord(frame->width * ratio, frame->height, dummy_path, kbps * ratio, fps, stream_callback, frame);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
-			printf("start_record saved to %s : %d kbps\n",
-					frame->output_filepath, (int) kbps);
+			printf("start_record saved to %s : %d kbps\n", frame->output_filepath, (int) kbps);
 		}
 
 		//rendering to buffer
@@ -886,18 +814,12 @@ void frame_handler() {
 				state->split = split + 1;
 
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-				redraw_render_texture(state, frame,
-						&state->model_data[frame->operation_mode]);
+				redraw_render_texture(state, frame, &state->model_data[frame->operation_mode]);
 				glFinish();
-				glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-						GL_UNSIGNED_BYTE, image_buffer);
+				glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 				for (int y = 0; y < frame->height; y++) {
-					memcpy(
-							image_buffer_double + frame->width * 2 * 3 * y
-									+ frame->width * 3 * split,
-							image_buffer + frame->width * 3 * y,
-							frame->width * 3);
+					memcpy(image_buffer_double + frame->width * 2 * 3 * y + frame->width * 3 * split, image_buffer + frame->width * 3 * y, frame->width * 3);
 				}
 			}
 			state->plugin_host.unlock_texture();
@@ -910,27 +832,23 @@ void frame_handler() {
 			//state->plugin_host.lock_texture();
 
 			glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-			redraw_render_texture(state, frame,
-					&state->model_data[frame->operation_mode]);
+			redraw_render_texture(state, frame, &state->model_data[frame->operation_mode]);
 			if (state->menu_visible) {
 				redraw_info(state, frame);
 			}
 			glFinish();
-			glReadPixels(0, 0, frame->width, frame->height, GL_RGB,
-					GL_UNSIGNED_BYTE, image_buffer);
+			glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			//state->plugin_host.unlock_texture();
 		}
 
 		switch (frame->output_mode) {
 		case OUTPUT_MODE_STILL:
-			SaveJpeg(frame->img_buff, img_width, img_height,
-					frame->output_filepath, 70);
+			SaveJpeg(frame->img_buff, img_width, img_height, frame->output_filepath, 70);
 			printf("snap saved to %s\n", frame->output_filepath);
 
 			gettimeofday(&f, NULL);
-			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-					+ (f.tv_usec - s.tv_usec) / 1000.0;
+			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
 			printf("elapsed %.3lf ms\n", elapsed_ms);
 
 			frame->output_mode = OUTPUT_MODE_NONE;
@@ -943,8 +861,7 @@ void frame_handler() {
 				AddFrame(frame->recorder, frame->img_buff);
 
 				gettimeofday(&f, NULL);
-				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-						+ (f.tv_usec - s.tv_usec) / 1000.0;
+				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
 				frame->frame_num++;
 				frame->frame_elapsed += elapsed_ms;
 			} else {
@@ -956,23 +873,20 @@ void frame_handler() {
 			AddFrame(frame->recorder, frame->img_buff);
 
 			gettimeofday(&f, NULL);
-			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0
-					+ (f.tv_usec - s.tv_usec) / 1000.0;
+			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
 			frame->frame_num++;
 			frame->frame_elapsed += elapsed_ms;
 
 			if (end_width(frame->output_filepath, ".jpeg")) {
-				SaveJpeg(frame->img_buff, img_width, img_height,
-						frame->output_filepath, 70);
+				SaveJpeg(frame->img_buff, img_width, img_height, frame->output_filepath, 70);
 				printf("snap saved to %s\n", frame->output_filepath);
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".h264")) {
 				if (frame->output_type == OUTPUT_TYPE_H264) {
-					frame->output_fd = open(frame->output_filepath,
-							O_CREAT | O_WRONLY | O_TRUNC, /*  */
-							S_IRUSR | S_IWUSR | /* rw */
-							S_IRGRP | S_IWGRP | /* rw */
-							S_IROTH | S_IXOTH);
+					frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
+					S_IRUSR | S_IWUSR | /* rw */
+					S_IRGRP | S_IWGRP | /* rw */
+					S_IROTH | S_IXOTH);
 					printf("start record to %s\n", frame->output_filepath);
 				} else {
 					printf("error type : %s\n", frame->output_filepath);
@@ -980,11 +894,10 @@ void frame_handler() {
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".mjpeg")) {
 				if (frame->output_type == OUTPUT_TYPE_MJPEG) {
-					frame->output_fd = open(frame->output_filepath,
-							O_CREAT | O_WRONLY | O_TRUNC, /*  */
-							S_IRUSR | S_IWUSR | /* rw */
-							S_IRGRP | S_IWGRP | /* rw */
-							S_IROTH | S_IXOTH);
+					frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
+					S_IRUSR | S_IWUSR | /* rw */
+					S_IRGRP | S_IWGRP | /* rw */
+					S_IROTH | S_IXOTH);
 					printf("start record to %s\n", frame->output_filepath);
 				} else {
 					printf("error type : %s\n", frame->output_filepath);
@@ -1016,11 +929,9 @@ void frame_handler() {
 		}
 	}
 	if (snap_finished) {
-		state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
-				PICAM360_CAPTURE_EVENT_AFTER_SNAP);
+		state->plugin_host.send_event(PICAM360_HOST_NODE_ID, PICAM360_CAPTURE_EVENT_AFTER_SNAP);
 	}
-	state->plugin_host.send_event(PICAM360_HOST_NODE_ID,
-			PICAM360_CAPTURE_EVENT_AFTER_FRAME);
+	state->plugin_host.send_event(PICAM360_HOST_NODE_ID, PICAM360_CAPTURE_EVENT_AFTER_FRAME);
 }
 
 static double calib_step = 0.01;
@@ -1033,9 +944,7 @@ int _command_handler(const char *_buff) {
 	char *cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0
-			|| strncmp(cmd, "q", sizeof(buff)) == 0
-			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0 || strncmp(cmd, "q", sizeof(buff)) == 0 || strncmp(cmd, "quit", sizeof(buff)) == 0) {
 		printf("exit\n");
 		exit(0);
 	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
@@ -1083,13 +992,10 @@ int _command_handler(const char *_buff) {
 				while ((opt = getopt(argc, argv, "0o:")) != -1) {
 					switch (opt) {
 					case 'o':
-						for (FRAME_T *frame = state->frame; frame != NULL;
-								frame = frame->next) {
+						for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 							if (frame->id == target_frame) {
-								strncpy(frame->output_filepath, optarg,
-										sizeof(frame->output_filepath));
-								printf("snap %d : %s\n", frame->id,
-										frame->output_filepath);
+								strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
+								printf("snap %d : %s\n", frame->id, frame->output_filepath);
 								break;
 							}
 						}
@@ -1133,13 +1039,10 @@ int _command_handler(const char *_buff) {
 				while ((opt = getopt(argc, argv, "0o:")) != -1) {
 					switch (opt) {
 					case 'o':
-						for (FRAME_T *frame = state->frame; frame != NULL;
-								frame = frame->next) {
+						for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 							if (frame->id == target_frame) {
-								strncpy(frame->output_filepath, optarg,
-										sizeof(frame->output_filepath));
-								printf("start_record %d : %s\n", frame->id,
-										frame->output_filepath);
+								strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
+								printf("start_record %d : %s\n", frame->id, frame->output_filepath);
 								break;
 							}
 						}
@@ -1173,8 +1076,7 @@ int _command_handler(const char *_buff) {
 			if (target_frame < 0) {
 				//do nothing
 			} else {
-				for (FRAME_T *frame = state->frame; frame != NULL;
-						frame = frame->next) {
+				for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 					if (frame->id == target_frame) {
 						if (frame->output_fd > 0) {
 							close(frame->output_fd);
@@ -1190,8 +1092,7 @@ int _command_handler(const char *_buff) {
 		}
 	} else if (strncmp(cmd, "start_ac", sizeof(buff)) == 0) {
 		bool checkAcMode = false;
-		for (FRAME_T *frame = state->frame; frame != NULL; frame =
-				frame->next) {
+		for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 			if (is_auto_calibration(frame)) {
 				checkAcMode = true;
 				break;
@@ -1224,8 +1125,7 @@ int _command_handler(const char *_buff) {
 			printf("start_ac\n");
 		}
 	} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
-		for (FRAME_T *frame = state->frame; frame != NULL; frame =
-				frame->next) {
+		for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 			if (is_auto_calibration(frame)) {
 				frame->delete_after_processed = true;
 				printf("stop_ac\n");
@@ -1235,8 +1135,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL && !state->output_raw) {
-			strncpy(state->output_raw_filepath, param,
-					sizeof(state->output_raw_filepath) - 1);
+			strncpy(state->output_raw_filepath, param, sizeof(state->output_raw_filepath) - 1);
 			state->output_raw = true;
 			printf("start_record_raw saved to %s\n", param);
 		}
@@ -1246,15 +1145,13 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "load_file", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			strncpy(state->input_filepath, param,
-					sizeof(state->input_filepath) - 1);
+			strncpy(state->input_filepath, param, sizeof(state->input_filepath) - 1);
 			state->input_mode = INPUT_MODE_FILE;
 			state->input_file_cur = -1;
 			state->input_file_size = 0;
 			printf("load_file from %s\n", param);
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			rtp_start_recording(param);
@@ -1266,8 +1163,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(param, true, true,
-					(RTP_LOADING_CALLBACK) loading_callback, NULL);
+			rtp_start_loading(param, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
@@ -1302,13 +1198,10 @@ int _command_handler(const char *_buff) {
 			int num = sscanf(param, "%i=%f,%f,%f,%f", &id, &x, &y, &z, &w);
 
 			if (num == 5) {
-				for (FRAME_T *frame = state->frame; frame != NULL;
-						frame = frame->next) {
-					if (frame->id == id && frame->view_mpu
-							&& frame->view_mpu->set_quaternion) {
+				for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
+					if (frame->id == id && frame->view_mpu && frame->view_mpu->set_quaternion) {
 						VECTOR4D_T value = { .ary = { x, y, z, w } };
-						frame->view_mpu->set_quaternion(
-								frame->view_mpu->user_data, value);
+						frame->view_mpu->set_quaternion(frame->view_mpu->user_data, value);
 						//printf("set_view_quaternion\n");
 						break;
 					}
@@ -1321,8 +1214,7 @@ int _command_handler(const char *_buff) {
 			int id;
 			float fov;
 			sscanf(param, "%i=%f", &id, &fov);
-			for (FRAME_T *frame = state->frame; frame != NULL;
-					frame = frame->next) {
+			for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 				if (frame->id == id) {
 					frame->fov = fov;
 					printf("set_fov\n");
@@ -1366,8 +1258,7 @@ int _command_handler(const char *_buff) {
 			}
 			{ //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_horizon_r %s",
-						param);
+				sprintf(cmd, "upstream.picam360_driver.add_camera_horizon_r %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1391,8 +1282,7 @@ int _command_handler(const char *_buff) {
 			}
 			{ //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_x %s",
-						param);
+				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_x %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1416,8 +1306,7 @@ int _command_handler(const char *_buff) {
 			}
 			{ //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_y %s",
-						param);
+				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_y %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1441,9 +1330,7 @@ int _command_handler(const char *_buff) {
 			}
 			{ //send upstream
 				char cmd[256];
-				sprintf(cmd,
-						"upstream.picam360_driver.add_camera_offset_yaw %s",
-						param);
+				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_yaw %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1477,20 +1364,17 @@ int _command_handler(const char *_buff) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_NEXT);
 	} else if (strncmp(cmd, "back2previouse_menu", sizeof(buff)) == 0) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_BACK);
-	} else if (state->frame != NULL
-			&& state->frame->operation_mode == CALIBRATION) {
+	} else if (state->frame != NULL && state->frame->operation_mode == CALIBRATION) {
 		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
 				sscanf(param, "%lf", &calib_step);
 			}
 		}
-		if (strncmp(cmd, "u", sizeof(buff)) == 0
-				|| strncmp(cmd, "t", sizeof(buff)) == 0) {
+		if (strncmp(cmd, "u", sizeof(buff)) == 0 || strncmp(cmd, "t", sizeof(buff)) == 0) {
 			state->options.cam_offset_y[state->active_cam] += calib_step;
 		}
-		if (strncmp(cmd, "d", sizeof(buff)) == 0
-				|| strncmp(cmd, "b", sizeof(buff)) == 0) {
+		if (strncmp(cmd, "d", sizeof(buff)) == 0 || strncmp(cmd, "b", sizeof(buff)) == 0) {
 			state->options.cam_offset_y[state->active_cam] -= calib_step;
 		}
 		if (strncmp(cmd, "l", sizeof(buff)) == 0) {
@@ -1533,10 +1417,8 @@ int command_handler() {
 			bool handled = false;
 			for (int i = 0; state->plugins[i] != NULL; i++) {
 				int name_len = strlen(state->plugins[i]->name);
-				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-						&& buff[name_len] == '.') {
-					ret = state->plugins[i]->command_handler(
-							state->plugins[i]->user_data, buff);
+				if (strncmp(buff, state->plugins[i]->name, name_len) == 0 && buff[name_len] == '.') {
+					ret = state->plugins[i]->command_handler(state->plugins[i]->user_data, buff);
 					handled = true;
 				}
 			}
@@ -1772,8 +1654,7 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 	event_handler(node_id, event_id);
 	for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]) {
-			state->plugins[i]->event_handler(state->plugins[i]->user_data,
-					node_id, event_id);
+			state->plugins[i]->event_handler(state->plugins[i]->user_data, node_id, event_id);
 		}
 	}
 }
@@ -1865,8 +1746,7 @@ static void add_plugin(PLUGIN_T *plugin) {
 	}
 }
 
-static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
-		const char *path) {
+static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode, const char *path) {
 	char cmd[512];
 	char *mode_str = "";
 	switch (mode) {
@@ -1947,8 +1827,7 @@ static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
 static int lg_debug_dump_fd = -1;
 
-static void stream_callback(unsigned char *data, unsigned int data_len,
-		void *user_data) {
+static void stream_callback(unsigned char *data, unsigned int data_len, void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
 	if (frame->output_mode == OUTPUT_MODE_STREAM) {
 		if (frame->output_type == OUTPUT_TYPE_H264) {
@@ -1958,8 +1837,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len,
 			for (int i = 0; i < data_len;) {
 				if (!frame->in_nal) {
 					frame->in_nal = true;
-					frame->nal_len = data[i] << 24 | data[i + 1] << 16
-							| data[i + 2] << 8 | data[i + 3];
+					frame->nal_len = data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3];
 					frame->nal_len += 4; //start code
 					if (frame->nal_len > 1024 * 1024) {
 						printf("something wrong in h264 stream at %d\n", i);
@@ -1971,8 +1849,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len,
 						PT_CAM_BASE + frame->id);
 						if (frame->output_fd > 0) {
 							write(frame->output_fd, SC, 4);
-							write(frame->output_fd, data + i + 4,
-									frame->nal_len - 4);
+							write(frame->output_fd, data + i + 4, frame->nal_len - 4);
 						}
 						for (int j = 0; j < frame->nal_len;) {
 							int len;
@@ -1996,15 +1873,13 @@ static void stream_callback(unsigned char *data, unsigned int data_len,
 				} else {
 					int rest = frame->nal_len - frame->nal_pos;
 					if (i + rest <= data_len) {
-						memcpy(frame->nal_buff + frame->nal_pos, data + i,
-								rest);
+						memcpy(frame->nal_buff + frame->nal_pos, data + i, rest);
 
 						rtp_sendpacket(SOI, sizeof(SOI),
 						PT_CAM_BASE + frame->id);
 						if (frame->output_fd > 0) {
 							write(frame->output_fd, SC, 4);
-							write(frame->output_fd, frame->nal_buff + 4,
-									frame->nal_len - 4);
+							write(frame->output_fd, frame->nal_buff + 4, frame->nal_len - 4);
 						}
 						for (int j = 0; j < frame->nal_len;) {
 							int len;
@@ -2095,9 +1970,7 @@ static int command2upstream_handler() {
 
 	if (buff) {
 		lg_command_id++;
-		snprintf(lg_command, sizeof(lg_command),
-				"<picam360:command id=\"%d\" value=\"%s\" />", lg_command_id,
-				buff);
+		snprintf(lg_command, sizeof(lg_command), "<picam360:command id=\"%d\" value=\"%s\" />", lg_command_id, buff);
 		free(buff);
 	}
 	return 0;
@@ -2108,14 +1981,11 @@ static void status_handler(char *data, int data_len) {
 		if (data[i] == '<') {
 			char name[64] = UPSTREAM_DOMAIN;
 			char value[256];
-			int num = sscanf(&data[i],
-					"<picam360:status name=\"%63[^\"]\" value=\"%255[^\"]\" />",
-					name + UPSTREAM_DOMAIN_SIZE, value);
+			int num = sscanf(&data[i], "<picam360:status name=\"%63[^\"]\" value=\"%255[^\"]\" />", name + UPSTREAM_DOMAIN_SIZE, value);
 			if (num == 2) {
 				for (int i = 0; state->watches[i] != NULL; i++) {
 					if (strncmp(state->watches[i]->name, name, 64) == 0) {
-						state->watches[i]->set_value(
-								state->watches[i]->user_data, value);
+						state->watches[i]->set_value(state->watches[i]->user_data, value);
 						break;
 					}
 				}
@@ -2124,8 +1994,7 @@ static void status_handler(char *data, int data_len) {
 	}
 }
 
-static int rtp_callback(unsigned char *data, unsigned int data_len,
-		unsigned char pt, unsigned int seq_num) {
+static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num) {
 	if (data_len == 0) {
 		return -1;
 	}
@@ -2149,8 +2018,7 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	return 0;
 }
 
-static int rtcp_callback(unsigned char *data, unsigned int data_len,
-		unsigned char pt, unsigned int seq_num) {
+static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num) {
 	if (data_len == 0) {
 		return -1;
 	}
@@ -2163,9 +2031,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len,
 	if (pt == PT_CMD) {
 		int id;
 		char value[256];
-		int num = sscanf((char*) data,
-				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
-				value);
+		int num = sscanf((char*) data, "<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id, value);
 		if (num == 2 && id != lg_ack_command_id) {
 			lg_ack_command_id = id;
 			state->plugin_host.send_command(value);
@@ -2261,11 +2127,7 @@ enum SYSTEM_CMD {
 };
 
 enum CALIBRATION_CMD {
-	CALIBRATION_CMD_NONE,
-	CALIBRATION_CMD_SAVE,
-	CALIBRATION_CMD_IMAGE_CIRCLE,
-	CALIBRATION_CMD_VIEWER_COMPASS,
-	CALIBRATION_CMD_VEHICLE_COMPASS,
+	CALIBRATION_CMD_NONE, CALIBRATION_CMD_SAVE, CALIBRATION_CMD_IMAGE_CIRCLE, CALIBRATION_CMD_VIEWER_COMPASS, CALIBRATION_CMD_VEHICLE_COMPASS,
 };
 
 #define PACKET_FOLDER_PATH "/media/usbdisk/packet"
@@ -2312,16 +2174,13 @@ static void convert_snap_handler() {
 		rtp_increment_loading(100 * 1000); //10 fps
 
 		char dst[256];
-		snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path,
-				lg_convert_frame_num);
+		snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path, lg_convert_frame_num);
 		lg_convert_frame_num++;
-		state->plugin_host.snap(lg_resolution * 1024, lg_resolution * 512,
-				RENDERING_MODE_EQUIRECTANGULAR, dst);
+		state->plugin_host.snap(lg_resolution * 1024, lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR, dst);
 	}
 }
 
-static void packet_menu_record_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_ACTIVATED:
 		break;
@@ -2350,8 +2209,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 				lg_is_converting = true;
 				convert_snap_handler();
 
-				swprintf(menu->name, 256, L"StopConverting:%s",
-						lg_convert_base_path);
+				swprintf(menu->name, 256, L"StopConverting:%s", lg_convert_base_path);
 				printf("start converting to %s\n", lg_convert_base_path);
 			}
 		} else if (rtp_is_recording(NULL)) { //stop record
@@ -2377,8 +2235,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu,
 	}
 }
 
-static void packet_menu_load_node_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void packet_menu_load_node_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_ACTIVATED:
 		break;
@@ -2394,16 +2251,13 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			menu->selected = false;
 		} else if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
 			char name[256];
-			snprintf(name, 256, PACKET_FOLDER_PATH "/%s",
-					(char*) menu->user_data);
-			rtp_start_loading(name, true, true,
-					(RTP_LOADING_CALLBACK) loading_callback, NULL);
+			snprintf(name, 256, PACKET_FOLDER_PATH "/%s", (char*) menu->user_data);
+			rtp_start_loading(name, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start loading %s\n", name);
 			menu->marked = true;
 			menu->selected = false;
 
-			snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
-					(char*) menu->user_data);
+			snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s", (char*) menu->user_data);
 			lg_convert_frame_num = 0;
 		} else {
 			menu->selected = false;
@@ -2422,8 +2276,7 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 	}
 }
 
-static void packet_menu_load_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void packet_menu_load_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_ACTIVATED:
 		if (!rtp_is_loading(NULL)) {
@@ -2437,8 +2290,7 @@ static void packet_menu_load_callback(struct _MENU_T *menu,
 					wchar_t name[256];
 					snprintf(name_s, 256, "%s", d->d_name);
 					swprintf(name, 256, L"%s", d->d_name);
-					MENU_T *node_menu = menu_new(name,
-							packet_menu_load_node_callback, name_s);
+					MENU_T *node_menu = menu_new(name, packet_menu_load_node_callback, name_s);
 					menu_add_submenu(menu, node_menu, INT_MAX);
 				}
 			}
@@ -2473,9 +2325,7 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 				char dst[256];
 				int last_id = get_last_id(STILL_FOLDER_PATH);
 				snprintf(dst, 256, STILL_FOLDER_PATH "/%d.jpeg", last_id + 1);
-				state->plugin_host.snap(lg_resolution * 1024,
-						lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR,
-						dst);
+				state->plugin_host.snap(lg_resolution * 1024, lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR, dst);
 			}
 			break;
 		default:
@@ -2513,8 +2363,7 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	}
 }
 
-static void refraction_menu_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void refraction_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		for (int idx = 0; menu->parent->submenu[idx]; idx++) {
@@ -2571,8 +2420,7 @@ static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	}
 }
 
-static void resolution_menu_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void resolution_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		lg_resolution = (int) menu->user_data;
@@ -2627,8 +2475,7 @@ static void fov_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	}
 }
 
-static void calibration_menu_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		switch ((int) menu->user_data) {
@@ -2701,8 +2548,7 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 	}
 }
 
-static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
+static void image_circle_calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	const float GAIN = 0.005;
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -2728,8 +2574,7 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
 				float value = (int) 1;
 				value *= GAIN;
 				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_x %d=%f",
-						state->active_cam, value);
+				snprintf(cmd, 256, "add_camera_offset_x %d=%f", state->active_cam, value);
 				state->plugin_host.send_command(cmd);
 			}
 			menu->selected = false;
@@ -2739,8 +2584,7 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
 				float value = (int) -1;
 				value *= GAIN;
 				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_x %d=%f",
-						state->active_cam, value);
+				snprintf(cmd, 256, "add_camera_offset_x %d=%f", state->active_cam, value);
 				state->plugin_host.send_command(cmd);
 			}
 			menu->selected = false;
@@ -2752,8 +2596,7 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
 				float value = (int) 1;
 				value *= GAIN;
 				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_y %d=%f",
-						state->active_cam, value);
+				snprintf(cmd, 256, "add_camera_offset_y %d=%f", state->active_cam, value);
 				state->plugin_host.send_command(cmd);
 			}
 			menu->selected = false;
@@ -2763,8 +2606,7 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
 				float value = (int) -1;
 				value *= GAIN;
 				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_y %d=%f",
-						state->active_cam, value);
+				snprintf(cmd, 256, "add_camera_offset_y %d=%f", state->active_cam, value);
 				state->plugin_host.send_command(cmd);
 			}
 			menu->selected = false;
@@ -2824,174 +2666,99 @@ static void _init_menu() {
 
 	MENU_T *menu = state->menu;
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu,
-				menu_new(L"Function", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"Snap", function_menu_callback, (void*) 0), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Function", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Snap", function_menu_callback, (void*) 0), INT_MAX);
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu,
-				menu_new(L"Config", NULL, NULL), INT_MAX);
-		MENU_T *sync_menu = menu_add_submenu(sub_menu,
-				menu_new(L"Sync", NULL, NULL), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Config", NULL, NULL), INT_MAX);
+		MENU_T *sync_menu = menu_add_submenu(sub_menu, menu_new(L"Sync", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = sync_menu;
-			MENU_T *on_menu = menu_add_submenu(sub_menu,
-					menu_new(L"On", sync_menu_callback, (void*) true), INT_MAX);
+			MENU_T *on_menu = menu_add_submenu(sub_menu, menu_new(L"On", sync_menu_callback, (void*) true), INT_MAX);
 			on_menu->marked = true;
 		}
-		MENU_T *refraction_menu = menu_add_submenu(sub_menu,
-				menu_new(L"Refraction", NULL, NULL), INT_MAX);
+		MENU_T *refraction_menu = menu_add_submenu(sub_menu, menu_new(L"Refraction", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = refraction_menu;
-			menu_add_submenu(sub_menu,
-					menu_new(L"Air", refraction_menu_callback, (void*) 1),
-					INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"AcrylicDome", refraction_menu_callback,
-							(void*) 2), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"UnderWater", refraction_menu_callback,
-							(void*) 3), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"Air", refraction_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"AcrylicDome", refraction_menu_callback, (void*) 2), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"UnderWater", refraction_menu_callback, (void*) 3), INT_MAX);
 			refraction_menu->submenu[0]->marked = true;
 		}
-		MENU_T *stereo_menu = menu_add_submenu(sub_menu,
-				menu_new(L"Stereo", NULL, NULL), INT_MAX);
+		MENU_T *stereo_menu = menu_add_submenu(sub_menu, menu_new(L"Stereo", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = stereo_menu;
-			MENU_T *off_menu = menu_add_submenu(sub_menu,
-					menu_new(L"Off", stereo_menu_callback, (void*) false),
-					INT_MAX);
+			MENU_T *off_menu = menu_add_submenu(sub_menu, menu_new(L"Off", stereo_menu_callback, (void*) false), INT_MAX);
 			off_menu->marked = true;
 		}
-		MENU_T *resolution_menu = menu_add_submenu(sub_menu,
-				menu_new(L"Resolution", NULL, NULL), INT_MAX);
+		MENU_T *resolution_menu = menu_add_submenu(sub_menu, menu_new(L"Resolution", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = resolution_menu;
-			menu_add_submenu(sub_menu,
-					menu_new(L"4K", resolution_menu_callback, (void*) 4),
-					INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"3K", resolution_menu_callback, (void*) 3),
-					INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"2K", resolution_menu_callback, (void*) 2),
-					INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"1K", resolution_menu_callback, (void*) 1),
-					INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"4K", resolution_menu_callback, (void*) 4), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"3K", resolution_menu_callback, (void*) 3), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"2K", resolution_menu_callback, (void*) 2), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"1K", resolution_menu_callback, (void*) 1), INT_MAX);
 			for (int idx = 0; sub_menu->submenu[idx]; idx++) {
-				if (sub_menu->submenu[idx]->user_data
-						== (void*) lg_resolution) {
+				if (sub_menu->submenu[idx]->user_data == (void*) lg_resolution) {
 					sub_menu->submenu[idx]->marked = true;
 				}
 			}
 		}
-		MENU_T *fov_menu = menu_add_submenu(sub_menu,
-				menu_new(L"Fov", NULL, NULL), INT_MAX);
+		MENU_T *fov_menu = menu_add_submenu(sub_menu, menu_new(L"Fov", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = fov_menu;
-			menu_add_submenu(sub_menu,
-					menu_new(L"-", fov_menu_callback, (void*) -1), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"+", fov_menu_callback, (void*) 1), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"60", fov_menu_callback, (void*) 60), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"90", fov_menu_callback, (void*) 90), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"120", fov_menu_callback, (void*) 120), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"-", fov_menu_callback, (void*) -1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"+", fov_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"60", fov_menu_callback, (void*) 60), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"90", fov_menu_callback, (void*) 90), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"120", fov_menu_callback, (void*) 120), INT_MAX);
 		}
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu,
-				menu_new(L"Packet", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"Record", packet_menu_record_callback, NULL),
-				INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"Load", packet_menu_load_callback, NULL), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Packet", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Record", packet_menu_record_callback, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Load", packet_menu_load_callback, NULL), INT_MAX);
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu,
-				menu_new(L"Calibration", NULL, NULL), INT_MAX);
-		MENU_T *image_circle_menu = menu_add_submenu(sub_menu,
-				menu_new(L"ImageCircle", calibration_menu_callback,
-						(void*) CALIBRATION_CMD_IMAGE_CIRCLE), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Calibration", NULL, NULL), INT_MAX);
+		MENU_T *image_circle_menu = menu_add_submenu(sub_menu, menu_new(L"ImageCircle", calibration_menu_callback, (void*) CALIBRATION_CMD_IMAGE_CIRCLE), INT_MAX);
 		{
 			MENU_T *sub_menu = image_circle_menu;
-			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu,
-					menu_new(L"cam", image_circle_calibration_menu_callback,
-							(void*) 0), INT_MAX);
+			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu, menu_new(L"cam", image_circle_calibration_menu_callback, (void*) 0), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_cam_menu;
-				menu_add_submenu(sub_menu,
-						menu_new(L"0", image_circle_calibration_menu_callback,
-								(void*) 1), INT_MAX);
-				menu_add_submenu(sub_menu,
-						menu_new(L"1", image_circle_calibration_menu_callback,
-								(void*) 2), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new(L"0", image_circle_calibration_menu_callback, (void*) 1), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new(L"1", image_circle_calibration_menu_callback, (void*) 2), INT_MAX);
 			}
-			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu,
-					menu_new(L"x", image_circle_calibration_menu_callback,
-							(void*) 10), INT_MAX);
+			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu, menu_new(L"x", image_circle_calibration_menu_callback, (void*) 10), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_x_menu;
-				menu_add_submenu(sub_menu,
-						menu_new(L"-", image_circle_calibration_menu_callback,
-								(void*) 11), INT_MAX);
-				menu_add_submenu(sub_menu,
-						menu_new(L"+", image_circle_calibration_menu_callback,
-								(void*) 12), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new(L"-", image_circle_calibration_menu_callback, (void*) 11), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new(L"+", image_circle_calibration_menu_callback, (void*) 12), INT_MAX);
 			}
-			MENU_T *image_circle_y_menu = menu_add_submenu(sub_menu,
-					menu_new(L"y", image_circle_calibration_menu_callback,
-							(void*) 20), INT_MAX);
+			MENU_T *image_circle_y_menu = menu_add_submenu(sub_menu, menu_new(L"y", image_circle_calibration_menu_callback, (void*) 20), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_y_menu;
-				menu_add_submenu(sub_menu,
-						menu_new(L"-", image_circle_calibration_menu_callback,
-								(void*) 21), INT_MAX);
-				menu_add_submenu(sub_menu,
-						menu_new(L"+", image_circle_calibration_menu_callback,
-								(void*) 22), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new(L"-", image_circle_calibration_menu_callback, (void*) 21), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new(L"+", image_circle_calibration_menu_callback, (void*) 22), INT_MAX);
 			}
-			menu_add_submenu(sub_menu,
-					menu_new(L"ac", image_circle_calibration_menu_callback,
-							(void*) 30), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"ac", image_circle_calibration_menu_callback, (void*) 30), INT_MAX);
 		}
-		menu_add_submenu(sub_menu,
-				menu_new(L"ViewerCompass", calibration_menu_callback,
-						(void*) CALIBRATION_CMD_VIEWER_COMPASS), INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"VehicleCompass", calibration_menu_callback,
-						(void*) CALIBRATION_CMD_VEHICLE_COMPASS), INT_MAX);
-		MENU_T *horizonr_menu = menu_add_submenu(sub_menu,
-				menu_new(L"HorizonR", NULL, NULL), 0);
+		menu_add_submenu(sub_menu, menu_new(L"ViewerCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VIEWER_COMPASS), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"VehicleCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VEHICLE_COMPASS), INT_MAX);
+		MENU_T *horizonr_menu = menu_add_submenu(sub_menu, menu_new(L"HorizonR", NULL, NULL), 0);
 		{
 			MENU_T *sub_menu = horizonr_menu;
-			menu_add_submenu(sub_menu,
-					menu_new(L"-", horizonr_menu_callback, (void*) -1),
-					INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new(L"+", horizonr_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"-", horizonr_menu_callback, (void*) -1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new(L"+", horizonr_menu_callback, (void*) 1), INT_MAX);
 		}
-		menu_add_submenu(sub_menu,
-				menu_new(L"Save", calibration_menu_callback,
-						(void*) CALIBRATION_CMD_SAVE), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Save", calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE), INT_MAX);
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu,
-				menu_new(L"System", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"Shutdown", system_menu_callback,
-						(void*) SYSTEM_CMD_SHUTDOWN), INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"Reboot", system_menu_callback,
-						(void*) SYSTEM_CMD_REBOOT), INT_MAX);
-		menu_add_submenu(sub_menu,
-				menu_new(L"Exit", system_menu_callback,
-						(void*) SYSTEM_CMD_EXIT), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"System", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Shutdown", system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Reboot", system_menu_callback, (void*) SYSTEM_CMD_REBOOT), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new(L"Exit", system_menu_callback, (void*) SYSTEM_CMD_EXIT), INT_MAX);
 	}
 }
 
@@ -3071,12 +2838,10 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'r':
 			state->output_raw = true;
-			strncpy(state->output_raw_filepath, optarg,
-					sizeof(state->output_raw_filepath));
+			strncpy(state->output_raw_filepath, optarg, sizeof(state->output_raw_filepath));
 			break;
 		case 'i':
-			strncpy(state->input_filepath, optarg,
-					sizeof(state->input_filepath));
+			strncpy(state->input_filepath, optarg, sizeof(state->input_filepath));
 			state->input_mode = INPUT_MODE_FILE;
 			state->input_file_cur = -1;
 			state->input_file_size = 0;
@@ -3091,9 +2856,7 @@ int main(int argc, char *argv[]) {
 			break;
 		default:
 			/* '?' */
-			printf(
-					"Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n",
-					argv[0]);
+			printf("Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n", argv[0]);
 			return -1;
 		}
 	}
@@ -3191,8 +2954,7 @@ int main(int argc, char *argv[]) {
 				mrevent_trigger(&state->request_frame_event[i]);
 			}
 		}
-		if (input_file_mode
-				&& state->input_file_cur == state->input_file_size) {
+		if (input_file_mode && state->input_file_cur == state->input_file_size) {
 			terminate = true;
 		}
 
@@ -3221,8 +2983,7 @@ int main(int argc, char *argv[]) {
  * Returns: void
  *
  ***********************************************************/
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
-		MODEL_T *model) {
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 
@@ -3243,8 +3004,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 			mjpeg_decoder_switch_buffer(i);
 		}
 		glActiveTexture(GL_TEXTURE1 + i);
-		glBindTexture(GL_TEXTURE_2D,
-				state->cam_texture[i][state->cam_texture_cur[i]]);
+		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
 	}
 
 	//depth axis is z, vertical asis is y
@@ -3294,15 +3054,13 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	// Rv : view
 	if (frame->view_mpu) {
-		mat4_fromQuat(view_matrix,
-				frame->view_mpu->get_quaternion(frame->view_mpu).ary);
+		mat4_fromQuat(view_matrix, frame->view_mpu->get_quaternion(frame->view_mpu).ary);
 		mat4_invert(view_matrix, view_matrix);
 	}
 
 	// Rn
 	{
-		float north_diff = state->plugin_host.get_view_north()
-				- state->plugin_host.get_camera_north();
+		float north_diff = state->plugin_host.get_view_north() - state->plugin_host.get_camera_north();
 		mat4_rotateY(north_matrix, north_matrix, north_diff * M_PI / 180);
 	}
 
@@ -3327,54 +3085,42 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
-	glUniform1f(glGetUniformLocation(program, "pixel_size"),
-			1.0 / state->cam_width);
+	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
 	{
 		float fov_rad = frame->fov * M_PI / 180.0;
 		float scale = 1.0 / tan(fov_rad / 2);
 		glUniform1f(glGetUniformLocation(program, "scale"), scale);
 	}
 	{
-		float aspect_ratio = (float) state->cam_width
-				/ (float) state->cam_height;
-		glUniform1f(glGetUniformLocation(program, "cam_aspect_ratio"),
-				aspect_ratio);
+		float aspect_ratio = (float) state->cam_width / (float) state->cam_height;
+		glUniform1f(glGetUniformLocation(program, "cam_aspect_ratio"), aspect_ratio);
 	}
 	{
 		float aspect_ratio = (float) frame_width / (float) frame_height;
-		glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"),
-				aspect_ratio);
+		glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"), aspect_ratio);
 	}
 
 	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
 
 	//options start
-	glUniform1f(glGetUniformLocation(program, "sharpness_gain"),
-			state->options.sharpness_gain);
+	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), state->options.sharpness_gain);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_yaw", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				state->options.cam_offset_yaw[i]);
+		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_yaw[i]);
 		sprintf(buff, "cam%d_offset_x", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				state->options.cam_offset_x[i]);
+		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_x[i]);
 		sprintf(buff, "cam%d_offset_y", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				state->options.cam_offset_y[i]);
+		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i]);
 		sprintf(buff, "cam%d_horizon_r", i);
-		glUniform1f(glGetUniformLocation(program, buff),
-				state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
+		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
 	}
-	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"),
-			state->options.cam_offset_yaw[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_offset_x"),
-			state->options.cam_offset_x[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_offset_y"),
-			state->options.cam_offset_y[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"),
-			state->options.cam_horizon_r[state->active_cam]
-					* state->camera_horizon_r_bias);
+	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"), state->options.cam_offset_yaw[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam]);
+	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"), state->options.cam_horizon_r[state->active_cam] * state->camera_horizon_r_bias);
+	glUniform1f(glGetUniformLocation(program, "color_offset"), state->options.color_offset);
+	glUniform1f(glGetUniformLocation(program, "overlap"), state->options.overlap);
 	//options end
 
 	//texture start
@@ -3384,14 +3130,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 		sprintf(buff, "cam%d_texture", i);
 		glUniform1i(glGetUniformLocation(program, buff), i + 1);
 	}
-	glUniform1i(glGetUniformLocation(program, "cam_texture"),
-			state->active_cam + 1);
+	glUniform1i(glGetUniformLocation(program, "cam_texture"), state->active_cam + 1);
 	//texture end
 
-	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1,
-			GL_FALSE, (GLfloat*) unif_matrix);
-	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1,
-			GL_FALSE, (GLfloat*) unif_matrix_1);
+	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1, GL_FALSE, (GLfloat*) unif_matrix);
+	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1, GL_FALSE, (GLfloat*) unif_matrix_1);
 
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
@@ -3409,8 +3152,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 }
 
-static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
-		MODEL_T *model) {
+static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 
@@ -3426,8 +3168,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
-	glUniform1f(glGetUniformLocation(program, "tex_scalex"),
-			(state->stereo) ? 0.5 : 1.0);
+	glUniform1f(glGetUniformLocation(program, "tex_scalex"), (state->stereo) ? 0.5 : 1.0);
 
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
@@ -3437,23 +3178,20 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame,
 	glEnable(GL_CULL_FACE);
 
 	if (frame->operation_mode == CALIBRATION) {
-		glViewport((state->screen_width - state->screen_height) / 2, 0,
-				(GLsizei) state->screen_height, (GLsizei) state->screen_height);
+		glViewport((state->screen_width - state->screen_height) / 2, 0, (GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	} else if (state->stereo) {
 		int offset_x = (state->screen_width / 2 - frame_width) / 2;
 		int offset_y = (state->screen_height - frame_height) / 2;
 		for (int i = 0; i < 2; i++) {
 			//glViewport(0, 0, (GLsizei)state->screen_width/2, (GLsizei)state->screen_height);
-			glViewport(offset_x + i * state->screen_width / 2, offset_y,
-					(GLsizei) frame_width, (GLsizei) frame_height);
+			glViewport(offset_x + i * state->screen_width / 2, offset_y, (GLsizei) frame_width, (GLsizei) frame_height);
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 		}
 	} else {
 		int offset_x = (state->screen_width - frame_width) / 2;
 		int offset_y = (state->screen_height - frame_height) / 2;
-		glViewport(offset_x, offset_y, (GLsizei) frame_width,
-				(GLsizei) frame_height);
+		glViewport(offset_x, offset_y, (GLsizei) frame_width, (GLsizei) frame_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	}
 
@@ -3472,33 +3210,23 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 		float north;
 		VECTOR4D_T quat = state->plugin_host.get_view_quaternion();
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-		len += swprintf(disp + len, MAX_INFO_SIZE - len,
-				L"View   : Tmp %.1f degC, N %.1f",
-				state->plugin_host.get_view_temperature(), north * 180 / M_PI);
+		len += swprintf(disp + len, MAX_INFO_SIZE - len, L"View   : Tmp %.1f degC, N %.1f", state->plugin_host.get_view_temperature(), north * 180 / M_PI);
 	}
 	{ //Vehicle
 		float north;
 		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-		len +=
-				swprintf(disp + len, MAX_INFO_SIZE - len,
-						L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %.0f:%.0f",
-						state->plugin_host.get_camera_temperature(),
-						north * 180 / M_PI, lg_cam_bandwidth, lg_cam_fps[0],
-						lg_cam_fps[1], lg_cam_frameskip[0],
-						lg_cam_frameskip[1]);
+		len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %.0f:%.0f", state->plugin_host.get_camera_temperature(),
+				north * 180 / M_PI, lg_cam_bandwidth, lg_cam_fps[0], lg_cam_fps[1], lg_cam_frameskip[0], lg_cam_frameskip[1]);
 	}
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]->get_info) {
-			wchar_t *info = state->plugins[i]->get_info(
-					state->plugins[i]->user_data);
+			wchar_t *info = state->plugins[i]->get_info(state->plugins[i]->user_data);
 			if (info) {
-				len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls",
-						info);
+				len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls", info);
 			}
 		}
 	}
-	menu_redraw(state->menu, disp, frame_width, frame_height, frame_width,
-			frame_height, false);
+	menu_redraw(state->menu, disp, frame_width, frame_height, frame_width, frame_height, false);
 }
 

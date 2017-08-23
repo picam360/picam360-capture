@@ -59,6 +59,8 @@ struct _PICAM360CAPTURE_T;
 
 typedef struct _OPTIONS_T {
 	float sharpness_gain;
+	float color_offset;
+	float overlap;
 	float cam_offset_pitch[MAX_CAM_NUM]; // x axis
 	float cam_offset_yaw[MAX_CAM_NUM]; // y axis
 	float cam_offset_roll[MAX_CAM_NUM]; // z axis

@@ -53,10 +53,10 @@ if [ $DRIVER_IP = "127.0.0.1" ]; then
   set -- $(/opt/vc/bin/vcgencmd get_camera)
   if [ $2 = "detected=1" ]; then
     echo "RASPI CAM"
-    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 1536 -h 1536 -n 1 -t RASPI&"
+    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 1536 -h 1536 -n 1 -t RASPI &"
   elif [ -e /dev/video0 ]; then
     echo "USB CAM"
-    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 1536 -h 1536 -n 1 -t RASPI &"
+    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 2048 -h 1536 -n 1 -t USB &"
   else
     echo "NO CAM"
   fi
