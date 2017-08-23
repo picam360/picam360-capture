@@ -25,7 +25,7 @@ mkdir -p /var/log/apt
 mkdir -p /var/log/ntpstats
 chown root.ntp /var/log/ntpstats
 chown root.adm /var/log/samba
- 
+
 touch /var/log/lastlog
 touch /var/log/wtmp
 touch /var/log/btmp
@@ -33,7 +33,46 @@ chown root.utmp /var/log/lastlog
 chown root.utmp /var/log/wtmp
 chown root.utmp /var/log/btmp
 
-sudo sh /home/pi/picam360/picam360-capture/lunch.sh -w 2048 -h 2048 -W 720 -H 720 -r -n 2 -s -c MJPEG -p -v OCULUS-RIFT
-#/home/pi/.nodebrew/current/bin/node /home/pi/.nodebrew/current/bin/forever start /home/pi/picam360/picam360-software/app.js > /dev/null
+sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o wlan1 -j MASQUERADE
+
+iw dev wlan0 set power_save off
+
+#
+#  Read environment 
+#
+for line in $(cat /home/pi/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
+  do
+     export $line
+  done
+
+# lunch driver
+echo "lunch driver"
+if [ $DRIVER_IP = "127.0.0.1" ]; then
+  set -- $(/opt/vc/bin/vcgencmd get_camera)
+  if [ $2 = "detected=1" ]; then
+    echo "RASPI CAM"
+    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 1536 -h 1536 -n 1 -t RASPI&"
+  elif [ -e /dev/video0 ]; then
+    echo "USB CAM"
+    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 1536 -h 1536 -n 1 -t RASPI &"
+  else
+    echo "NO CAM"
+  fi
+fi
+
+# lunch capture & server
+echo "lunch capture"
+OPTION="-w 1536 -h 1536 -r -c MJPEG -n 1"
+set -- $(tvservice -s)
+if [ $(($2&0x02)) != 0 ]; then
+	echo "HDMI"
+	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 800 -h 480 -v mpu9250\" -p &"
+else
+	echo "NO HDMI"
+	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 320 -h 320 -s h264 -f 5\" &"
+	su -l pi -c "bash /home/pi/picam360/picam360-server/sh/start-app.sh &"
+fi
 
 exit 0
