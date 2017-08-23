@@ -3,6 +3,7 @@ uniform mat4 unif_matrix_1;
 uniform sampler2D cam0_texture;
 uniform sampler2D cam1_texture;
 uniform float color_offset;
+uniform float color_factor;
 uniform float overlap;
 
 const float M_PI = 3.1415926535;
