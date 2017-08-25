@@ -1946,9 +1946,23 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 }
 
 static int command2upstream_handler() {
+	static struct timeval last_try = { };
+	static bool is_first_try = false;
 	int len = strlen(lg_command);
 	if (len != 0 && lg_command_id != lg_ack_command_id) {
+		struct timeval s;
+		gettimeofday(&s, NULL);
+		if (!is_first_try) {
+			struct timeval diff;
+			timersub(&s, &last_try, &diff);
+			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			if (diff_sec < 0.050) {
+				return 0;
+			}
+		}
 		rtcp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
+		last_try = s;
+		is_first_try = false;
 		return 0;
 	} else {
 		memset(lg_command, 0, sizeof(lg_command));
@@ -2962,8 +2976,8 @@ int main(int argc, char *argv[]) {
 		timersub(&time, &last_time, &diff);
 		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 		if (diff_sec < 0.010) { //10msec
-			int delay = 10 - (int) (diff_sec * 1000);
-			usleep(delay);
+			int delay_ms = 10 - (int) (diff_sec * 1000);
+			usleep(delay_ms * 1000);
 		}
 		last_time = time;
 	}
