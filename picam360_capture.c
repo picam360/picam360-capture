@@ -2392,10 +2392,10 @@ static void refraction_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event
 				value = 1.0;
 				break;
 			case 2:
-				value = 1.02;
+				value = 0.94;
 				break;
 			case 3:
-				value = 1.08;
+				value = 0.9;
 				break;
 			}
 			char cmd[256];
