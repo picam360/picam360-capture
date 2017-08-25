@@ -175,6 +175,7 @@ typedef struct _PICAM360CAPTURE_T {
 
 	//for unif matrix
 	//euler angles
+	float refraction;
 	float camera_pitch; // x axis
 	float camera_yaw; // y axis
 	float camera_roll; // z axis

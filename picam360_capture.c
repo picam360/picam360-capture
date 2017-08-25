@@ -2402,6 +2402,21 @@ static void refraction_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event
 			snprintf(cmd, 256, "set_camera_horizon_r_bias %f", value);
 			state->plugin_host.send_command(cmd);
 		}
+		{
+			float value = 1.0;
+			switch ((int) menu->user_data) {
+			case 1:
+				value = 1.0;
+				break;
+			case 2:
+				value = 1.2;
+				break;
+			case 3:
+				value = 1.3;
+				break;
+			}
+			state->refraction = value;
+		}
 		break;
 	case MENU_EVENT_DESELECTED:
 		break;
@@ -2800,6 +2815,7 @@ int main(int argc, char *argv[]) {
 	state->output_raw = false;
 	state->conf_sync = true;
 	state->camera_horizon_r_bias = 1.0;
+	state->refraction = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", 64);
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -3128,6 +3144,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i]);
 		sprintf(buff, "cam%d_horizon_r", i);
 		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
+		sprintf(buff, "cam%d_aov", i);
+		glUniform1f(glGetUniformLocation(program, buff), 245.0 / state->refraction);
 	}
 	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"), state->options.cam_offset_yaw[state->active_cam]);
 	glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam]);

@@ -14,10 +14,7 @@ uniform float cam0_offset_yaw;
 uniform float cam0_offset_x;
 uniform float cam0_offset_y;
 uniform float cam0_horizon_r;
-uniform float cam1_offset_yaw;
-uniform float cam1_offset_x;
-uniform float cam1_offset_y;
-uniform float cam1_horizon_r;
+uniform float cam0_aov;
 //options end
 
 const float overlap = 0.03;
@@ -41,7 +38,7 @@ void main(void) {
 
 		r0 = (M_PI / 2.0 - pitch) / M_PI;
 		float r2 = r0;
-		r2 = sin(M_PI * 180.0 / 270.0 * r2) / 2.0;
+		r2 = sin(M_PI * 180.0 / cam0_aov * r2) / 2.0;
 		float yaw2 = yaw + M_PI + cam0_offset_yaw;
 		u0 = cam0_horizon_r / cam_aspect_ratio * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
 		v0 = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y;
