@@ -22,7 +22,6 @@ uniform float cam1_horizon_r;
 uniform float cam1_aov;
 //options end
 
-const float overlap = 0.03;
 const float M_PI = 3.1415926535;
 
 varying float r0;

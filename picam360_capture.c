@@ -209,18 +209,59 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	return 0;
 }
 
-int board_mesh(GLuint *vbo_out, GLuint *n_out) {
+int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out) {
 	GLuint vbo;
-	static const GLfloat quad_vertex_positions[] = { 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+
+	int n = 2 * (num_of_steps + 1) * num_of_steps;
+	float points[4 * n];
+
+	float start_x = 0.0f;
+	float start_y = 0.0f;
+
+	float end_x = 1.0f;
+	float end_y = 1.0f;
+
+	float step_x = (end_x - start_x) / num_of_steps;
+	float step_y = (end_y - start_y) / num_of_steps;
+
+	int idx = 0;
+	int i, j;
+	for (i = 0; i < num_of_steps; i++) {	//x
+		for (j = 0; j <= num_of_steps; j++) {	//y
+			{
+				float x = start_x + step_x * i;
+				float y = start_y + step_y * j;
+				float z = 1.0;
+				points[idx++] = x;
+				points[idx++] = y;
+				points[idx++] = z;
+				points[idx++] = 1.0;
+				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+				//		points[idx - 3], points[idx - 2], points[idx - 1]);
+			}
+			{
+				float x = start_x + step_x * (i + 1);
+				float y = start_y + step_y * j;
+				float z = 1.0;
+				float len = sqrt(x * x + y * y + z * z);
+				points[idx++] = x;
+				points[idx++] = y;
+				points[idx++] = z;
+				points[idx++] = 1.0;
+				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
+				//		points[idx - 3], points[idx - 2], points[idx - 1]);
+			}
+		}
+	}
 
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertex_positions), quad_vertex_positions, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
+
 	if (vbo_out != NULL)
 		*vbo_out = vbo;
 	if (n_out != NULL)
-		*n_out = 4;
+		*n_out = n;
 
 	return 0;
 }
@@ -300,17 +341,17 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 	float maxfov = 150.0;
 
-	board_mesh(&state->model_data[EQUIRECTANGULAR].vbo, &state->model_data[EQUIRECTANGULAR].vbo_nop);
+	board_mesh(64, &state->model_data[EQUIRECTANGULAR].vbo, &state->model_data[EQUIRECTANGULAR].vbo_nop);
 	if (state->num_of_cam == 1) {
 		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
 	} else {
-		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular_sphere.frag");
+		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(&state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
+	board_mesh(1, &state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
 	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert", "shader/fisheye.frag");
 
-	board_mesh(&state->model_data[CALIBRATION].vbo, &state->model_data[CALIBRATION].vbo_nop);
+	board_mesh(1, &state->model_data[CALIBRATION].vbo, &state->model_data[CALIBRATION].vbo_nop);
 	state->model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert", "shader/calibration.frag");
 
 	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[WINDOW].vbo, &state->model_data[WINDOW].vbo_nop);
@@ -320,7 +361,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 		state->model_data[WINDOW].program = GLProgram_new("shader/window_sphere.vert", "shader/window_sphere.frag");
 	}
 
-	board_mesh(&state->model_data[BOARD].vbo, &state->model_data[BOARD].vbo_nop);
+	board_mesh(1, &state->model_data[BOARD].vbo, &state->model_data[BOARD].vbo_nop);
 	state->model_data[BOARD].program = GLProgram_new("shader/board.vert", "shader/board.frag");
 }
 
@@ -973,7 +1014,7 @@ int _command_handler(const char *_buff) {
 			argv[0] = cmd;
 			argv[argc] = 0;
 			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "0o:")) != -1) {
+			while ((opt = getopt(argc, argv, "0o:w:h:E")) != -1) {
 				switch (opt) {
 				case '0':
 					target_frame = 0;
@@ -1757,7 +1798,7 @@ static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode, cons
 		break;
 	}
 
-	sprintf(cmd, "snap -W %d -H %d %s -o %s", width, height, mode_str, path);
+	sprintf(cmd, "snap -w %d -h %d %s -o %s", width, height, mode_str, path);
 	state->plugin_host.send_command(cmd);
 }
 
@@ -2161,21 +2202,26 @@ static void menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 }
 
 static int get_last_id(const char *path) {
-	int last_id = 0;
 	struct dirent *d;
 	DIR *dir;
 
 	dir = opendir(path);
-	while ((d = readdir(dir)) != 0) {
-		if (d->d_name[0] != L'.') {
-			int id = 0;
-			sscanf(d->d_name, "%d", &id);
-			if (id > last_id) {
-				last_id = id;
+	if (dir != NULL) {
+		int last_id = 0;
+		while ((d = readdir(dir)) != 0) {
+			if (d->d_name[0] != L'.') {
+				int id = 0;
+				sscanf(d->d_name, "%d", &id);
+				if (id > last_id) {
+					last_id = id;
+				}
 			}
 		}
+		close(dir);
+		return last_id;
+	} else {
+		return -1;
 	}
-	return last_id;
 }
 
 static void loading_callback(void *user_data, int ret) {
@@ -2233,10 +2279,12 @@ static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT ev
 		} else if (!rtp_is_loading(NULL)) { //start record
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
-			snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
-			rtp_start_recording(dst);
-			swprintf(menu->name, 256, L"StopRecording:%s", dst);
-			printf("start recording %s\n", dst);
+			if (last_id >= 0) {
+				snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
+				rtp_start_recording(dst);
+				swprintf(menu->name, 256, L"StopRecording:%s", dst);
+				printf("start recording %s\n", dst);
+			}
 		}
 		break;
 	case MENU_EVENT_DESELECTED:
@@ -2298,14 +2346,16 @@ static void packet_menu_load_callback(struct _MENU_T *menu, enum MENU_EVENT even
 			DIR *dir;
 
 			dir = opendir(PACKET_FOLDER_PATH);
-			while ((d = readdir(dir)) != 0) {
-				if (d->d_name[0] != L'.') {
-					char *name_s = malloc(256);
-					wchar_t name[256];
-					snprintf(name_s, 256, "%s", d->d_name);
-					swprintf(name, 256, L"%s", d->d_name);
-					MENU_T *node_menu = menu_new(name, packet_menu_load_node_callback, name_s);
-					menu_add_submenu(menu, node_menu, INT_MAX);
+			if (dir != NULL) {
+				while ((d = readdir(dir)) != 0) {
+					if (d->d_name[0] != L'.') {
+						char *name_s = malloc(256);
+						wchar_t name[256];
+						snprintf(name_s, 256, "%s", d->d_name);
+						swprintf(name, 256, L"%s", d->d_name);
+						MENU_T *node_menu = menu_new(name, packet_menu_load_node_callback, name_s);
+						menu_add_submenu(menu, node_menu, INT_MAX);
+					}
 				}
 			}
 		}
@@ -2338,8 +2388,10 @@ static void function_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) 
 			{
 				char dst[256];
 				int last_id = get_last_id(STILL_FOLDER_PATH);
-				snprintf(dst, 256, STILL_FOLDER_PATH "/%d.jpeg", last_id + 1);
-				state->plugin_host.snap(lg_resolution * 1024, lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR, dst);
+				if (last_id >= 0) {
+					snprintf(dst, 256, STILL_FOLDER_PATH "/%d.jpeg", last_id + 1);
+					state->plugin_host.snap(lg_resolution * 1024, lg_resolution * 512, RENDERING_MODE_EQUIRECTANGULAR, dst);
+				}
 			}
 			break;
 		default:
