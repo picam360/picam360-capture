@@ -473,9 +473,14 @@ static void init_options(PICAM360CAPTURE_T *state) {
 			state->options.cam_offset_y[i] = json_number_value(json_object_get(options, buff));
 			sprintf(buff, "cam%d_horizon_r", i);
 			state->options.cam_horizon_r[i] = json_number_value(json_object_get(options, buff));
+			sprintf(buff, "cam%d_aov", i);
+			state->options.cam_aov[i] = json_number_value(json_object_get(options, buff));
 
 			if (state->options.cam_horizon_r[i] == 0) {
 				state->options.cam_horizon_r[i] = 0.8;
+			}
+			if (state->options.cam_aov[i] == 0) {
+				state->options.cam_aov[i] = 245;
 			}
 		}
 		{
@@ -558,6 +563,8 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, buff, json_real(state->options.cam_offset_y[i]));
 		sprintf(buff, "cam%d_horizon_r", i);
 		json_object_set_new(options, buff, json_real(state->options.cam_horizon_r[i]));
+		sprintf(buff, "cam%d_aov", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_aov[i]));
 	}
 
 	if (state->plugin_paths) {
@@ -3197,12 +3204,13 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		sprintf(buff, "cam%d_horizon_r", i);
 		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
 		sprintf(buff, "cam%d_aov", i);
-		glUniform1f(glGetUniformLocation(program, buff), 245.0 / state->refraction);
+		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_aov[i] / state->refraction);
 	}
 	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"), state->options.cam_offset_yaw[state->active_cam]);
 	glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam]);
 	glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam]);
 	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"), state->options.cam_horizon_r[state->active_cam] * state->camera_horizon_r_bias);
+	glUniform1f(glGetUniformLocation(program, "cam_aov"), state->options.cam_aov[state->active_cam] / state->refraction);
 	glUniform1f(glGetUniformLocation(program, "color_offset"), state->options.color_offset);
 	glUniform1f(glGetUniformLocation(program, "color_factor"), 1.0 / (1.0 - state->options.color_offset));
 	glUniform1f(glGetUniformLocation(program, "overlap"), state->options.overlap);

@@ -5,6 +5,7 @@ uniform sampler2D logo_texture;
 uniform float color_offset;
 uniform float color_factor;
 uniform float overlap;
+uniform float cam0_aov;
 
 const float M_PI = 3.1415926535;
 
@@ -16,7 +17,7 @@ varying float u1;
 varying float v1;
 
 void main(void) {
-	if (r0 < 0.7) {
+	if (r0 < cam0_aov / 360.0 - overlap) {
 		if (u0 <= 0.0 || u0 > 1.0 || v0 <= 0.0 || v0 > 1.0) {
 			gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 		} else {
