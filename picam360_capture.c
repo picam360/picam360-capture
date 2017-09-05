@@ -348,6 +348,13 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
 	}
 
+	board_mesh(64, &state->model_data[EQUIRECTANGULAR_WINDOW].vbo, &state->model_data[EQUIRECTANGULAR_WINDOW].vbo_nop);
+	if (state->num_of_cam == 1) {
+		state->model_data[EQUIRECTANGULAR_WINDOW].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
+	} else {
+		state->model_data[EQUIRECTANGULAR_WINDOW].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
+	}
+
 	board_mesh(1, &state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
 	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert", "shader/fisheye.frag");
 
@@ -634,7 +641,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:ECFo:s:v:f:k:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:ERCFo:s:v:f:k:")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &render_width);
@@ -644,6 +651,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			break;
 		case 'E':
 			frame->operation_mode = EQUIRECTANGULAR;
+			break;
+		case 'R':
+			frame->operation_mode = EQUIRECTANGULAR_WINDOW;
 			break;
 		case 'C':
 			frame->operation_mode = CALIBRATION;
@@ -3175,7 +3185,15 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	{
+	if (frame->operation_mode == EQUIRECTANGULAR_WINDOW) {
+		float scale_x = frame->fov / 360.0;
+		float scale_y = frame->fov / 180.0;
+		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0 / scale_x);
+		glUniform1f(glGetUniformLocation(program, "scale_y"), 1.0 / scale_y);
+	} else if (frame->operation_mode == EQUIRECTANGULAR) {
+		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
+		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);
+	} else {
 		float fov_rad = frame->fov * M_PI / 180.0;
 		float scale = 1.0 / tan(fov_rad / 2);
 		glUniform1f(glGetUniformLocation(program, "scale"), scale);

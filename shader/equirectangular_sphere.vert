@@ -1,4 +1,7 @@
 attribute vec4 vPosition;
+uniform float scale_x;
+uniform float scale_y;
+uniform float frame_aspect_ratio;
 
 uniform mat4 unif_matrix;
 uniform mat4 unif_matrix_1;
@@ -33,6 +36,7 @@ varying float v1;
 void main(void) {
 	vec4 position = vPosition;
 	gl_Position.xy = position.xy * vec2(2, 2) + vec2(-1, -1);
+	gl_Position.xy = vec2(gl_Position.x * scale_x, gl_Position.y * scale_y * frame_aspect_ratio);
 	gl_Position.zw = vec2(1.0, 1.0);
 
 	float pitch_orig = -M_PI / 2.0 + M_PI * position.y;
@@ -46,7 +50,7 @@ void main(void) {
 	position.y = sin(pitch_orig);
 	position.z = cos(pitch_orig) * cos(yaw_orig); //yaw starts from z
 	position.w = 1.0;
-	
+
 	{
 		vec4 pos = unif_matrix * position;
 		float pitch = asin(pos.y);
