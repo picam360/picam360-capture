@@ -92,6 +92,7 @@ typedef struct _FRAME_T {
 	bool is_recording;
 	void *recorder;
 	VECTOR4D_T frame_view_quat;
+	float frame_fov;
 
 	//h264
 	bool in_nal;
