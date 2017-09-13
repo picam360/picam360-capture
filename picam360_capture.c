@@ -1259,7 +1259,14 @@ int _command_handler(const char *_buff) {
 				for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 					if (frame->id == id && frame->view_mpu && frame->view_mpu->set_quaternion) {
 						VECTOR4D_T value = { .ary = { x, y, z, w } };
+						state->plugin_host.lock_texture();
 						frame->view_mpu->set_quaternion(frame->view_mpu->user_data, value);
+						param = strtok(NULL, " \n");
+						if (param != NULL) {
+							strncpy(frame->ttl_key, param, sizeof(frame->ttl_key));
+							gettimeofday(&frame->ttl_key_time, NULL);
+						}
+						state->plugin_host.unlock_texture();
 						//printf("set_view_quaternion\n");
 						break;
 					}
@@ -1904,8 +1911,31 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 						return;
 					}
 					if (i + frame->nal_len <= data_len) {
-						rtp_sendpacket(SOI, sizeof(SOI),
-						PT_CAM_BASE + frame->id);
+						if (frame->nal_type == 1 || frame->nal_type == 5) { // sei for a frame
+							float diff_sec = 0;
+							if (frame->frame_ttl_key[0] != '\0') {
+								struct timeval s;
+								gettimeofday(&s, NULL);
+								struct timeval diff;
+								timersub(&s, &frame->frame_ttl_key_time, &diff);
+								diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+							}
+
+							char sei[512];
+							sei[4] = 6; //nal_type:sei
+							int len = sprintf(sei + 5, "<picam360_frame vq=\"%.3f,%.3f,%.3f,%.3f\" tk=\"%s\" ft=\"%.3f\" />", frame->frame_view_quat.x, frame->frame_view_quat.y,
+									frame->frame_view_quat.z, frame->frame_view_quat.w, frame->frame_ttl_key, diff_sec);
+							len += 1; //nal header
+							sei[0] = (len >> 24) & 0xFF;
+							sei[1] = (len >> 16) & 0xFF;
+							sei[2] = (len >> 8) & 0xFF;
+							sei[3] = (len >> 0) & 0xFF;
+							len += 4; //start code
+							rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
+							rtp_sendpacket(sei, len, PT_CAM_BASE + frame->id);
+							rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
+						}
+						rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
 						if (frame->output_fd > 0) {
 							if (!frame->output_start) {
 								if (frame->nal_type == 7) { // wait for sps
@@ -1925,12 +1955,10 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 							} else {
 								len = frame->nal_len - j;
 							}
-							rtp_sendpacket(data + i + j, len,
-							PT_CAM_BASE + frame->id);
+							rtp_sendpacket(data + i + j, len, PT_CAM_BASE + frame->id);
 							j += len;
 						}
-						rtp_sendpacket(EOI, sizeof(EOI),
-						PT_CAM_BASE + frame->id);
+						rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
 						i += frame->nal_len;
 						frame->in_nal = false;
 					} else {
@@ -1942,8 +1970,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 					if (i + rest <= data_len) {
 						memcpy(frame->nal_buff + frame->nal_pos, data + i, rest);
 
-						rtp_sendpacket(SOI, sizeof(SOI),
-						PT_CAM_BASE + frame->id);
+						rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
 						if (frame->output_fd > 0) {
 							write(frame->output_fd, SC, 4);
 							write(frame->output_fd, frame->nal_buff + 4, frame->nal_len - 4);
@@ -1955,12 +1982,10 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 							} else {
 								len = frame->nal_len - j;
 							}
-							rtp_sendpacket(frame->nal_buff + j, len,
-							PT_CAM_BASE + frame->id);
+							rtp_sendpacket(frame->nal_buff + j, len, PT_CAM_BASE + frame->id);
 							j += len;
 						}
-						rtp_sendpacket(EOI, sizeof(EOI),
-						PT_CAM_BASE + frame->id);
+						rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
 						free(frame->nal_buff);
 						frame->nal_buff = NULL;
 
@@ -3162,7 +3187,10 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 
 	// Rv : view
 	if (frame->view_mpu) {
-		mat4_fromQuat(view_matrix, frame->view_mpu->get_quaternion(frame->view_mpu).ary);
+		memcpy(frame->frame_ttl_key, frame->ttl_key, sizeof(frame->frame_ttl_key));
+		frame->frame_ttl_key_time = frame->ttl_key_time;
+		frame->frame_view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
+		mat4_fromQuat(view_matrix, frame->frame_view_quat.ary);
 		mat4_invert(view_matrix, view_matrix);
 	}
 

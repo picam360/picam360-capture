@@ -91,6 +91,7 @@ typedef struct _FRAME_T {
 	double frame_elapsed;
 	bool is_recording;
 	void *recorder;
+	VECTOR4D_T frame_view_quat;
 
 	//h264
 	bool in_nal;
@@ -114,12 +115,16 @@ typedef struct _FRAME_T {
 	//for unif matrix
 	MPU_T *view_mpu;
 
+	// for ttl cal
+	char ttl_key[256];
+	struct timeval ttl_key_time;
+	char frame_ttl_key[256];
+	struct timeval frame_ttl_key_time;
+
 	void *custom_data;
 	//event
-	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *,
-			struct _FRAME_T *);
-	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *,
-			struct _FRAME_T *);
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
+	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
 
 	struct _FRAME_T *next;
 } FRAME_T;
