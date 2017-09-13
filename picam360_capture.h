@@ -95,6 +95,7 @@ typedef struct _FRAME_T {
 	//h264
 	bool in_nal;
 	uint32_t nal_len;
+	uint8_t nal_type;
 	uint8_t *nal_buff;
 	uint32_t nal_pos;
 
@@ -103,6 +104,7 @@ typedef struct _FRAME_T {
 	enum OUTPUT_TYPE output_type;
 	char output_filepath[256];
 	int output_fd;
+	bool output_start;
 	bool double_size;
 
 	float kbps;

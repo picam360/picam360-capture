@@ -641,7 +641,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:ERCFo:s:v:f:k:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:EACFo:s:v:f:k:")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &render_width);
@@ -652,7 +652,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		case 'E':
 			frame->operation_mode = EQUIRECTANGULAR;
 			break;
-		case 'R':
+		case 'A': //anti-delay
 			frame->operation_mode = EQUIRECTANGULAR_WINDOW;
 			break;
 		case 'C':
@@ -1897,6 +1897,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 					frame->in_nal = true;
 					frame->nal_len = data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3];
 					frame->nal_len += 4; //start code
+					frame->nal_type = data[i + 4] & 0x1f;
 					if (frame->nal_len > 1024 * 1024) {
 						printf("something wrong in h264 stream at %d\n", i);
 						frame->in_nal = false;
@@ -1906,8 +1907,16 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 						rtp_sendpacket(SOI, sizeof(SOI),
 						PT_CAM_BASE + frame->id);
 						if (frame->output_fd > 0) {
-							write(frame->output_fd, SC, 4);
-							write(frame->output_fd, data + i + 4, frame->nal_len - 4);
+							if (!frame->output_start) {
+								if (frame->nal_type == 7) { // wait for sps
+									printf("output_start\n");
+									frame->output_start = true;
+								}
+							}
+							if (frame->output_start) {
+								write(frame->output_fd, SC, 4);
+								write(frame->output_fd, data + i + 4, frame->nal_len - 4);
+							}
 						}
 						for (int j = 0; j < frame->nal_len;) {
 							int len;
