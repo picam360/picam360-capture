@@ -808,6 +808,7 @@ void frame_handler() {
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
+			frame->output_start = false;
 			frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
 			S_IRUSR | S_IWUSR | /* rw */
 			S_IRGRP | S_IWGRP | /* rw */
@@ -941,6 +942,7 @@ void frame_handler() {
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".h264")) {
 				if (frame->output_type == OUTPUT_TYPE_H264) {
+					frame->output_start = false;
 					frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
 					S_IRUSR | S_IWUSR | /* rw */
 					S_IRGRP | S_IWGRP | /* rw */
@@ -952,6 +954,7 @@ void frame_handler() {
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".mjpeg")) {
 				if (frame->output_type == OUTPUT_TYPE_MJPEG) {
+					frame->output_start = false;
 					frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
 					S_IRUSR | S_IWUSR | /* rw */
 					S_IRGRP | S_IWGRP | /* rw */
@@ -1923,7 +1926,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 
 							char sei[512];
 							sei[4] = 6; //nal_type:sei
-							int len = sprintf(sei + 5, "<picam360_frame vq=\"%.3f,%.3f,%.3f,%.3f\" tk=\"%s\" ft=\"%.3f\" />", frame->frame_view_quat.x, frame->frame_view_quat.y,
+							int len = sprintf(sei + 5, "<picam360:frame vq=\"%.3f,%.3f,%.3f,%.3f\" tk=\"%s\" ft=\"%.3f\" />", frame->frame_view_quat.x, frame->frame_view_quat.y,
 									frame->frame_view_quat.z, frame->frame_view_quat.w, frame->frame_ttl_key, diff_sec);
 							len += 1; //nal header
 							sei[0] = (len >> 24) & 0xFF;
