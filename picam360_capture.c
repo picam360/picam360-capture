@@ -69,7 +69,7 @@ static void init_textures(PICAM360CAPTURE_T *state);
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
 static void exit_func(void);
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, FRAME_INFO_T *frame_info);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
 
@@ -768,7 +768,7 @@ bool delete_frame(FRAME_T *frame) {
 	return true;
 }
 
-static void stream_callback(unsigned char *data, unsigned int data_len, void *user_data);
+static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
 
 void frame_handler() {
 	struct timeval s, f;
@@ -776,6 +776,7 @@ void frame_handler() {
 	bool snap_finished = false;
 	FRAME_T **frame_pp = &state->frame;
 	while (*frame_pp) {
+		FRAME_INFO_T frame_info;
 		FRAME_T *frame = *frame_pp;
 		gettimeofday(&s, NULL);
 
@@ -859,51 +860,48 @@ void frame_handler() {
 			printf("start_record saved to %s : %d kbps\n", frame->output_filepath, (int) kbps);
 		}
 
-		//rendering to buffer
-		int img_width;
-		int img_height;
-		if (frame->double_size) {
-			int size = frame->width * frame->height * 3;
-			unsigned char *image_buffer = (unsigned char*) malloc(size);
-			unsigned char *image_buffer_double = frame->img_buff;
-			img_width = frame->width * 2;
-			img_height = frame->height;
+		{ //rendering to buffer
 			state->plugin_host.lock_texture();
-			for (int split = 0; split < 2; split++) {
-				state->split = split + 1;
+			if (frame->double_size) {
+				int size = frame->width * frame->height * 3;
+				unsigned char *image_buffer = (unsigned char*) malloc(size);
+				unsigned char *image_buffer_double = frame->img_buff;
+				frame->img_width = frame->width * 2;
+				frame->img_height = frame->height;
+				for (int split = 0; split < 2; split++) {
+					state->split = split + 1;
+
+					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+					redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], &frame_info);
+					glFinish();
+					glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
+					glBindFramebuffer(GL_FRAMEBUFFER, 0);
+					for (int y = 0; y < frame->height; y++) {
+						memcpy(image_buffer_double + frame->width * 2 * 3 * y + frame->width * 3 * split, image_buffer + frame->width * 3 * y, frame->width * 3);
+					}
+				}
+				free(image_buffer);
+			} else {
+				unsigned char *image_buffer = frame->img_buff;
+				frame->img_width = frame->width;
+				frame->img_height = frame->height;
+				state->split = 0;
 
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-				redraw_render_texture(state, frame, &state->model_data[frame->operation_mode]);
+				redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], &frame_info);
+				if (state->menu_visible) {
+					redraw_info(state, frame);
+				}
 				glFinish();
 				glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
-				for (int y = 0; y < frame->height; y++) {
-					memcpy(image_buffer_double + frame->width * 2 * 3 * y + frame->width * 3 * split, image_buffer + frame->width * 3 * y, frame->width * 3);
-				}
 			}
 			state->plugin_host.unlock_texture();
-			free(image_buffer);
-		} else {
-			unsigned char *image_buffer = frame->img_buff;
-			img_width = frame->width;
-			img_height = frame->height;
-			state->split = 0;
-			//state->plugin_host.lock_texture();
-
-			glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-			redraw_render_texture(state, frame, &state->model_data[frame->operation_mode]);
-			if (state->menu_visible) {
-				redraw_info(state, frame);
-			}
-			glFinish();
-			glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			//state->plugin_host.unlock_texture();
 		}
 
 		switch (frame->output_mode) {
 		case OUTPUT_MODE_STILL:
-			SaveJpeg(frame->img_buff, img_width, img_height, frame->output_filepath, 70);
+			SaveJpeg(frame->img_buff, frame->img_width, frame->img_height, frame->output_filepath, 70);
 			printf("snap saved to %s\n", frame->output_filepath);
 
 			gettimeofday(&f, NULL);
@@ -917,7 +915,7 @@ void frame_handler() {
 			break;
 		case OUTPUT_MODE_VIDEO:
 			if (frame->output_fd > 0) {
-				AddFrame(frame->recorder, frame->img_buff);
+				AddFrame(frame->recorder, frame->img_buff, NULL);
 
 				gettimeofday(&f, NULL);
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
@@ -929,7 +927,11 @@ void frame_handler() {
 			}
 			break;
 		case OUTPUT_MODE_STREAM:
-			AddFrame(frame->recorder, frame->img_buff);
+			if (1) {
+				FRAME_INFO_T *frame_info_p = malloc(sizeof(FRAME_INFO_T));
+				memcpy(frame_info_p, &frame_info, sizeof(FRAME_INFO_T));
+				AddFrame(frame->recorder, frame->img_buff, frame_info_p);
+			}
 
 			gettimeofday(&f, NULL);
 			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
@@ -937,7 +939,7 @@ void frame_handler() {
 			frame->frame_elapsed += elapsed_ms;
 
 			if (end_width(frame->output_filepath, ".jpeg")) {
-				SaveJpeg(frame->img_buff, img_width, img_height, frame->output_filepath, 70);
+				SaveJpeg(frame->img_buff, frame->img_width, frame->img_height, frame->output_filepath, 70);
 				printf("snap saved to %s\n", frame->output_filepath);
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".h264")) {
@@ -1905,111 +1907,60 @@ static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
 static int lg_debug_dump_fd = -1;
 
-static void stream_callback(unsigned char *data, unsigned int data_len, void *user_data) {
+static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
+	FRAME_INFO_T *frame_info = (FRAME_INFO_T*) frame_data;
 	if (frame->output_mode == OUTPUT_MODE_STREAM) {
 		if (frame->output_type == OUTPUT_TYPE_H264) {
 			const unsigned char SC[] = { 0x00, 0x00, 0x00, 0x01 };
 			const unsigned char SOI[] = { 0x4E, 0x41 }; //'N', 'A'
 			const unsigned char EOI[] = { 0x4C, 0x55 }; //'L', 'U'
-			for (int i = 0; i < data_len;) {
-				if (!frame->in_nal) {
-					frame->in_nal = true;
-					frame->nal_len = data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3];
-					frame->nal_len += 4; //start code
-					frame->nal_type = data[i + 4] & 0x1f;
-					if (frame->nal_len > 1024 * 1024) {
-						printf("something wrong in h264 stream at %d\n", i);
-						frame->in_nal = false;
-						return;
-					}
-					if (i + frame->nal_len <= data_len) {
-						rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
-						if (frame->nal_type == 1 || frame->nal_type == 5) { // sei for a frame
-							float diff_sec = 0;
-							if (frame->frame_ttl_key[0] != '\0') {
-								struct timeval s;
-								gettimeofday(&s, NULL);
-								struct timeval diff;
-								timersub(&s, &frame->frame_ttl_key_time, &diff);
-								diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-							}
+			rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
+			if (frame_info) { // sei for a frame
+				float diff_sec = 0;
+				if (frame_info->ttl_key[0] != '\0') {
+					struct timeval s;
+					gettimeofday(&s, NULL);
+					struct timeval diff;
+					timersub(&s, &frame_info->ttl_key_time, &diff);
+					diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+				}
 
-							char sei[512];
-							sei[4] = 6; //nal_type:sei
-							int len = sprintf(sei + 5, "<picam360:frame vq=\"%.3f,%.3f,%.3f,%.3f\" tk=\"%s\" fov=\"%.3f\" ft=\"%.3f\" />", frame->frame_view_quat.x, frame->frame_view_quat.y,
-									frame->frame_view_quat.z, frame->frame_view_quat.w, frame->frame_ttl_key, frame->frame_fov, diff_sec);
-							len += 1; //nal header
-							sei[0] = (len >> 24) & 0xFF;
-							sei[1] = (len >> 16) & 0xFF;
-							sei[2] = (len >> 8) & 0xFF;
-							sei[3] = (len >> 0) & 0xFF;
-							len += 4; //start code
-							rtp_sendpacket(sei, len, PT_CAM_BASE + frame->id);
-						}
-						if (frame->output_fd > 0) {
-							if (!frame->output_start) {
-								if (frame->nal_type == 7) { // wait for sps
-									printf("output_start\n");
-									frame->output_start = true;
-								}
-							}
-							if (frame->output_start) {
-								write(frame->output_fd, SC, 4);
-								write(frame->output_fd, data + i + 4, frame->nal_len - 4);
-							}
-						}
-						for (int j = 0; j < frame->nal_len;) {
-							int len;
-							if (j + RTP_MAXPAYLOADSIZE < frame->nal_len) {
-								len = RTP_MAXPAYLOADSIZE;
-							} else {
-								len = frame->nal_len - j;
-							}
-							rtp_sendpacket(data + i + j, len, PT_CAM_BASE + frame->id);
-							j += len;
-						}
-						rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
-						i += frame->nal_len;
-						frame->in_nal = false;
-					} else {
-						frame->nal_pos = 0;
-						frame->nal_buff = malloc(frame->nal_len);
-					}
-				} else {
-					int rest = frame->nal_len - frame->nal_pos;
-					if (i + rest <= data_len) {
-						memcpy(frame->nal_buff + frame->nal_pos, data + i, rest);
-
-						rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
-						if (frame->output_fd > 0) {
-							write(frame->output_fd, SC, 4);
-							write(frame->output_fd, frame->nal_buff + 4, frame->nal_len - 4);
-						}
-						for (int j = 0; j < frame->nal_len;) {
-							int len;
-							if (j + RTP_MAXPAYLOADSIZE < frame->nal_len) {
-								len = RTP_MAXPAYLOADSIZE;
-							} else {
-								len = frame->nal_len - j;
-							}
-							rtp_sendpacket(frame->nal_buff + j, len, PT_CAM_BASE + frame->id);
-							j += len;
-						}
-						rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
-						free(frame->nal_buff);
-						frame->nal_buff = NULL;
-
-						i += rest;
-						frame->in_nal = false;
-					} else {
-						int len = data_len - i;
-						memcpy(frame->nal_buff + frame->nal_pos, data + i, len);
-						frame->nal_pos += len;
-						i += len;
+				char sei[512];
+				sei[4] = 6; //nal_type:sei
+				int len = sprintf(sei + 5, "<picam360:frame vq=\"%.3f,%.3f,%.3f,%.3f\" tk=\"%s\" fov=\"%.3f\" ft=\"%.3f\" />", frame_info->view_quat.x, frame_info->view_quat.y,
+						frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key, frame_info->fov, diff_sec);
+				len += 1; //nal header
+				sei[0] = (len >> 24) & 0xFF;
+				sei[1] = (len >> 16) & 0xFF;
+				sei[2] = (len >> 8) & 0xFF;
+				sei[3] = (len >> 0) & 0xFF;
+				len += 4; //start code
+				rtp_sendpacket(sei, len, PT_CAM_BASE + frame->id);
+			}
+			if (frame->output_fd > 0) {
+				if (!frame->output_start) {
+					if ((data[4] & 0x1f) == 7) { // wait for sps
+						printf("output_start\n");
+						frame->output_start = true;
 					}
 				}
+				if (frame->output_start) {
+					write(frame->output_fd, SC, 4);
+					write(frame->output_fd, data + 4, data_len - 4);
+				}
 			}
+			for (int j = 0; j < data_len;) {
+				int len;
+				if (j + RTP_MAXPAYLOADSIZE < data_len) {
+					len = RTP_MAXPAYLOADSIZE;
+				} else {
+					len = data_len - j;
+				}
+				rtp_sendpacket(data + j, len, PT_CAM_BASE + frame->id);
+				j += len;
+			}
+			rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
 		} else if (frame->output_type == OUTPUT_TYPE_MJPEG) {
 			if (lg_debug_dump) {
 				if (data[0] == 0xFF && data[1] == 0xD8) { //
@@ -2045,6 +1996,9 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *us
 				write(frame->output_fd, data, data_len);
 			}
 		}
+	}
+	if (frame_info) {
+		free(frame_info);
 	}
 }
 
@@ -3127,9 +3081,14 @@ int main(int argc, char *argv[]) {
  * Returns: void
  *
  ***********************************************************/
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, FRAME_INFO_T *frame_info) {
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
+
+	VECTOR4D_T view_quat = { .ary = { 0, 0, 0, 1 } };
+	if (frame->view_mpu) {
+		view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
+	}
 
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
@@ -3151,13 +3110,11 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
 	}
 
-	{ //store info
-		memcpy(frame->frame_ttl_key, frame->ttl_key, sizeof(frame->frame_ttl_key));
-		frame->frame_ttl_key_time = frame->ttl_key_time;
-		frame->frame_fov = frame->fov;
-		if (frame->view_mpu) {
-			frame->frame_view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
-		}
+	if (frame_info) { //store info
+		memcpy(frame_info->ttl_key, frame->ttl_key, sizeof(frame_info->ttl_key));
+		frame_info->ttl_key_time = frame->ttl_key_time;
+		frame_info->fov = frame->fov;
+		frame_info->view_quat = view_quat;
 	}
 
 	//depth axis is z, vertical asis is y
@@ -3206,8 +3163,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 //	mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
 
 	// Rv : view
-	if (frame->view_mpu) {
-		mat4_fromQuat(view_matrix, frame->frame_view_quat.ary);
+	{
+		mat4_fromQuat(view_matrix, view_quat.ary);
 		mat4_invert(view_matrix, view_matrix);
 	}
 

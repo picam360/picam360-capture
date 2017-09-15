@@ -79,11 +79,20 @@ typedef struct _LIST_T {
 	struct _LIST_T *next;
 } LIST_T;
 
+typedef struct _FRAME_INFO_T {
+	VECTOR4D_T view_quat;
+	float fov;
+	char ttl_key[256];
+	struct timeval ttl_key_time;
+} FRAME_INFO_T;
+
 typedef struct _FRAME_T {
 	int id;
 	GLuint framebuffer;
 	GLuint texture;
 	uint8_t *img_buff;
+	uint32_t img_width;
+	uint32_t img_height;
 	uint32_t width;
 	uint32_t height;
 	bool delete_after_processed;
@@ -91,15 +100,6 @@ typedef struct _FRAME_T {
 	double frame_elapsed;
 	bool is_recording;
 	void *recorder;
-	VECTOR4D_T frame_view_quat;
-	float frame_fov;
-
-	//h264
-	bool in_nal;
-	uint32_t nal_len;
-	uint8_t nal_type;
-	uint8_t *nal_buff;
-	uint32_t nal_pos;
 
 	enum OPERATION_MODE operation_mode;
 	enum OUTPUT_MODE output_mode;
@@ -119,8 +119,6 @@ typedef struct _FRAME_T {
 	// for ttl cal
 	char ttl_key[256];
 	struct timeval ttl_key_time;
-	char frame_ttl_key[256];
-	struct timeval frame_ttl_key_time;
 
 	void *custom_data;
 	//event

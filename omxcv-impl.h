@@ -71,7 +71,7 @@ public:
 			void *user_data = NULL);
 	virtual ~OmxCvImpl();
 
-	bool process(const unsigned char *in_data);
+	bool process(const unsigned char *in_data, void *frame_data);
 
 private:
 	int m_width, m_height, m_stride, m_bitrate, m_fpsnum, m_fpsden;
@@ -84,6 +84,7 @@ private:
 
 	std::condition_variable m_input_signaller;
 	std::deque<std::pair<OMX_BUFFERHEADERTYPE *, int64_t>> m_input_queue;
+	std::deque<void*> m_frame_data_queue;
 	std::thread m_input_worker;
 	std::mutex m_input_mutex;
 	std::atomic<bool> m_stop;
@@ -95,15 +96,13 @@ private:
 	std::chrono::steady_clock::time_point m_frame_start;
 	int m_frame_count;
 
-	//for jpeg
-	unsigned char *image_buff;
-	int image_buff_size;
-	int image_buff_cur;
-	int image_start;
-	int data_len_total;
-	int marker;
-	int soicount;
-	bool first_packet;
+	//h264
+	bool in_nal;
+	uint32_t nal_len;
+	uint8_t nal_type;
+	uint8_t *nal_buff;
+	uint32_t nal_pos;
+
 	OMX_BUFFERHEADERTYPE *output_buffer;
 
 	void input_worker();

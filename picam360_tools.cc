@@ -43,12 +43,12 @@ int StopRecord(void *obj) {
 	return 0;
 }
 
-int AddFrame(void *obj, const unsigned char *in_data) {
+int AddFrame(void *obj, const unsigned char *in_data, void *frame_data) {
 	OmxCv *recorder = (OmxCv*)obj;
 	if (recorder == NULL) {
 		return -1;
 	}
-	recorder->Encode(in_data);
+	recorder->Encode(in_data, frame_data);
 	return 0;
 }
 
