@@ -348,11 +348,11 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(64, &state->model_data[EQUIRECTANGULAR_WINDOW].vbo, &state->model_data[EQUIRECTANGULAR_WINDOW].vbo_nop);
+	board_mesh(64, &state->model_data[ANGULAR].vbo, &state->model_data[ANGULAR].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[EQUIRECTANGULAR_WINDOW].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
+		state->model_data[ANGULAR].program = GLProgram_new("shader/angular.vert", "shader/angular.frag");
 	} else {
-		state->model_data[EQUIRECTANGULAR_WINDOW].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
+		state->model_data[ANGULAR].program = GLProgram_new("shader/angular.vert", "shader/angular.frag");
 	}
 
 	board_mesh(1, &state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
@@ -653,7 +653,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			frame->operation_mode = EQUIRECTANGULAR;
 			break;
 		case 'A': //anti-delay
-			frame->operation_mode = EQUIRECTANGULAR_WINDOW;
+			frame->operation_mode = ANGULAR;
 			break;
 		case 'C':
 			frame->operation_mode = CALIBRATION;
@@ -1906,7 +1906,24 @@ static int lg_ack_command_id = 0;
 static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
 static int lg_debug_dump_fd = -1;
-
+static const char *get_operation_mode_string(enum OPERATION_MODE mode) {
+	switch (mode) {
+	case BOARD:
+		return "BOARD";
+	case WINDOW:
+		return "WINDOW";
+	case ANGULAR:
+		return "ANGULAR";
+	case EQUIRECTANGULAR:
+		return "EQUIRECTANGULAR";
+	case FISHEYE:
+		return "FISHEYE";
+	case CALIBRATION:
+		return "CALIBRATION";
+	default:
+		return "UNKNOWN";
+	}
+}
 static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
 	FRAME_INFO_T *frame_info = (FRAME_INFO_T*) frame_data;
@@ -1928,8 +1945,8 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 
 				char sei[512];
 				sei[4] = 6; //nal_type:sei
-				int len = sprintf(sei + 5, "<picam360:frame vq=\"%.3f,%.3f,%.3f,%.3f\" tk=\"%s\" fov=\"%.3f\" ft=\"%.3f\" />", frame_info->view_quat.x, frame_info->view_quat.y,
-						frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key, frame_info->fov, diff_sec);
+				int len = sprintf(sei + 5, "<picam360:frame mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elappsed=\"%.3f\" />", get_operation_mode_string(frame->operation_mode),
+						frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key, frame_info->fov, diff_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
 				sei[1] = (len >> 16) & 0xFF;
@@ -3196,11 +3213,12 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	if (frame->operation_mode == EQUIRECTANGULAR_WINDOW) {
-		float scale_x = frame->fov / 360.0;
-		float scale_y = frame->fov / 180.0;
-		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0 / scale_x);
-		glUniform1f(glGetUniformLocation(program, "scale_y"), 1.0 / scale_y);
+	if (frame->operation_mode == ANGULAR) {
+		float fov_rad = frame->fov * M_PI / 180.0;
+		float angular_r = sqrt(2.0);
+		float angular_gain = (fov_rad / 2) / asin(1.0 / angular_r);
+		glUniform1f(glGetUniformLocation(program, "angular_gain"), angular_gain);
+		glUniform1f(glGetUniformLocation(program, "angular_r"), angular_r);
 	} else if (frame->operation_mode == EQUIRECTANGULAR) {
 		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
 		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);
