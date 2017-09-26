@@ -50,6 +50,10 @@ void OmxCvImpl::my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	//printf("omxcv done!\n");
 
 	if (output_buffer->nFilledLen == 0) {
+		std::unique_lock < std::mutex > lock(_this->m_input_mutex);
+		_this->m_frame_data_queue.pop_front();
+		lock.unlock();
+
 		printf("output_buffer->nFilledLen = 0\n");
 	} else {
 		// Do something with outBuf
