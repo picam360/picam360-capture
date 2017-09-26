@@ -1945,7 +1945,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 
 				char sei[512];
 				sei[4] = 6; //nal_type:sei
-				int len = sprintf(sei + 5, "<picam360:frame mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elappsed=\"%.3f\" />", get_operation_mode_string(frame->operation_mode),
+				int len = sprintf(sei + 5, "<picam360:frame mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elapsed=\"%.3f\" />", get_operation_mode_string(frame->operation_mode),
 						frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key, frame_info->fov, diff_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
