@@ -243,7 +243,6 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out) {
 				float x = start_x + step_x * (i + 1);
 				float y = start_y + step_y * j;
 				float z = 1.0;
-				float len = sqrt(x * x + y * y + z * z);
 				points[idx++] = x;
 				points[idx++] = y;
 				points[idx++] = z;
@@ -348,11 +347,11 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(64, &state->model_data[ANGULAR].vbo, &state->model_data[ANGULAR].vbo_nop);
+	board_mesh(64, &state->model_data[PICAM360MAP].vbo, &state->model_data[PICAM360MAP].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[ANGULAR].program = GLProgram_new("shader/angular.vert", "shader/angular.frag");
+		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
 	} else {
-		state->model_data[ANGULAR].program = GLProgram_new("shader/angular.vert", "shader/angular.frag");
+		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
 	}
 
 	board_mesh(1, &state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
@@ -641,7 +640,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:EACFo:s:v:f:k:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:EPCFo:s:v:f:k:")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &render_width);
@@ -652,8 +651,8 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		case 'E':
 			frame->operation_mode = EQUIRECTANGULAR;
 			break;
-		case 'A': //anti-delay
-			frame->operation_mode = ANGULAR;
+		case 'P': //360 map optimized for remote-reality
+			frame->operation_mode = PICAM360MAP;
 			break;
 		case 'C':
 			frame->operation_mode = CALIBRATION;
@@ -1912,8 +1911,8 @@ static const char *get_operation_mode_string(enum OPERATION_MODE mode) {
 		return "BOARD";
 	case WINDOW:
 		return "WINDOW";
-	case ANGULAR:
-		return "ANGULAR";
+	case PICAM360MAP:
+		return "PICAM360MAP";
 	case EQUIRECTANGULAR:
 		return "EQUIRECTANGULAR";
 	case FISHEYE:
@@ -1945,8 +1944,9 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 
 				char sei[512];
 				sei[4] = 6; //nal_type:sei
-				int len = sprintf(sei + 5, "<picam360:frame mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elapsed=\"%.3f\" />", get_operation_mode_string(frame->operation_mode),
-						frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key, frame_info->fov, diff_sec);
+				int len = sprintf(sei + 5, "<picam360:frame mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elapsed=\"%.3f\" />",
+						get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key,
+						frame_info->fov, diff_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
 				sei[1] = (len >> 16) & 0xFF;
@@ -2250,7 +2250,7 @@ static int get_last_id(const char *path) {
 				}
 			}
 		}
-		close(dir);
+		closedir(dir);
 		return last_id;
 	} else {
 		return -1;
@@ -3213,12 +3213,24 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	if (frame->operation_mode == ANGULAR) {
-		float fov_rad = frame->fov * M_PI / 180.0;
-		float angular_r = sqrt(2.0);
-		float angular_gain = (fov_rad / 2) / asin(1.0 / angular_r);
-		glUniform1f(glGetUniformLocation(program, "angular_gain"), angular_gain);
-		glUniform1f(glGetUniformLocation(program, "angular_r"), angular_r);
+	if (frame->operation_mode == PICAM360MAP) {
+		const int stepnum = 256;
+		float x_ary[3] = { 0.0, 1.0, sqrt(2) };
+		float y_ary[3] = { 0.0, frame->fov * M_PI / 180.0, M_PI };
+		float x_ary2[stepnum];
+		float y_ary2[stepnum];
+		for (int i = 0; i < stepnum; i++) {
+			x_ary2[i] = sqrt(2) * (float) i / (float) (stepnum - 1);
+		}
+		get_cubic_spline(3, x_ary, y_ary, stepnum, x_ary2, y_ary2);
+		glUniform1fv(glGetUniformLocation(program, "r_2_pitch"), stepnum, y_ary2);
+//		static bool init = false;
+//		if (!init) {
+//			init = true;
+//			for (int i = 0; i < stepnum; i++) {
+//				printf("%f,%f\n", x_ary2[i], y_ary2[i]);
+//			}
+//		}
 	} else if (frame->operation_mode == EQUIRECTANGULAR) {
 		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
 		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);

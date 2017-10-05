@@ -3,7 +3,9 @@
  * @brief Simple testing application for omxcv.
  */
 #include "picam360_tools.h"
+#include "spline.hpp"
 #include "omxcv.h"
+
 #include <opencv2/opencv.hpp>
 #include <cstdio>
 #include <cstdlib>
@@ -27,14 +29,13 @@ using std::chrono::duration_cast;
 
 //global variables
 
-void* StartRecord(const int width, const int height, const char *filename,
-		int bitrate_kbps, int fps, RECORD_CALLBACK callback, void *user_data) {
+void* StartRecord(const int width, const int height, const char *filename, int bitrate_kbps, int fps, RECORD_CALLBACK callback, void *user_data) {
 	OmxCv *recorder = new OmxCv(filename, width, height, bitrate_kbps, fps, 1, callback, user_data);
-	return (void*)recorder;
+	return (void*) recorder;
 }
 
 int StopRecord(void *obj) {
-	OmxCv *recorder = (OmxCv*)obj;
+	OmxCv *recorder = (OmxCv*) obj;
 	if (recorder == NULL) {
 		return -1;
 	}
@@ -44,7 +45,7 @@ int StopRecord(void *obj) {
 }
 
 int AddFrame(void *obj, const unsigned char *in_data, void *frame_data) {
-	OmxCv *recorder = (OmxCv*)obj;
+	OmxCv *recorder = (OmxCv*) obj;
 	if (recorder == NULL) {
 		return -1;
 	}
@@ -52,8 +53,7 @@ int AddFrame(void *obj, const unsigned char *in_data, void *frame_data) {
 	return 0;
 }
 
-int SaveJpeg(const unsigned char *in_data, const int width, const int height,
-		const char *out_filename, int quality) {
+int SaveJpeg(const unsigned char *in_data, const int width, const int height, const char *out_filename, int quality) {
 
 	OmxCvJpeg encoder(width, height, quality);
 	if (out_filename != NULL) {
@@ -65,4 +65,20 @@ int SaveJpeg(const unsigned char *in_data, const int width, const int height,
 	}
 
 	return 0;
+}
+
+void get_cubic_spline(int num_of_points, float *x_ary, float *y_ary, int num_of_points2, float *x_ary2, float *out_y_ary2) {
+	std::vector<double> X, Y;
+
+	for (int i = 0; i < num_of_points; i++) {
+		X.push_back(x_ary[i]);
+		Y.push_back(y_ary[i]);
+	}
+
+	tk::spline s;
+	s.set_points(X, Y);
+
+	for (int i = 0; i < num_of_points2; i++) {
+		out_y_ary2[i] = (float) s(x_ary2[i]);
+	}
 }

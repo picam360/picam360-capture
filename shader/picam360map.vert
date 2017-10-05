@@ -10,11 +10,7 @@ uniform sampler2D cam1_texture;
 uniform float pixel_size;
 uniform float cam_aspect_ratio;
 //angular map params
-//coner pitch PI : angular_r = M_SQRT_2 && angular_gain = M_PI / asin(1.0 / angular_r) 
-//mirror-ball : angular_r = 1.0 && angular_gain = M_PI / asin(1.0 / angular_r) 
-//axsis edge fov_rad : angular_r = 1.0 && angular_gain = fov_rad / asin(1.0 / angular_r) 
-uniform float angular_gain;
-uniform float angular_r;
+uniform float r_2_pitch[256];
 //options start
 uniform float sharpness_gain;
 uniform float cam0_offset_yaw;
@@ -30,6 +26,8 @@ uniform float cam1_aov;
 //options end
 
 const float M_PI = 3.1415926535;
+const float M_PI_DIV_2 = M_PI / 2.0;
+const float M_PI_DIV_4 = M_PI / 4.0;
 const float M_SQRT_2 = 1.4142135623;
 
 varying float r0;
@@ -46,8 +44,21 @@ void main(void) {
 	gl_Position.zw = vec2(1.0, 1.0);
 
 	float r = sqrt(position.x * position.x + position.y * position.y);
-	float pitch_orig = angular_gain * asin(r / angular_r) ;
+	if (r > M_SQRT_2) {
+		r = M_SQRT_2;
+	}
+	float indexf = r / M_SQRT_2 * 255.0;
+	int index = int(indexf);
+	float index_sub = indexf - float(index);
+	float pitch_orig = r_2_pitch[index] * (1.0 - index_sub) + r_2_pitch[index + 1] * index_sub;
 	float roll_orig = atan(position.y, position.x);
+	if (r < M_SQRT_2 && r > 1.0) {
+		int roll_index = int(roll_orig / M_PI_DIV_2);
+		float roll_base = float(roll_index) * M_PI_DIV_2 + (roll_orig > 0.0 ? M_PI_DIV_4 : -M_PI_DIV_4);
+		float roll_diff = roll_orig - roll_base;
+		float roll_gain = M_PI / (M_PI - 4.0 * acos(1.0 / r));
+		roll_orig = roll_diff * roll_gain + roll_base;
+	}
 	position.x = sin(pitch_orig) * cos(roll_orig);
 	position.y = sin(pitch_orig) * sin(roll_orig);
 	position.z = cos(pitch_orig);
