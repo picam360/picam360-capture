@@ -351,7 +351,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	if (state->num_of_cam == 1) {
 		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
 	} else {
-		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
+		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag");
 	}
 
 	board_mesh(1, &state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
