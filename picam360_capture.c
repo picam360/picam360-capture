@@ -624,15 +624,13 @@ bool inputAvailable() {
 	return (FD_ISSET(0, &fds));
 }
 
-static int next_frame_id = 0;
-
 FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	int opt;
 	int render_width = 512;
 	int render_height = 512;
 	FRAME_T *frame = malloc(sizeof(FRAME_T));
 	memset(frame, 0, sizeof(FRAME_T));
-	frame->id = next_frame_id++;
+	frame->id = state->next_frame_id++;
 	frame->operation_mode = WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->output_type = OUTPUT_TYPE_NONE;
@@ -665,10 +663,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 			break;
 		case 'v':
-			frame->view_mpu = state->mpus[0];
-			for (int i = 0; state->mpus[i] != NULL; i++) {
-				if (strncmp(state->mpus[i]->name, optarg, 64) == 0) {
-					frame->view_mpu = state->mpus[i];
+			for (int i = 0; state->mpu_factories[i] != NULL; i++) {
+				if (strncmp(state->mpu_factories[i]->name, optarg, 64) == 0) {
+					state->mpu_factories[i]->create_mpu(state->mpu_factories[i]->user_data, &frame->view_mpu);
 				}
 			}
 			break;
@@ -693,9 +690,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	}
 
 	if (frame->view_mpu == NULL) {
-		for (int i = 0; state->mpus[i] != NULL; i++) {
-			if (strncmp(state->mpus[i]->name, state->default_view_coordinate_mode, 64) == 0) {
-				frame->view_mpu = state->mpus[i];
+		for (int i = 0; state->mpu_factories[i] != NULL; i++) {
+			if (strncmp(state->mpu_factories[i]->name, state->default_view_coordinate_mode, 64) == 0) {
+				state->mpu_factories[i]->create_mpu(state->mpu_factories[i]->user_data, &frame->view_mpu);
 			}
 		}
 	}
@@ -761,6 +758,10 @@ bool delete_frame(FRAME_T *frame) {
 	if (frame->img_buff) {
 		free(frame->img_buff);
 		frame->img_buff = NULL;
+	}
+	if (frame->view_mpu) {
+		frame->view_mpu->release(frame->view_mpu);
+		frame->view_mpu = NULL;
 	}
 	free(frame);
 
@@ -1046,8 +1047,8 @@ int _command_handler(const char *_buff) {
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
 				frame->output_mode = OUTPUT_MODE_STILL;
-				frame->view_mpu = state->mpus[0];
-				manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+				//TODO : frame->view_mpu = state->mpu_factories[0];
+				//TODO : manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
 				state->frame = frame;
 			} else {
 				optind = 1; // reset getopt
@@ -1063,6 +1064,57 @@ int _command_handler(const char *_buff) {
 						}
 						break;
 					}
+				}
+			}
+		}
+	} else if (strncmp(cmd, "create_frame", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			const int kMaxArgs = 32;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+
+			FRAME_T *frame = create_frame(state, argc, argv);
+			frame->next = state->frame;
+			state->frame = frame;
+			printf("create_frame id=%d\n", frame->id);
+		}
+	} else if (strncmp(cmd, "delete_frame", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			int id = -1;
+			const int kMaxArgs = 32;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+			optind = 1; // reset getopt
+			while ((opt = getopt(argc, argv, "i:")) != -1) {
+				switch (opt) {
+				case 'i':
+					sscanf(optarg, "%d", &id);
+					break;
+				}
+			}
+			for (FRAME_T **frame_pp = &state->frame; *frame_pp != NULL; frame_pp = &(*frame_pp)->next) {
+				if ((*frame_pp)->id == id) {
+					FRAME_T *frame_p = *frame_pp;
+					*frame_pp = (*frame_pp)->next;
+					delete_frame(frame_p);
+					printf("delete_frame id=%d\n", id);
+					break;
 				}
 			}
 		}
@@ -1092,8 +1144,8 @@ int _command_handler(const char *_buff) {
 				FRAME_T *frame = create_frame(state, argc, argv);
 				frame->next = state->frame;
 				frame->output_mode = OUTPUT_MODE_VIDEO;
-				frame->view_mpu = state->mpus[0];
-				manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+				//TODO : frame->view_mpu = state->mpu_factories[0];
+				//TODO : manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
 				state->frame = frame;
 				printf("start_record id=%d\n", frame->id);
 			} else {
@@ -1253,37 +1305,52 @@ int _command_handler(const char *_buff) {
 			printf("set_camera_orientation\n");
 		}
 	} else if (strncmp(cmd, "set_view_quaternion", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int id;
-			float x, y, z, w;
-			int num = sscanf(param, "%i=%f,%f,%f,%f", &id, &x, &y, &z, &w);
-
-			if (num == 5) {
-				for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
-					if (frame->id == id && frame->view_mpu && frame->view_mpu->set_quaternion) {
-						VECTOR4D_T value = { .ary = { x, y, z, w } };
-						state->plugin_host.lock_texture();
-						frame->view_mpu->set_quaternion(frame->view_mpu->user_data, value);
-						do {
-							param = strtok(NULL, " \n");
-							if (param != NULL) {
-								if (strncmp(param, "fov=", 4) == 0) {
-									float fov;
-									int num = sscanf(param, "fov=%f", &fov);
-									if (num == 1) {
-										frame->fov = fov;
-									}
-								} else if (strncmp(param, "key=", 4) == 0) {
-									strncpy(frame->ttl_key, param + 4, sizeof(frame->ttl_key));
-									gettimeofday(&frame->ttl_key_time, NULL);
-								}
-							}
-						} while (param);
-						state->plugin_host.unlock_texture();
-						//printf("set_view_quaternion\n");
-						break;
+		char *param = NULL;
+		int id = 0; //default
+		bool quat_valid = false;
+		float x, y, z, w;
+		bool fov_valid = false;
+		float fov;
+		bool key_valid = false;
+		char *key = NULL;
+		do {
+			param = strtok(NULL, " \n");
+			if (param != NULL) {
+				if (strncmp(param, "quat=", 5) == 0) {
+					int num = sscanf(param, "quat=%f,%f,%f,%f", &x, &y, &z, &w);
+					if (num == 4) {
+						quat_valid = true;
 					}
+				} else if (strncmp(param, "fov=", 4) == 0) {
+					int num = sscanf(param, "fov=%f", &fov);
+					if (num == 1) {
+						fov_valid = true;
+					}
+				} else if (strncmp(param, "key=", 4) == 0) {
+					key = param + 4;
+					key_valid = true;
+				} else if (strncmp(param, "id=", 3) == 0) {
+					int num = sscanf(param, "id=%d", &id);
+				}
+			}
+		} while (param);
+
+		if (quat_valid) {
+			for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
+				if (frame->id == id && frame->view_mpu && frame->view_mpu->set_quaternion) {
+					VECTOR4D_T value = { .ary = { x, y, z, w } };
+					state->plugin_host.lock_texture();
+					frame->view_mpu->set_quaternion(frame->view_mpu->user_data, value);
+					state->plugin_host.unlock_texture();
+					//printf("set_view_quaternion\n");
+					if (fov_valid) {
+						frame->fov = fov;
+					}
+					if (key_valid) {
+						strncpy(frame->ttl_key, key, sizeof(frame->ttl_key));
+						gettimeofday(&frame->ttl_key_time, NULL);
+					}
+					break;
 				}
 			}
 		}
@@ -1737,21 +1804,21 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 		}
 	}
 }
-static void add_mpu(MPU_T *mpu) {
-	for (int i = 0; state->mpus[i] != (void*) -1; i++) {
-		if (state->mpus[i] == NULL) {
-			state->mpus[i] = mpu;
-			if (state->mpus[i + 1] == (void*) -1) {
+static void add_mpu_factory(MPU_FACTORY_T *mpu_factory) {
+	for (int i = 0; state->mpu_factories[i] != (void*) -1; i++) {
+		if (state->mpu_factories[i] == NULL) {
+			state->mpu_factories[i] = mpu_factory;
+			if (state->mpu_factories[i + 1] == (void*) -1) {
 				int space = (i + 2) * 2;
 				if (space > 256) {
-					fprintf(stderr, "error on add_mpu\n");
+					fprintf(stderr, "error on add_mpu_factory\n");
 					return;
 				}
-				MPU_T **current = state->mpus;
-				state->mpus = malloc(sizeof(MPU_T*) * space);
-				memset(state->mpus, 0, sizeof(STATUS_T*) * space);
-				memcpy(state->mpus, current, sizeof(MPU_T*) * i);
-				state->mpus[space - 1] = (void*) -1;
+				MPU_FACTORY_T **current = state->mpu_factories;
+				state->mpu_factories = malloc(sizeof(MPU_FACTORY_T*) * space);
+				memset(state->mpu_factories, 0, sizeof(MPU_FACTORY_T*) * space);
+				memcpy(state->mpu_factories, current, sizeof(MPU_FACTORY_T*) * i);
+				state->mpu_factories[space - 1] = (void*) -1;
 				free(current);
 			}
 			return;
@@ -1874,7 +1941,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
-		state->plugin_host.add_mpu = add_mpu;
+		state->plugin_host.add_mpu_factory = add_mpu_factory;
 		state->plugin_host.add_status = add_status;
 		state->plugin_host.add_watch = add_watch;
 		state->plugin_host.add_plugin = add_plugin;
@@ -1883,9 +1950,9 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 	}
 
 	{
-		MPU_T *mpu = NULL;
-		create_manual_mpu(&mpu);
-		state->plugin_host.add_mpu(mpu);
+		MPU_FACTORY_T *mpu_factory = NULL;
+		create_manual_mpu_factory(&mpu_factory);
+		state->plugin_host.add_mpu_factory(mpu_factory);
 	}
 }
 
@@ -1931,7 +1998,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			const unsigned char SC[] = { 0x00, 0x00, 0x00, 0x01 };
 			const unsigned char SOI[] = { 0x4E, 0x41 }; //'N', 'A'
 			const unsigned char EOI[] = { 0x4C, 0x55 }; //'L', 'U'
-			rtp_sendpacket(SOI, sizeof(SOI), PT_CAM_BASE + frame->id);
+			//header pack
 			if (frame_info) { // sei for a frame
 				float diff_sec = 0;
 				if (frame_info->ttl_key[0] != '\0') {
@@ -1942,9 +2009,10 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 					diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				}
 
-				char sei[512];
+				char header_pack[512];
+				char *sei = header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
-				int len = sprintf(sei + 5, "<picam360:frame mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elapsed=\"%.3f\" />",
+				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elapsed=\"%.3f\" />", frame->id,
 						get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key,
 						frame_info->fov, diff_sec);
 				len += 1; //nal header
@@ -1953,7 +2021,23 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				sei[2] = (len >> 8) & 0xFF;
 				sei[3] = (len >> 0) & 0xFF;
 				len += 4; //start code
-				rtp_sendpacket(sei, len, PT_CAM_BASE + frame->id);
+				memcpy(header_pack, SOI, sizeof(SOI));
+				len += 2; //SOI
+				rtp_sendpacket(header_pack, len, PT_CAM_BASE);
+			} else {
+				char header_pack[512];
+				char *sei = header_pack + sizeof(SOI);
+				sei[4] = 6; //nal_type:sei
+				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" />", frame->id);
+				len += 1; //nal header
+				sei[0] = (len >> 24) & 0xFF;
+				sei[1] = (len >> 16) & 0xFF;
+				sei[2] = (len >> 8) & 0xFF;
+				sei[3] = (len >> 0) & 0xFF;
+				len += 4; //start code
+				memcpy(header_pack, SOI, sizeof(SOI));
+				len += 2; //SOI
+				rtp_sendpacket(header_pack, len, PT_CAM_BASE);
 			}
 			if (frame->output_fd > 0) {
 				if (!frame->output_start) {
@@ -1974,10 +2058,10 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				} else {
 					len = data_len - j;
 				}
-				rtp_sendpacket(data + j, len, PT_CAM_BASE + frame->id);
+				rtp_sendpacket(data + j, len, PT_CAM_BASE);
 				j += len;
 			}
-			rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE + frame->id);
+			rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE);
 		} else if (frame->output_type == OUTPUT_TYPE_MJPEG) {
 			if (lg_debug_dump) {
 				if (data[0] == 0xFF && data[1] == 0xD8) { //
@@ -2006,7 +2090,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				} else {
 					len = data_len - i;
 				}
-				rtp_sendpacket(data + i, len, PT_CAM_BASE + frame->id);
+				rtp_sendpacket(data + i, len, PT_CAM_BASE);
 				i += len;
 			}
 			if (frame->output_fd > 0) {
@@ -2131,9 +2215,13 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 #if (1) //status block
 
 #define STATUS_VAR(name) lg_status_ ## name
+#define STATUS_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_status(STATUS_VAR(name));
 #define WATCH_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
                                                (plugin_host)->add_watch(STATUS_VAR(name));
-
+//status
+static STATUS_T *STATUS_VAR(next_frame_id);
+//watch
 static STATUS_T *STATUS_VAR(ack_command_id);
 static STATUS_T *STATUS_VAR(quaternion);
 static STATUS_T *STATUS_VAR(compass);
@@ -2146,7 +2234,10 @@ static void status_release(void *user_data) {
 	free(user_data);
 }
 static void status_get_value(void *user_data, char *buff, int buff_len) {
-	//STATUS_T *status = (STATUS_T*) user_data;
+	STATUS_T *status = (STATUS_T*) user_data;
+	if (status == STATUS_VAR(next_frame_id)) {
+		snprintf(buff, buff_len, "%d", state->next_frame_id);
+	}
 }
 static void status_set_value(void *user_data, const char *value) {
 	STATUS_T *status = (STATUS_T*) user_data;
@@ -2184,6 +2275,7 @@ static STATUS_T *new_status(const char *name) {
 }
 
 static void init_status() {
+	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, next_frame_id);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, quaternion);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, compass);
@@ -2908,9 +3000,9 @@ int main(int argc, char *argv[]) {
 		state->plugins[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
-		state->mpus = malloc(sizeof(MPU_T*) * INITIAL_SPACE);
-		memset(state->mpus, 0, sizeof(MPU_T*) * INITIAL_SPACE);
-		state->mpus[INITIAL_SPACE - 1] = (void*) -1;
+		state->mpu_factories = malloc(sizeof(MPU_FACTORY_T*) * INITIAL_SPACE);
+		memset(state->mpu_factories, 0, sizeof(MPU_FACTORY_T*) * INITIAL_SPACE);
+		state->mpu_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
 		state->watches = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
@@ -3019,22 +3111,16 @@ int main(int argc, char *argv[]) {
 
 	//frame id=0
 	if (frame_param[0]) {
-		char *param = frame_param;
-		const int kMaxArgs = 32;
-		int argc = 1;
-		char *argv[kMaxArgs];
-		char *p2 = strtok(param, " ");
-		while (p2 && argc < kMaxArgs - 1) {
-			argv[argc++] = p2;
-			p2 = strtok(0, " ");
-		}
-		argv[0] = "default_frame";
-		argv[argc] = 0;
-		state->frame = create_frame(state, argc, argv);
+		char cmd[256];
+		sprintf(cmd, "create_frame %s", frame_param);
+		state->plugin_host.send_command(cmd);
 	}
 
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
+
+	static struct timeval last_statuses_handled_time = { };
+	gettimeofday(&last_statuses_handled_time, NULL);
 
 	//readline
 	pthread_t readline_thread;
@@ -3073,12 +3159,40 @@ int main(int argc, char *argv[]) {
 			terminate = true;
 		}
 
-		struct timeval diff;
-		timersub(&time, &last_time, &diff);
-		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-		if (diff_sec < 0.010) { //10msec
-			int delay_ms = 10 - (int) (diff_sec * 1000);
-			usleep(delay_ms * 1000);
+		{ //wait 10msec at least for performance
+			struct timeval diff;
+			timersub(&time, &last_time, &diff);
+			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			if (diff_sec < 0.010) { //10msec
+				int delay_ms = 10 - (int) (diff_sec * 1000);
+				usleep(delay_ms * 1000);
+			}
+		}
+		{ //status
+			struct timeval diff;
+			timersub(&time, &last_statuses_handled_time, &diff);
+			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			if (diff_sec > 0.100) { //less than 10Hz
+				int cur = 0;
+				char statuses[RTP_MAXPAYLOADSIZE];
+				for (int i = 0; state->statuses[i]; i++) {
+					char value[256] = { };
+					state->statuses[i]->get_value(state->statuses[i]->user_data, value, sizeof(value));
+					char buff[256];
+					int len = snprintf(buff, sizeof(buff), "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, value);
+					if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
+						rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+						cur = 0;
+					} else {
+						strncpy(statuses + cur, buff, len);
+						cur += len;
+					}
+				}
+				if (cur != 0) {
+					rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+				}
+				last_statuses_handled_time = time;
+			}
 		}
 		last_time = time;
 	}

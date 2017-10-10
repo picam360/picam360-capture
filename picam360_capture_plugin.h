@@ -43,6 +43,13 @@ typedef struct _MPU_T {
 	void *user_data;
 } MPU_T;
 
+typedef struct _MPU_FACTORY_T {
+	char name[64];
+	void (*release)(void *user_data);
+	void (*create_mpu)(void *user_data, MPU_T **mpu);
+	void *user_data;
+} MPU_FACTORY_T;
+
 typedef struct _STATUS_T {
 	char name[64];
 	void (*get_value)(void *user_data, char *buff, int buff_len);
@@ -96,7 +103,7 @@ typedef struct _PLUGIN_HOST_T {
 
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
-	void (*add_mpu)(MPU_T *mpu);
+	void (*add_mpu_factory)(MPU_FACTORY_T *mpu_factory);
 	void (*add_status)(STATUS_T *status);
 	void (*add_watch)(STATUS_T *status);
 	void (*add_plugin)(PLUGIN_T *plugin);

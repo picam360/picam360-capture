@@ -194,6 +194,7 @@ typedef struct _PICAM360CAPTURE_T {
 	bool camera_coordinate_from_device;
 	char default_view_coordinate_mode[64];
 
+	unsigned int next_frame_id;
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
 	pthread_mutex_t texture_mutex;
@@ -208,7 +209,7 @@ typedef struct _PICAM360CAPTURE_T {
 
 	char **plugin_paths;
 	PLUGIN_T **plugins;
-	MPU_T **mpus;
+	MPU_FACTORY_T **mpu_factories;
 	STATUS_T **statuses;
 	STATUS_T **watches;
 	struct _OPTIONS_T options;
