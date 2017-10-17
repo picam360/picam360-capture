@@ -9,6 +9,7 @@
 #define MPU_NAME "oculus_rift_dk2"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
+static MPU_T *lg_mpu = NULL;
 
 static Device *dev = NULL;
 static VECTOR4D_T quat;
@@ -52,8 +53,7 @@ static void init() {
 
 	if (dev == NULL) {
 		printf("Could not locate Rift\n");
-		printf(
-				"Be sure you have read/write permission to the proper /dev/hidrawX device\n");
+		printf("Be sure you have read/write permission to the proper /dev/hidrawX device\n");
 		return;
 	}
 
@@ -76,7 +76,7 @@ static VECTOR4D_T get_quaternion() {
 }
 
 static VECTOR4D_T get_compass() {
-	VECTOR4D_T ret = {};
+	VECTOR4D_T ret = { };
 	return ret;
 }
 
@@ -90,6 +90,13 @@ static float get_north() {
 
 static void release(void *user_data) {
 	free(user_data);
+}
+
+static void no_release(void *user_data) {
+}
+
+static void create_mpu(void *user_data, MPU_T **mpu) {
+	*mpu = lg_mpu;
 }
 
 static int command_handler(void *user_data, const char *_buff) {
@@ -119,7 +126,7 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	init();
 	lg_plugin_host = plugin_host;
 
-	if (_plugin) {
+	{
 		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
 		memset(plugin, 0, sizeof(PLUGIN_T));
 		strcpy(plugin->name, PLUGIN_NAME);
@@ -133,17 +140,26 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 
 		*_plugin = plugin;
 	}
-	if (plugin_host) {
+	{
 		MPU_T *mpu = (MPU_T*) malloc(sizeof(MPU_T));
 		memset(mpu, 0, sizeof(MPU_T));
 		strcpy(mpu->name, MPU_NAME);
-		mpu->release = release;
+		mpu->release = no_release;
 		mpu->get_quaternion = get_quaternion;
 		mpu->get_compass = get_compass;
 		mpu->get_temperature = get_temperature;
 		mpu->get_north = get_north;
 		mpu->user_data = mpu;
 
-		lg_plugin_host->add_mpu(mpu);
+		lg_mpu = mpu;
+	}
+	{
+		MPU_FACTORY_T *mpu_factory = (MPU_FACTORY_T*) malloc(sizeof(MPU_FACTORY_T));
+		memset(mpu_factory, 0, sizeof(MPU_FACTORY_T));
+		strcpy(mpu_factory->name, MPU_NAME);
+		mpu_factory->release = release;
+		mpu_factory->create_mpu = create_mpu;
+
+		lg_plugin_host->add_mpu_factory(mpu_factory);
 	}
 }
