@@ -61,9 +61,11 @@ void OmxCvImpl::my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 		output_buffer->nFilledLen = 0;
 	}
 
-	OMX_ERRORTYPE r = OMX_FillThisBuffer(ILC_GET_HANDLE(comp), output_buffer);
-	if (r != OMX_ErrorNone) {
-		printf("Error filling buffer\n");
+	if (!_this->m_stop) {
+		OMX_ERRORTYPE r = OMX_FillThisBuffer(ILC_GET_HANDLE(comp), output_buffer);
+		if (r != OMX_ErrorNone) {
+			printf("Error filling buffer\n");
+		}
 	}
 }
 
@@ -258,6 +260,7 @@ OmxCvImpl::~OmxCvImpl() {
 	//Teardown similar to hello_encode
 	ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
 
+	ilclient_disable_port_buffers(m_encoder_component, OMX_ENCODE_PORT_IN, NULL, NULL, NULL);
 	OMX_FreeBuffer(ILC_GET_HANDLE(m_encoder_component), OMX_ENCODE_PORT_OUT, output_buffer);
 
 	//ilclient_change_component_state(m_encoder_component, OMX_StateIdle);
@@ -352,7 +355,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 						this->in_nal = false;
 					} else {
 						this->nal_pos = 0;
-						this->nal_buff = (uint8_t*)malloc(this->nal_len);
+						this->nal_buff = (uint8_t*) malloc(this->nal_len);
 					}
 				} else {
 					int rest = this->nal_len - this->nal_pos;

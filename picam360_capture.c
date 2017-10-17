@@ -739,10 +739,14 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		frame->img_buff = (unsigned char*) malloc(size);
 	}
 
+	printf("create_frame id=%d\n", frame->id);
+
 	return frame;
 }
 
 bool delete_frame(FRAME_T *frame) {
+	printf("delete_frame id=%d\n", frame->id);
+
 	if (frame->befor_deleted_callback) {
 		frame->befor_deleted_callback(state, frame);
 	}
@@ -763,6 +767,17 @@ bool delete_frame(FRAME_T *frame) {
 		frame->view_mpu->release(frame->view_mpu);
 		frame->view_mpu = NULL;
 	}
+
+	if (frame->recorder) { //stop record
+		StopRecord(frame->recorder);
+		frame->recorder = NULL;
+	}
+
+	if (frame->output_fd >= 0) {
+		close(frame->output_fd);
+		frame->output_fd = -1;
+	}
+
 	free(frame);
 
 	return true;
@@ -771,6 +786,8 @@ bool delete_frame(FRAME_T *frame) {
 static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
 
 void frame_handler() {
+	pthread_mutex_lock(&state->frame_mutex);
+
 	struct timeval s, f;
 	double elapsed_ms;
 	bool snap_finished = false;
@@ -801,6 +818,10 @@ void frame_handler() {
 			frame->output_mode = OUTPUT_MODE_NONE;
 			frame->is_recording = false;
 			frame->delete_after_processed = true;
+			if (frame->output_fd >= 0) {
+				close(frame->output_fd);
+				frame->output_fd = -1;
+			}
 		}
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
@@ -995,6 +1016,8 @@ void frame_handler() {
 		state->plugin_host.send_event(PICAM360_HOST_NODE_ID, PICAM360_CAPTURE_EVENT_AFTER_SNAP);
 	}
 	state->plugin_host.send_event(PICAM360_HOST_NODE_ID, PICAM360_CAPTURE_EVENT_AFTER_FRAME);
+
+	pthread_mutex_unlock(&state->frame_mutex);
 }
 
 static double calib_step = 0.01;
@@ -1049,7 +1072,9 @@ int _command_handler(const char *_buff) {
 				frame->output_mode = OUTPUT_MODE_STILL;
 				//TODO : frame->view_mpu = state->mpu_factories[0];
 				//TODO : manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+				pthread_mutex_lock(&state->frame_mutex);
 				state->frame = frame;
+				pthread_mutex_unlock(&state->frame_mutex);
 			} else {
 				optind = 1; // reset getopt
 				while ((opt = getopt(argc, argv, "0o:")) != -1) {
@@ -1083,8 +1108,9 @@ int _command_handler(const char *_buff) {
 
 			FRAME_T *frame = create_frame(state, argc, argv);
 			frame->next = state->frame;
+			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
-			printf("create_frame id=%d\n", frame->id);
+			pthread_mutex_unlock(&state->frame_mutex);
 		}
 	} else if (strncmp(cmd, "delete_frame", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
@@ -1113,14 +1139,13 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
-			for (FRAME_T **frame_pp = &state->frame; *frame_pp != NULL; frame_pp = &(*frame_pp)->next) {
-				if (delete_all || (*frame_pp)->id == id) {
-					printf("delete_frame id=%d\n", (*frame_pp)->id);
-					FRAME_T *frame_p = *frame_pp;
-					*frame_pp = (*frame_pp)->next;
-					delete_frame(frame_p);
+			pthread_mutex_lock(&state->frame_mutex);
+			for (FRAME_T *frame_p = state->frame; frame_p != NULL; frame_p = frame_p->next) {
+				if (delete_all || frame_p->id == id) {
+					frame_p->delete_after_processed = true;
 				}
 			}
+			pthread_mutex_unlock(&state->frame_mutex);
 		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
@@ -1150,7 +1175,9 @@ int _command_handler(const char *_buff) {
 				frame->output_mode = OUTPUT_MODE_VIDEO;
 				//TODO : frame->view_mpu = state->mpu_factories[0];
 				//TODO : manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
+				pthread_mutex_lock(&state->frame_mutex);
 				state->frame = frame;
+				pthread_mutex_unlock(&state->frame_mutex);
 				printf("start_record id=%d\n", frame->id);
 			} else {
 				optind = 1; // reset getopt
@@ -1238,7 +1265,9 @@ int _command_handler(const char *_buff) {
 			FRAME_T *frame = create_frame(state, argc, argv);
 			set_auto_calibration(frame);
 			frame->next = state->frame;
+			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
+			pthread_mutex_unlock(&state->frame_mutex);
 
 			printf("start_ac\n");
 		}
@@ -1971,7 +2000,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 static char lg_command[256] = { };
 static int lg_command_id = 0;
-static int lg_ack_command_id = -1;
+static int lg_ack_command_id_to = -1;
+static int lg_ack_command_id_from = -1;
 
 static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
@@ -2111,7 +2141,7 @@ static int command2upstream_handler() {
 	static struct timeval last_try = { };
 	static bool is_first_try = false;
 	int len = strlen(lg_command);
-	if (len != 0 && lg_command_id != lg_ack_command_id) {
+	if (len != 0 && lg_command_id != lg_ack_command_id_to) {
 		struct timeval s;
 		gettimeofday(&s, NULL);
 		if (!is_first_try) {
@@ -2208,8 +2238,8 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 		int id;
 		char value[256];
 		int num = sscanf((char*) data, "<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id, value);
-		if (num == 2 && id != lg_ack_command_id) {
-			lg_ack_command_id = id;
+		if (num == 2 && id != lg_ack_command_id_from) {
+			lg_ack_command_id_from = id;
 			state->plugin_host.send_command(value);
 		}
 	}
@@ -2246,7 +2276,7 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 static void status_set_value(void *user_data, const char *value) {
 	STATUS_T *status = (STATUS_T*) user_data;
 	if (status == STATUS_VAR(ack_command_id)) {
-		sscanf(value, "%d", &lg_ack_command_id);
+		sscanf(value, "%d", &lg_ack_command_id_to);
 	} else if (status == STATUS_VAR(quaternion)) {
 		VECTOR4D_T vec = { };
 		sscanf(value, "%f,%f,%f,%f", &vec.x, &vec.y, &vec.z, &vec.w);
@@ -3081,6 +3111,8 @@ int main(int argc, char *argv[]) {
 		}
 
 		pthread_mutex_init(&state->mutex, 0);
+		//frame mutex init
+		pthread_mutex_init(&state->frame_mutex, 0);
 		//texture mutex init
 		pthread_mutex_init(&state->texture_mutex, 0);
 		//texture size mutex init

@@ -197,6 +197,7 @@ typedef struct _PICAM360CAPTURE_T {
 	unsigned int next_frame_id;
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
+	pthread_mutex_t frame_mutex;
 	pthread_mutex_t texture_mutex;
 	pthread_mutex_t texture_size_mutex;
 
