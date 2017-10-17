@@ -1967,7 +1967,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 static char lg_command[256] = { };
 static int lg_command_id = 0;
-static int lg_ack_command_id = 0;
+static int lg_ack_command_id = -1;
 
 static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
@@ -2194,7 +2194,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 	if (data_len == 0) {
 		return -1;
 	}
-	static unsigned int last_seq_num = 0;
+	static unsigned int last_seq_num = -1;
 	if (seq_num != last_seq_num + 1) {
 		printf("rtcp : packet lost : from %d to %d\n", last_seq_num, seq_num);
 	}
