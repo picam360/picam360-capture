@@ -1089,6 +1089,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "delete_frame", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
+			bool delete_all = false;
 			int id = -1;
 			const int kMaxArgs = 32;
 			int argc = 1;
@@ -1104,17 +1105,20 @@ int _command_handler(const char *_buff) {
 			while ((opt = getopt(argc, argv, "i:")) != -1) {
 				switch (opt) {
 				case 'i':
-					sscanf(optarg, "%d", &id);
+					if (optarg[0] == '*') {
+						delete_all = true;
+					} else {
+						sscanf(optarg, "%d", &id);
+					}
 					break;
 				}
 			}
 			for (FRAME_T **frame_pp = &state->frame; *frame_pp != NULL; frame_pp = &(*frame_pp)->next) {
-				if ((*frame_pp)->id == id) {
+				if (delete_all || (*frame_pp)->id == id) {
+					printf("delete_frame id=%d\n", (*frame_pp)->id);
 					FRAME_T *frame_p = *frame_pp;
 					*frame_pp = (*frame_pp)->next;
 					delete_frame(frame_p);
-					printf("delete_frame id=%d\n", id);
-					break;
 				}
 			}
 		}
