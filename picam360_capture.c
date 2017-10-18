@@ -1147,6 +1147,38 @@ int _command_handler(const char *_buff) {
 			}
 			pthread_mutex_unlock(&state->frame_mutex);
 		}
+	} else if (strncmp(cmd, "set_fps", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			int id = -1;
+			float value = 5;
+			const int kMaxArgs = 32;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+			optind = 1; // reset getopt
+			while ((opt = getopt(argc, argv, "f:i:")) != -1) {
+				switch (opt) {
+				case 'i':
+					sscanf(optarg, "%d", &id);
+					break;
+				case 'f':
+					sscanf(optarg, "%f", &value);
+					break;
+				}
+			}
+			for (FRAME_T *frame_p = state->frame; frame_p != NULL; frame_p = frame_p->next) {
+				if (frame_p->id == id) {
+					frame_p->fps = MAX(value, 1);
+				}
+			}
+		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
