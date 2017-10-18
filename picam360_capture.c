@@ -1344,8 +1344,8 @@ int _command_handler(const char *_buff) {
 		float x, y, z, w;
 		bool fov_valid = false;
 		float fov;
-		bool key_valid = false;
-		char *key = NULL;
+		bool client_key_valid = false;
+		char *client_key = NULL;
 		do {
 			param = strtok(NULL, " \n");
 			if (param != NULL) {
@@ -1359,9 +1359,9 @@ int _command_handler(const char *_buff) {
 					if (num == 1) {
 						fov_valid = true;
 					}
-				} else if (strncmp(param, "key=", 4) == 0) {
-					key = param + 4;
-					key_valid = true;
+				} else if (strncmp(param, "client_key=", 11) == 0) {
+					client_key = param + 11;
+					client_key_valid = true;
 				} else if (strncmp(param, "id=", 3) == 0) {
 					int num = sscanf(param, "id=%d", &id);
 				}
@@ -1379,9 +1379,8 @@ int _command_handler(const char *_buff) {
 					if (fov_valid) {
 						frame->fov = fov;
 					}
-					if (key_valid) {
-						strncpy(frame->ttl_key, key, sizeof(frame->ttl_key));
-						gettimeofday(&frame->ttl_key_time, NULL);
+					if (client_key_valid) {
+						strncpy(frame->client_key, client_key, sizeof(frame->client_key));
 					}
 					break;
 				}
@@ -2035,20 +2034,20 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			//header pack
 			if (frame_info) { // sei for a frame
 				float diff_sec = 0;
-				if (frame_info->ttl_key[0] != '\0') {
+				if (frame_info->client_key[0] != '\0') {
 					struct timeval s;
 					gettimeofday(&s, NULL);
 					struct timeval diff;
-					timersub(&s, &frame_info->ttl_key_time, &diff);
+					timersub(&s, &frame_info->server_key, &diff);
 					diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				}
 
 				char header_pack[512];
 				char *sei = header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
-				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" ttl_key=\"%s\" fov=\"%.3f\" elapsed=\"%.3f\" />", frame->id,
-						get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->ttl_key,
-						frame_info->fov, diff_sec);
+				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" client_key=\"%s\" server_key=\"%d\" fov=\"%.3f\" elapsed=\"%.3f\" />",
+						frame->id, get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
+						frame_info->client_key, (frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec), frame_info->fov, diff_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
 				sei[1] = (len >> 16) & 0xFF;
@@ -3278,8 +3277,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	}
 
 	if (frame_info) { //store info
-		memcpy(frame_info->ttl_key, frame->ttl_key, sizeof(frame_info->ttl_key));
-		frame_info->ttl_key_time = frame->ttl_key_time;
+		memcpy(frame_info->client_key, frame->client_key, sizeof(frame_info->client_key));
+		gettimeofday(&frame_info->server_key, NULL);
 		frame_info->fov = frame->fov;
 		frame_info->view_quat = view_quat;
 	}

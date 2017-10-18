@@ -82,8 +82,8 @@ typedef struct _LIST_T {
 typedef struct _FRAME_INFO_T {
 	VECTOR4D_T view_quat;
 	float fov;
-	char ttl_key[256];
-	struct timeval ttl_key_time;
+	char client_key[256];
+	struct timeval server_key;
 } FRAME_INFO_T;
 
 typedef struct _FRAME_T {
@@ -117,8 +117,7 @@ typedef struct _FRAME_T {
 	MPU_T *view_mpu;
 
 	// for ttl cal
-	char ttl_key[256];
-	struct timeval ttl_key_time;
+	char client_key[256];
 
 	void *custom_data;
 	//event
