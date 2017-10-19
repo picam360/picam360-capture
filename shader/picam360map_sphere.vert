@@ -66,10 +66,10 @@ void main(void) {
 
 	{
 		vec4 pos = unif_matrix * position;
-		float pitch = asin(pos.y);
+		float pitch = acos(pos.y);
 		float yaw = atan(pos.x, pos.z); //yaw starts from z
-	
-		r0 = (M_PI / 2.0 - pitch) / M_PI;
+
+		r0 = pitch / M_PI;
 		float r2 = r0;
 		r2 = sin(M_PI * 180.0 / cam0_aov * r2) / 2.0;
 		float yaw2 = yaw + M_PI + cam0_offset_yaw;
@@ -78,10 +78,10 @@ void main(void) {
 	}
 	{
 		vec4 pos = unif_matrix_1 * position;
-		float pitch = asin(pos.y);
+		float pitch = acos(pos.y);
 		float yaw = atan(pos.x, pos.z);
-		
-		r1 = (M_PI / 2.0 - pitch) / M_PI;
+
+		r1 = pitch / M_PI;
 		float r2 = 1.0 - r1;
 		r2 = sin(M_PI * 180.0 / cam1_aov * r2) / 2.0;
 		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
