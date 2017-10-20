@@ -84,6 +84,9 @@ typedef struct _FRAME_INFO_T {
 	float fov;
 	char client_key[256];
 	struct timeval server_key;
+	struct timeval before_redraw_render_texture;
+	struct timeval after_redraw_render_texture;
+	struct timeval after_encoded;
 } FRAME_INFO_T;
 
 typedef struct _FRAME_T {
@@ -118,6 +121,7 @@ typedef struct _FRAME_T {
 
 	// for ttl cal
 	char client_key[256];
+	struct timeval server_key;
 
 	void *custom_data;
 	//event

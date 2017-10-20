@@ -69,7 +69,7 @@ static void init_textures(PICAM360CAPTURE_T *state);
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
 static void exit_func(void);
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, FRAME_INFO_T *frame_info);
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
 
@@ -882,6 +882,19 @@ void frame_handler() {
 		}
 
 		{ //rendering to buffer
+			VECTOR4D_T view_quat = { .ary = { 0, 0, 0, 1 } };
+			if (frame->view_mpu) {
+				view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
+			}
+
+			{ //store info
+				memcpy(frame_info.client_key, frame->client_key, sizeof(frame_info.client_key));
+				frame_info.server_key = frame->server_key;
+				gettimeofday(&frame_info.before_redraw_render_texture, NULL);
+				frame_info.fov = frame->fov;
+				frame_info.view_quat = view_quat;
+			}
+
 			state->plugin_host.lock_texture();
 			if (frame->double_size) {
 				int size = frame->width * frame->height * 3;
@@ -893,7 +906,7 @@ void frame_handler() {
 					state->split = split + 1;
 
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-					redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], &frame_info);
+					redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], view_quat);
 					glFinish();
 					glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -909,7 +922,7 @@ void frame_handler() {
 				state->split = 0;
 
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-				redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], &frame_info);
+				redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], view_quat);
 				if (state->menu_visible) {
 					redraw_info(state, frame);
 				}
@@ -918,6 +931,10 @@ void frame_handler() {
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 			state->plugin_host.unlock_texture();
+
+			{ //store info
+				gettimeofday(&frame_info.after_redraw_render_texture, NULL);
+			}
 		}
 
 		switch (frame->output_mode) {
@@ -1413,6 +1430,7 @@ int _command_handler(const char *_buff) {
 					}
 					if (client_key_valid) {
 						strncpy(frame->client_key, client_key, sizeof(frame->client_key));
+						gettimeofday(&frame->server_key, NULL);
 					}
 					break;
 				}
@@ -2065,21 +2083,32 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			const unsigned char EOI[] = { 0x4C, 0x55 }; //'L', 'U'
 			//header pack
 			if (frame_info) { // sei for a frame
-				float diff_sec = 0;
+				int server_key = frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec;
+				float idle_time_sec = 0;
+				float frame_processed_sec = 0;
+				float encoded_sec = 0;
 				if (frame_info->client_key[0] != '\0') {
-					struct timeval s;
-					gettimeofday(&s, NULL);
 					struct timeval diff;
-					timersub(&s, &frame_info->server_key, &diff);
-					diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+					gettimeofday(&frame_info->after_encoded, NULL);
+
+					timersub(&frame_info->before_redraw_render_texture, &frame_info->server_key, &diff);
+					idle_time_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+
+					timersub(&frame_info->after_redraw_render_texture, &frame_info->before_redraw_render_texture, &diff);
+					frame_processed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+
+					timersub(&frame_info->after_encoded, &frame_info->after_redraw_render_texture, &diff);
+					encoded_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				}
 
 				char header_pack[512];
 				char *sei = header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
-				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" client_key=\"%s\" server_key=\"%d\" fov=\"%.3f\" elapsed=\"%.3f\" />",
-						frame->id, get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
-						frame_info->client_key, (frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec), frame_info->fov, diff_sec);
+				int len =
+						sprintf(sei + 5,
+								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
+								frame->id, get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
+								frame_info->fov, frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
 				sei[1] = (len >> 16) & 0xFF;
@@ -3279,14 +3308,9 @@ int main(int argc, char *argv[]) {
  * Returns: void
  *
  ***********************************************************/
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, FRAME_INFO_T *frame_info) {
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat) {
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
-
-	VECTOR4D_T view_quat = { .ary = { 0, 0, 0, 1 } };
-	if (frame->view_mpu) {
-		view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
-	}
 
 	int program = GLProgram_GetId(model->program);
 	glUseProgram(program);
@@ -3306,13 +3330,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		}
 		glActiveTexture(GL_TEXTURE1 + i);
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
-	}
-
-	if (frame_info) { //store info
-		memcpy(frame_info->client_key, frame->client_key, sizeof(frame_info->client_key));
-		gettimeofday(&frame_info->server_key, NULL);
-		frame_info->fov = frame->fov;
-		frame_info->view_quat = view_quat;
 	}
 
 	//depth axis is z, vertical asis is y
@@ -3482,7 +3499,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
 }
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
