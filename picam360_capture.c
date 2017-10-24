@@ -93,6 +93,48 @@ static int end_width(const char *str, const char *suffix) {
 		return 0;
 	return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
+static const char *get_operation_mode_string(enum OPERATION_MODE mode) {
+	switch (mode) {
+	case OPERATION_MODE_BOARD:
+		return "BOARD";
+	case OPERATION_MODE_WINDOW:
+		return "WINDOW";
+	case OPERATION_MODE_PICAM360MAP:
+		return "PICAM360MAP";
+	case OPERATION_MODE_EQUIRECTANGULAR:
+		return "EQUIRECTANGULAR";
+	case OPERATION_MODE_FISHEYE:
+		return "FISHEYE";
+	case OPERATION_MODE_CALIBRATION:
+		return "CALIBRATION";
+	default:
+		return "NONE";
+	}
+}
+static enum OPERATION_MODE get_operation_mode(const char *mode_string) {
+	switch (mode_string[0]) {
+	case 'B':
+	case 'b':
+		return OPERATION_MODE_BOARD;
+	case 'W':
+	case 'w':
+		return OPERATION_MODE_WINDOW;
+	case 'P':
+	case 'p':
+		return OPERATION_MODE_PICAM360MAP;
+	case 'E':
+	case 'e':
+		return OPERATION_MODE_EQUIRECTANGULAR;
+	case 'F':
+	case 'f':
+		return OPERATION_MODE_FISHEYE;
+	case 'C':
+	case 'c':
+		return OPERATION_MODE_CALIBRATION;
+	default:
+		return OPERATION_MODE_NONE;
+	}
+}
 
 /***********************************************************
  * Name: init_ogl
@@ -341,35 +383,35 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 	float maxfov = 150.0;
 
-	board_mesh(64, &state->model_data[EQUIRECTANGULAR].vbo, &state->model_data[EQUIRECTANGULAR].vbo_nop);
+	board_mesh(64, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
+		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
 	} else {
-		state->model_data[EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
+		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(64, &state->model_data[PICAM360MAP].vbo, &state->model_data[PICAM360MAP].vbo_nop);
+	board_mesh(64, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
+		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
 	} else {
-		state->model_data[PICAM360MAP].program = GLProgram_new("shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag");
+		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new("shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag");
 	}
 
-	board_mesh(1, &state->model_data[FISHEYE].vbo, &state->model_data[FISHEYE].vbo_nop);
-	state->model_data[FISHEYE].program = GLProgram_new("shader/fisheye.vert", "shader/fisheye.frag");
+	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop);
+	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new("shader/fisheye.vert", "shader/fisheye.frag");
 
-	board_mesh(1, &state->model_data[CALIBRATION].vbo, &state->model_data[CALIBRATION].vbo_nop);
-	state->model_data[CALIBRATION].program = GLProgram_new("shader/calibration.vert", "shader/calibration.frag");
+	board_mesh(1, &state->model_data[OPERATION_MODE_CALIBRATION].vbo, &state->model_data[OPERATION_MODE_CALIBRATION].vbo_nop);
+	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new("shader/calibration.vert", "shader/calibration.frag");
 
-	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[WINDOW].vbo, &state->model_data[WINDOW].vbo_nop);
+	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[OPERATION_MODE_WINDOW].vbo, &state->model_data[OPERATION_MODE_WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[WINDOW].program = GLProgram_new("shader/window.vert", "shader/window.frag");
+		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new("shader/window.vert", "shader/window.frag");
 	} else {
-		state->model_data[WINDOW].program = GLProgram_new("shader/window_sphere.vert", "shader/window_sphere.frag");
+		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new("shader/window_sphere.vert", "shader/window_sphere.frag");
 	}
 
-	board_mesh(1, &state->model_data[BOARD].vbo, &state->model_data[BOARD].vbo_nop);
-	state->model_data[BOARD].program = GLProgram_new("shader/board.vert", "shader/board.frag");
+	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop);
+	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new("shader/board.vert", "shader/board.frag");
 }
 
 /***********************************************************
@@ -632,14 +674,14 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	FRAME_T *frame = malloc(sizeof(FRAME_T));
 	memset(frame, 0, sizeof(FRAME_T));
 	frame->id = state->next_frame_id++;
-	frame->operation_mode = WINDOW;
+	frame->operation_mode = OPERATION_MODE_WINDOW;
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->output_type = OUTPUT_TYPE_NONE;
 	frame->output_fd = -1;
 	frame->fov = 120;
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:EPCFo:s:v:f:k:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:m:o:s:v:f:k:")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &render_width);
@@ -647,17 +689,8 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		case 'h':
 			sscanf(optarg, "%d", &render_height);
 			break;
-		case 'E':
-			frame->operation_mode = EQUIRECTANGULAR;
-			break;
-		case 'P': //360 map optimized for remote-reality
-			frame->operation_mode = PICAM360MAP;
-			break;
-		case 'C':
-			frame->operation_mode = CALIBRATION;
-			break;
-		case 'F':
-			frame->operation_mode = FISHEYE;
+		case 'm':
+			frame->operation_mode = get_operation_mode(optarg);
 			break;
 		case 'o':
 			frame->output_mode = OUTPUT_MODE_VIDEO;
@@ -787,8 +820,6 @@ bool delete_frame(FRAME_T *frame) {
 static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
 
 void frame_handler() {
-	pthread_mutex_lock(&state->frame_mutex);
-
 	struct timeval s, f;
 	double elapsed_ms;
 	bool snap_finished = false;
@@ -1023,7 +1054,7 @@ void frame_handler() {
 		}
 		//preview
 		if (frame && frame == state->frame && state->preview) {
-			redraw_scene(state, frame, &state->model_data[BOARD]);
+			redraw_scene(state, frame, &state->model_data[OPERATION_MODE_BOARD]);
 			eglSwapBuffers(state->display, state->surface);
 		}
 		if (frame) {
@@ -1034,8 +1065,6 @@ void frame_handler() {
 		state->plugin_host.send_event(PICAM360_HOST_NODE_ID, PICAM360_CAPTURE_EVENT_AFTER_SNAP);
 	}
 	state->plugin_host.send_event(PICAM360_HOST_NODE_ID, PICAM360_CAPTURE_EVENT_AFTER_FRAME);
-
-	pthread_mutex_unlock(&state->frame_mutex);
 }
 
 static double calib_step = 0.01;
@@ -1065,7 +1094,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			int target_frame = -1;
+			int id = -1;
 			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
@@ -1077,29 +1106,20 @@ int _command_handler(const char *_buff) {
 			argv[0] = cmd;
 			argv[argc] = 0;
 			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "0o:w:h:E")) != -1) {
+			while ((opt = getopt(argc, argv, "i:o")) != -1) {
 				switch (opt) {
-				case '0':
-					target_frame = 0;
+				case 'i':
+					sscanf(optarg, "%d", &id);
 					break;
 				}
 			}
-			if (target_frame < 0) {
-				FRAME_T *frame = create_frame(state, argc, argv);
-				frame->next = state->frame;
-				frame->output_mode = OUTPUT_MODE_STILL;
-				//TODO : frame->view_mpu = state->mpu_factories[0];
-				//TODO : manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
-				pthread_mutex_lock(&state->frame_mutex);
-				state->frame = frame;
-				pthread_mutex_unlock(&state->frame_mutex);
-			} else {
+			if (id >= 0) {
 				optind = 1; // reset getopt
-				while ((opt = getopt(argc, argv, "0o:")) != -1) {
+				while ((opt = getopt(argc, argv, "i:o:")) != -1) {
 					switch (opt) {
 					case 'o':
 						for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
-							if (frame->id == target_frame) {
+							if (frame->id == id) {
 								strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 								printf("snap %d : %s\n", frame->id, frame->output_filepath);
 								break;
@@ -1126,9 +1146,7 @@ int _command_handler(const char *_buff) {
 
 			FRAME_T *frame = create_frame(state, argc, argv);
 			frame->next = state->frame;
-			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
-			pthread_mutex_unlock(&state->frame_mutex);
 		}
 	} else if (strncmp(cmd, "delete_frame", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
@@ -1157,13 +1175,11 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
-			pthread_mutex_lock(&state->frame_mutex);
 			for (FRAME_T *frame_p = state->frame; frame_p != NULL; frame_p = frame_p->next) {
 				if (delete_all || frame_p->id == id) {
 					frame_p->delete_after_processed = true;
 				}
 			}
-			pthread_mutex_unlock(&state->frame_mutex);
 		}
 	} else if (strncmp(cmd, "set_fps", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
@@ -1197,10 +1213,43 @@ int _command_handler(const char *_buff) {
 				}
 			}
 		}
+	} else if (strncmp(cmd, "set_mode", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			int id = -1;
+			enum OPERATION_MODE mode = OPERATION_MODE_NONE;
+			const int kMaxArgs = 32;
+			int argc = 1;
+			char *argv[kMaxArgs];
+			char *p2 = strtok(param, " ");
+			while (p2 && argc < kMaxArgs - 1) {
+				argv[argc++] = p2;
+				p2 = strtok(0, " ");
+			}
+			argv[0] = cmd;
+			argv[argc] = 0;
+
+			optind = 1; // reset getopt
+			while ((opt = getopt(argc, argv, "m:i:")) != -1) {
+				switch (opt) {
+				case 'i':
+					sscanf(optarg, "%d", &id);
+					break;
+				case 'm':
+					mode = get_operation_mode(optarg);
+					break;
+				}
+			}
+			for (FRAME_T *frame_p = state->frame; frame_p != NULL; frame_p = frame_p->next) {
+				if (frame_p->id == id) {
+					frame_p->operation_mode = mode;
+				}
+			}
+		}
 	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			int target_frame = -1;
+			int id = -1;
 			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
@@ -1212,30 +1261,20 @@ int _command_handler(const char *_buff) {
 			argv[0] = cmd;
 			argv[argc] = 0;
 			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "0o:")) != -1) {
+			while ((opt = getopt(argc, argv, "i:o")) != -1) {
 				switch (opt) {
-				case '0':
-					target_frame = 0;
+				case 'i':
+					sscanf(optarg, "%d", &id);
 					break;
 				}
 			}
-			if (target_frame < 0) {
-				FRAME_T *frame = create_frame(state, argc, argv);
-				frame->next = state->frame;
-				frame->output_mode = OUTPUT_MODE_VIDEO;
-				//TODO : frame->view_mpu = state->mpu_factories[0];
-				//TODO : manual_mpu_set(frame->view_mpu, 90 * M_PI / 180.0, 0, 0);
-				pthread_mutex_lock(&state->frame_mutex);
-				state->frame = frame;
-				pthread_mutex_unlock(&state->frame_mutex);
-				printf("start_record id=%d\n", frame->id);
-			} else {
+			if (id >= 0) {
 				optind = 1; // reset getopt
-				while ((opt = getopt(argc, argv, "0o:")) != -1) {
+				while ((opt = getopt(argc, argv, "i:o:")) != -1) {
 					switch (opt) {
 					case 'o':
 						for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
-							if (frame->id == target_frame) {
+							if (frame->id == id) {
 								strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 								printf("start_record %d : %s\n", frame->id, frame->output_filepath);
 								break;
@@ -1249,6 +1288,7 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
+			int id = -1;
 			int target_frame = -1;
 			const int kMaxArgs = 32;
 			int argc = 1;
@@ -1261,16 +1301,14 @@ int _command_handler(const char *_buff) {
 			argv[0] = cmd;
 			argv[argc] = 0;
 			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "0")) != -1) {
+			while ((opt = getopt(argc, argv, "i:")) != -1) {
 				switch (opt) {
-				case '0':
-					target_frame = 0;
+				case 'i':
+					sscanf(optarg, "%d", &id);
 					break;
 				}
 			}
-			if (target_frame < 0) {
-				//do nothing
-			} else {
+			if (id >= 0) {
 				for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
 					if (frame->id == target_frame) {
 						if (frame->output_fd > 0) {
@@ -1315,9 +1353,7 @@ int _command_handler(const char *_buff) {
 			FRAME_T *frame = create_frame(state, argc, argv);
 			set_auto_calibration(frame);
 			frame->next = state->frame;
-			pthread_mutex_lock(&state->frame_mutex);
 			state->frame = frame;
-			pthread_mutex_unlock(&state->frame_mutex);
 
 			printf("start_ac\n");
 		}
@@ -1593,7 +1629,7 @@ int _command_handler(const char *_buff) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_NEXT);
 	} else if (strncmp(cmd, "back2previouse_menu", sizeof(buff)) == 0) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_BACK);
-	} else if (state->frame != NULL && state->frame->operation_mode == CALIBRATION) {
+	} else if (state->frame != NULL && state->frame->operation_mode == OPERATION_MODE_CALIBRATION) {
 		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
@@ -2056,24 +2092,6 @@ static int lg_ack_command_id_from = -1;
 static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
 static int lg_debug_dump_fd = -1;
-static const char *get_operation_mode_string(enum OPERATION_MODE mode) {
-	switch (mode) {
-	case BOARD:
-		return "BOARD";
-	case WINDOW:
-		return "WINDOW";
-	case PICAM360MAP:
-		return "PICAM360MAP";
-	case EQUIRECTANGULAR:
-		return "EQUIRECTANGULAR";
-	case FISHEYE:
-		return "FISHEYE";
-	case CALIBRATION:
-		return "CALIBRATION";
-	default:
-		return "UNKNOWN";
-	}
-}
 static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data) {
 	FRAME_T *frame = (FRAME_T*) user_data;
 	FRAME_INFO_T *frame_info = (FRAME_INFO_T*) frame_data;
@@ -2797,7 +2815,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				if (state->frame) {
-					state->frame->operation_mode = CALIBRATION;
+					state->frame->operation_mode = OPERATION_MODE_CALIBRATION;
 				}
 			}
 			break;
@@ -2826,7 +2844,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				if (state->frame) {
-					state->frame->operation_mode = WINDOW;
+					state->frame->operation_mode = OPERATION_MODE_WINDOW;
 				}
 			}
 			break;
@@ -3178,8 +3196,6 @@ int main(int argc, char *argv[]) {
 		}
 
 		pthread_mutex_init(&state->mutex, 0);
-		//frame mutex init
-		pthread_mutex_init(&state->frame_mutex, 0);
 		//texture mutex init
 		pthread_mutex_init(&state->texture_mutex, 0);
 		//texture size mutex init
@@ -3328,7 +3344,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 
 	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
-	if (frame->operation_mode == CALIBRATION) {
+	if (frame->operation_mode == OPERATION_MODE_CALIBRATION) {
 		glBindTexture(GL_TEXTURE_2D, state->calibration_texture);
 	} else {
 		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
@@ -3420,7 +3436,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	if (frame->operation_mode == PICAM360MAP) {
+	if (frame->operation_mode == OPERATION_MODE_PICAM360MAP) {
 		const int stepnum = 256;
 		float x_ary[3] = { 0.0, 1.0, sqrt(2) };
 		float y_ary[3] = { 0.0, frame->fov * M_PI / 180.0, M_PI };
@@ -3438,7 +3454,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 //				printf("%f,%f\n", x_ary2[i], y_ary2[i]);
 //			}
 //		}
-	} else if (frame->operation_mode == EQUIRECTANGULAR) {
+	} else if (frame->operation_mode == OPERATION_MODE_EQUIRECTANGULAR) {
 		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
 		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);
 	} else {
@@ -3535,7 +3551,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
-	if (frame->operation_mode == CALIBRATION) {
+	if (frame->operation_mode == OPERATION_MODE_CALIBRATION) {
 		glViewport((state->screen_width - state->screen_height) / 2, 0, (GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	} else if (state->stereo) {

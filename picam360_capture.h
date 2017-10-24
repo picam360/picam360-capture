@@ -37,7 +37,7 @@
 
 #define TEXTURE_BUFFER_NUM 2
 #define MAX_CAM_NUM 2
-#define MAX_OPERATION_NUM 6
+#define MAX_OPERATION_NUM 7
 
 enum INPUT_MODE {
 	INPUT_MODE_NONE, INPUT_MODE_CAM, INPUT_MODE_FILE
@@ -49,7 +49,7 @@ enum OUTPUT_TYPE {
 	OUTPUT_TYPE_NONE, OUTPUT_TYPE_JPEG, OUTPUT_TYPE_MJPEG, OUTPUT_TYPE_H264
 };
 enum OPERATION_MODE {
-	BOARD, WINDOW, PICAM360MAP, EQUIRECTANGULAR, FISHEYE, CALIBRATION
+	OPERATION_MODE_NONE, OPERATION_MODE_BOARD, OPERATION_MODE_WINDOW, OPERATION_MODE_PICAM360MAP, OPERATION_MODE_EQUIRECTANGULAR, OPERATION_MODE_FISHEYE, OPERATION_MODE_CALIBRATION
 };
 enum CODEC_TYPE {
 	H264, MJPEG
@@ -119,7 +119,7 @@ typedef struct _FRAME_T {
 	//for unif matrix
 	MPU_T *view_mpu;
 
-	// for ttl cal
+	// for latency cal
 	char client_key[256];
 	struct timeval server_key;
 
@@ -200,7 +200,6 @@ typedef struct _PICAM360CAPTURE_T {
 	unsigned int next_frame_id;
 	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
-	pthread_mutex_t frame_mutex;
 	pthread_mutex_t texture_mutex;
 	pthread_mutex_t texture_size_mutex;
 
