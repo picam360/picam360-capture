@@ -118,7 +118,7 @@ static void init_options(void *user_data, json_t *options) {
 static void save_options(void *user_data, json_t *options) {
 }
 
-static wchar_t *get_info(void *user_data) {
+static char *get_info(void *user_data) {
 	return NULL;
 }
 

@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <linux/input.h>
 #include <fcntl.h>
-#include <wchar.h>
 #include <pthread.h>
 #include <editline/readline.h>
 #include <editline/history.h>
@@ -72,6 +71,7 @@ static void exit_func(void);
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
+static void get_info(char *buff, int buff_len);
 
 static void loading_callback(void *user_data, int ret);
 static void convert_snap_handler();
@@ -2315,6 +2315,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
                                                (plugin_host)->add_watch(STATUS_VAR(name));
 //status
 static STATUS_T *STATUS_VAR(next_frame_id);
+static STATUS_T *STATUS_VAR(info);
 //watch
 static STATUS_T *STATUS_VAR(ack_command_id);
 static STATUS_T *STATUS_VAR(quaternion);
@@ -2331,6 +2332,8 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
 	if (status == STATUS_VAR(next_frame_id)) {
 		snprintf(buff, buff_len, "%d", state->next_frame_id);
+	} else if (status == STATUS_VAR(info)) {
+		get_info(buff, buff_len);
 	}
 }
 static void status_set_value(void *user_data, const char *value) {
@@ -2370,6 +2373,7 @@ static STATUS_T *new_status(const char *name) {
 
 static void init_status() {
 	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, next_frame_id);
+	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, info);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, quaternion);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, compass);
@@ -2473,7 +2477,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT ev
 			rtp_set_auto_play(true);
 			rtp_set_is_looping(true);
 
-			swprintf(menu->name, 8, L"Record");
+			snprintf(menu->name, 8, "Record");
 			printf("stop converting\n");
 			menu->selected = false;
 		} else if (rtp_is_loading(NULL)) { //start convert
@@ -2488,12 +2492,12 @@ static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT ev
 				lg_is_converting = true;
 				convert_snap_handler();
 
-				swprintf(menu->name, 256, L"StopConverting:%s", lg_convert_base_path);
+				snprintf(menu->name, 256, "StopConverting:%s", lg_convert_base_path);
 				printf("start converting to %s\n", lg_convert_base_path);
 			}
 		} else if (rtp_is_recording(NULL)) { //stop record
 			rtp_stop_recording();
-			swprintf(menu->name, 8, L"Record");
+			snprintf(menu->name, 8, "Record");
 			printf("stop recording\n");
 		} else if (!rtp_is_loading(NULL)) { //start record
 			char dst[256];
@@ -2501,7 +2505,7 @@ static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT ev
 			if (last_id >= 0) {
 				snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
 				rtp_start_recording(dst);
-				swprintf(menu->name, 256, L"StopRecording:%s", dst);
+				snprintf(menu->name, 256, "StopRecording:%s", dst);
 				printf("start recording %s\n", dst);
 			}
 		}
@@ -2568,11 +2572,9 @@ static void packet_menu_load_callback(struct _MENU_T *menu, enum MENU_EVENT even
 			if (dir != NULL) {
 				while ((d = readdir(dir)) != 0) {
 					if (d->d_name[0] != L'.') {
-						char *name_s = malloc(256);
-						wchar_t name[256];
-						snprintf(name_s, 256, "%s", d->d_name);
-						swprintf(name, 256, L"%s", d->d_name);
-						MENU_T *node_menu = menu_new(name, packet_menu_load_node_callback, name_s);
+						char *name = malloc(256);
+						strncpy(name, d->d_name, 256);
+						MENU_T *node_menu = menu_new(name, packet_menu_load_node_callback, name);
 						menu_add_submenu(menu, node_menu, INT_MAX);
 					}
 				}
@@ -2630,9 +2632,9 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		lg_stereo_enabled = !(bool) menu->user_data;
 		menu->user_data = (void*) lg_stereo_enabled;
 		if (lg_stereo_enabled) {
-			swprintf(menu->name, 8, L"On");
+			snprintf(menu->name, 8, "On");
 		} else {
-			swprintf(menu->name, 8, L"Off");
+			snprintf(menu->name, 8, "Off");
 		}
 		{
 			char cmd[256];
@@ -2702,9 +2704,9 @@ static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 		lg_sync_enabled = !(bool) menu->user_data;
 		menu->user_data = (void*) lg_sync_enabled;
 		if (lg_sync_enabled) {
-			swprintf(menu->name, 8, L"On");
+			snprintf(menu->name, 8, "On");
 		} else {
-			swprintf(menu->name, 8, L"Off");
+			snprintf(menu->name, 8, "Off");
 		}
 		{
 			char cmd[256];
@@ -2962,103 +2964,103 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 
 static void _init_menu() {
 	init_menu(state->screen_height / 32);
-	state->menu = menu_new(L"Menu", menu_callback, NULL);
+	state->menu = menu_new("Menu", menu_callback, NULL);
 
 	MENU_T *menu = state->menu;
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Function", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"Snap", function_menu_callback, (void*) 0), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("Function", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Snap", function_menu_callback, (void*) 0), INT_MAX);
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Config", NULL, NULL), INT_MAX);
-		MENU_T *sync_menu = menu_add_submenu(sub_menu, menu_new(L"Sync", NULL, NULL), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("Config", NULL, NULL), INT_MAX);
+		MENU_T *sync_menu = menu_add_submenu(sub_menu, menu_new("Sync", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = sync_menu;
-			MENU_T *on_menu = menu_add_submenu(sub_menu, menu_new(L"On", sync_menu_callback, (void*) true), INT_MAX);
+			MENU_T *on_menu = menu_add_submenu(sub_menu, menu_new("On", sync_menu_callback, (void*) true), INT_MAX);
 			on_menu->marked = true;
 		}
-		MENU_T *refraction_menu = menu_add_submenu(sub_menu, menu_new(L"Refraction", NULL, NULL), INT_MAX);
+		MENU_T *refraction_menu = menu_add_submenu(sub_menu, menu_new("Refraction", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = refraction_menu;
-			menu_add_submenu(sub_menu, menu_new(L"Air", refraction_menu_callback, (void*) 1), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"AcrylicDome", refraction_menu_callback, (void*) 2), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"UnderWater", refraction_menu_callback, (void*) 3), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("Air", refraction_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("AcrylicDome", refraction_menu_callback, (void*) 2), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("UnderWater", refraction_menu_callback, (void*) 3), INT_MAX);
 			refraction_menu->submenu[0]->marked = true;
 		}
-		MENU_T *stereo_menu = menu_add_submenu(sub_menu, menu_new(L"Stereo", NULL, NULL), INT_MAX);
+		MENU_T *stereo_menu = menu_add_submenu(sub_menu, menu_new("Stereo", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = stereo_menu;
-			MENU_T *off_menu = menu_add_submenu(sub_menu, menu_new(L"Off", stereo_menu_callback, (void*) false), INT_MAX);
+			MENU_T *off_menu = menu_add_submenu(sub_menu, menu_new("Off", stereo_menu_callback, (void*) false), INT_MAX);
 			off_menu->marked = true;
 		}
-		MENU_T *resolution_menu = menu_add_submenu(sub_menu, menu_new(L"Resolution", NULL, NULL), INT_MAX);
+		MENU_T *resolution_menu = menu_add_submenu(sub_menu, menu_new("Resolution", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = resolution_menu;
-			menu_add_submenu(sub_menu, menu_new(L"4K", resolution_menu_callback, (void*) 4), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"3K", resolution_menu_callback, (void*) 3), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"2K", resolution_menu_callback, (void*) 2), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"1K", resolution_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("4K", resolution_menu_callback, (void*) 4), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("3K", resolution_menu_callback, (void*) 3), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("2K", resolution_menu_callback, (void*) 2), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("1K", resolution_menu_callback, (void*) 1), INT_MAX);
 			for (int idx = 0; sub_menu->submenu[idx]; idx++) {
 				if (sub_menu->submenu[idx]->user_data == (void*) lg_resolution) {
 					sub_menu->submenu[idx]->marked = true;
 				}
 			}
 		}
-		MENU_T *fov_menu = menu_add_submenu(sub_menu, menu_new(L"Fov", NULL, NULL), INT_MAX);
+		MENU_T *fov_menu = menu_add_submenu(sub_menu, menu_new("Fov", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = fov_menu;
-			menu_add_submenu(sub_menu, menu_new(L"-", fov_menu_callback, (void*) -1), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"+", fov_menu_callback, (void*) 1), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"60", fov_menu_callback, (void*) 60), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"90", fov_menu_callback, (void*) 90), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"120", fov_menu_callback, (void*) 120), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("-", fov_menu_callback, (void*) -1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("+", fov_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("60", fov_menu_callback, (void*) 60), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("90", fov_menu_callback, (void*) 90), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("120", fov_menu_callback, (void*) 120), INT_MAX);
 		}
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Packet", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"Record", packet_menu_record_callback, NULL), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"Load", packet_menu_load_callback, NULL), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("Packet", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Record", packet_menu_record_callback, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Load", packet_menu_load_callback, NULL), INT_MAX);
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"Calibration", NULL, NULL), INT_MAX);
-		MENU_T *image_circle_menu = menu_add_submenu(sub_menu, menu_new(L"ImageCircle", calibration_menu_callback, (void*) CALIBRATION_CMD_IMAGE_CIRCLE), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("Calibration", NULL, NULL), INT_MAX);
+		MENU_T *image_circle_menu = menu_add_submenu(sub_menu, menu_new("ImageCircle", calibration_menu_callback, (void*) CALIBRATION_CMD_IMAGE_CIRCLE), INT_MAX);
 		{
 			MENU_T *sub_menu = image_circle_menu;
-			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu, menu_new(L"cam", image_circle_calibration_menu_callback, (void*) 0), INT_MAX);
+			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu, menu_new("cam", image_circle_calibration_menu_callback, (void*) 0), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_cam_menu;
-				menu_add_submenu(sub_menu, menu_new(L"0", image_circle_calibration_menu_callback, (void*) 1), INT_MAX);
-				menu_add_submenu(sub_menu, menu_new(L"1", image_circle_calibration_menu_callback, (void*) 2), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new("0", image_circle_calibration_menu_callback, (void*) 1), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new("1", image_circle_calibration_menu_callback, (void*) 2), INT_MAX);
 			}
-			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu, menu_new(L"x", image_circle_calibration_menu_callback, (void*) 10), INT_MAX);
+			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu, menu_new("x", image_circle_calibration_menu_callback, (void*) 10), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_x_menu;
-				menu_add_submenu(sub_menu, menu_new(L"-", image_circle_calibration_menu_callback, (void*) 11), INT_MAX);
-				menu_add_submenu(sub_menu, menu_new(L"+", image_circle_calibration_menu_callback, (void*) 12), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new("-", image_circle_calibration_menu_callback, (void*) 11), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new("+", image_circle_calibration_menu_callback, (void*) 12), INT_MAX);
 			}
-			MENU_T *image_circle_y_menu = menu_add_submenu(sub_menu, menu_new(L"y", image_circle_calibration_menu_callback, (void*) 20), INT_MAX);
+			MENU_T *image_circle_y_menu = menu_add_submenu(sub_menu, menu_new("y", image_circle_calibration_menu_callback, (void*) 20), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_y_menu;
-				menu_add_submenu(sub_menu, menu_new(L"-", image_circle_calibration_menu_callback, (void*) 21), INT_MAX);
-				menu_add_submenu(sub_menu, menu_new(L"+", image_circle_calibration_menu_callback, (void*) 22), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new("-", image_circle_calibration_menu_callback, (void*) 21), INT_MAX);
+				menu_add_submenu(sub_menu, menu_new("+", image_circle_calibration_menu_callback, (void*) 22), INT_MAX);
 			}
-			menu_add_submenu(sub_menu, menu_new(L"ac", image_circle_calibration_menu_callback, (void*) 30), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("ac", image_circle_calibration_menu_callback, (void*) 30), INT_MAX);
 		}
-		menu_add_submenu(sub_menu, menu_new(L"ViewerCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VIEWER_COMPASS), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"VehicleCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VEHICLE_COMPASS), INT_MAX);
-		MENU_T *horizonr_menu = menu_add_submenu(sub_menu, menu_new(L"HorizonR", NULL, NULL), 0);
+		menu_add_submenu(sub_menu, menu_new("ViewerCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VIEWER_COMPASS), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("VehicleCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VEHICLE_COMPASS), INT_MAX);
+		MENU_T *horizonr_menu = menu_add_submenu(sub_menu, menu_new("HorizonR", NULL, NULL), 0);
 		{
 			MENU_T *sub_menu = horizonr_menu;
-			menu_add_submenu(sub_menu, menu_new(L"-", horizonr_menu_callback, (void*) -1), INT_MAX);
-			menu_add_submenu(sub_menu, menu_new(L"+", horizonr_menu_callback, (void*) 1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("-", horizonr_menu_callback, (void*) -1), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("+", horizonr_menu_callback, (void*) 1), INT_MAX);
 		}
-		menu_add_submenu(sub_menu, menu_new(L"Save", calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Save", calibration_menu_callback, (void*) CALIBRATION_CMD_SAVE), INT_MAX);
 	}
 	{
-		MENU_T *sub_menu = menu_add_submenu(menu, menu_new(L"System", NULL, NULL), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"Shutdown", system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"Reboot", system_menu_callback, (void*) SYSTEM_CMD_REBOOT), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new(L"Exit", system_menu_callback, (void*) SYSTEM_CMD_EXIT), INT_MAX);
+		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("System", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Shutdown", system_menu_callback, (void*) SYSTEM_CMD_SHUTDOWN), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Reboot", system_menu_callback, (void*) SYSTEM_CMD_REBOOT), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Exit", system_menu_callback, (void*) SYSTEM_CMD_EXIT), INT_MAX);
 	}
 }
 
@@ -3222,6 +3224,11 @@ int main(int argc, char *argv[]) {
 	pthread_t readline_thread;
 	pthread_create(&readline_thread, NULL, readline_thread_func, (void*) NULL);
 
+	//status buffer
+	char *status_value = (char*) malloc(RTP_MAXPAYLOADSIZE);
+	char *status_buffer = (char*) malloc(RTP_MAXPAYLOADSIZE);
+	char *status_packet = (char*) malloc(RTP_MAXPAYLOADSIZE);
+
 	while (!terminate) {
 		struct timeval time = { };
 		gettimeofday(&time, NULL);
@@ -3270,22 +3277,19 @@ int main(int argc, char *argv[]) {
 			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 			if (diff_sec > 0.100) { //less than 10Hz
 				int cur = 0;
-				char statuses[RTP_MAXPAYLOADSIZE];
 				for (int i = 0; state->statuses[i]; i++) {
-					char value[256] = { };
-					state->statuses[i]->get_value(state->statuses[i]->user_data, value, sizeof(value));
-					char buff[256];
-					int len = snprintf(buff, sizeof(buff), "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, value);
+					state->statuses[i]->get_value(state->statuses[i]->user_data, status_value, RTP_MAXPAYLOADSIZE);
+					int len = snprintf(status_buffer, RTP_MAXPAYLOADSIZE, "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, status_value);
 					if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
-						rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+						rtp_sendpacket((unsigned char*) status_packet, cur, PT_STATUS);
 						cur = 0;
 					} else {
-						strncpy(statuses + cur, buff, len);
+						strncpy(status_packet + cur, status_buffer, len);
 						cur += len;
 					}
 				}
 				if (cur != 0) {
-					rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+					rtp_sendpacket((unsigned char*) status_packet, cur, PT_STATUS);
 				}
 				last_statuses_handled_time = time;
 			}
@@ -3549,33 +3553,37 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
-	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
-	int frame_height = frame->height;
+static void get_info(char *buff, int buff_len) {
 	int len = 0;
-	const int MAX_INFO_SIZE = 1024;
-	wchar_t disp[MAX_INFO_SIZE];
 	{ //View
 		float north;
 		VECTOR4D_T quat = state->plugin_host.get_view_quaternion();
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-		len += swprintf(disp + len, MAX_INFO_SIZE - len, L"View   : Tmp %.1f degC, N %.1f", state->plugin_host.get_view_temperature(), north * 180 / M_PI);
+		len += snprintf(buff + len, buff_len - len, "View   : Tmp %.1f degC, N %.1f", state->plugin_host.get_view_temperature(), north * 180 / M_PI);
 	}
 	{ //Vehicle
 		float north;
 		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
 		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-		len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %.0f:%.0f", state->plugin_host.get_camera_temperature(),
-				north * 180 / M_PI, lg_cam_bandwidth, lg_cam_fps[0], lg_cam_fps[1], lg_cam_frameskip[0], lg_cam_frameskip[1]);
+		len += snprintf(buff + len, buff_len - len, "\nVehicle: Tmp %.1f degC, N %.1f, rx %.1f Mbps, fps %.1f:%.1f skip %.0f:%.0f", state->plugin_host.get_camera_temperature(), north * 180 / M_PI,
+				lg_cam_bandwidth, lg_cam_fps[0], lg_cam_fps[1], lg_cam_frameskip[0], lg_cam_frameskip[1]);
 	}
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]->get_info) {
-			wchar_t *info = state->plugins[i]->get_info(state->plugins[i]->user_data);
+			char *info = state->plugins[i]->get_info(state->plugins[i]->user_data);
 			if (info) {
-				len += swprintf(disp + len, MAX_INFO_SIZE - len, L"\n%ls", info);
+				len += snprintf(buff + len, buff_len - len, "\n%s", info);
 			}
 		}
 	}
+}
+
+static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
+	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_height = frame->height;
+	const int MAX_INFO_SIZE = 1024;
+	char disp[MAX_INFO_SIZE];
+	get_info(disp, MAX_INFO_SIZE);
 	menu_redraw(state->menu, disp, frame_width, frame_height, frame_width, frame_height, false);
 }
 

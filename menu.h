@@ -3,7 +3,8 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <wchar.h>
+
+#define MENU_NAME_MAX_LENGTH 256
 
 enum MENU_EVENT {
 	MENU_EVENT_NONE,
@@ -24,7 +25,7 @@ enum MENU_OPERATE {
 struct _MENU_T;
 typedef void (*MENU_CALLBACK)(struct _MENU_T *menu, enum MENU_EVENT event);
 typedef struct _MENU_T {
-	wchar_t name[256];
+	char name[MENU_NAME_MAX_LENGTH];
 	bool activated;
 	bool selected;
 	bool marked;
@@ -36,11 +37,11 @@ typedef struct _MENU_T {
 
 void init_menu(uint32_t font_size);
 void deinit_menu();
-void menu_redraw(MENU_T *root, wchar_t *_status, uint32_t screen_width,
+void menu_redraw(MENU_T *root, char *_status, uint32_t screen_width,
 		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
 		bool stereo);
-MENU_T *menu_new(wchar_t *name, MENU_CALLBACK callback, void *user_data);
+MENU_T *menu_new(char *name, MENU_CALLBACK callback, void *user_data);
 void menu_delete(MENU_T **menu);
 MENU_T *menu_add_submenu(MENU_T *parent, MENU_T *child, int idx);
-MENU_T *menu_get_submenu(MENU_T *parent, wchar_t *name, bool create_new);
+MENU_T *menu_get_submenu(MENU_T *parent, char *name, bool create_new);
 void menu_operate(MENU_T *root, enum MENU_OPERATE operate);

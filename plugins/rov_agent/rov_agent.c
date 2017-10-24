@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <math.h>
 #include <pthread.h>
-#include <wchar.h>
 #include <limits.h>
 #include <dirent.h>
 #include <pthread.h>
@@ -165,36 +164,36 @@ static void save_options(void *user_data, json_t *options) {
 }
 
 #define MAX_INFO_LEN 1024
-static wchar_t lg_info[MAX_INFO_LEN];
-static wchar_t *get_info(void *user_data) {
+static char lg_info[MAX_INFO_LEN];
+static char *get_info(void *user_data) {
 	int cur = 0;
 //	if (rtp_is_recording(NULL)) {
 //		char *path;
 //		rtp_is_recording(&path);
-//		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", to %hs", path);
+//		cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur, ", to %hs", path);
 //	}
 //	if (rtp_is_loading(NULL)) {
 //		char *path;
 //		rtp_is_loading(&path);
-//		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L", from %hs", path);
+//		cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur, ", from %hs", path);
 //	}
-	cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-			L"thr %.1f, pch=%.1f, yaw=%.1f, mtr=%.1f", lg_thrust, lg_pitch_diff,
+	cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur,
+			"thr %.1f, pch=%.1f, yaw=%.1f, mtr=%.1f", lg_thrust, lg_pitch_diff,
 			lg_yaw_diff, lg_motor_value[0]);
 	for (int i = 1; i < MOTOR_NUM; i++) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L",%.1f",
+		cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur, ",%.1f",
 				lg_motor_value[i]);
 	}
 	if (lg_pid_enabled) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-				L"\npid_value=%.1f,%.1f,%.1f\tdelta_value=%.1f,%.1f,%.1f",
+		cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur,
+				"\npid_value=%.1f,%.1f,%.1f\tdelta_value=%.1f,%.1f,%.1f",
 				lg_pid_value[0], lg_pid_value[1], lg_pid_value[2],
 				lg_delta_pid_target[0], lg_delta_pid_target[1],
 				lg_delta_pid_target[2]);
 	}
 	if (lg_is_compass_calib) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
+		cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur,
+				"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
 				lg_compass_min[0], lg_compass_min[1], lg_compass_min[2],
 				lg_compass_max[0], lg_compass_max[1], lg_compass_max[2]);
 	}
@@ -211,9 +210,9 @@ static void pid_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 			bool value = !(bool) menu->user_data;
 			menu->user_data = (void*) value;
 			if (value) {
-				swprintf(menu->name, 8, L"On");
+				snprintf(menu->name, 8, "On");
 			} else {
-				swprintf(menu->name, 8, L"Off");
+				snprintf(menu->name, 8, "Off");
 			}
 			{
 				char cmd[256];
@@ -256,28 +255,28 @@ static void light_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 }
 
 static void _init_menu() {
-	MENU_T *sub_menu = menu_get_submenu(lg_plugin_host->get_menu(), L"Config",
+	MENU_T *sub_menu = menu_get_submenu(lg_plugin_host->get_menu(), "Config",
 			true);
-	MENU_T *pid_menu = menu_add_submenu(sub_menu, menu_new(L"PID", NULL, NULL),
+	MENU_T *pid_menu = menu_add_submenu(sub_menu, menu_new("PID", NULL, NULL),
 			INT_MAX);
 	{
 		MENU_T *sub_menu = pid_menu;
 		MENU_T *off_menu = menu_add_submenu(sub_menu,
-				menu_new(L"Off", pid_menu_callback, (void*) false), INT_MAX);
+				menu_new("Off", pid_menu_callback, (void*) false), INT_MAX);
 		off_menu->marked = true;
 	}
 	MENU_T *light_menu = menu_add_submenu(sub_menu,
-			menu_new(L"Light", NULL, NULL), INT_MAX);
+			menu_new("Light", NULL, NULL), INT_MAX);
 	{
 		MENU_T *sub_menu = light_menu;
 		menu_add_submenu(sub_menu,
-				menu_new(L"MIN", light_menu_callback, (void*) 0), INT_MAX);
+				menu_new("MIN", light_menu_callback, (void*) 0), INT_MAX);
 		menu_add_submenu(sub_menu,
-				menu_new(L"-", light_menu_callback, (void*) -1), INT_MAX);
+				menu_new("-", light_menu_callback, (void*) -1), INT_MAX);
 		menu_add_submenu(sub_menu,
-				menu_new(L"+", light_menu_callback, (void*) 1), INT_MAX);
+				menu_new("+", light_menu_callback, (void*) 1), INT_MAX);
 		menu_add_submenu(sub_menu,
-				menu_new(L"MAX", light_menu_callback, (void*) 100), INT_MAX);
+				menu_new("MAX", light_menu_callback, (void*) 100), INT_MAX);
 	}
 }
 

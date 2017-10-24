@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <pthread.h>
-#include <wchar.h>
 #include <jansson.h>//json parser
 #include "quaternion.h"
 #include "menu.h"
@@ -65,7 +64,7 @@ typedef struct _PLUGIN_T {
 	void (*event_handler)(void *user_data, uint32_t node_id, uint32_t event_id);
 	void (*init_options)(void *user_data, json_t *options);
 	void (*save_options)(void *user_data, json_t *options);
-	wchar_t *(*get_info)(void *user_data);
+	char *(*get_info)(void *user_data);
 	void *user_data;
 	uint32_t node_id;
 } PLUGIN_T;

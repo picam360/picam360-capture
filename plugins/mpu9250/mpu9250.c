@@ -315,11 +315,11 @@ static void save_options(void *user_data, json_t *options) {
 }
 
 #define MAX_INFO_LEN 1024
-static wchar_t lg_info[MAX_INFO_LEN];
-static wchar_t *get_info(void *user_data) {
+static char lg_info[MAX_INFO_LEN];
+static char *get_info(void *user_data) {
 	int cur = 0;
 	if (lg_is_compass_calib) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]", lg_compass_min[0], lg_compass_min[1], lg_compass_min[2], lg_compass_max[0],
+		cur += snprintf(lg_info + cur, MAX_INFO_LEN - cur, "\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]", lg_compass_min[0], lg_compass_min[1], lg_compass_min[2], lg_compass_max[0],
 				lg_compass_max[1], lg_compass_max[2]);
 	}
 	return lg_info;

@@ -85,10 +85,10 @@ static void save_options(void *user_data, json_t *options) {
 }
 
 #define MAX_INFO_LEN 1024
-static wchar_t lg_info[MAX_INFO_LEN];
-static wchar_t *get_info(void *user_data) {
+static char lg_info[MAX_INFO_LEN];
+static char *get_info(void *user_data) {
 	int cur = 0;
-	cur += swprintf(lg_info, MAX_INFO_LEN, L"param1=%f,param2=%f", lg_param1,
+	cur += snprintf(lg_info, MAX_INFO_LEN, L"param1=%f,param2=%f", lg_param1,
 			lg_param2);
 	return lg_info;
 }

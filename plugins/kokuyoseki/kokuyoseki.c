@@ -185,7 +185,7 @@ static void kokuyoseki_callback(struct timeval time, int button, int value) {
 	lg_last_button = button;
 }
 
-static wchar_t *get_info(void *user_data) {
+static char *get_info(void *user_data) {
 	return NULL;
 }
 
