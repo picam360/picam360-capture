@@ -71,7 +71,8 @@ static void exit_func(void);
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
-static void get_info(char *buff, int buff_len);
+static void get_info_str(char *buff, int buff_len);
+static void get_menu_str(char *buff, int buff_len);
 
 static void loading_callback(void *user_data, int ret);
 static void convert_snap_handler();
@@ -2316,6 +2317,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 //status
 static STATUS_T *STATUS_VAR(next_frame_id);
 static STATUS_T *STATUS_VAR(info);
+static STATUS_T *STATUS_VAR(menu);
 //watch
 static STATUS_T *STATUS_VAR(ack_command_id);
 static STATUS_T *STATUS_VAR(quaternion);
@@ -2333,7 +2335,9 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	if (status == STATUS_VAR(next_frame_id)) {
 		snprintf(buff, buff_len, "%d", state->next_frame_id);
 	} else if (status == STATUS_VAR(info)) {
-		get_info(buff, buff_len);
+		get_info_str(buff, buff_len);
+	} else if (status == STATUS_VAR(menu)) {
+		get_menu_str(buff, buff_len);
 	}
 }
 static void status_set_value(void *user_data, const char *value) {
@@ -2374,6 +2378,7 @@ static STATUS_T *new_status(const char *name) {
 static void init_status() {
 	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, next_frame_id);
 	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, info);
+	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, menu);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, quaternion);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, compass);
@@ -3553,7 +3558,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-static void get_info(char *buff, int buff_len) {
+static void get_info_str(char *buff, int buff_len) {
 	int len = 0;
 	{ //View
 		float north;
@@ -3576,6 +3581,27 @@ static void get_info(char *buff, int buff_len) {
 			}
 		}
 	}
+	len += snprintf(buff + len, buff_len - len, "\n");
+}
+
+static void _get_menu_str(char **buff, int buff_len, MENU_T *menu, int depth) {
+	int len = snprintf(*buff, buff_len, "%s,%d,%d,%d,%d\n", menu->name, depth, menu->activated ? 1 : 0, menu->selected ? 1 : 0, menu->marked ? 1 : 0);
+	*buff += len;
+	buff_len -= len;
+	depth++;
+	if (menu->selected) {
+		for (int idx = 0; menu->submenu[idx]; idx++) {
+			_get_menu_str(buff, buff_len, menu->submenu[idx], depth);
+		}
+	}
+}
+
+static void get_menu_str(char *_buff, int buff_len) {
+	char **buff = &_buff;
+	int len = snprintf(*buff, buff_len, "name,depth,activated,selected,marked\n");
+	*buff += len;
+	buff_len -= len;
+	_get_menu_str(buff, buff_len, state->menu, 0);
 }
 
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
@@ -3583,7 +3609,7 @@ static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
 	int frame_height = frame->height;
 	const int MAX_INFO_SIZE = 1024;
 	char disp[MAX_INFO_SIZE];
-	get_info(disp, MAX_INFO_SIZE);
+	get_info_str(disp, MAX_INFO_SIZE);
 	menu_redraw(state->menu, disp, frame_width, frame_height, frame_width, frame_height, false);
 }
 
