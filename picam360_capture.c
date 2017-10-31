@@ -1609,6 +1609,14 @@ int _command_handler(const char *_buff) {
 			state->camera_horizon_r_bias = value;
 			printf("set_camera_horizon_r_bias : completed\n");
 		}
+	} else if (strncmp(cmd, "add_color_offset", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value = 0;
+			sscanf(param, "%f", &value);
+			state->options.color_offset += value;
+			printf("add_color_offset : completed\n");
+		}
 	} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
@@ -2428,7 +2436,7 @@ enum SYSTEM_CMD {
 };
 
 enum CALIBRATION_CMD {
-	CALIBRATION_CMD_NONE, CALIBRATION_CMD_SAVE, CALIBRATION_CMD_IMAGE_CIRCLE, CALIBRATION_CMD_VIEWER_COMPASS, CALIBRATION_CMD_VEHICLE_COMPASS,
+	CALIBRATION_CMD_NONE, CALIBRATION_CMD_SAVE, CALIBRATION_CMD_IMAGE_CIRCLE, CALIBRATION_CMD_IMAGE_PARAMS, CALIBRATION_CMD_VIEWER_COMPASS, CALIBRATION_CMD_VEHICLE_COMPASS,
 };
 
 #define PACKET_FOLDER_PATH "/media/usbdisk/packet"
@@ -2965,6 +2973,21 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu, enum ME
 	}
 }
 
+static void image_params_calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		if (menu->user_data) {
+			state->plugin_host.send_command((char*) menu->user_data);
+			menu->selected = false;
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
+
 static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -3068,6 +3091,55 @@ static void _init_menu() {
 				menu_add_submenu(sub_menu, menu_new("+", image_circle_calibration_menu_callback, (void*) 22), INT_MAX);
 			}
 			menu_add_submenu(sub_menu, menu_new("ac", image_circle_calibration_menu_callback, (void*) 30), INT_MAX);
+		}
+		MENU_T *image_params_menu = menu_add_submenu(sub_menu, menu_new("ImageParams", calibration_menu_callback, (void*) CALIBRATION_CMD_IMAGE_PARAMS), INT_MAX);
+		{
+			MENU_T *sub_menu = image_params_menu;
+			{
+				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("brightness", image_params_calibration_menu_callback, NULL), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl brightness=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl brightness=1"), INT_MAX);
+			}
+			{
+				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("gamma", image_params_calibration_menu_callback, NULL), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl gamma=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl gamma=1"), INT_MAX);
+			}
+			{
+				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("contrast", image_params_calibration_menu_callback, NULL), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl contrast=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl contrast=1"), INT_MAX);
+			}
+			{
+				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("saturation", image_params_calibration_menu_callback, NULL), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl saturation=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl saturation=1"), INT_MAX);
+			}
+			{
+				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("sharpness", image_params_calibration_menu_callback, NULL), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl sharpness=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl sharpness=1"), INT_MAX);
+			}
+//			{
+//				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("white_balance_temperature_auto", image_params_calibration_menu_callback, NULL), INT_MAX);
+//				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, NULL), INT_MAX);
+//				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, NULL), INT_MAX);
+//			}
+//			{
+//				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("white_balance_temperature", image_params_calibration_menu_callback, NULL), INT_MAX);
+//				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, NULL), INT_MAX);
+//				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, NULL), INT_MAX);
+//			}
+//			{
+//				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("exposure_auto", image_params_calibration_menu_callback, NULL), INT_MAX);
+//				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, NULL, INT_MAX);
+//				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, NULL), INT_MAX);
+//			}
+			{
+				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("color_offset", image_params_calibration_menu_callback, NULL), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "add_color_offset -0.01"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "add_color_offset 0.01"), INT_MAX);
+			}
 		}
 		menu_add_submenu(sub_menu, menu_new("ViewerCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VIEWER_COMPASS), INT_MAX);
 		menu_add_submenu(sub_menu, menu_new("VehicleCompass", calibration_menu_callback, (void*) CALIBRATION_CMD_VEHICLE_COMPASS), INT_MAX);
