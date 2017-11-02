@@ -1,3 +1,6 @@
+const int STEPNUM = 256;
+const float STEPNUM_M1 = 255.0;
+
 attribute vec4 vPosition; //[0:1]
 uniform float scale_x;
 uniform float scale_y;
@@ -10,7 +13,7 @@ uniform sampler2D cam1_texture;
 uniform float pixel_size;
 uniform float cam_aspect_ratio;
 //angular map params
-uniform float r_2_pitch[256];
+uniform float r_2_pitch[STEPNUM];
 //options start
 uniform float sharpness_gain;
 uniform float cam0_offset_yaw;
@@ -47,12 +50,12 @@ void main(void) {
 	if (r > M_SQRT_2) {
 		r = M_SQRT_2;
 	}
-	float indexf = r / M_SQRT_2 * 255.0;
+	float indexf = r / M_SQRT_2 * STEPNUM_M1;
 	int index = int(indexf);
 	float index_sub = indexf - float(index);
 	float pitch_orig = r_2_pitch[index] * (1.0 - index_sub) + r_2_pitch[index + 1] * index_sub;
 	float roll_orig = atan(position.y, position.x);
-	if (r < M_SQRT_2 && r > 1.0) {
+	if (r <= M_SQRT_2 && r > 1.0) {
 		int roll_index = int(roll_orig / M_PI_DIV_2);
 		float roll_base = float(roll_index) * M_PI_DIV_2 + (roll_orig > 0.0 ? M_PI_DIV_4 : -M_PI_DIV_4);
 		float roll_diff = roll_orig - roll_base;

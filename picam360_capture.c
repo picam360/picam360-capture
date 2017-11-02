@@ -3510,15 +3510,38 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
 	if (frame->operation_mode == OPERATION_MODE_PICAM360MAP) {
 		const int stepnum = 256;
+		float fov_min = 30;
+		float fov_max = 120;
+		float fov_factor = 1.0 - (MIN(MAX(frame->fov / 2.0, fov_min), fov_max) - fov_min) / (fov_max - fov_min) / 2.0;
+		float ganma = log(frame->fov / 2.0 / 180.0) / log(1.0 / sqrt(2));
 		float x_ary[3] = { 0.0, 1.0, sqrt(2) };
-		float y_ary[3] = { 0.0, frame->fov * M_PI / 180.0, M_PI };
+		float y_ary[3] = { 0.0, frame->fov / 1.2 * M_PI / 180.0, M_PI };
 		float x_ary2[stepnum];
 		float y_ary2[stepnum];
+		POINT_T p0 = { 0.0, 0.0 };
+		POINT_T p1 = { fov_factor, -fov_factor + 1.0 };
+		POINT_T p2 = { 1.0, 1.0 };
 		for (int i = 0; i < stepnum; i++) {
-			x_ary2[i] = sqrt(2) * (float) i / (float) (stepnum - 1);
+			POINT_T p = QuadraticBezPoint(p0, p1, p2, (float) i / (stepnum - 1));
+			x_ary2[i] = p.x;
+			y_ary2[i] = p.y;
 		}
-		get_cubic_spline(3, x_ary, y_ary, stepnum, x_ary2, y_ary2);
-		glUniform1fv(glGetUniformLocation(program, "r_2_pitch"), stepnum, y_ary2);
+		// invert x y
+		const int stepnum3 = 256;
+		float x_ary3[stepnum3];
+		float y_ary3[stepnum3];
+		for (int i = 0; i < stepnum3; i++) {
+			x_ary3[i] = (float) i / (stepnum3 - 1);
+			for (int j = 0; j < stepnum - 1; j++) {
+				if (x_ary3[i] >= x_ary2[j] && x_ary3[i] <= x_ary2[j + 1]) {
+					float ratio = (x_ary3[i] - x_ary2[j]) / (x_ary2[j + 1] - x_ary2[j]);
+					y_ary3[i] = ratio * (y_ary2[j + 1] - y_ary2[j]) + y_ary2[j];
+					y_ary3[i] *= M_PI;
+					break;
+				}
+			}
+		}
+		glUniform1fv(glGetUniformLocation(program, "r_2_pitch"), stepnum3, y_ary3);
 //		static bool init = false;
 //		if (!init) {
 //			init = true;

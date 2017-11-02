@@ -82,3 +82,22 @@ void get_cubic_spline(int num_of_points, float *x_ary, float *y_ary, int num_of_
 		out_y_ary2[i] = (float) s(x_ary2[i]);
 	}
 }
+
+POINT_T QuadraticBezPoint(POINT_T p0, POINT_T p1, POINT_T p2, float d) {
+
+	POINT_T o = { 0, 0 };
+
+	float v = (1 - d) * (1 - d);
+	o.x += v * p0.x;
+	o.y += v * p0.y;
+
+	v = 2 * d * (1 - d);
+	o.x += v * p1.x;
+	o.y += v * p1.y;
+
+	v = d * d;
+	o.x += v * p2.x;
+	o.y += v * p2.y;
+
+	return o;
+}
