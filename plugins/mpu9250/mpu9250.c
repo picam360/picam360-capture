@@ -207,10 +207,13 @@ static void init() {
 	} else {
 		is_init = true;
 	}
+	if (ms_open(lg_i2c_ch) != 0) {
+		//error
+		return;
+	}
+
 	pthread_mutex_init(&lg_mutex, 0);
 	gettimeofday(&lg_base_time, NULL);
-
-	ms_open(lg_i2c_ch);
 
 	init_status();
 
