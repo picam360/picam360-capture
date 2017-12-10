@@ -66,7 +66,10 @@ if [ $DRIVER_IP = "127.0.0.1" ]; then
   set -- $(/opt/vc/bin/vcgencmd get_camera)
   if [ $2 = "detected=1" ]; then
     echo "RASPI CAM"
+    #WDR
     su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 1536 -h 1536 -n $NUM_OF_CAMERA -t RASPI >/dev/null 2>/dev/null &"
+	#8M
+	#su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 2592 -h 1944 -n $NUM_OF_CAMERA -t RASPI >/dev/null 2>/dev/null &"
   elif [ -e /dev/video0 ]; then
     echo "USB CAM"
     su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w 2048 -h 1536 -n $NUM_OF_CAMERA -t USB >/dev/null 2>/dev/null &"
@@ -77,14 +80,17 @@ fi
 
 # lunch capture & server
 echo "lunch capture"
+#WDR
 OPTION="-w 1536 -h 1536 -r -c MJPEG -n $NUM_OF_CAMERA"
+#8M
+#OPTION="-w 1944 -h 1944 -r -c MJPEG -n $NUM_OF_CAMERA"
 set -- $(tvservice -s)
 if [ $(($2&0x02)) != 0 ]; then
 	echo "HDMI"
 	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 800 -h 480 -v mpu9250\" -p >/dev/null 2>/dev/null &"
 else
 	echo "NO HDMI"
-	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 544 -h 640 -s h264 -f 5\" >/dev/null 2>/dev/null &"
+	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION >/dev/null 2>/dev/null &"
 	su -l pi -c "bash /home/pi/picam360/picam360-server/sh/start-app.sh &"
 fi
 

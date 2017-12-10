@@ -67,6 +67,8 @@ static void init_model_proj(PICAM360CAPTURE_T *state);
 static void init_textures(PICAM360CAPTURE_T *state);
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
+static void init_options_ex(PICAM360CAPTURE_T *state);
+static void save_options_ex(PICAM360CAPTURE_T *state);
 static void exit_func(void);
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
@@ -631,6 +633,40 @@ static void save_options(PICAM360CAPTURE_T *state) {
 	}
 
 	json_dump_file(options, CONFIG_FILE, JSON_INDENT(4));
+
+	json_decref(options);
+}
+
+static void init_options_ex(PICAM360CAPTURE_T *state) {
+	json_error_t error;
+	json_t *options = json_load_file(state->options.config_ex_filepath, 0, &error);
+	if (options != NULL) {
+		for (int i = 0; i < MAX_CAM_NUM; i++) {
+			char buff[256];
+			sprintf(buff, "cam%d_offset_x", i);
+			state->options.cam_offset_x_ex[i] = json_number_value(json_object_get(options, buff));
+			sprintf(buff, "cam%d_offset_y", i);
+			state->options.cam_offset_y_ex[i] = json_number_value(json_object_get(options, buff));
+			sprintf(buff, "cam%d_horizon_r", i);
+			state->options.cam_horizon_r_ex[i] = json_number_value(json_object_get(options, buff));
+		}
+	}
+}
+
+static void save_options_ex(PICAM360CAPTURE_T *state) {
+	json_t *options = json_object();
+
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
+		char buff[256];
+		sprintf(buff, "cam%d_offset_x", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_x_ex[i]));
+		sprintf(buff, "cam%d_offset_y", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_offset_y_ex[i]));
+		sprintf(buff, "cam%d_horizon_r", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_horizon_r_ex[i]));
+	}
+
+	json_dump_file(options, state->options.config_ex_filepath, JSON_INDENT(4));
 
 	json_decref(options);
 }
@@ -1508,20 +1544,25 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "add_camera_horizon_r", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
+			float *cam_horizon_r = (state->options.config_ex_enabled) ? state->options.cam_horizon_r_ex : state->options.cam_horizon_r;
+
 			int cam_num = 0;
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
 				for (int i = 0; i < MAX_CAM_NUM; i++) {
-					state->options.cam_horizon_r[i] += value;
+					cam_horizon_r[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
-					state->options.cam_horizon_r[cam_num] += value;
+					cam_horizon_r[cam_num] += value;
 				}
 			}
-			{ //send upstream
+
+			if (state->options.config_ex_enabled) { //try loading configuration
+				save_options_ex(state);
+			} else { //send upstream
 				char cmd[256];
 				sprintf(cmd, "upstream.picam360_driver.add_camera_horizon_r %s", param);
 				state->plugin_host.send_command(cmd);
@@ -1532,20 +1573,25 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "add_camera_offset_x", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
+			float *cam_offset_x = (state->options.config_ex_enabled) ? state->options.cam_offset_x_ex : state->options.cam_offset_x;
+
 			int cam_num = 0;
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
 				for (int i = 0; i < MAX_CAM_NUM; i++) {
-					state->options.cam_offset_x[i] += value;
+					cam_offset_x[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
-					state->options.cam_offset_x[cam_num] += value;
+					cam_offset_x[cam_num] += value;
 				}
 			}
-			{ //send upstream
+
+			if (state->options.config_ex_enabled) { //try loading configuration
+				save_options_ex(state);
+			} else { //send upstream
 				char cmd[256];
 				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_x %s", param);
 				state->plugin_host.send_command(cmd);
@@ -1556,20 +1602,25 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "add_camera_offset_y", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
+			float *cam_offset_y = (state->options.config_ex_enabled) ? state->options.cam_offset_y_ex : state->options.cam_offset_y;
+
 			int cam_num = 0;
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
 				for (int i = 0; i < MAX_CAM_NUM; i++) {
-					state->options.cam_offset_y[i] += value;
+					cam_offset_y[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
-					state->options.cam_offset_y[cam_num] += value;
+					cam_offset_y[cam_num] += value;
 				}
 			}
-			{ //send upstream
+
+			if (state->options.config_ex_enabled) { //try loading configuration
+				save_options_ex(state);
+			} else { //send upstream
 				char cmd[256];
 				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_y %s", param);
 				state->plugin_host.send_command(cmd);
@@ -2565,13 +2616,21 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu, enum MENU_EVENT
 			printf("stop loading\n");
 			menu->marked = false;
 			menu->selected = false;
+
+			state->options.config_ex_enabled = false;
 		} else if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
-			char name[256];
-			snprintf(name, 256, PACKET_FOLDER_PATH "/%s", (char*) menu->user_data);
-			rtp_start_loading(name, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
-			printf("start loading %s\n", name);
+			char filepath[256];
+			snprintf(filepath, 256, PACKET_FOLDER_PATH "/%s", (char*) menu->user_data);
+			rtp_start_loading(filepath, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
+			printf("start loading %s\n", filepath);
 			menu->marked = true;
 			menu->selected = false;
+
+			{ //try loading configuration
+				snprintf(state->options.config_ex_filepath, 256, "%s.json", filepath);
+				init_options_ex(state);
+				state->options.config_ex_enabled = true;
+			}
 
 			snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s", (char*) menu->user_data);
 			lg_convert_frame_num = 0;
@@ -2603,6 +2662,11 @@ static void packet_menu_load_callback(struct _MENU_T *menu, enum MENU_EVENT even
 			if (dir != NULL) {
 				while ((d = readdir(dir)) != 0) {
 					if (d->d_name[0] != L'.') {
+						int len = strlen(d->d_name);
+						if (strncmp(d->d_name + len - 5, ".json", 5) == 0) {
+							continue;
+						}
+
 						char *name = malloc(256);
 						strncpy(name, d->d_name, 256);
 						MENU_T *node_menu = menu_new(name, packet_menu_load_node_callback, name);
@@ -3574,19 +3638,35 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		char buff[256];
 		sprintf(buff, "cam%d_offset_yaw", i);
 		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_yaw[i]);
-		sprintf(buff, "cam%d_offset_x", i);
-		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_x[i]);
-		sprintf(buff, "cam%d_offset_y", i);
-		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i]);
-		sprintf(buff, "cam%d_horizon_r", i);
-		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
+		if (state->options.config_ex_enabled) {
+			sprintf(buff, "cam%d_offset_x", i);
+			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_x[i] + state->options.cam_offset_x_ex[i]);
+			sprintf(buff, "cam%d_offset_y", i);
+			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i] + state->options.cam_offset_y_ex[i]);
+			sprintf(buff, "cam%d_horizon_r", i);
+			glUniform1f(glGetUniformLocation(program, buff), (state->options.cam_horizon_r[i] + state->options.cam_horizon_r_ex[i]) * state->camera_horizon_r_bias);
+		} else {
+			sprintf(buff, "cam%d_offset_x", i);
+			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_x[i]);
+			sprintf(buff, "cam%d_offset_y", i);
+			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i]);
+			sprintf(buff, "cam%d_horizon_r", i);
+			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
+		}
 		sprintf(buff, "cam%d_aov", i);
 		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_aov[i] / state->refraction);
 	}
 	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"), state->options.cam_offset_yaw[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam]);
-	glUniform1f(glGetUniformLocation(program, "cam_horizon_r"), state->options.cam_horizon_r[state->active_cam] * state->camera_horizon_r_bias);
+	if (state->options.config_ex_enabled) {
+		glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam] + state->options.cam_offset_x_ex[state->active_cam]);
+		glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam] + state->options.cam_offset_y_ex[state->active_cam]);
+		glUniform1f(glGetUniformLocation(program, "cam_horizon_r"),
+				(state->options.cam_horizon_r[state->active_cam] + state->options.cam_horizon_r_ex[state->active_cam]) * state->camera_horizon_r_bias);
+	} else {
+		glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam]);
+		glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam]);
+		glUniform1f(glGetUniformLocation(program, "cam_horizon_r"), state->options.cam_horizon_r[state->active_cam] * state->camera_horizon_r_bias);
+	}
 	glUniform1f(glGetUniformLocation(program, "cam_aov"), state->options.cam_aov[state->active_cam] / state->refraction);
 	glUniform1f(glGetUniformLocation(program, "color_offset"), state->options.color_offset);
 	glUniform1f(glGetUniformLocation(program, "color_factor"), 1.0 / (1.0 - state->options.color_offset));
