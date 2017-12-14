@@ -2468,7 +2468,7 @@ static void init_status() {
 #endif //status block
 
 static void _init_rtp() {
-	init_rtp(9002, "192.168.4.1", 9004, 0);
+	init_rtp(9002, RTP_SOCKET_TYPE_TCP, "127.0.0.1", 9004, RTP_SOCKET_TYPE_UDP, 0);
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	init_rtcp(9003, "192.168.4.1", 9005, 0);

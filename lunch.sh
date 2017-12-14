@@ -128,7 +128,7 @@ if [ $REMOTE = true ]; then
 	sudo killall $SOCAT
 #	$SOCAT -u udp-recv:9002 - > rtp_rx &
 	$SOCAT PIPE:rtcp_tx UDP-DATAGRAM:$DRIVER_IP:9003 &
-	$SOCAT PIPE:rtp_tx UDP-DATAGRAM:$SERVER_IP:9004 &
+#	$SOCAT PIPE:rtp_tx UDP-DATAGRAM:$SERVER_IP:9004 &
 	$SOCAT -u udp-recv:9005 - > rtcp_rx &
 
 elif [ $DIRECT = ]; then

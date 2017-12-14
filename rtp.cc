@@ -34,8 +34,6 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define USE_SOCKET
-
 #if defined USE_JRTP
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
@@ -51,11 +49,10 @@ static RTPSession lg_sess;
 
 #else
 
-#if defined USE_SOCKET
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#endif
+#include <signal.h>
 
 struct RTPHeader {
 #ifdef RTP_BIG_ENDIAN
@@ -166,6 +163,34 @@ static RTP_CALLBACK lg_callback = NULL;
 static float lg_bandwidth = 0;
 static float lg_bandwidth_limit = 100 * 1024 * 1024; //100Mbps
 
+static char lg_socket_buffer[8 * 1024];
+static int lg_socket_buffer_cur = 0;
+static sockaddr_in lg_tx_addr = { };
+static sockaddr_in lg_rx_addr = { };
+static enum RTP_SOCKET_TYPE lg_rx_socket_type = RTP_SOCKET_TYPE_NONE;
+static enum RTP_SOCKET_TYPE lg_tx_socket_type = RTP_SOCKET_TYPE_NONE;
+int send_via_socket(int fd, const unsigned char *data, int data_len) {
+	for (int i = 0; i < data_len;) {
+		int buffer_space = sizeof(lg_socket_buffer) - lg_socket_buffer_cur;
+		if (buffer_space < (data_len - i)) {
+			memcpy(lg_socket_buffer + lg_socket_buffer_cur, data + i, buffer_space);
+			lg_socket_buffer_cur = 0;
+			i += buffer_space;
+
+			int sendsize = sendto(fd, lg_socket_buffer, sizeof(lg_socket_buffer), 0, (struct sockaddr *) &lg_tx_addr, sizeof(lg_tx_addr));
+			if (sendsize != sizeof(lg_socket_buffer)) {
+				perror("sendto() failed.");
+				return -1;
+			}
+		} else {
+			memcpy(lg_socket_buffer + lg_socket_buffer_cur, data + i, data_len - i);
+			lg_socket_buffer_cur += data_len - i;
+			i = data_len;
+		}
+	}
+	return data_len;
+}
+
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
 }
@@ -189,6 +214,71 @@ static void checkerror(int rtperr) {
 
 float rtp_get_bandwidth() {
 	return lg_bandwidth;
+}
+
+static int connect_timeout(struct sockaddr_in *client, int timeout) {
+	int sock;
+	int retval;
+	fd_set set;
+	struct timeval tv;
+
+	/*** make socket discriptor ***/
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		close(sock);
+		return -1;
+	}
+	/*** end make socket discriptor ***/
+
+	/*** set socket nonblocking ***/
+	retval = fcntl(sock, F_SETFL, O_NONBLOCK);
+	if (retval < 0) {
+		close(sock);
+		return -1;
+	}
+	/*** end set socket nonblocking ***/
+
+	/*** connect time out***/
+	retval = connect(sock, (struct sockaddr *) client, sizeof(*client));
+	if (retval < 0) {
+		if (errno == EINPROGRESS) {
+			tv.tv_sec = timeout;
+			tv.tv_usec = 0;
+			FD_ZERO(&set);
+			FD_SET(sock, &set);
+			retval = select(sock + 1, NULL, &set, NULL, &tv);
+			if (retval < 0) {
+				close(sock);
+				return -1;
+			} else if (retval > 0) {
+				/*connect*/
+				retval = connect(sock, (struct sockaddr *) client, sizeof(*client));
+				if (retval < 0) {
+					close(sock);
+					return -1;
+				}
+			} else {
+				/** Time out **/
+				close(sock);
+				return -1;
+			}
+		} else {
+			close(sock);
+			return -1;
+		}
+	}
+	/*** end connect time out ***/
+
+	/*** set socket blocking(option) ***/
+	retval = fcntl(sock, F_SETFL, 0);
+	if (retval < 0) {
+		close(sock);
+		return -1;
+	}
+	/*** end set socket blocking(option) ***/
+
+	/*** end close socket discriptor ***/
+	return sock;
 }
 
 int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
@@ -215,13 +305,35 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 		checkerror(status);
 #else
 		if (lg_tx_fd < 0) {
-			lg_tx_fd = open("rtp_tx", O_WRONLY);
+			switch (lg_tx_socket_type) {
+			case RTP_SOCKET_TYPE_TCP:
+				lg_tx_fd = connect_timeout(&lg_tx_addr, 5);
+				break;
+			case RTP_SOCKET_TYPE_UDP:
+				lg_tx_fd = socket(AF_INET, SOCK_DGRAM, 0);
+				break;
+			case RTP_SOCKET_TYPE_FIFO:
+				lg_tx_fd = open("rtp_tx", O_WRONLY);
+				break;
+			default:
+				break;
+			}
 		}
 		if (lg_tx_fd >= 0) {
+
+			lg_seqnr++;
+			lg_timestamp += diff_usec;
+
+			RTPPacket *pack = new RTPPacket(sizeof(RTPHeader));
+			pack->seqnr = lg_seqnr;
+			pack->timestamp = lg_timestamp;
+			pack->payloadtype = pt;
+			pack->StoreHeader();
+
 			unsigned char header[8];
+			unsigned short len = sizeof(header) + sizeof(struct RTPHeader) + data_len;
 			header[0] = 0xFF;
 			header[1] = 0xE1;
-			unsigned short len = sizeof(header) + sizeof(struct RTPHeader) + data_len;
 			for (int i = 0; i < 2; i++) {
 				header[2 + i] = (len >> (8 * i)) & 0xFF;
 			}
@@ -229,18 +341,31 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			header[5] = (unsigned char) 't';
 			header[6] = (unsigned char) 'p';
 			header[7] = (unsigned char) '\0';
-			write(lg_tx_fd, header, sizeof(header));
 
-			lg_seqnr++;
-			lg_timestamp += diff_usec;
-
-			RTPPacket *pack = new RTPPacket(sizeof(struct RTPHeader));
-			pack->seqnr = lg_seqnr;
-			pack->timestamp = lg_timestamp;
-			pack->payloadtype = pt;
-			pack->StoreHeader();
-			write(lg_tx_fd, pack->GetPacketData(), pack->GetPacketLength());
-			write(lg_tx_fd, data, data_len);
+			switch (lg_tx_socket_type) {
+			case RTP_SOCKET_TYPE_TCP:
+			case RTP_SOCKET_TYPE_UDP:
+				if (1) {
+					uint8_t *data_ary[3] = { header, pack->GetPacketData(), data };
+					int datalen_ary[3] = { sizeof(header), pack->GetPacketLength(), data_len };
+					for (int i = 0; i < 3; i++) {
+						int size = send_via_socket(lg_tx_fd, data_ary[i], datalen_ary[i]);
+						if (size < 0) {
+							close(lg_tx_fd);
+							lg_tx_fd = -1;
+							break;
+						}
+					}
+				}
+				break;
+			case RTP_SOCKET_TYPE_FIFO:
+				write(lg_tx_fd, header, sizeof(header));
+				write(lg_tx_fd, pack->GetPacketData(), pack->GetPacketLength());
+				write(lg_tx_fd, data, data_len);
+				break;
+			default:
+				break;
+			}
 			delete pack;
 		}
 #endif
@@ -268,46 +393,82 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 static void *buffering_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP BUFFERING");
 
-#if defined USE_SOCKET
-	sockaddr_in addr;
-
-	bzero(&addr, sizeof(addr));
-
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(9002);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	int rx_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	int status = bind(rx_fd, (struct sockaddr*) &addr, sizeof(addr));
-	if(status < 0){
-        perror("bind() failed.");
-	}
-
-#else
-	int rx_fd = open("rtp_rx", O_RDONLY);
-#endif
-	if (rx_fd < 0) {
-		return NULL;
-	}
+	int srv_fd = -1;
 	while (lg_receive_run) {
-#if defined USE_SOCKET
-		int size = RTP_MAXPAYLOADSIZE + 8 + 12;
-		RTPPacket *raw_pack = new RTPPacket(size);
-		raw_pack->packetlength = recvfrom(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength(), 0, NULL, NULL);
-#else
-		int size = 4 * 1024;
-		RTPPacket *raw_pack = new RTPPacket(size);
-		raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
-#endif
-		if (raw_pack->packetlength <= 0) {
-			delete raw_pack;
-			continue;
-		}
+		int rx_fd = -1;
+		switch (lg_rx_socket_type) {
+		case RTP_SOCKET_TYPE_TCP:
+			if (1) {
+				sockaddr_in client_addr = { };
+				socklen_t client_addr_size = sizeof(client_addr);
 
-		pthread_mutex_lock(&lg_buffering_queue_mlock);
-		lg_buffering_queue.push_back(raw_pack);
-		mrevent_trigger(&lg_buffering_ready);
-		pthread_mutex_unlock(&lg_buffering_queue_mlock);
+				if (srv_fd < 0) {
+					srv_fd = socket(AF_INET, SOCK_STREAM, 0);
+					int status = bind(srv_fd, (struct sockaddr*) &lg_rx_addr, sizeof(lg_rx_addr));
+					if (status < 0) {
+						perror("bind() failed.");
+					}
+				}
+				listen(srv_fd, 1);
+				printf("Waiting for connection ...\n");
+				rx_fd = accept(srv_fd, (struct sockaddr *) &client_addr, &client_addr_size);
+				printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
+			}
+			break;
+		case RTP_SOCKET_TYPE_UDP:
+			if (1) {
+				rx_fd = socket(AF_INET, SOCK_DGRAM, 0);
+				int status = bind(rx_fd, (struct sockaddr*) &lg_rx_addr, sizeof(lg_rx_addr));
+				if (status < 0) {
+					perror("bind() failed.");
+				}
+			}
+			break;
+		case RTP_SOCKET_TYPE_FIFO:
+			rx_fd = open("rtp_rx", O_RDONLY);
+			break;
+		default:
+			break;
+		}
+		if (rx_fd < 0) {
+			return NULL;
+		}
+		while (lg_receive_run) {
+			RTPPacket *raw_pack = NULL;
+			switch (lg_rx_socket_type) {
+			case RTP_SOCKET_TYPE_TCP:
+			case RTP_SOCKET_TYPE_UDP:
+				if (1) {
+					int size = RTP_MAXPAYLOADSIZE + 8 + 12;
+					raw_pack = new RTPPacket(size);
+					raw_pack->packetlength = recvfrom(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength(), 0, NULL, NULL);
+				}
+				break;
+			case RTP_SOCKET_TYPE_FIFO:
+				if (1) {
+					int size = 4 * 1024;
+					raw_pack = new RTPPacket(size);
+					raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
+				}
+				break;
+			default:
+				break;
+			}
+
+			if (raw_pack == NULL) {
+				continue;
+			} else if (raw_pack->packetlength <= 0) {
+				delete raw_pack;
+				close(rx_fd);
+				rx_fd = -1;
+				break;
+			}
+
+			pthread_mutex_lock(&lg_buffering_queue_mlock);
+			lg_buffering_queue.push_back(raw_pack);
+			mrevent_trigger(&lg_buffering_ready);
+			pthread_mutex_unlock(&lg_buffering_queue_mlock);
+		}
 	}
 	return NULL;
 }
@@ -531,7 +692,7 @@ static void *load_thread_func(void* arg) {
 	void *user_data = args[1];
 	free(arg);
 
-	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader)];
+	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader) + 8];
 	unsigned int last_timestamp = 0;
 	uint64_t current_play_time = 0;
 	struct timeval last_time = { };
@@ -623,12 +784,14 @@ static void *load_thread_func(void* arg) {
 }
 
 static bool is_init = false;
-int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport, float bandwidth_limit) {
+int init_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit) {
 	if (is_init) {
 		return -1;
 	}
 	is_init = true;
 
+	lg_rx_socket_type = rx_socket_type;
+	lg_tx_socket_type = tx_socket_type;
 	lg_bandwidth_limit = bandwidth_limit;
 	lg_receive_run = true;
 
@@ -664,6 +827,17 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
 	status = lg_sess.AddDestination(addr);
 	checkerror(status);
 #else
+
+	signal(SIGPIPE, SIG_IGN);
+
+	lg_rx_addr.sin_family = AF_INET;
+	lg_rx_addr.sin_port = htons(portbase);
+	lg_rx_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	lg_tx_addr.sin_family = AF_INET;
+	lg_tx_addr.sin_port = htons(destport);
+	lg_tx_addr.sin_addr.s_addr = inet_addr(destip_str);
+
 	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func, (void*) NULL);
 	mrevent_init(&lg_buffering_ready);
 #endif
