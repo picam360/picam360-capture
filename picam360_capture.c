@@ -31,8 +31,6 @@
 #include "gl_program.h"
 #include "auto_calibration.h"
 #include "manual_mpu.h"
-#include "rtp.h"
-#include "rtcp.h"
 
 #include <mat4/type.h>
 //#include <mat4/create.h>
@@ -534,6 +532,30 @@ static void init_options(PICAM360CAPTURE_T *state) {
 				state->options.cam_aov[i] = 245;
 			}
 		}
+		{ //rtp
+			state->options.rtp_rx_port = json_number_value(json_object_get(options, "rtp_rx_port"));
+			state->options.rtp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_rx_type")));
+			json_t *value = json_object_get(options, "rtp_tx_ip");
+			if (value) {
+				strncpy(state->options.rtp_tx_ip, json_string_value(value), sizeof(state->options.rtp_tx_ip) - 1);
+			} else {
+				memset(state->options.rtp_tx_ip, 0, sizeof(state->options.rtp_tx_ip));
+			}
+			state->options.rtp_tx_port = json_number_value(json_object_get(options, "rtp_tx_port"));
+			state->options.rtp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_tx_type")));
+		}
+		{ //rtcp
+			state->options.rtcp_rx_port = json_number_value(json_object_get(options, "rtcp_rx_port"));
+			state->options.rtcp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_rx_type")));
+			json_t *value = json_object_get(options, "rtcp_tx_ip");
+			if (value) {
+				strncpy(state->options.rtcp_tx_ip, json_string_value(value), sizeof(state->options.rtcp_tx_ip) - 1);
+			} else {
+				memset(state->options.rtcp_tx_ip, 0, sizeof(state->options.rtcp_tx_ip));
+			}
+			state->options.rtcp_tx_port = json_number_value(json_object_get(options, "rtcp_tx_port"));
+			state->options.rtcp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_tx_type")));
+		}
 		{
 			json_t *plugin_paths = json_object_get(options, "plugin_paths");
 			if (json_is_array(plugin_paths)) {
@@ -616,6 +638,20 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, buff, json_real(state->options.cam_horizon_r[i]));
 		sprintf(buff, "cam%d_aov", i);
 		json_object_set_new(options, buff, json_real(state->options.cam_aov[i]));
+	}
+	{ //rtp
+		json_object_set_new(options, "rtp_rx_port", json_real(state->options.rtp_rx_port));
+		json_object_set_new(options, "rtp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_rx_type)));
+		json_object_set_new(options, "rtp_tx_ip", json_string(state->options.rtp_tx_ip));
+		json_object_set_new(options, "rtp_tx_port", json_real(state->options.rtp_tx_port));
+		json_object_set_new(options, "rtp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_tx_type)));
+	}
+	{ //rtcp
+		json_object_set_new(options, "rtcp_rx_port", json_real(state->options.rtcp_rx_port));
+		json_object_set_new(options, "rtcp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_rx_type)));
+		json_object_set_new(options, "rtcp_tx_ip", json_string(state->options.rtcp_tx_ip));
+		json_object_set_new(options, "rtcp_tx_port", json_real(state->options.rtcp_tx_port));
+		json_object_set_new(options, "rtcp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_tx_type)));
 	}
 
 	if (state->plugin_paths) {
@@ -1939,7 +1975,7 @@ static void set_fov(float value) {
 static void send_command(const char *_cmd) {
 	pthread_mutex_lock(&state->cmd_list_mutex);
 
-	char *cmd = (char*)_cmd;
+	char *cmd = (char*) _cmd;
 	LIST_T **cur = NULL;
 	if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
 		cur = &state->cmd2upstream_list;
@@ -2182,7 +2218,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				}
 
 				unsigned char header_pack[512];
-				char *sei = (char*)header_pack + sizeof(SOI);
+				char *sei = (char*) header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
 				int len =
 						sprintf(sei + 5,
@@ -2200,7 +2236,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
 			} else {
 				unsigned char header_pack[512];
-				char *sei = (char*)header_pack + sizeof(SOI);
+				char *sei = (char*) header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
 				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" />", frame->id);
 				len += 1; //nal header
@@ -2292,7 +2328,7 @@ static int command2upstream_handler() {
 				return 0;
 			}
 		}
-		rtcp_sendpacket((unsigned char*) lg_command, len, PT_CMD);
+		rtp_sendpacket(state->rtcp, (unsigned char*) lg_command, len, PT_CMD);
 		last_try = s;
 		is_first_try = false;
 		return 0;
@@ -2470,11 +2506,11 @@ static void init_status() {
 #endif //status block
 
 static void _init_rtp(PICAM360CAPTURE_T *state) {
-	state->rtp = create_rtp(9002, RTP_SOCKET_TYPE_TCP, "127.0.0.1", 9004, RTP_SOCKET_TYPE_UDP, 0);
+	state->rtp = create_rtp(state->options.rtp_rx_port, state->options.rtp_rx_type, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
 	rtp_set_callback(state->rtp, (RTP_CALLBACK) rtp_callback);
 
-	init_rtcp(9003, "192.168.4.1", 9005, 0);
-	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
+	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, state->options.rtcp_tx_ip, state->options.rtcp_tx_port, state->options.rtcp_tx_type, 0);
+	rtp_set_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback);
 
 	init_status();
 }

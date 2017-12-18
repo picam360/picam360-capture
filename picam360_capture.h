@@ -79,6 +79,18 @@ typedef struct _OPTIONS_T {
 	float view_offset_pitch; // x axis
 	float view_offset_yaw; // y axis
 	float view_offset_roll; // z axis
+
+	int rtp_rx_port;
+	enum RTP_SOCKET_TYPE rtp_rx_type;
+	char rtp_tx_ip[256];
+	int rtp_tx_port;
+	enum RTP_SOCKET_TYPE rtp_tx_type;
+
+	int rtcp_rx_port;
+	enum RTP_SOCKET_TYPE rtcp_rx_type;
+	char rtcp_tx_ip[256];
+	int rtcp_tx_port;
+	enum RTP_SOCKET_TYPE rtcp_tx_type;
 } OPTIONS_T;
 
 typedef struct _LIST_T {

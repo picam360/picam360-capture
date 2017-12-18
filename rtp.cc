@@ -822,3 +822,32 @@ bool rtp_is_loading(RTP_T *_this, char **path) {
 	}
 	return (_this->load_fd > 0);
 }
+
+const char *rtp_get_rtp_socket_type_str(enum RTP_SOCKET_TYPE type) {
+	switch (type) {
+	case RTP_SOCKET_TYPE_TCP:
+		return "tcp";
+	case RTP_SOCKET_TYPE_UDP:
+		return "udp";
+	case RTP_SOCKET_TYPE_FIFO:
+		return "fifo";
+	default:
+		return "none";
+	}
+}
+
+enum RTP_SOCKET_TYPE rtp_get_rtp_socket_type(const char *type_str) {
+	if (type_str == NULL) {
+		return RTP_SOCKET_TYPE_NONE;
+	}
+	switch (type_str[0]) {
+	case 't':
+		return RTP_SOCKET_TYPE_TCP;
+	case 'u':
+		return RTP_SOCKET_TYPE_UDP;
+	case 'f':
+		return RTP_SOCKET_TYPE_FIFO;
+	default:
+		return RTP_SOCKET_TYPE_NONE;
+	}
+}

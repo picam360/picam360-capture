@@ -17,7 +17,6 @@ BITRATE=8000000
 RENDER_WIDTH=1440
 RENDER_HEIGHT=720
 PREVIEW=
-REMOTE=false
 STEREO=
 MODE=
 DIRECT=
@@ -30,7 +29,7 @@ DEBUG=false
 KBPS=
 FRAME0_PARAM=
 
-while getopts ac:n:w:h:psf:rDv:g0: OPT
+while getopts ac:n:w:h:psf:Dv:g0: OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
@@ -49,8 +48,6 @@ do
             ;;
         f)  FPS=$OPTARG
             ;;
-        r)  REMOTE=true
-            ;;
         D)  DIRECT="-D"
             ;;
         v)  VIEW_COODINATE=$OPTARG
@@ -64,12 +61,6 @@ do
     esac
 done
 
-if [ -e status ]; then
-	rm status
-fi
-mkfifo status
-chmod 0666 status
-
 if [ -e cam0 ]; then
 	rm cam0
 fi
@@ -82,56 +73,7 @@ fi
 mkfifo cam1
 chmod 0666 cam1
 
-if [ -e rtp_rx ]; then
-	rm rtp_rx
-fi
-mkfifo rtp_rx
-chmod 0666 rtp_rx
-
-if [ -e rtp_tx ]; then
-	rm rtp_tx
-fi
-mkfifo rtp_tx
-chmod 0666 rtp_tx
-
-if [ -e rtcp_rx ]; then
-	rm rtcp_rx
-fi
-mkfifo rtcp_rx
-chmod 0666 rtcp_rx
-
-if [ -e rtcp_tx ]; then
-	rm rtcp_tx
-fi
-mkfifo rtcp_tx
-chmod 0666 rtcp_tx
-
-if [ $REMOTE = true ]; then
-
-	if [ "$DRIVER_IP" = "" ]; then
-		DRIVER_IP="192.168.4.1"
-	fi
-	
-	if [ "$SERVER_IP" = "" ]; then
-		SERVER_IP="192.168.4.2"
-	fi
-
-#use tcp
-#	sudo killall nc
-#   nc 192.168.4.1 9006 < rtp_tx > rtp_rx &
-
-	SOCAT=socat
-	if type socat2 >/dev/null 2>&1; then
-		SOCAT=socat2
-	fi
-
-	sudo killall $SOCAT
-#	$SOCAT -u udp-recv:9002 - > rtp_rx &
-	$SOCAT PIPE:rtcp_tx UDP-DATAGRAM:$DRIVER_IP:9003 &
-#	$SOCAT PIPE:rtp_tx UDP-DATAGRAM:$SERVER_IP:9004 &
-	$SOCAT -u udp-recv:9005 - > rtcp_rx &
-
-elif [ $DIRECT = ]; then
+if [ $DIRECT = ]; then
 	sudo killall raspivid
 	if [ $CODEC = "MJPEG" ]; then
 #		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -b $BITRATE -fps $FPS -o - > cam0 &

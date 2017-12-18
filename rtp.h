@@ -27,6 +27,9 @@ float rtp_get_bandwidth(RTP_T *_this);
 void rtp_set_auto_play(RTP_T *_this, bool value);
 void rtp_set_is_looping(RTP_T *_this, bool value);
 
+const char *rtp_get_rtp_socket_type_str(enum RTP_SOCKET_TYPE type);
+enum RTP_SOCKET_TYPE rtp_get_rtp_socket_type(const char *type_str);
+
 typedef void (*RTP_CALLBACK)(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num);
 void rtp_set_callback(RTP_T *_this, RTP_CALLBACK callback);
 
