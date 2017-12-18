@@ -35,16 +35,16 @@
 #include "rtcp.h"
 
 #include <mat4/type.h>
-#include <mat4/create.h>
+//#include <mat4/create.h>
 #include <mat4/identity.h>
 #include <mat4/rotateX.h>
 #include <mat4/rotateY.h>
 #include <mat4/rotateZ.h>
-#include <mat4/scale.h>
+//#include <mat4/scale.h>
 #include <mat4/multiply.h>
 #include <mat4/transpose.h>
 #include <mat4/fromQuat.h>
-#include <mat4/perspective.h>
+//#include <mat4/perspective.h>
 #include <mat4/invert.h>
 
 //json parser
@@ -1369,7 +1369,7 @@ int _command_handler(const char *_buff) {
 		}
 		if (!checkAcMode) {
 			char param[256];
-			if (state->frame->output_mode = OUTPUT_MODE_STREAM) {
+			if (state->frame->output_mode == OUTPUT_MODE_STREAM) {
 				strncpy(param, "-w 256 -h 256 -F -s mjpeg", 256);
 			} else {
 				strncpy(param, "-w 256 -h 256 -F", 256);
@@ -1423,20 +1423,20 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_recording(param);
+			rtp_start_recording(state->rtp, param);
 			printf("start_recording : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_recording", sizeof(buff)) == 0) {
-		rtp_stop_recording();
+		rtp_stop_recording(state->rtp);
 		printf("stop_recording : completed\n");
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(param, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
+			rtp_start_loading(state->rtp, param, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
-		rtp_stop_loading();
+		rtp_stop_loading(state->rtp);
 		printf("stop_loading : completed\n");
 	} else if (strncmp(cmd, "cam_mode", sizeof(buff)) == 0) {
 		state->input_mode = INPUT_MODE_CAM;
@@ -1486,6 +1486,8 @@ int _command_handler(const char *_buff) {
 					client_key_valid = true;
 				} else if (strncmp(param, "id=", 3) == 0) {
 					int num = sscanf(param, "id=%d", &id);
+					if (num == 1) {
+					}
 				}
 			}
 		} while (param);
@@ -1937,7 +1939,7 @@ static void set_fov(float value) {
 static void send_command(const char *_cmd) {
 	pthread_mutex_lock(&state->cmd_list_mutex);
 
-	char *cmd = _cmd;
+	char *cmd = (char*)_cmd;
 	LIST_T **cur = NULL;
 	if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
 		cur = &state->cmd2upstream_list;
@@ -2179,8 +2181,8 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 					encoded_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				}
 
-				char header_pack[512];
-				char *sei = header_pack + sizeof(SOI);
+				unsigned char header_pack[512];
+				char *sei = (char*)header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
 				int len =
 						sprintf(sei + 5,
@@ -2195,10 +2197,10 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				len += 4; //start code
 				memcpy(header_pack, SOI, sizeof(SOI));
 				len += 2; //SOI
-				rtp_sendpacket(header_pack, len, PT_CAM_BASE);
+				rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
 			} else {
-				char header_pack[512];
-				char *sei = header_pack + sizeof(SOI);
+				unsigned char header_pack[512];
+				char *sei = (char*)header_pack + sizeof(SOI);
 				sei[4] = 6; //nal_type:sei
 				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" />", frame->id);
 				len += 1; //nal header
@@ -2209,7 +2211,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				len += 4; //start code
 				memcpy(header_pack, SOI, sizeof(SOI));
 				len += 2; //SOI
-				rtp_sendpacket(header_pack, len, PT_CAM_BASE);
+				rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
 			}
 			if (frame->output_fd > 0) {
 				if (!frame->output_start) {
@@ -2230,10 +2232,10 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				} else {
 					len = data_len - j;
 				}
-				rtp_sendpacket(data + j, len, PT_CAM_BASE);
+				rtp_sendpacket(state->rtp, data + j, len, PT_CAM_BASE);
 				j += len;
 			}
-			rtp_sendpacket(EOI, sizeof(EOI), PT_CAM_BASE);
+			rtp_sendpacket(state->rtp, EOI, sizeof(EOI), PT_CAM_BASE);
 		} else if (frame->output_type == OUTPUT_TYPE_MJPEG) {
 			if (lg_debug_dump) {
 				if (data[0] == 0xFF && data[1] == 0xD8) { //
@@ -2262,7 +2264,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				} else {
 					len = data_len - i;
 				}
-				rtp_sendpacket(data + i, len, PT_CAM_BASE);
+				rtp_sendpacket(state->rtp, data + i, len, PT_CAM_BASE);
 				i += len;
 			}
 			if (frame->output_fd > 0) {
@@ -2467,9 +2469,9 @@ static void init_status() {
 
 #endif //status block
 
-static void _init_rtp() {
-	init_rtp(9002, RTP_SOCKET_TYPE_TCP, "127.0.0.1", 9004, RTP_SOCKET_TYPE_UDP, 0);
-	rtp_set_callback((RTP_CALLBACK) rtp_callback);
+static void _init_rtp(PICAM360CAPTURE_T *state) {
+	state->rtp = create_rtp(9002, RTP_SOCKET_TYPE_TCP, "127.0.0.1", 9004, RTP_SOCKET_TYPE_UDP, 0);
+	rtp_set_callback(state->rtp, (RTP_CALLBACK) rtp_callback);
 
 	init_rtcp(9003, "192.168.4.1", 9005, 0);
 	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
@@ -2536,7 +2538,7 @@ static void loading_callback(void *user_data, int ret) {
 
 static void convert_snap_handler() {
 	if (lg_is_converting) {
-		rtp_increment_loading(100 * 1000); //10 fps
+		rtp_increment_loading(state->rtp, 100 * 1000); //10 fps
 
 		char dst[256];
 		snprintf(dst, 256, "%s/%d.jpeg", lg_convert_base_path, lg_convert_frame_num);
@@ -2556,20 +2558,20 @@ static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT ev
 		if (lg_is_converting) { //stop convert
 			lg_is_converting = false;
 
-			rtp_set_auto_play(true);
-			rtp_set_is_looping(true);
+			rtp_set_auto_play(state->rtp, true);
+			rtp_set_is_looping(state->rtp, true);
 
 			snprintf(menu->name, 8, "Record");
 			printf("stop converting\n");
 			menu->selected = false;
-		} else if (rtp_is_loading(NULL)) { //start convert
+		} else if (rtp_is_loading(state->rtp, NULL)) { //start convert
 			int ret = mkdir(lg_convert_base_path, //
 					S_IRUSR | S_IWUSR | S_IXUSR | /* rwx */
 					S_IRGRP | S_IWGRP | S_IXGRP | /* rwx */
 					S_IROTH | S_IXOTH | S_IXOTH);
 			if (ret == 0 || errno == EEXIST) {
-				rtp_set_auto_play(false);
-				rtp_set_is_looping(false);
+				rtp_set_auto_play(state->rtp, false);
+				rtp_set_is_looping(state->rtp, false);
 
 				lg_is_converting = true;
 				convert_snap_handler();
@@ -2577,16 +2579,16 @@ static void packet_menu_record_callback(struct _MENU_T *menu, enum MENU_EVENT ev
 				snprintf(menu->name, 256, "StopConverting:%s", lg_convert_base_path);
 				printf("start converting to %s\n", lg_convert_base_path);
 			}
-		} else if (rtp_is_recording(NULL)) { //stop record
-			rtp_stop_recording();
+		} else if (rtp_is_recording(state->rtp, NULL)) { //stop record
+			rtp_stop_recording(state->rtp);
 			snprintf(menu->name, 8, "Record");
 			printf("stop recording\n");
-		} else if (!rtp_is_loading(NULL)) { //start record
+		} else if (!rtp_is_loading(state->rtp, NULL)) { //start record
 			char dst[256];
 			int last_id = get_last_id(PACKET_FOLDER_PATH);
 			if (last_id >= 0) {
 				snprintf(dst, 256, PACKET_FOLDER_PATH "/%d.rtp", last_id + 1);
-				rtp_start_recording(dst);
+				rtp_start_recording(state->rtp, dst);
 				snprintf(menu->name, 256, "StopRecording:%s", dst);
 				printf("start recording %s\n", dst);
 			}
@@ -2612,16 +2614,16 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu, enum MENU_EVENT
 		if (lg_is_converting) {
 			//do nothing
 		} else if (menu->marked) {
-			rtp_stop_loading();
+			rtp_stop_loading(state->rtp);
 			printf("stop loading\n");
 			menu->marked = false;
 			menu->selected = false;
 
 			state->options.config_ex_enabled = false;
-		} else if (!rtp_is_recording(NULL) && !rtp_is_loading(NULL)) {
+		} else if (!rtp_is_recording(state->rtp, NULL) && !rtp_is_loading(state->rtp, NULL)) {
 			char filepath[256];
 			snprintf(filepath, 256, PACKET_FOLDER_PATH "/%s", (char*) menu->user_data);
-			rtp_start_loading(filepath, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
+			rtp_start_loading(state->rtp, filepath, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start loading %s\n", filepath);
 			menu->marked = true;
 			menu->selected = false;
@@ -2654,7 +2656,7 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu, enum MENU_EVENT
 static void packet_menu_load_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_ACTIVATED:
-		if (!rtp_is_loading(NULL)) {
+		if (!rtp_is_loading(state->rtp, NULL)) {
 			struct dirent *d;
 			DIR *dir;
 
@@ -2677,7 +2679,7 @@ static void packet_menu_load_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		}
 		break;
 	case MENU_EVENT_DEACTIVATED:
-		if (!rtp_is_loading(NULL)) {
+		if (!rtp_is_loading(state->rtp, NULL)) {
 			for (int idx = 0; menu->submenu[idx]; idx++) {
 				menu_delete(&menu->submenu[idx]);
 			}
@@ -3362,7 +3364,7 @@ int main(int argc, char *argv[]) {
 	init_options(state);
 
 	//init rtp
-	_init_rtp();
+	_init_rtp(state);
 
 	//frame id=0
 	if (frame_param[0]) {
@@ -3438,7 +3440,7 @@ int main(int argc, char *argv[]) {
 					state->statuses[i]->get_value(state->statuses[i]->user_data, status_value, RTP_MAXPAYLOADSIZE);
 					int len = snprintf(status_buffer, RTP_MAXPAYLOADSIZE, "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, status_value);
 					if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
-						rtp_sendpacket((unsigned char*) status_packet, cur, PT_STATUS);
+						rtp_sendpacket(state->rtp, (unsigned char*) status_packet, cur, PT_STATUS);
 						cur = 0;
 					} else {
 						strncpy(status_packet + cur, status_buffer, len);
@@ -3446,7 +3448,7 @@ int main(int argc, char *argv[]) {
 					}
 				}
 				if (cur != 0) {
-					rtp_sendpacket((unsigned char*) status_packet, cur, PT_STATUS);
+					rtp_sendpacket(state->rtp, (unsigned char*) status_packet, cur, PT_STATUS);
 				}
 				last_statuses_handled_time = time;
 			}
@@ -3577,9 +3579,9 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		float fov_min = 30;
 		float fov_max = 120;
 		float fov_factor = 1.0 - (MIN(MAX(frame->fov / 2.0, fov_min), fov_max) - fov_min) / (fov_max - fov_min) / 2.0;
-		float ganma = log(frame->fov / 2.0 / 180.0) / log(1.0 / sqrt(2));
-		float x_ary[3] = { 0.0, 1.0, sqrt(2) };
-		float y_ary[3] = { 0.0, frame->fov / 1.2 * M_PI / 180.0, M_PI };
+		//float ganma = log(frame->fov / 2.0 / 180.0) / log(1.0 / sqrt(2));
+		//float x_ary[3] = { 0.0, 1.0, sqrt(2) };
+		//float y_ary[3] = { 0.0, frame->fov / 1.2 * M_PI / 180.0, M_PI };
 		float x_ary2[stepnum];
 		float y_ary2[stepnum];
 		POINT_T p0 = { 0.0, 0.0 };

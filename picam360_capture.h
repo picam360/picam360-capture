@@ -32,6 +32,7 @@
 #include "EGL/eglext.h"
 #include <pthread.h>
 #include "mrevent.h"
+#include "rtp.h"
 
 #include "picam360_capture_plugin.h"
 
@@ -215,6 +216,9 @@ typedef struct _PICAM360CAPTURE_T {
 
 	MENU_T *menu;
 	bool menu_visible;
+
+	RTP_T *rtp;
+	RTP_T *rtcp;
 
 	char **plugin_paths;
 	PLUGIN_T **plugins;
