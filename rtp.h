@@ -13,9 +13,11 @@ enum RTP_SOCKET_TYPE {
 typedef void (*RTP_LOADING_CALLBACK)(void *user_data, int ret);
 typedef struct _RTP_T RTP_T;
 
-RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, int rx_buffer_size, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, int tx_buffer_size, float bandwidth_limit);
+RTP_T *create_rtp(unsigned short rx_port, enum RTP_SOCKET_TYPE rx_socket_type, char *tx_ip, unsigned short tx_port, enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit);
 int delete_rtp(RTP_T **_this_p);
+int rtp_set_buffer_size(RTP_T *_this, int rx_buffer_size, int tx_buffer_size);
 int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt);
+void rtp_flush(RTP_T *_this);
 void rtp_start_recording(RTP_T *_this, char *path);
 void rtp_stop_recording(RTP_T *_this);
 bool rtp_is_recording(RTP_T *_this, char **path);
