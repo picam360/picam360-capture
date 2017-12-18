@@ -36,6 +36,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <signal.h>
 
@@ -150,30 +151,32 @@ typedef struct _RTP_T {
 	float bandwidth = 0;
 	float bandwidth_limit = 100 * 1024 * 1024; //100Mbps
 
-	char socket_buffer[8 * 1024];
-	int socket_buffer_cur = 0;
+	char *tx_buffer = NULL;
+	int tx_buffer_cur = 0;
 	sockaddr_in tx_addr = { };
 	sockaddr_in rx_addr = { };
 	enum RTP_SOCKET_TYPE rx_socket_type = RTP_SOCKET_TYPE_NONE;
 	enum RTP_SOCKET_TYPE tx_socket_type = RTP_SOCKET_TYPE_NONE;
+	int rx_buffer_size = 8 * 1024;
+	int tx_buffer_size = 8 * 1024;
 } RTP_T;
 
 int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_len) {
 	for (int i = 0; i < data_len;) {
-		int buffer_space = sizeof(_this->socket_buffer) - _this->socket_buffer_cur;
+		int buffer_space = _this->tx_buffer_size - _this->tx_buffer_cur;
 		if (buffer_space < (data_len - i)) {
-			memcpy(_this->socket_buffer + _this->socket_buffer_cur, data + i, buffer_space);
-			_this->socket_buffer_cur = 0;
+			memcpy(_this->tx_buffer + _this->tx_buffer_cur, data + i, buffer_space);
+			_this->tx_buffer_cur = 0;
 			i += buffer_space;
 
-			int sendsize = sendto(fd, _this->socket_buffer, sizeof(_this->socket_buffer), 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
-			if (sendsize != sizeof(_this->socket_buffer)) {
+			int sendsize = sendto(fd, _this->tx_buffer, _this->tx_buffer_size, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+			if (sendsize != _this->tx_buffer_size) {
 				perror("sendto() failed.");
 				return -1;
 			}
 		} else {
-			memcpy(_this->socket_buffer + _this->socket_buffer_cur, data + i, data_len - i);
-			_this->socket_buffer_cur += data_len - i;
+			memcpy(_this->tx_buffer + _this->tx_buffer_cur, data + i, data_len - i);
+			_this->tx_buffer_cur += data_len - i;
 			i = data_len;
 		}
 	}
@@ -414,15 +417,13 @@ static void *buffering_thread_func(void* arg) {
 			case RTP_SOCKET_TYPE_TCP:
 			case RTP_SOCKET_TYPE_UDP:
 				if (1) {
-					int size = RTP_MAXPAYLOADSIZE + 8 + 12;
-					raw_pack = new RTPPacket(size);
+					raw_pack = new RTPPacket(_this->rx_buffer_size);
 					raw_pack->packetlength = recvfrom(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength(), 0, NULL, NULL);
 				}
 				break;
 			case RTP_SOCKET_TYPE_FIFO:
 				if (1) {
-					int size = 4 * 1024;
-					raw_pack = new RTPPacket(size);
+					raw_pack = new RTPPacket(_this->rx_buffer_size);
 					raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
 				}
 				break;
@@ -434,9 +435,14 @@ static void *buffering_thread_func(void* arg) {
 				continue;
 			} else if (raw_pack->packetlength <= 0) {
 				delete raw_pack;
-				close(rx_fd);
-				rx_fd = -1;
-				break;
+				if (errno == EAGAIN) {
+					continue;
+				} else {
+					close(rx_fd);
+					rx_fd = -1;
+					printf("connection closed\n");
+					break;
+				}
 			}
 
 			pthread_mutex_lock(&_this->buffering_queue_mlock);
@@ -714,11 +720,19 @@ static void *load_thread_func(void* arg) {
 	return NULL;
 }
 
-RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit) {
+RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, int rx_buffer_size, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, int tx_buffer_size,
+		float bandwidth_limit) {
 	RTP_T *_this = new RTP_T;
 
 	_this->rx_socket_type = rx_socket_type;
+	if (rx_buffer_size > 0) {
+		_this->rx_buffer_size = rx_buffer_size;
+	}
 	_this->tx_socket_type = tx_socket_type;
+	if (tx_buffer_size > 0) {
+		_this->tx_buffer_size = tx_buffer_size;
+	}
+	_this->tx_buffer = (char*)malloc(_this->tx_buffer_size);
 	_this->bandwidth_limit = bandwidth_limit;
 	_this->receive_run = true;
 

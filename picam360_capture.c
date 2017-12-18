@@ -2506,10 +2506,10 @@ static void init_status() {
 #endif //status block
 
 static void _init_rtp(PICAM360CAPTURE_T *state) {
-	state->rtp = create_rtp(state->options.rtp_rx_port, state->options.rtp_rx_type, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
+	state->rtp = create_rtp(state->options.rtp_rx_port, state->options.rtp_rx_type, 16 * 1024, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 8 * 1024, 0);
 	rtp_set_callback(state->rtp, (RTP_CALLBACK) rtp_callback);
 
-	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, state->options.rtcp_tx_ip, state->options.rtcp_tx_port, state->options.rtcp_tx_type, 0);
+	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, 8 * 1024, state->options.rtcp_tx_ip, state->options.rtcp_tx_port, state->options.rtcp_tx_type, 64, 0);
 	rtp_set_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback);
 
 	init_status();
