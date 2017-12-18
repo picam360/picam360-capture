@@ -34,21 +34,6 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#if defined USE_JRTP
-#include "rtpsession.h"
-#include "rtpudpv4transmitter.h"
-#include "rtpipv4address.h"
-#include "rtpsessionparams.h"
-#include "rtperrors.h"
-#include "rtplibraryversion.h"
-#include "rtppacket.h"
-
-using namespace jrtplib;
-
-static RTPSession lg_sess;
-
-#else
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -137,7 +122,6 @@ static pthread_t lg_buffering_thread;
 static MREVENT_T lg_buffering_ready;
 static pthread_mutex_t lg_buffering_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
 static std::list<RTPPacket*> lg_buffering_queue;
-#endif
 
 static bool lg_receive_run = false;
 static pthread_t lg_receive_thread;
@@ -202,15 +186,6 @@ void rtp_set_auto_play(bool value) {
 void rtp_set_is_looping(bool value) {
 	lg_is_looping = value;
 }
-
-#ifdef USE_JRTP
-static void checkerror(int rtperr) {
-	if (rtperr < 0) {
-		std::cout << "ERROR: " << RTPGetErrorString(rtperr) << std::endl;
-		exit(-1);
-	}
-}
-#endif
 
 float rtp_get_bandwidth() {
 	return lg_bandwidth;
@@ -300,10 +275,6 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			lg_bandwidth = lg_bandwidth * (1.0 - w) + tmp * w;
 		}
 
-#ifdef USE_JRTP
-		int status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
-		checkerror(status);
-#else
 		if (lg_tx_fd < 0) {
 			switch (lg_tx_socket_type) {
 			case RTP_SOCKET_TYPE_TCP:
@@ -368,7 +339,6 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			}
 			delete pack;
 		}
-#endif
 		if (lg_bandwidth_limit > 0) { //limit bandwidth
 			struct timeval time2 = { };
 			gettimeofday(&time2, NULL);
@@ -388,8 +358,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 	pthread_mutex_unlock(&lg_mlock);
 	return 0;
 }
-#ifdef USE_JRTP
-#else
+
 static void *buffering_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP BUFFERING");
 
@@ -472,48 +441,10 @@ static void *buffering_thread_func(void* arg) {
 	}
 	return NULL;
 }
-#endif
 
 static void *receive_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP RECEIVE");
 
-#ifdef USE_JRTP
-	int status;
-	while (lg_receive_run) {
-		lg_sess.BeginDataAccess();
-
-		// check incoming packets
-		if (lg_sess.GotoFirstSourceWithData()) {
-			do {
-				RTPPacket *pack;
-
-				while ((pack = lg_sess.GetNextPacket()) != NULL) {
-					if (lg_callback && lg_load_fd < 0) {
-						lg_callback(pack->GetPayloadData(),
-								pack->GetPayloadLength(),
-								pack->GetPayloadType(),
-								pack->GetSequenceNumber());
-					}
-					if (lg_record_fd > 0) {
-						pthread_mutex_lock(&lg_record_packet_queue_mlock);
-						lg_record_packet_queue.push_back(pack);
-						mrevent_trigger(&lg_record_packet_ready);
-						pthread_mutex_unlock(&lg_record_packet_queue_mlock);
-					} else {
-						lg_sess.DeletePacket(pack);
-					}
-				}
-			}while (lg_sess.GotoNextSourceWithData());
-		}
-
-		lg_sess.EndDataAccess();
-
-#ifndef RTP_SUPPORT_THREAD
-		status = lg_sess.Poll();
-		checkerror(status);
-#endif // RTP_SUPPORT_THREAD
-	}
-#else
 	int marker = 0;
 	int xmp_len = 0;
 	int xmp_pos = 0;
@@ -613,7 +544,6 @@ static void *receive_thread_func(void* arg) {
 		}
 		delete raw_pack;
 	}
-#endif
 	return NULL;
 }
 
@@ -663,21 +593,13 @@ static void *record_thread_func(void* arg) {
 			last_sync_bytes = num_of_bytes;
 			fsync(fd); //this avoid that file size would be zero after os crash
 		}
-#ifdef USE_JRTP
-		lg_sess.DeletePacket(pack);
-#else
 		delete pack;
-#endif
 	}
 	pthread_mutex_lock(&lg_record_packet_queue_mlock);
 	while (!lg_record_packet_queue.empty()) {
 		pack = *(lg_record_packet_queue.begin());
 		lg_record_packet_queue.pop_front();
-#ifdef USE_JRTP
-		lg_sess.DeletePacket(pack);
-#else
 		delete pack;
-#endif
 	}
 	mrevent_reset(&lg_record_packet_ready);
 	pthread_mutex_unlock(&lg_record_packet_queue_mlock);
@@ -795,39 +717,6 @@ int init_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char 
 	lg_bandwidth_limit = bandwidth_limit;
 	lg_receive_run = true;
 
-#ifdef USE_JRTP
-	uint32_t destip;
-	int status;
-
-	destip = inet_addr(destip_str);
-	if (destip == INADDR_NONE) {
-		std::cerr << "Bad IP address specified" << std::endl;
-		return -1;
-	}
-
-// The inet_addr function returns a value in network byte order, but
-// we need the IP address in host byte order, so we use a call to
-// ntohl
-	destip = ntohl(destip);
-
-	RTPUDPv4TransmissionParams transparams;
-	RTPSessionParams sessparams;
-
-	sessparams.SetOwnTimestampUnit(1.0 / 1E6);//micro sec
-	sessparams.SetMaximumPacketSize(
-			RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader));
-	sessparams.SetAcceptOwnPackets(true);
-	transparams.SetPortbase(portbase);
-
-	status = lg_sess.Create(sessparams, &transparams);
-	checkerror(status);
-
-	RTPIPv4Address addr(destip, destport);
-
-	status = lg_sess.AddDestination(addr);
-	checkerror(status);
-#else
-
 	signal(SIGPIPE, SIG_IGN);
 
 	lg_rx_addr.sin_family = AF_INET;
@@ -840,7 +729,6 @@ int init_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char 
 
 	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func, (void*) NULL);
 	mrevent_init(&lg_buffering_ready);
-#endif
 
 	pthread_create(&lg_receive_thread, NULL, receive_thread_func, (void*) NULL);
 
@@ -856,15 +744,11 @@ int deinit_rtp() {
 	}
 	lg_receive_run = false;
 	pthread_join(lg_receive_thread, NULL);
-#ifdef USE_JRTP
-	lg_sess.BYEDestroy(RTPTime(10, 0), 0, 0);
-#else
 	if (lg_tx_fd >= 0) {
 		close(lg_tx_fd);
 		lg_tx_fd = -1;
 	}
 	pthread_join(lg_buffering_thread, NULL);
-#endif
 	is_init = false;
 	return 0;
 }

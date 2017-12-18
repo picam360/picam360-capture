@@ -11,13 +11,11 @@ LDFLAGS+=-L$(SDKSTAGE)/opt/vc/lib/ -lstdc++ -ldl\
 		-lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lilclient -lfreetype -ledit -ljansson\
 		-lpthread -lrt -lm -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient -L$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont \
 		-Wl,-rpath,/usr/local/lib
-		
-# -ljrtp
 
 INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads \
 		-I$(SDKSTAGE)/opt/vc/include/interface/vmcs_host/linux -I./ -I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient \
 		-I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont -I./include \
-		-I./libs/freetypeGlesRpi/src -I/usr/local/include/jrtplib3
+		-I./libs/freetypeGlesRpi/src
 
 all: $(BIN) $(LIB) $(PLUGINS)
 
