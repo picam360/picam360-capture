@@ -53,7 +53,7 @@ fi
 #
 for line in $(cat /home/pi/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
   do
-     export $line
+     $line
   done
   
  if [ "$NUM_OF_CAMERA" = "" ]; then
