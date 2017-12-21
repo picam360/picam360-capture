@@ -63,16 +63,7 @@ for line in $(cat /home/pi/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
 # lunch driver
 echo "lunch driver"
 if [ $DRIVER_IP = "127.0.0.1" ]; then
-  set -- $(/opt/vc/bin/vcgencmd get_camera)
-  if [ $2 = "detected=1" ]; then
-    echo "RASPI CAM"
-    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -t RASPI >/dev/null 2>/dev/null &"
-  elif [ -e /dev/video0 ]; then
-    echo "USB CAM"
-    su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh >/dev/null 2>/dev/null &"
-  else
-    echo "NO CAM"
-  fi
+	su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh >/dev/null 2>/dev/null &"
 fi
 
 # lunch capture & server
