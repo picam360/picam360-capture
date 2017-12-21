@@ -57,36 +57,30 @@ for line in $(cat /home/pi/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
   done
   
  if [ "$NUM_OF_CAMERA" = "" ]; then
-   NUM_OF_CAMERA=1
+	NUM_OF_CAMERA=1
  fi
   
  if [ "$CAMERA_WIDTH" = "" ]; then
-   CAMERA_WIDTH=2048
+	CAMERA_WIDTH=2048
  fi
   
  if [ "$CAMERA_HEIGHT" = "" ]; then
-   CAMERA_HEIGHT=2048
+	CAMERA_HEIGHT=2048
  fi
   
  if [ "$CAMERA_FPS" = "" ]; then
-   CAMERA_FPS=30
+	CAMERA_FPS=30
  fi
 
 # lunch driver
-echo "lunch driver"
 if [ $DRIVER_IP = "127.0.0.1" ]; then
+	echo "lunch driver"
 	su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -f $CAMERA_FPS -n $NUM_OF_CAMERA >/dev/null 2>/dev/null &"
 fi
 
 # lunch capture & server
-echo "lunch capture"
-OPTION="-w $CAMERA_HEIGHT -h $CAMERA_HEIGHT -n $NUM_OF_CAMERA"
-set -- $(tvservice -s)
-if [ $(($2&0x02)) != 0 ]; then
-	echo "HDMI"
-	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION -0 \"-w 800 -h 480 -v mpu9250\" -p >/dev/null 2>/dev/null &"
-else
-	echo "NO HDMI"
+	echo "lunch capture"
+	OPTION="-w $CAMERA_HEIGHT -h $CAMERA_HEIGHT -n $NUM_OF_CAMERA"
 	su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION >/dev/null 2>/dev/null &"
 	su -l pi -c "bash /home/pi/picam360/picam360-server/sh/start-app.sh &"
 fi
