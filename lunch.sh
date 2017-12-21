@@ -21,7 +21,7 @@ STEREO=
 MODE=
 DIRECT=
 FPS=30
-CODEC=H264
+CODEC=MJPEG
 STREAM=
 AUTO_CALIBRATION=
 VIEW_COODINATE=manual
@@ -29,7 +29,7 @@ DEBUG=false
 KBPS=
 FRAME0_PARAM=
 
-while getopts ac:n:w:h:psf:Dv:g0: OPT
+while getopts ac:n:w:h:psf:dv:g0: OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
@@ -48,7 +48,7 @@ do
             ;;
         f)  FPS=$OPTARG
             ;;
-        D)  DIRECT="-D"
+        d)  DIRECT="-d"
             ;;
         v)  VIEW_COODINATE=$OPTARG
             ;;
@@ -60,28 +60,6 @@ do
             ;;
     esac
 done
-
-if [ -e cam0 ]; then
-	rm cam0
-fi
-mkfifo cam0
-chmod 0666 cam0
-
-if [ -e cam1 ]; then
-	rm cam1
-fi
-mkfifo cam1
-chmod 0666 cam1
-
-if [ $DIRECT = ]; then
-	sudo killall raspivid
-	if [ $CODEC = "MJPEG" ]; then
-#		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -b $BITRATE -fps $FPS -o - > cam0 &
-		raspivid -cd MJPEG -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -b $BITRATE -fps $FPS -o - > cam0 &
-	else
-		raspivid -n -t 0 -w $CAM_WIDTH -h $CAM_HEIGHT -ex sports -ih -b $BITRATE -fps $FPS -o - > cam0 &
-	fi
-fi
 
 #picam360-capture
 

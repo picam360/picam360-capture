@@ -78,9 +78,9 @@ fi
 # lunch capture & server
 echo "lunch capture"
 if [ "$CAMERA_TYPE" = "USB_WDR" ]; then
-OPTION="-w 1536 -h 1536 -c MJPEG -n $NUM_OF_CAMERA"
+OPTION="-w 1536 -h 1536 -n $NUM_OF_CAMERA"
 else
-OPTION="-w 1944 -h 1944 -c MJPEG -n $NUM_OF_CAMERA"
+OPTION="-w 1944 -h 1944 -n $NUM_OF_CAMERA"
 fi
 set -- $(tvservice -s)
 if [ $(($2&0x02)) != 0 ]; then

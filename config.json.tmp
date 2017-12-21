@@ -34,5 +34,5 @@
     "rtcp_rx_type": "udp",
     "rtcp_tx_port": 9003,
     "rtcp_tx_type": "udp",
-    "rtcp_tx_ip": "192.168.4.1"
+    "rtcp_tx_ip": "127.0.0.1"
 }
