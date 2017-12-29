@@ -231,6 +231,7 @@ typedef struct _PICAM360CAPTURE_T {
 
 	RTP_T *rtp;
 	RTP_T *rtcp;
+	float rtp_play_speed;
 
 	char **plugin_paths;
 	PLUGIN_T **plugins;

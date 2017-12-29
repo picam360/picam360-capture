@@ -1698,6 +1698,15 @@ int _command_handler(const char *_buff) {
 			state->camera_horizon_r_bias = value;
 			printf("set_camera_horizon_r_bias : completed\n");
 		}
+	} else if (strncmp(cmd, "set_play_speed", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value = 0;
+			sscanf(param, "%f", &value);
+			state->rtp_play_speed = value;
+			rtp_set_play_speed(state->rtp, value);
+			printf("set_play_speed : completed\n");
+		}
 	} else if (strncmp(cmd, "add_color_offset", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
@@ -2832,6 +2841,28 @@ static void refraction_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event
 	}
 }
 
+static void play_speed_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_SELECTED:
+		for (int idx = 0; menu->parent->submenu[idx]; idx++) {
+			menu->parent->submenu[idx]->marked = false;
+		}
+		menu->marked = true;
+		menu->selected = false;
+		{
+			float value = (float) ((int) menu->user_data) / 100;
+			char cmd[256];
+			snprintf(cmd, 256, "set_play_speed %f", value);
+			state->plugin_host.send_command(cmd);
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	default:
+		break;
+	}
+}
+
 static void sync_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -3155,6 +3186,23 @@ static void _init_menu() {
 				}
 			}
 		}
+		MENU_T *play_speed_menu = menu_add_submenu(sub_menu, menu_new("PlaySpeed", NULL, NULL), INT_MAX);
+		{
+			MENU_T *sub_menu = play_speed_menu;
+			menu_add_submenu(sub_menu, menu_new("x1/8", play_speed_menu_callback, (void*) 12), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("x1/4", play_speed_menu_callback, (void*) 25), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("x1/2", play_speed_menu_callback, (void*) 50), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("x1", play_speed_menu_callback, (void*) 100), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("x2", play_speed_menu_callback, (void*) 200), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("x4", play_speed_menu_callback, (void*) 400), INT_MAX);
+			menu_add_submenu(sub_menu, menu_new("x8", play_speed_menu_callback, (void*) 400), INT_MAX);
+			for (int idx = 0; sub_menu->submenu[idx]; idx++) {
+				int play_speed_percent = (int) (state->rtp_play_speed * 100);
+				if (sub_menu->submenu[idx]->user_data == (void*) play_speed_percent) {
+					sub_menu->submenu[idx]->marked = true;
+				}
+			}
+		}
 		MENU_T *fov_menu = menu_add_submenu(sub_menu, menu_new("Fov", NULL, NULL), INT_MAX);
 		{
 			MENU_T *sub_menu = fov_menu;
@@ -3168,7 +3216,7 @@ static void _init_menu() {
 	{
 		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("Packet", NULL, NULL), INT_MAX);
 		menu_add_submenu(sub_menu, menu_new("Record", packet_menu_record_callback, NULL), INT_MAX);
-		menu_add_submenu(sub_menu, menu_new("Load", packet_menu_load_callback, NULL), INT_MAX);
+		menu_add_submenu(sub_menu, menu_new("Play", packet_menu_load_callback, NULL), INT_MAX);
 	}
 	{
 		MENU_T *sub_menu = menu_add_submenu(menu, menu_new("Calibration", NULL, NULL), INT_MAX);
@@ -3287,6 +3335,7 @@ int main(int argc, char *argv[]) {
 	state->conf_sync = true;
 	state->camera_horizon_r_bias = 1.0;
 	state->refraction = 1.0;
+	state->rtp_play_speed = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", 64);
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);

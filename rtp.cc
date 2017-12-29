@@ -145,6 +145,7 @@ typedef struct _RTP_T {
 	bool is_looping = false;
 	MREVENT_T play_time_updated;
 	uint64_t play_time = 0;
+	float play_speed = 1.0;
 
 	RTP_CALLBACK callback = NULL;
 
@@ -565,10 +566,11 @@ static void *receive_thread_func(void* arg) {
 							if (_this->auto_play) {
 								struct timeval diff;
 								timersub(&time, &last_time, &diff);
-								int diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
+								float diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
+								float _elapsed_usec = ((float) elapsed_usec / _this->play_speed);
 
-								if (diff_usec < elapsed_usec) {
-									usleep(MIN(elapsed_usec - diff_usec, 1000000));
+								if (diff_usec < _elapsed_usec) {
+									usleep(MIN(_elapsed_usec - diff_usec, 1000000));
 								}
 								last_time = time;
 								_this->play_time = current_play_time;
@@ -690,6 +692,10 @@ static void *load_thread_func(void* arg) {
 	void *user_data = args[2];
 	free(arg);
 
+	uint64_t num_of_bytes = 0;
+	uint64_t last_sync_bytes = 0;
+	const uint64_t MB = 1024 * 1024; // 64MB
+	const uint64_t SYNC_THRESHOLD = 64 * MB; // 64MB
 	int ret = 0;
 	_this->play_time = 0;
 	while (_this->load_fd >= 0) {
@@ -709,6 +715,9 @@ static void *load_thread_func(void* arg) {
 
 		if (raw_pack->packetlength <= 0) { //eof
 			if (_this->is_looping) {
+				num_of_bytes = 0;
+				last_sync_bytes = 0;
+
 				lseek(_this->load_fd, 0, SEEK_SET);
 				delete raw_pack;
 				continue;
@@ -720,6 +729,12 @@ static void *load_thread_func(void* arg) {
 		_this->buffering_queue.push_back(raw_pack);
 		mrevent_trigger(&_this->buffering_ready);
 		pthread_mutex_unlock(&_this->buffering_queue_mlock);
+
+		num_of_bytes += raw_pack->packetlength;
+		if (num_of_bytes - last_sync_bytes > SYNC_THRESHOLD) {
+			printf("loading info %lluMB\n", num_of_bytes / MB);
+			last_sync_bytes = num_of_bytes;
+		}
 	}
 	if (callback) {
 		callback(user_data, ret);
@@ -831,6 +846,10 @@ bool rtp_start_loading(RTP_T *_this, char *path, bool auto_play, bool is_looping
 void rtp_increment_loading(RTP_T *_this, int elapsed_usec) {
 	_this->play_time += elapsed_usec;
 	mrevent_trigger(&_this->play_time_updated);
+}
+
+void rtp_set_play_speed(RTP_T *_this, float play_speed) {
+	_this->play_speed = play_speed;
 }
 
 void rtp_stop_loading(RTP_T *_this) {

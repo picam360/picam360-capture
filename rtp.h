@@ -23,6 +23,7 @@ void rtp_stop_recording(RTP_T *_this);
 bool rtp_is_recording(RTP_T *_this, char **path);
 bool rtp_start_loading(RTP_T *_this, char *path, bool auto_play, bool is_looping, RTP_LOADING_CALLBACK callback, void *userdata);
 void rtp_increment_loading(RTP_T *_this, int elapsed_usec);
+void rtp_set_play_speed(RTP_T *_this, float play_speed);
 void rtp_stop_loading(RTP_T *_this);
 bool rtp_is_loading(RTP_T *_this, char **path);
 float rtp_get_bandwidth(RTP_T *_this);
