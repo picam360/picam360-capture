@@ -462,10 +462,12 @@ static void *buffering_thread_func(void* arg) {
 				}
 			}
 
-			pthread_mutex_lock(&_this->buffering_queue_mlock);
-			_this->buffering_queue.push_back(raw_pack);
-			mrevent_trigger(&_this->buffering_ready);
-			pthread_mutex_unlock(&_this->buffering_queue_mlock);
+			if (_this->load_fd < 0) {
+				pthread_mutex_lock(&_this->buffering_queue_mlock);
+				_this->buffering_queue.push_back(raw_pack);
+				mrevent_trigger(&_this->buffering_ready);
+				pthread_mutex_unlock(&_this->buffering_queue_mlock);
+			}
 		}
 	}
 	return NULL;
@@ -474,6 +476,12 @@ static void *buffering_thread_func(void* arg) {
 static void *receive_thread_func(void* arg) {
 	RTP_T *_this = (RTP_T*) arg;
 	pthread_setname_np(pthread_self(), "RTP RECEIVE");
+
+	//for loading
+	unsigned int last_timestamp = 0;
+	uint64_t current_play_time = 0;
+	struct timeval last_time = { };
+	bool is_first = true;
 
 	int marker = 0;
 	int xmp_len = 0;
@@ -539,7 +547,43 @@ static void *receive_thread_func(void* arg) {
 						i += xmp_len - xmp_pos - 1;
 						xmp_pos = xmp_len;
 						pack->LoadHeader();
-						if (_this->callback && _this->load_fd < 0) {
+						if (_this->load_fd >= 0) { //wait
+							struct timeval time = { };
+							gettimeofday(&time, NULL);
+							if (is_first) {
+								is_first = false;
+								last_timestamp = pack->timestamp;
+								gettimeofday(&last_time, NULL);
+							}
+							int elapsed_usec;
+							if (pack->timestamp < last_timestamp) {
+								elapsed_usec = pack->timestamp + (UINT_MAX - last_timestamp);
+							} else {
+								elapsed_usec = pack->timestamp - last_timestamp;
+							}
+							current_play_time += elapsed_usec;
+							if (_this->auto_play) {
+								struct timeval diff;
+								timersub(&time, &last_time, &diff);
+								int diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
+
+								if (diff_usec < elapsed_usec) {
+									usleep(MIN(elapsed_usec - diff_usec, 1000000));
+								}
+								last_time = time;
+								_this->play_time = current_play_time;
+							}
+							while (_this->load_fd >= 0 && !_this->auto_play) {
+								if (current_play_time <= _this->play_time) {
+									break;
+								} else {
+									mrevent_reset(&_this->play_time_updated);
+								}
+								mrevent_wait(&_this->play_time_updated, 1000);
+							}
+							last_timestamp = pack->timestamp;
+						}
+						if (_this->callback) {
 							_this->callback(pack->GetPayloadData(), pack->GetPayloadLength(), pack->GetPayloadType(), pack->GetSequenceNumber());
 						}
 						if (_this->record_fd > 0) {
@@ -646,90 +690,36 @@ static void *load_thread_func(void* arg) {
 	void *user_data = args[2];
 	free(arg);
 
-	unsigned char buff[RTP_MAXPAYLOADSIZE + sizeof(struct RTPHeader) + 8];
-	unsigned int last_timestamp = 0;
-	uint64_t current_play_time = 0;
-	struct timeval last_time = { };
-	bool is_first = true;
 	int ret = 0;
 	_this->play_time = 0;
 	while (_this->load_fd >= 0) {
-		int raw_header_size = 8;
-		int read_len;
-		struct RTPHeader *header = (struct RTPHeader *) buff;
-		read_len = read(_this->load_fd, buff, raw_header_size);
-		if (read_len == 0) { //eof
+		{ //check if buffering enough
+			bool needToWait = false;
+			pthread_mutex_lock(&_this->buffering_queue_mlock);
+			if (_this->buffering_queue.size() > 10) {
+				needToWait = true;
+			}
+			pthread_mutex_unlock(&_this->buffering_queue_mlock);
+			if (needToWait) {
+				usleep(10 * 1000); //10ms
+			}
+		}
+		RTPPacket *raw_pack = new RTPPacket(_this->rx_buffer_size);
+		raw_pack->packetlength = read(_this->load_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
+
+		if (raw_pack->packetlength <= 0) { //eof
 			if (_this->is_looping) {
 				lseek(_this->load_fd, 0, SEEK_SET);
+				delete raw_pack;
 				continue;
 			} else {
 				break;
 			}
 		}
-		if (read_len != 8 || buff[0] != 0xFF || buff[1] != 0xE1 || buff[4] != 'r' || buff[5] != 't' || buff[6] != 'p' || buff[7] != '\0') {
-			//error
-			ret = -1;
-			perror("rtp error\n");
-			break;
-		}
-		unsigned short len = 0;
-		for (int i = 0; i < 2; i++) {
-			len += (buff[i + 2] << (8 * i));
-		}
-		len -= raw_header_size;
-		if (len > sizeof(buff)) {
-			//error
-			ret = -1;
-			break;
-		}
-		read_len = read(_this->load_fd, buff, len);
-		if (read_len != len) {
-			//error
-			ret = -1;
-			break;
-		}
-
-		{ //wait
-			unsigned int timestamp = ntohl(header->timestamp);
-			struct timeval time = { };
-			gettimeofday(&time, NULL);
-			if (is_first) {
-				is_first = false;
-				last_timestamp = timestamp;
-				gettimeofday(&last_time, NULL);
-			}
-			int elapsed_usec;
-			if (timestamp < last_timestamp) {
-				elapsed_usec = timestamp + (UINT_MAX - last_timestamp);
-			} else {
-				elapsed_usec = timestamp - last_timestamp;
-			}
-			current_play_time += elapsed_usec;
-			if (_this->auto_play) {
-				struct timeval diff;
-				timersub(&time, &last_time, &diff);
-				int diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
-
-				if (diff_usec < elapsed_usec) {
-					usleep(MIN(elapsed_usec - diff_usec, 1000000));
-				}
-				last_time = time;
-				_this->play_time = current_play_time;
-			}
-			while (_this->load_fd >= 0 && !_this->auto_play) {
-				if (current_play_time <= _this->play_time) {
-					break;
-				} else {
-					mrevent_reset(&_this->play_time_updated);
-				}
-				mrevent_wait(&_this->play_time_updated, 1000);
-			}
-			last_timestamp = timestamp;
-		}
-
-		if (_this->callback) {
-			_this->callback(buff + sizeof(struct RTPHeader), len - sizeof(struct RTPHeader), header->payloadtype, ntohs(header->sequencenumber));
-		}
+		pthread_mutex_lock(&_this->buffering_queue_mlock);
+		_this->buffering_queue.push_back(raw_pack);
+		mrevent_trigger(&_this->buffering_ready);
+		pthread_mutex_unlock(&_this->buffering_queue_mlock);
 	}
 	if (callback) {
 		callback(user_data, ret);
