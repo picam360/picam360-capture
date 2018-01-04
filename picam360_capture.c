@@ -2828,7 +2828,7 @@ static void refraction_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event
 				value = 1.1;
 				break;
 			case 3:
-				value = 1.4;
+				value = 1.3;
 				break;
 			}
 			state->refraction = value;
