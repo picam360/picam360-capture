@@ -35,6 +35,7 @@ chown root.utmp /var/log/btmp
 
 sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o wlan1 -j MASQUERADE
 
 iw dev wlan0 set power_save off
