@@ -3615,16 +3615,15 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		mat4_rotateY(camera_matrix_1, camera_matrix_1, state->camera_yaw);
 	}
 
-//	// Rco : camera offset
-//	//euler Y(yaw)X(pitch)Z(roll)
-//	mat4_rotateZ(camera_offset_matrix, camera_offset_matrix,
-//			state->options.cam_offset_roll[0]);
-//	mat4_rotateX(camera_offset_matrix, camera_offset_matrix,
-//			state->options.cam_offset_pitch[0]);
-//	mat4_rotateY(camera_offset_matrix, camera_offset_matrix,
-//			state->options.cam_offset_yaw[0]);
-//
-//	mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
+	// Rco : camera offset
+	//euler Y(yaw)X(pitch)Z(roll)
+	{
+		mat4_rotateZ(camera_offset_matrix, camera_offset_matrix, state->options.cam_offset_roll[0]);
+		mat4_rotateX(camera_offset_matrix, camera_offset_matrix, state->options.cam_offset_pitch[0]);
+		mat4_rotateY(camera_offset_matrix, camera_offset_matrix, state->options.cam_offset_yaw[0]);
+		mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
+		mat4_multiply(camera_matrix_1, camera_matrix_1, camera_offset_matrix); // Rc'=RcoRc
+	}
 
 	// Rv : view
 	{
