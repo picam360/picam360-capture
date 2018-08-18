@@ -5,6 +5,7 @@
 #include "picam360_tools.h"
 #include "spline.hpp"
 #include "omxcv.h"
+#include "h265_encoder.h"
 
 #include <opencv2/opencv.hpp>
 #include <cstdio>
