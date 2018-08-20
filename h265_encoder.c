@@ -9,10 +9,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <stdint.h>
-#include <stdbool.h>
 
 #include "h265_encoder.h"
+#define CLASS_NAME "h265"
 
 typedef struct _h265_encoder {
 	char class_name[8];
@@ -37,6 +36,10 @@ typedef struct _h265_encoder {
 	void *user_data;
 } h265_encoder;
 
+bool h265_is_encoder(void *obj) {
+	return (strcmp((char*) obj, CLASS_NAME) == 0);
+}
+
 static void *pout_thread_func(void* arg) {
 	unsigned int data_len = 0;
 	unsigned int buff_size = 64 * 1024;
@@ -57,9 +60,10 @@ static void *pout_thread_func(void* arg) {
 				}
 				if (i + _this->nal_len <= data_len) {
 					void *frame_data = NULL;
-					if (_this->nal_type == 1 || _this->nal_type == 5) {
+					//if (_this->nal_type == 1 || _this->nal_type == 5) {
+					if (_this->nal_type == 2) {
 						pthread_mutex_lock(&_this->frame_data_queue_mutex);
-						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur%16];
+						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
 						_this->frame_data_queue_cur--;
 						pthread_mutex_unlock(&_this->frame_data_queue_mutex);
 					}
@@ -78,7 +82,7 @@ static void *pout_thread_func(void* arg) {
 					void *frame_data = NULL;
 					if (_this->nal_type == 1 || _this->nal_type == 5) {
 						pthread_mutex_lock(&_this->frame_data_queue_mutex);
-						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur%16];
+						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
 						_this->frame_data_queue_cur--;
 						pthread_mutex_unlock(&_this->frame_data_queue_mutex);
 					}
@@ -117,7 +121,7 @@ h265_encoder *h265_create_encoder(const int width, const int height, int bitrate
 
 	h265_encoder *_this = malloc(sizeof(h265_encoder));
 	memset(_this, 0, sizeof(h265_encoder));
-	sprintf(_this->class_name, "h265");
+	sprintf(_this->class_name, CLASS_NAME);
 	_this->callback = callback;
 	_this->user_data = user_data;
 	_this->width = width;
@@ -135,8 +139,8 @@ h265_encoder *h265_create_encoder(const int width, const int height, int bitrate
 		//ask kernel to deliver SIGTERM in case the parent dies
 		prctl(PR_SET_PDEATHSIG, SIGTERM);
 
-		execlp("ffmpeg", "ffmpeg", "-f", "rawvideo", "-framerate", fps_str, "-video_size", size_str, "-pix_fmt", "rgb24", "-i", "pipe:0", "-c:v", "libx265", "-x265-params", "annexb=0:repeat-headers=1", "-pix_fmt",
-				"yuv420p", "-preset", "ultrafast", "-tune", "zerolatency", "-vb", kbps_str, "-f", "rawvideo", "pipe:1", (char*) NULL);
+		execlp("ffmpeg", "ffmpeg", "-f", "rawvideo", "-framerate", fps_str, "-video_size", size_str, "-pix_fmt", "rgb24", "-i", "pipe:0", "-c:v", "libx265", "-x265-params",
+				"annexb=0:repeat-headers=1", "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-tune", "zerolatency", "-vb", kbps_str, "-f", "rawvideo", "pipe:1", (char*) NULL);
 		// Nothing below _this line should be executed by child process. If so,
 		// it means that the execl function wasn't successfull, so lets exit:
 		exit(1);
@@ -167,13 +171,12 @@ void h265_delete_encoder(h265_encoder *_this) {
 void h265_add_frame(h265_encoder *_this, const unsigned char *in_data, void *frame_data) {
 	pthread_mutex_lock(&_this->frame_data_queue_mutex);
 	_this->frame_data_queue_cur++;
-	_this->frame_data_queue[_this->frame_data_queue_cur%16] = frame_data;
+	_this->frame_data_queue[_this->frame_data_queue_cur % 16] = frame_data;
 	pthread_mutex_unlock(&_this->frame_data_queue_mutex);
 
 	write(_this->pin_fd, in_data, _this->width * _this->height * 3);
 }
 
-#define H265_TEST
 #ifdef H265_TEST
 static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data) {
 	int out_fd = (int) user_data;

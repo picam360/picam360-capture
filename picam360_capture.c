@@ -778,7 +778,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		case 's':
 			frame->output_mode = OUTPUT_MODE_STREAM;
 			//h264 or mjpeg
-			if (strcasecmp(optarg, "h264") == 0) {
+			if (strcasecmp(optarg, "h265") == 0) {
+				frame->output_type = OUTPUT_TYPE_H265;
+			} else if (strcasecmp(optarg, "h264") == 0) {
 				frame->output_type = OUTPUT_TYPE_H264;
 			} else {
 				frame->output_type = OUTPUT_TYPE_MJPEG;
@@ -945,10 +947,24 @@ void frame_handler() {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
 			float kbps = frame->kbps;
-			char *dummy_path = (frame->output_type == OUTPUT_TYPE_H264) ? "stream.h264" : "stream.mjpeg";
+			char *dummy_path = (frame->output_type == OUTPUT_TYPE_H265) ? "stream.h265" : (frame->output_type == OUTPUT_TYPE_H264) ? "stream.h264" : "stream.mjpeg";
 			if (kbps == 0) {
 				float ave_sq = sqrt((float) frame->width * (float) frame->height) / 1.2;
-				if (frame->output_type == OUTPUT_TYPE_H264) {
+				if (frame->output_type == OUTPUT_TYPE_H265) {
+					if (ave_sq <= 240) {
+						kbps = 100;
+					} else if (ave_sq <= 320) {
+						kbps = 200;
+					} else if (ave_sq <= 480) {
+						kbps = 400;
+					} else if (ave_sq <= 640) {
+						kbps = 800;
+					} else if (ave_sq <= 960) {
+						kbps = 1600;
+					} else {
+						kbps = 3200;
+					}
+				} else if (frame->output_type == OUTPUT_TYPE_H264) {
 					if (ave_sq <= 240) {
 						kbps = 200;
 					} else if (ave_sq <= 320) {
@@ -1083,6 +1099,18 @@ void frame_handler() {
 			if (end_width(frame->output_filepath, ".jpeg")) {
 				SaveJpeg(frame->img_buff, frame->img_width, frame->img_height, frame->output_filepath, 70);
 				printf("snap saved to %s\n", frame->output_filepath);
+				frame->output_filepath[0] = '\0';
+			} else if (end_width(frame->output_filepath, ".h265")) {
+				if (frame->output_type == OUTPUT_TYPE_H265) {
+					frame->output_start = false;
+					frame->output_fd = open(frame->output_filepath, O_CREAT | O_WRONLY | O_TRUNC, /*  */
+					S_IRUSR | S_IWUSR | /* rw */
+					S_IRGRP | S_IWGRP | /* rw */
+					S_IROTH | S_IXOTH);
+					printf("start record to %s\n", frame->output_filepath);
+				} else {
+					printf("error type : %s\n", frame->output_filepath);
+				}
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".h264")) {
 				if (frame->output_type == OUTPUT_TYPE_H264) {
@@ -2202,7 +2230,87 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 	FRAME_T *frame = (FRAME_T*) user_data;
 	FRAME_INFO_T *frame_info = (FRAME_INFO_T*) frame_data;
 	if (frame->output_mode == OUTPUT_MODE_STREAM) {
-		if (frame->output_type == OUTPUT_TYPE_H264) {
+		if (frame->output_type == OUTPUT_TYPE_H265) {
+			const unsigned char SC[] = { 0x00, 0x00, 0x00, 0x01 };
+			const unsigned char SOI[] = { 0x48, 0x45 }; //'H', 'E'
+			const unsigned char EOI[] = { 0x56, 0x43 }; //'V', 'C'
+			//header pack
+			printf("debug info h265 len=%d\n",data_len);
+			if (frame_info) { // sei for a frame
+				int server_key = frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec;
+				float idle_time_sec = 0;
+				float frame_processed_sec = 0;
+				float encoded_sec = 0;
+				if (frame_info->client_key[0] != '\0') {
+					struct timeval diff;
+					gettimeofday(&frame_info->after_encoded, NULL);
+
+					timersub(&frame_info->before_redraw_render_texture, &frame_info->server_key, &diff);
+					idle_time_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+
+					timersub(&frame_info->after_redraw_render_texture, &frame_info->before_redraw_render_texture, &diff);
+					frame_processed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+
+					timersub(&frame_info->after_encoded, &frame_info->after_redraw_render_texture, &diff);
+					encoded_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+				}
+
+				unsigned char header_pack[512];
+				char *sei = (char*) header_pack + sizeof(SOI);
+				sei[4] = 6; //nal_type:sei
+				int len =
+						sprintf(sei + 5,
+								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
+								frame->id, get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
+								frame_info->fov, frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
+				len += 1; //nal header
+				sei[0] = (len >> 24) & 0xFF;
+				sei[1] = (len >> 16) & 0xFF;
+				sei[2] = (len >> 8) & 0xFF;
+				sei[3] = (len >> 0) & 0xFF;
+				len += 4; //start code
+				memcpy(header_pack, SOI, sizeof(SOI));
+				len += 2; //SOI
+				rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
+			} else {
+				unsigned char header_pack[512];
+				char *sei = (char*) header_pack + sizeof(SOI);
+				sei[4] = 6; //nal_type:sei
+				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" />", frame->id);
+				len += 1; //nal header
+				sei[0] = (len >> 24) & 0xFF;
+				sei[1] = (len >> 16) & 0xFF;
+				sei[2] = (len >> 8) & 0xFF;
+				sei[3] = (len >> 0) & 0xFF;
+				len += 4; //start code
+				memcpy(header_pack, SOI, sizeof(SOI));
+				len += 2; //SOI
+				rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
+			}
+			if (frame->output_fd > 0) {
+				if (!frame->output_start) {
+					if ((data[4] & 0x1f) == 7) { // wait for sps
+						printf("output_start\n");
+						frame->output_start = true;
+					}
+				}
+				if (frame->output_start) {
+					write(frame->output_fd, SC, 4);
+					write(frame->output_fd, data + 4, data_len - 4);
+				}
+			}
+			for (int j = 0; j < data_len;) {
+				int len;
+				if (j + RTP_MAXPAYLOADSIZE < data_len) {
+					len = RTP_MAXPAYLOADSIZE;
+				} else {
+					len = data_len - j;
+				}
+				rtp_sendpacket(state->rtp, data + j, len, PT_CAM_BASE);
+				j += len;
+			}
+			rtp_sendpacket(state->rtp, EOI, sizeof(EOI), PT_CAM_BASE);
+		} else if (frame->output_type == OUTPUT_TYPE_H264) {
 			const unsigned char SC[] = { 0x00, 0x00, 0x00, 0x01 };
 			const unsigned char SOI[] = { 0x4E, 0x41 }; //'N', 'A'
 			const unsigned char EOI[] = { 0x4C, 0x55 }; //'L', 'U'

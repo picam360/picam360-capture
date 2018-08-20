@@ -5,7 +5,6 @@
 #include "picam360_tools.h"
 #include "spline.hpp"
 #include "omxcv.h"
-#include "h265_encoder.h"
 
 #include <opencv2/opencv.hpp>
 #include <cstdio>
@@ -31,27 +30,44 @@ using std::chrono::duration_cast;
 //global variables
 
 void* StartRecord(const int width, const int height, const char *filename, int bitrate_kbps, int fps, RECORD_CALLBACK callback, void *user_data) {
-	OmxCv *recorder = new OmxCv(filename, width, height, bitrate_kbps, fps, 1, callback, user_data);
-	return (void*) recorder;
+	std::string _filename = filename;
+	std::string extention = _filename.substr(_filename.find_last_of(".") + 1);
+	if (extention == "h265") {
+		h265_encoder *encoder = h265_create_encoder(width, height, bitrate_kbps, fps, callback, user_data);
+		return (void*) encoder;
+	} else {
+		OmxCv *recorder = new OmxCv(filename, width, height, bitrate_kbps, fps, 1, callback, user_data);
+		return (void*) recorder;
+	}
 }
 
 int StopRecord(void *obj) {
-	OmxCv *recorder = (OmxCv*) obj;
-	if (recorder == NULL) {
-		return -1;
+	if (h265_is_encoder(obj)) {
+		h265_delete_encoder((h265_encoder*) obj);
+		return 0;
+	} else {
+		OmxCv *recorder = (OmxCv*) obj;
+		if (recorder == NULL) {
+			return -1;
+		}
+		delete recorder;
+		recorder = NULL;
+		return 0;
 	}
-	delete recorder;
-	recorder = NULL;
-	return 0;
 }
 
 int AddFrame(void *obj, const unsigned char *in_data, void *frame_data) {
-	OmxCv *recorder = (OmxCv*) obj;
-	if (recorder == NULL) {
-		return -1;
+	if (h265_is_encoder(obj)) {
+		h265_add_frame((h265_encoder*) obj, in_data, frame_data);
+		return 0;
+	} else {
+		OmxCv *recorder = (OmxCv*) obj;
+		if (recorder == NULL) {
+			return -1;
+		}
+		recorder->Encode(in_data, frame_data);
+		return 0;
 	}
-	recorder->Encode(in_data, frame_data);
-	return 0;
 }
 
 int SaveJpeg(const unsigned char *in_data, const int width, const int height, const char *out_filename, int quality) {
