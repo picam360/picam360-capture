@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include "h265_encoder.h"
+
 typedef struct _POINT_T {
 	float x;
 	float y;

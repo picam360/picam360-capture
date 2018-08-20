@@ -9,50 +9,119 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-typedef void (*RECORD_CALLBACK)(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
+#include "h265_encoder.h"
 
-typedef struct _h254_encoder {
+typedef struct _h265_encoder {
+	char class_name[8];
+	//nal
+	bool in_nal;
+	uint32_t nal_len;
+	uint8_t nal_type;
+	uint8_t *nal_buff;
+	uint32_t nal_pos;
+
+	pthread_mutex_t frame_data_queue_mutex;
+	void *frame_data_queue[16];
+	int frame_data_queue_cur;
+
 	pid_t pid;
 	int pin_fd;
 	int pout_fd;
 	int width;
 	int height;
 	pthread_t pout_thread;
-	RECORD_CALLBACK callback;
+	H265_STREAM_CALLBACK callback;
 	void *user_data;
-} h254_encoder;
+} h265_encoder;
 
 static void *pout_thread_func(void* arg) {
 	unsigned int data_len = 0;
 	unsigned int buff_size = 64 * 1024;
 	unsigned char *data = malloc(buff_size);
-	h254_encoder *encoder = (h254_encoder*) arg;
-	while ((data_len = read(encoder->pout_fd, data, buff_size)) > 0) {
-		if (encoder->callback) {
-			encoder->callback(data, data_len, NULL, encoder->user_data);
+	h265_encoder *_this = (h265_encoder*) arg;
+	while ((data_len = read(_this->pout_fd, data, buff_size)) > 0) {
+		for (int i = 0; i < data_len;) {
+			if (!_this->in_nal) {
+				_this->in_nal = true;
+				_this->nal_len = data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3];
+				_this->nal_len += 4; //start code
+				_this->nal_type = data[i + 4] & 0x1f;
+				if (_this->nal_len > 1024 * 1024) {
+					printf("something wrong in h264 stream at %d\n", i);
+					_this->in_nal = false;
+
+					break;
+				}
+				if (i + _this->nal_len <= data_len) {
+					void *frame_data = NULL;
+					if (_this->nal_type == 1 || _this->nal_type == 5) {
+						pthread_mutex_lock(&_this->frame_data_queue_mutex);
+						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur%16];
+						_this->frame_data_queue_cur--;
+						pthread_mutex_unlock(&_this->frame_data_queue_mutex);
+					}
+					_this->callback(data + i, _this->nal_len, frame_data, _this->user_data);
+					i += _this->nal_len;
+					_this->in_nal = false;
+				} else {
+					_this->nal_pos = 0;
+					_this->nal_buff = (uint8_t*) malloc(_this->nal_len);
+				}
+			} else {
+				int rest = _this->nal_len - _this->nal_pos;
+				if (i + rest <= data_len) {
+					memcpy(_this->nal_buff + _this->nal_pos, data + i, rest);
+
+					void *frame_data = NULL;
+					if (_this->nal_type == 1 || _this->nal_type == 5) {
+						pthread_mutex_lock(&_this->frame_data_queue_mutex);
+						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur%16];
+						_this->frame_data_queue_cur--;
+						pthread_mutex_unlock(&_this->frame_data_queue_mutex);
+					}
+					_this->callback(_this->nal_buff, _this->nal_len, frame_data, _this->user_data);
+
+					free(_this->nal_buff);
+					_this->nal_buff = NULL;
+
+					i += rest;
+					_this->in_nal = false;
+				} else {
+					int len = data_len - i;
+					memcpy(_this->nal_buff + _this->nal_pos, data + i, len);
+					_this->nal_pos += len;
+					i += len;
+				}
+			}
 		}
-		//printf("%d:%s\n", data_len, data);
-		if (data_len != buff_size) {
-			printf("NAL %02x%02x%02x%02x\n", data[0], data[1], data[2], data[3]);
-		} else {
-			printf("not NAL %02x%02x%02x%02x\n", data[0], data[1], data[2], data[3]);
-		}
-		printf("%d\n", data_len);
 	}
 	return NULL;
 }
 
 #define R (0)
 #define W (1)
-h254_encoder *h265_create_encoder(const int width, const int height, int bitrate_kbps, int fps, RECORD_CALLBACK callback, void *user_data) {
+h265_encoder *h265_create_encoder(const int width, const int height, int bitrate_kbps, int fps, H265_STREAM_CALLBACK callback, void *user_data) {
 	pid_t pid = 0;
 	int pin_fd[2];
 	int pout_fd[2];
+	char size_str[16];
+	char fps_str[16];
+	char kbps_str[16];
 
-	h254_encoder *encoder = malloc(sizeof(h254_encoder));
-	encoder->width = width;
-	encoder->height = height;
+	sprintf(size_str, "%dx%d", width, height);
+	sprintf(fps_str, "%d", fps);
+	sprintf(kbps_str, "%dk", bitrate_kbps);
+
+	h265_encoder *_this = malloc(sizeof(h265_encoder));
+	memset(_this, 0, sizeof(h265_encoder));
+	sprintf(_this->class_name, "h265");
+	_this->callback = callback;
+	_this->user_data = user_data;
+	_this->width = width;
+	_this->height = height;
 
 	pipe(pin_fd);
 	pipe(pout_fd);
@@ -66,9 +135,9 @@ h254_encoder *h265_create_encoder(const int width, const int height, int bitrate
 		//ask kernel to deliver SIGTERM in case the parent dies
 		prctl(PR_SET_PDEATHSIG, SIGTERM);
 
-		execlp("ffmpeg", "ffmpeg", "-f", "rawvideo", "-framerate", "5", "-video_size", "512x512", "-pix_fmt", "rgb24", "-i", "pipe:0", "-c:v", "libx265", "-pix_fmt", "yuv420p", "-preset", "ultrafast",
-				"-tune", "zerolatency", "-vb", "256k", "-f", "rawvideo", "pipe:1", (char*) NULL);
-		// Nothing below this line should be executed by child process. If so,
+		execlp("ffmpeg", "ffmpeg", "-f", "rawvideo", "-framerate", fps_str, "-video_size", size_str, "-pix_fmt", "rgb24", "-i", "pipe:0", "-c:v", "libx265", "-x265-params", "annexb=0:repeat-headers=1", "-pix_fmt",
+				"yuv420p", "-preset", "ultrafast", "-tune", "zerolatency", "-vb", kbps_str, "-f", "rawvideo", "pipe:1", (char*) NULL);
+		// Nothing below _this line should be executed by child process. If so,
 		// it means that the execl function wasn't successfull, so lets exit:
 		exit(1);
 	}
@@ -82,31 +151,67 @@ h254_encoder *h265_create_encoder(const int width, const int height, int bitrate
 	close(pin_fd[R]);
 	close(pout_fd[W]);
 
-	pthread_create(&encoder->pout_thread, NULL, pout_thread_func, (void*) encoder);
+	pthread_mutex_init(&_this->frame_data_queue_mutex, 0);
+	pthread_create(&_this->pout_thread, NULL, pout_thread_func, (void*) _this);
 
-	encoder->pid = pid;
-	encoder->pin_fd = pin_fd[W];
-	encoder->pout_fd = pout_fd[R];
-	return encoder;
+	_this->pid = pid;
+	_this->pin_fd = pin_fd[W];
+	_this->pout_fd = pout_fd[R];
+	return _this;
 }
-void h265_delete_encoder(h254_encoder *encoder) {
+void h265_delete_encoder(h265_encoder *_this) {
 	int status;
-	kill(encoder->pid, SIGKILL); //send SIGKILL signal to the child process
-	waitpid(encoder->pid, &status, 0);
+	kill(_this->pid, SIGKILL); //send SIGKILL signal to the child process
+	waitpid(_this->pid, &status, 0);
 }
-void h265_add_frame(h254_encoder *encoder, const unsigned char *in_data) {
-	write(encoder->pin_fd, in_data, encoder->width * encoder->height * 3);
+void h265_add_frame(h265_encoder *_this, const unsigned char *in_data, void *frame_data) {
+	pthread_mutex_lock(&_this->frame_data_queue_mutex);
+	_this->frame_data_queue_cur++;
+	_this->frame_data_queue[_this->frame_data_queue_cur%16] = frame_data;
+	pthread_mutex_unlock(&_this->frame_data_queue_mutex);
+
+	write(_this->pin_fd, in_data, _this->width * _this->height * 3);
 }
 
+#define H265_TEST
+#ifdef H265_TEST
+static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data) {
+	int out_fd = (int) user_data;
+	write(out_fd, data, data_len);
+}
 int main(int argc, char *argv[]) {
-	h254_encoder *encoder = h265_create_encoder(512, 512, 256, 5, NULL, NULL);
-	int fd = open(argv[1], O_RDONLY);
+	int in_fd = -1;
+	int out_fd = -1;
 	int size = 0;
 	int frame_size = 512 * 512 * 3;
-	unsigned char *frame_buffer = (unsigned char *) malloc(frame_size);
-	while ((size = read(fd, frame_buffer, frame_size)) == frame_size) {
-		h265_add_frame(encoder, frame_buffer);
+	unsigned char *frame_buffer = NULL;
+	h265_encoder *encoder = NULL;
+
+	if (argc < 3) {
+		fprintf(stderr, "argc:%d", argc);
+		return -1;
+	}
+
+	in_fd = open(argv[1], O_RDONLY);
+	if (in_fd < 0) {
+		fprintf(stderr, "in_fd:%s", argv[1]);
+		return -1;
+	}
+	out_fd = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC);
+	if (out_fd < 0) {
+		fprintf(stderr, "out_fd:%s", argv[2]);
+		return -1;
+	}
+
+	frame_buffer = (unsigned char *) malloc(frame_size);
+	encoder = h265_create_encoder(512, 512, 256, 5, stream_callback, (void*) out_fd);
+	while ((size = read(in_fd, frame_buffer, frame_size)) == frame_size) {
+		h265_add_frame(encoder, frame_buffer, NULL);
 		usleep(200 * 1000);
 	}
-	close(fd);
+	usleep(1000 * 1000);
+	h265_delete_encoder(encoder);
+	close(in_fd);
+	close(out_fd);
 }
+#endif
