@@ -2235,7 +2235,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			const unsigned char SOI[] = { 0x48, 0x45 }; //'H', 'E'
 			const unsigned char EOI[] = { 0x56, 0x43 }; //'V', 'C'
 			//header pack
-			printf("debug info h265 len=%d\n",data_len);
+			printf("debug info h265 len=%d\n", data_len);
 			if (frame_info) { // sei for a frame
 				int server_key = frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec;
 				float idle_time_sec = 0;
@@ -2257,7 +2257,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 
 				unsigned char header_pack[512];
 				char *sei = (char*) header_pack + sizeof(SOI);
-				sei[4] = 6; //nal_type:sei
+				sei[4] = 40 << 1; //nal_type:sei
 				int len =
 						sprintf(sei + 5,
 								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
@@ -2275,7 +2275,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			} else {
 				unsigned char header_pack[512];
 				char *sei = (char*) header_pack + sizeof(SOI);
-				sei[4] = 6; //nal_type:sei
+				sei[4] = 40 << 1; //nal_type:sei
 				int len = sprintf(sei + 5, "<picam360:frame frame_id=\"%d\" />", frame->id);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
@@ -2289,7 +2289,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			}
 			if (frame->output_fd > 0) {
 				if (!frame->output_start) {
-					if ((data[4] & 0x1f) == 7) { // wait for sps
+					if (((data[4] & 0x7e) >> 1) == 32) { // wait for vps
 						printf("output_start\n");
 						frame->output_start = true;
 					}

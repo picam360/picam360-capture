@@ -40,6 +40,17 @@ bool h265_is_encoder(void *obj) {
 	return (strcmp((char*) obj, CLASS_NAME) == 0);
 }
 
+static void *get_frame_data(h265_encoder *_this) {
+	void *frame_data = NULL;
+	if (_this->nal_type == 1 || _this->nal_type == 5 || _this->nal_type == 19 || _this->nal_type == 21) {
+		pthread_mutex_lock(&_this->frame_data_queue_mutex);
+		frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
+		_this->frame_data_queue_cur--;
+		pthread_mutex_unlock(&_this->frame_data_queue_mutex);
+	}
+	return frame_data;
+}
+
 static void *pout_thread_func(void* arg) {
 	unsigned int data_len = 0;
 	unsigned int buff_size = 64 * 1024;
@@ -51,7 +62,7 @@ static void *pout_thread_func(void* arg) {
 				_this->in_nal = true;
 				_this->nal_len = data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3];
 				_this->nal_len += 4; //start code
-				_this->nal_type = data[i + 4] & 0x1f;
+				_this->nal_type = (data[i + 4] & 0x7e) >> 1;
 				if (_this->nal_len > 1024 * 1024) {
 					printf("something wrong in h264 stream at %d\n", i);
 					_this->in_nal = false;
@@ -59,14 +70,7 @@ static void *pout_thread_func(void* arg) {
 					break;
 				}
 				if (i + _this->nal_len <= data_len) {
-					void *frame_data = NULL;
-					//if (_this->nal_type == 1 || _this->nal_type == 5) {
-					if (_this->nal_type == 2) {
-						pthread_mutex_lock(&_this->frame_data_queue_mutex);
-						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
-						_this->frame_data_queue_cur--;
-						pthread_mutex_unlock(&_this->frame_data_queue_mutex);
-					}
+					void *frame_data = get_frame_data(_this);
 					_this->callback(data + i, _this->nal_len, frame_data, _this->user_data);
 					i += _this->nal_len;
 					_this->in_nal = false;
@@ -79,13 +83,7 @@ static void *pout_thread_func(void* arg) {
 				if (i + rest <= data_len) {
 					memcpy(_this->nal_buff + _this->nal_pos, data + i, rest);
 
-					void *frame_data = NULL;
-					if (_this->nal_type == 1 || _this->nal_type == 5) {
-						pthread_mutex_lock(&_this->frame_data_queue_mutex);
-						frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
-						_this->frame_data_queue_cur--;
-						pthread_mutex_unlock(&_this->frame_data_queue_mutex);
-					}
+					void *frame_data = get_frame_data(_this);
 					_this->callback(_this->nal_buff, _this->nal_len, frame_data, _this->user_data);
 
 					free(_this->nal_buff);
