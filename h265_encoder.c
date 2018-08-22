@@ -25,6 +25,7 @@ typedef struct _h265_encoder {
 	pthread_mutex_t frame_data_queue_mutex;
 	void *frame_data_queue[16];
 	int frame_data_queue_cur;
+	int frame_data_queue_last_cur;
 
 	pid_t pid;
 	int pin_fd;
@@ -42,10 +43,15 @@ bool h265_is_encoder(void *obj) {
 
 static void *get_frame_data(h265_encoder *_this) {
 	void *frame_data = NULL;
-	if (_this->nal_type == 1 || _this->nal_type == 5 || _this->nal_type == 19 || _this->nal_type == 21) {
+	if ((_this->nal_type >= 0 && _this->nal_type <= 9) || (_this->nal_type >= 16 && _this->nal_type <= 21)) {
 		pthread_mutex_lock(&_this->frame_data_queue_mutex);
-		frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
-		_this->frame_data_queue_cur--;
+		if (_this->frame_data_queue_cur >= _this->frame_data_queue_last_cur) {
+			printf("something wrong!");
+		} else {
+			frame_data = _this->frame_data_queue[_this->frame_data_queue_cur % 16];
+			_this->frame_data_queue[_this->frame_data_queue_cur % 16] = NULL;
+			_this->frame_data_queue_cur++;
+		}
 		pthread_mutex_unlock(&_this->frame_data_queue_mutex);
 	}
 	return frame_data;
@@ -168,8 +174,12 @@ void h265_delete_encoder(h265_encoder *_this) {
 }
 void h265_add_frame(h265_encoder *_this, const unsigned char *in_data, void *frame_data) {
 	pthread_mutex_lock(&_this->frame_data_queue_mutex);
-	_this->frame_data_queue_cur++;
-	_this->frame_data_queue[_this->frame_data_queue_cur % 16] = frame_data;
+	if (_this->frame_data_queue_last_cur >= _this->frame_data_queue_cur + 16) {
+		printf("buffer is too small!");
+	} else {
+		_this->frame_data_queue[_this->frame_data_queue_last_cur % 16] = frame_data;
+		_this->frame_data_queue_last_cur++;
+	}
 	pthread_mutex_unlock(&_this->frame_data_queue_mutex);
 
 	write(_this->pin_fd, in_data, _this->width * _this->height * 3);
