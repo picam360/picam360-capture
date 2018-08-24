@@ -31,3 +31,12 @@
 # Debug files
 *.dSYM/
 *.su
+
+picam360-capture.bin
+
+#cmake
+picam360-driver.bin
+Makefile
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake

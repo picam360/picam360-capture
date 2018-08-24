@@ -1,7 +1,7 @@
 
 #include "gl_program.h"
 #include <assert.h>
-#include <error.h>
+#include <errno.h>
 
 #include <sstream>
 #include <stdexcept>

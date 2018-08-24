@@ -10,14 +10,21 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdbool.h>
-#include <linux/input.h>
 #include <fcntl.h>
 #include <wchar.h>
 #include <limits.h>
 
+#ifdef USE_GLES
 #include "GLES2/gl2.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
+#else
+#include <OpenGL/OpenGL.h>
+#include <GLUT/GLUT.h>
+//#include "GL/gl.h"
+//#include "GL/glut.h"
+//#include "GL/glext.h"
+#endif
 
 #include "texture-atlas.h"
 #include "texture-font.h"
@@ -76,17 +83,18 @@ void init_menu(uint32_t font_size) {
 
 	/* Texture atlas to store individual glyphs */
 	lg_freetypegles.atlas = texture_atlas_new(1024, 1024, 1);
-
+#ifdef USE_GLES
 	lg_freetypegles.font = texture_font_new(lg_freetypegles.atlas, "./libs/freetypeGlesRpi/fonts/custom.ttf", font_size);
-
+#endif
 	/* Cache some glyphs to speed things up */
 	texture_font_load_glyphs(lg_freetypegles.font, L" !\"#$%&'()*+,-./0123456789:;<=>?"
 			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
 	lg_freetypegles.model.program = GLProgram_new("shader/freetypegles.vert", "shader/freetypegles.frag");
-
+#ifdef USE_GLES
 	texture_atlas_upload(lg_freetypegles.atlas);
+#endif
 }
 void deinit_menu() {
 	//todo

@@ -27,9 +27,17 @@
 #pragma once
 
 #include <stdbool.h>
+#ifdef USE_GLES
 #include "GLES2/gl2.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
+#else
+#include <OpenGL/OpenGL.h>
+#include <GLUT/GLUT.h>
+//#include "GL/gl.h"
+//#include "GL/glut.h"
+//#include "GL/glext.h"
+#endif
 #include <pthread.h>
 #include "mrevent.h"
 #include "rtp.h"
@@ -137,6 +145,7 @@ typedef struct _FRAME_T {
 	float fov;
 	//for unif matrix
 	MPU_T *view_mpu;
+	ENCODER_T *encoder;
 
 	// for latency cal
 	char client_key[256];
@@ -168,9 +177,11 @@ typedef struct _PICAM360CAPTURE_T {
 	uint32_t cam_width;
 	uint32_t cam_height;
 // OpenGL|ES objects
+#ifdef USE_EGL
 	EGLDisplay display;
 	EGLSurface surface;
 	EGLContext context;
+#endif
 	int active_cam;
 	int num_of_cam;
 	pthread_t thread[MAX_CAM_NUM];
@@ -221,6 +232,7 @@ typedef struct _PICAM360CAPTURE_T {
 	MODEL_T model_data[MAX_OPERATION_NUM];
 	pthread_mutex_t texture_mutex;
 	pthread_mutex_t texture_size_mutex;
+	DECODER_T *decoders[MAX_CAM_NUM];
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;
@@ -236,6 +248,8 @@ typedef struct _PICAM360CAPTURE_T {
 	char **plugin_paths;
 	PLUGIN_T **plugins;
 	MPU_FACTORY_T **mpu_factories;
+	DECODER_FACTORY_T **decoder_factories;
+	ENCODER_FACTORY_T **encoder_factories;
 	STATUS_T **statuses;
 	STATUS_T **watches;
 	struct _OPTIONS_T options;

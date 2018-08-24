@@ -1,9 +1,17 @@
 
 #ifndef _GLPROGRAM_H
 #define _GLPROGRAM_H
-#include <GLES2/gl2.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
+#ifdef USE_GLES
+#include "GLES2/gl2.h"
+#include "EGL/egl.h"
+#include "EGL/eglext.h"
+#else
+#include <OpenGL/OpenGL.h>
+#include <GLUT/GLUT.h>
+//#include "GL/gl.h"
+//#include "GL/glut.h"
+//#include "GL/glext.h"
+#endif
 
 #ifdef __cplusplus
 

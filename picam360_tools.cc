@@ -4,15 +4,18 @@
  */
 #include "picam360_tools.h"
 #include "spline.hpp"
+#if(0)
 #include "omxcv.h"
-
 #include <opencv2/opencv.hpp>
+#endif
+
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <chrono>
 #include <thread>
 
+#if(0)
 #define TIMEDIFF(start) (duration_cast<microseconds>(steady_clock::now() - start).count())
 
 using omxcv::OmxCv;
@@ -84,6 +87,7 @@ int SaveJpeg(const unsigned char *in_data, const int width, const int height, co
 	return 0;
 }
 
+#endif
 void get_cubic_spline(int num_of_points, float *x_ary, float *y_ary, int num_of_points2, float *x_ary2, float *out_y_ary2) {
 	std::vector<double> X, Y;
 

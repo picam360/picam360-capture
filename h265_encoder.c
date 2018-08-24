@@ -1,7 +1,6 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <sys/prctl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +8,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#if __linux
+#include <sys/prctl.h>
+#endif
 
 #include "h265_encoder.h"
 #define CLASS_NAME "h265"
@@ -140,8 +142,10 @@ h265_encoder *h265_create_encoder(const int width, const int height, int bitrate
 		dup2(pout_fd[W], STDOUT_FILENO);
 		//dup2(pout_fd[W], STDERR_FILENO);
 
+#if __linux
 		//ask kernel to deliver SIGTERM in case the parent dies
 		prctl(PR_SET_PDEATHSIG, SIGTERM);
+#endif
 
 		execlp("ffmpeg", "ffmpeg", "-f", "rawvideo", "-framerate", fps_str, "-video_size", size_str, "-pix_fmt", "rgb24", "-i", "pipe:0", "-c:v", "libx265", "-x265-params",
 				"annexb=0:repeat-headers=1", "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-tune", "zerolatency", "-vb", kbps_str, "-f", "rawvideo", "pipe:1", (char*) NULL);

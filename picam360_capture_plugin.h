@@ -42,6 +42,40 @@ typedef struct _MPU_FACTORY_T {
 	void *user_data;
 } MPU_FACTORY_T;
 
+typedef struct _DECODER_T {
+	char name[64];
+	void (*init)(void *user_data, void **egl_images, int egl_image_num);
+	float (*get_fps)(void *user_data);
+	int (*get_frameskip)(void *user_data);
+	void (*decode)(void *user_data, unsigned char *data, int data_len);
+	void (*switch_buffer)(void *user_data);
+	void (*release)(void *user_data);
+	void *user_data;
+} DECODER_T;
+
+typedef struct _DECODER_FACTORY_T {
+	char name[64];
+	void (*release)(void *user_data);
+	void (*create_decoder)(void *user_data, DECODER_T **decoder);
+	void *user_data;
+} DECODER_FACTORY_T;
+
+typedef void (*ENCODER_STREAM_CALLBACK)(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
+typedef struct _ENCODER_T {
+	char name[64];
+	void (*init)(void *user_data, const int width, const int height, int bitrate_kbps, int fps, ENCODER_STREAM_CALLBACK callback, void *user_data2);
+	void (*release)(void *user_data);
+	void (*add_frame)(void *user_data, const unsigned char *in_data, void *frame_data);
+	void *user_data;
+} ENCODER_T;
+
+typedef struct _ENCODER_FACTORY_T {
+	char name[64];
+	void (*release)(void *user_data);
+	void (*create_decoder)(void *user_data, ENCODER_T **encoder);
+	void *user_data;
+} ENCODER_FACTORY_T;
+
 typedef struct _STATUS_T {
 	char name[64];
 	void (*get_value)(void *user_data, char *buff, int buff_len);
@@ -95,7 +129,9 @@ typedef struct _PLUGIN_HOST_T {
 
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
-	void (*add_mpu_factory)(MPU_FACTORY_T *mpu_factory);
+	void (*add_mpu_factory)(MPU_FACTORY_T *factory);
+	void (*add_decoder_factory)(DECODER_FACTORY_T *factory);
+	void (*add_encoder_factory)(ENCODER_FACTORY_T *factory);
 	void (*add_status)(STATUS_T *status);
 	void (*add_watch)(STATUS_T *status);
 	void (*add_plugin)(PLUGIN_T *plugin);

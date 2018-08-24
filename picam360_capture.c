@@ -9,19 +9,28 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdbool.h>
-#include <linux/input.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <editline/readline.h>
-#include <editline/history.h>
 #include <dirent.h>
 #include <dlfcn.h>
+#include <errno.h>
 
+#ifdef BCMHOST
 #include "bcm_host.h"
+#endif
 
+#ifdef USE_GLES
 #include "GLES2/gl2.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
+#else
+#include <OpenGL/OpenGL.h>
+#include <GLUT/GLUT.h>
+//#include "GL/gl.h"
+//#include "GL/glut.h"
+//#include "GL/glext.h"
+#endif
 
 #include "picam360_capture.h"
 #include "video.h"
@@ -49,6 +58,29 @@
 #include <jansson.h>
 
 #include <opencv/highgui.h>
+
+#ifdef _WIN64
+//define something for Windows (64-bit)
+#elif _WIN32
+//define something for Windows (32-bit)
+#elif __APPLE__
+#include "TargetConditionals.h"
+#if TARGET_OS_IPHONE && TARGET_IPHONE_SIMULATOR
+// define something for simulator
+#elif TARGET_OS_IPHONE
+// define something for iphone
+#else
+#define TARGET_OS_OSX 1
+// define something for OSX
+#endif
+#elif __linux
+// linux
+#include <editline/history.h>
+#elif __unix // all unices not caught above
+// Unix
+#elif __posix
+// POSIX
+#endif
 
 #define PATH "./"
 #define PICAM360_HISTORY_FILE ".picam360_history"
@@ -148,6 +180,7 @@ static enum OPERATION_MODE get_operation_mode(const char *mode_string) {
  *
  ***********************************************************/
 static void init_ogl(PICAM360CAPTURE_T *state) {
+#ifdef USE_GLES
 	int32_t success = 0;
 	EGLBoolean result;
 	EGLint num_config;
@@ -160,10 +193,10 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	VC_RECT_T dst_rect;
 	VC_RECT_T src_rect;
 
-	static const EGLint attribute_list[] = { EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 16,
-	//EGL_SAMPLES, 4,
-			EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_NONE };
-	static const EGLint context_attributes[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+	static const EGLint attribute_list[] = {EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 16,
+		//EGL_SAMPLES, 4,
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_NONE};
+	static const EGLint context_attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
 
 	EGLConfig config;
 
@@ -231,6 +264,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	// Enable back face culling.
 	glEnable(GL_CULL_FACE);
+#endif
 }
 
 int load_texture(const char *filename, GLuint *tex_out) {
@@ -427,6 +461,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  *
  ***********************************************************/
 static void destroy_egl_images(PICAM360CAPTURE_T *state) {
+#ifdef USE_GLES
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 			if (state->cam_texture[i][j] != 0) {
@@ -436,13 +471,15 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 			}
 			if (state->egl_image[i][j] != 0) {
 				if (!eglDestroyImageKHR(state->display, (EGLImageKHR) state->egl_image[i][j]))
-					printf("eglDestroyImageKHR failed.");
+				printf("eglDestroyImageKHR failed.");
 				state->egl_image[i][j] = NULL;
 			}
 		}
 	}
+#endif
 }
 static void update_egl_images(PICAM360CAPTURE_T *state) {
+#ifdef USE_GLES
 	destroy_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
@@ -465,6 +502,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			}
 		}
 	}
+#endif
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
 
@@ -475,14 +513,10 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		// Start rendering
 		if (state->codec_type == MJPEG) {
-			init_mjpeg_decoder(&state->plugin_host, i, state->egl_image[i],
-			TEXTURE_BUFFER_NUM);
-		} else {
-			void **args = malloc(sizeof(void*) * 3);
-			args[0] = (void*) i;
-			args[1] = (void*) state->egl_image[i];
-			args[2] = (void*) state;
-			pthread_create(&state->thread[i], NULL, (state->video_direct) ? video_direct : video_decode_test, args);
+			//TODO:create decoder
+		}
+		if (state->decoders[i]) {
+			state->decoders[i]->init(state->decoders[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 		}
 	}
 }
@@ -711,6 +745,7 @@ static void save_options_ex(PICAM360CAPTURE_T *state) {
 static void exit_func(void)
 // Function to be passed to atexit().
 {
+#ifdef USE_GLES
 	destroy_egl_images(state);
 
 	// clear screen
@@ -722,7 +757,7 @@ static void exit_func(void)
 	eglDestroySurface(state->display, state->surface);
 	eglDestroyContext(state->display, state->context);
 	eglTerminate(state->display);
-
+#endif
 	printf("\npicam360-capture closed\n");
 } // exit_func()
 
@@ -876,9 +911,9 @@ bool delete_frame(FRAME_T *frame) {
 		frame->view_mpu = NULL;
 	}
 
-	if (frame->recorder) { //stop record
-		StopRecord(frame->recorder);
-		frame->recorder = NULL;
+	if (frame->encoder) { //stop record
+		frame->encoder->release(frame->encoder);
+		frame->encoder = NULL;
 	}
 
 	if (frame->output_fd >= 0) {
@@ -915,8 +950,8 @@ void frame_handler() {
 
 		//start & stop recording
 		if (frame->is_recording && frame->output_mode == OUTPUT_MODE_NONE) { //stop record
-			StopRecord(frame->recorder);
-			frame->recorder = NULL;
+			frame->encoder->release(frame->encoder);
+			frame->encoder = NULL;
 
 			frame->frame_elapsed /= frame->frame_num;
 			printf("stop record : frame num : %d : fps %.3lf\n", frame->frame_num, 1000.0 / frame->frame_elapsed);
@@ -932,7 +967,8 @@ void frame_handler() {
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
-			frame->recorder = StartRecord(frame->width * ratio, frame->height, frame->output_filepath, 4000 * ratio, fps, stream_callback, NULL);
+			//TODO: state->encoder_factories[]->create_encoder(state->encoder_factories[], &frame->encoder);
+			frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, 4000 * ratio, fps, stream_callback, NULL);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -994,7 +1030,8 @@ void frame_handler() {
 					}
 				}
 			}
-			frame->recorder = StartRecord(frame->width * ratio, frame->height, dummy_path, kbps * ratio, fps, stream_callback, frame);
+			//TODO: state->encoder_factories[]->create_encoder(state->encoder_factories[], &frame->encoder);
+			frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, kbps * ratio, fps, stream_callback, frame);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -1059,13 +1096,14 @@ void frame_handler() {
 
 		switch (frame->output_mode) {
 		case OUTPUT_MODE_STILL:
+#if(0)
 			SaveJpeg(frame->img_buff, frame->img_width, frame->img_height, frame->output_filepath, 70);
 			printf("snap saved to %s\n", frame->output_filepath);
 
 			gettimeofday(&f, NULL);
 			elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
 			printf("elapsed %.3lf ms\n", elapsed_ms);
-
+#endif
 			frame->output_mode = OUTPUT_MODE_NONE;
 			frame->delete_after_processed = true;
 
@@ -1073,7 +1111,7 @@ void frame_handler() {
 			break;
 		case OUTPUT_MODE_VIDEO:
 			if (frame->output_fd > 0) {
-				AddFrame(frame->recorder, frame->img_buff, NULL);
+				frame->encoder->add_frame(frame->encoder, frame->img_buff, NULL);
 
 				gettimeofday(&f, NULL);
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
@@ -1088,7 +1126,7 @@ void frame_handler() {
 			if (1) {
 				FRAME_INFO_T *frame_info_p = malloc(sizeof(FRAME_INFO_T));
 				memcpy(frame_info_p, &frame_info, sizeof(FRAME_INFO_T));
-				AddFrame(frame->recorder, frame->img_buff, frame_info_p);
+				frame->encoder->add_frame(frame->encoder, frame->img_buff, frame_info_p);
 			}
 
 			gettimeofday(&f, NULL);
@@ -1097,8 +1135,10 @@ void frame_handler() {
 			frame->frame_elapsed += elapsed_ms;
 
 			if (end_width(frame->output_filepath, ".jpeg")) {
+#if(0)
 				SaveJpeg(frame->img_buff, frame->img_width, frame->img_height, frame->output_filepath, 70);
 				printf("snap saved to %s\n", frame->output_filepath);
+#endif
 				frame->output_filepath[0] = '\0';
 			} else if (end_width(frame->output_filepath, ".h265")) {
 				if (frame->output_type == OUTPUT_TYPE_H265) {
@@ -1155,7 +1195,9 @@ void frame_handler() {
 		//preview
 		if (frame && frame == state->frame && state->preview) {
 			redraw_scene(state, frame, &state->model_data[OPERATION_MODE_BOARD]);
+#ifdef USE_GLES
 			eglSwapBuffers(state->display, state->surface);
+#endif
 		}
 		if (frame) {
 			frame->last_updated = s;
@@ -1959,8 +2001,8 @@ static void set_camera_north(float value) {
 	state->camera_north = value;
 }
 static void decode_video(int cam_num, unsigned char *data, int data_len) {
-	if (state->codec_type == MJPEG) {
-		mjpeg_decode(cam_num, data, data_len);
+	if (state->decoders[cam_num]) {
+		state->decoders[cam_num]->decode(state->decoders[cam_num], data, data_len);
 	}
 }
 static void lock_texture() {
@@ -2057,6 +2099,7 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 		}
 	}
 }
+
 static void add_mpu_factory(MPU_FACTORY_T *mpu_factory) {
 	for (int i = 0; state->mpu_factories[i] != (void*) -1; i++) {
 		if (state->mpu_factories[i] == NULL) {
@@ -2072,6 +2115,50 @@ static void add_mpu_factory(MPU_FACTORY_T *mpu_factory) {
 				memset(state->mpu_factories, 0, sizeof(MPU_FACTORY_T*) * space);
 				memcpy(state->mpu_factories, current, sizeof(MPU_FACTORY_T*) * i);
 				state->mpu_factories[space - 1] = (void*) -1;
+				free(current);
+			}
+			return;
+		}
+	}
+}
+
+static void add_decoder_factory(DECODER_FACTORY_T *decoder_factory) {
+	for (int i = 0; state->decoder_factories[i] != (void*) -1; i++) {
+		if (state->decoder_factories[i] == NULL) {
+			state->decoder_factories[i] = decoder_factory;
+			if (state->decoder_factories[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_decoder_factory\n");
+					return;
+				}
+				DECODER_FACTORY_T **current = state->decoder_factories;
+				state->decoder_factories = malloc(sizeof(DECODER_FACTORY_T*) * space);
+				memset(state->decoder_factories, 0, sizeof(DECODER_FACTORY_T*) * space);
+				memcpy(state->decoder_factories, current, sizeof(DECODER_FACTORY_T*) * i);
+				state->decoder_factories[space - 1] = (void*) -1;
+				free(current);
+			}
+			return;
+		}
+	}
+}
+
+static void add_encoder_factory(ENCODER_FACTORY_T *encoder_factory) {
+	for (int i = 0; state->encoder_factories[i] != (void*) -1; i++) {
+		if (state->encoder_factories[i] == NULL) {
+			state->encoder_factories[i] = encoder_factory;
+			if (state->encoder_factories[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_encoder_factory\n");
+					return;
+				}
+				ENCODER_FACTORY_T **current = state->encoder_factories;
+				state->encoder_factories = malloc(sizeof(ENCODER_FACTORY_T*) * space);
+				memset(state->encoder_factories, 0, sizeof(ENCODER_FACTORY_T*) * space);
+				memcpy(state->encoder_factories, current, sizeof(ENCODER_FACTORY_T*) * i);
+				state->encoder_factories[space - 1] = (void*) -1;
 				free(current);
 			}
 			return;
@@ -3456,6 +3543,16 @@ int main(int argc, char *argv[]) {
 		state->mpu_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
+		state->decoder_factories = malloc(sizeof(DECODER_FACTORY_T*) * INITIAL_SPACE);
+		memset(state->decoder_factories, 0, sizeof(DECODER_FACTORY_T*) * INITIAL_SPACE);
+		state->decoder_factories[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
+		state->encoder_factories = malloc(sizeof(ENCODER_FACTORY_T*) * INITIAL_SPACE);
+		memset(state->encoder_factories, 0, sizeof(ENCODER_FACTORY_T*) * INITIAL_SPACE);
+		state->encoder_factories[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
 		state->watches = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
 		memset(state->watches, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
 		state->watches[INITIAL_SPACE - 1] = (void*) -1;
@@ -3535,9 +3632,10 @@ int main(int argc, char *argv[]) {
 		//frame mutex init
 		pthread_mutex_init(&state->cmd_list_mutex, 0);
 	}
-
+#if BCMHOST
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
+#endif
 
 	// Start OGLES
 	init_ogl(state);
@@ -3682,8 +3780,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 	}
 	for (int i = 0; i < state->num_of_cam; i++) {
-		if (state->codec_type == MJPEG) {
-			mjpeg_decoder_switch_buffer(i);
+		if (state->decoders[i]) {
+			state->decoders[i]->switch_buffer(state->decoders[i]);
 		}
 		glActiveTexture(GL_TEXTURE1 + i);
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
