@@ -13,10 +13,15 @@
 #endif
 
 #include "h265_encoder.h"
-#define CLASS_NAME "h265"
+
+#define PLUGIN_NAME "h265_encoder"
+#define ENCODER_NAME "h265"
+
+static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 typedef struct _h265_encoder {
-	char class_name[8];
+	ENCODER_T super;
+
 	//nal
 	bool in_nal;
 	uint32_t nal_len;
@@ -35,13 +40,9 @@ typedef struct _h265_encoder {
 	int width;
 	int height;
 	pthread_t pout_thread;
-	H265_STREAM_CALLBACK callback;
+	ENCODER_STREAM_CALLBACK callback;
 	void *user_data;
 } h265_encoder;
-
-bool h265_is_encoder(void *obj) {
-	return (strcmp((char*) obj, CLASS_NAME) == 0);
-}
 
 static void *get_frame_data(h265_encoder *_this) {
 	void *frame_data = NULL;
@@ -113,7 +114,8 @@ static void *pout_thread_func(void* arg) {
 
 #define R (0)
 #define W (1)
-h265_encoder *h265_create_encoder(const int width, const int height, int bitrate_kbps, int fps, H265_STREAM_CALLBACK callback, void *user_data) {
+static void init(void *obj, const int width, const int height, int bitrate_kbps, int fps, ENCODER_STREAM_CALLBACK callback, void *user_data) {
+	h265_encoder *_this = (h265_encoder*)obj;
 	pid_t pid = 0;
 	int pin_fd[2];
 	int pout_fd[2];
@@ -125,9 +127,6 @@ h265_encoder *h265_create_encoder(const int width, const int height, int bitrate
 	sprintf(fps_str, "%d", fps);
 	sprintf(kbps_str, "%dk", bitrate_kbps);
 
-	h265_encoder *_this = malloc(sizeof(h265_encoder));
-	memset(_this, 0, sizeof(h265_encoder));
-	sprintf(_this->class_name, CLASS_NAME);
 	_this->callback = callback;
 	_this->user_data = user_data;
 	_this->width = width;
@@ -169,14 +168,16 @@ h265_encoder *h265_create_encoder(const int width, const int height, int bitrate
 	_this->pid = pid;
 	_this->pin_fd = pin_fd[W];
 	_this->pout_fd = pout_fd[R];
-	return _this;
 }
-void h265_delete_encoder(h265_encoder *_this) {
+static void release(void *obj) {
+	h265_encoder *_this = (h265_encoder*)obj;
 	int status;
 	kill(_this->pid, SIGKILL); //send SIGKILL signal to the child process
 	waitpid(_this->pid, &status, 0);
+	free(obj);
 }
-void h265_add_frame(h265_encoder *_this, const unsigned char *in_data, void *frame_data) {
+static void add_frame(void *obj, const unsigned char *in_data, void *frame_data) {
+	h265_encoder *_this = (h265_encoder*)obj;
 	pthread_mutex_lock(&_this->frame_data_queue_mutex);
 	if (_this->frame_data_queue_last_cur >= _this->frame_data_queue_cur + 16) {
 		printf("buffer is too small!");
@@ -187,6 +188,57 @@ void h265_add_frame(h265_encoder *_this, const unsigned char *in_data, void *fra
 	pthread_mutex_unlock(&_this->frame_data_queue_mutex);
 
 	write(_this->pin_fd, in_data, _this->width * _this->height * 3);
+}
+
+static void create_encoder(void *user_data, ENCODER_T **mpu) {
+	ENCODER_T *encoder = (ENCODER_T*) malloc(sizeof(h265_encoder));
+	memset(encoder, 0, sizeof(h265_encoder));
+	strcpy(encoder->name, ENCODER_NAME);
+	encoder->release = release;
+	encoder->init = init;
+	encoder->add_frame = add_frame;
+	encoder->user_data = encoder;
+}
+
+static int command_handler(void *user_data, const char *_buff) {
+	return 0;
+}
+
+static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
+}
+
+static void init_options(void *user_data, json_t *options) {
+}
+
+static void save_options(void *user_data, json_t *options) {
+}
+
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+	lg_plugin_host = plugin_host;
+
+	{
+		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
+		memset(plugin, 0, sizeof(PLUGIN_T));
+		strcpy(plugin->name, PLUGIN_NAME);
+		plugin->release = release;
+		plugin->command_handler = command_handler;
+		plugin->event_handler = event_handler;
+		plugin->init_options = init_options;
+		plugin->save_options = save_options;
+		plugin->get_info = NULL;
+		plugin->user_data = plugin;
+
+		*_plugin = plugin;
+	}
+	{
+		ENCODER_FACTORY_T *encoder_factory = (ENCODER_FACTORY_T*) malloc(sizeof(ENCODER_FACTORY_T));
+		memset(encoder_factory, 0, sizeof(ENCODER_FACTORY_T));
+		strcpy(encoder_factory->name, ENCODER_NAME);
+		encoder_factory->release = release;
+		encoder_factory->create_encoder = create_encoder;
+
+		lg_plugin_host->add_encoder_factory(encoder_factory);
+	}
 }
 
 #ifdef H265_TEST

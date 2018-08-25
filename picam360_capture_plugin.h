@@ -72,7 +72,7 @@ typedef struct _ENCODER_T {
 typedef struct _ENCODER_FACTORY_T {
 	char name[64];
 	void (*release)(void *user_data);
-	void (*create_decoder)(void *user_data, ENCODER_T **encoder);
+	void (*create_encoder)(void *user_data, ENCODER_T **encoder);
 	void *user_data;
 } ENCODER_FACTORY_T;
 
