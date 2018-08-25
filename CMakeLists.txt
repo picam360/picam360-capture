@@ -19,7 +19,6 @@ if(APPLE)
 		manual_mpu.c
 		picam360_tools.cc
 		menu.c
-		h265_encoder.c
 	)
 elseif(UNIX)
 	message("UNIX or LINUX")
@@ -29,17 +28,11 @@ elseif(UNIX)
 		mrevent.c
 		quaternion.c
 		manual_mpu.c
-		video.c
-		mjpeg_decoder.cc
-		video_direct.c
 		gl_program.cc
 		auto_calibration.cc
-		omxcv_jpeg.cc
-		omxcv.cc
 		manual_mpu.c
 		picam360_tools.cc
 		menu.c
-		h265_encoder.c
 	)
 	#add_definitions(-DENABLE_V4L2)
 elseif(WIN32)
@@ -84,11 +77,12 @@ if(USE_GLES)
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/src )
 else()
 find_package(OpenGL REQUIRED)
-find_package(GLUT REQUIRED)
+find_package(GLEW REQUIRED)
+pkg_check_modules(GLFW glfw3 REQUIRED)
 find_package(Freetype REQUIRED)
 	
-include_directories( ${OPENGL_INCLUDE_DIRS} ${GLUT_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
-target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${FREETYPE_LIBRARIES})
+include_directories( ${OPENGL_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
+target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_LIBRARY} ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
 
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl )
 target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl/libfreetype-gl.a )

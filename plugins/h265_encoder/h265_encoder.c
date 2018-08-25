@@ -115,7 +115,7 @@ static void *pout_thread_func(void* arg) {
 #define R (0)
 #define W (1)
 static void init(void *obj, const int width, const int height, int bitrate_kbps, int fps, ENCODER_STREAM_CALLBACK callback, void *user_data) {
-	h265_encoder *_this = (h265_encoder*)obj;
+	h265_encoder *_this = (h265_encoder*) obj;
 	pid_t pid = 0;
 	int pin_fd[2];
 	int pout_fd[2];
@@ -170,14 +170,14 @@ static void init(void *obj, const int width, const int height, int bitrate_kbps,
 	_this->pout_fd = pout_fd[R];
 }
 static void release(void *obj) {
-	h265_encoder *_this = (h265_encoder*)obj;
+	h265_encoder *_this = (h265_encoder*) obj;
 	int status;
 	kill(_this->pid, SIGKILL); //send SIGKILL signal to the child process
 	waitpid(_this->pid, &status, 0);
 	free(obj);
 }
 static void add_frame(void *obj, const unsigned char *in_data, void *frame_data) {
-	h265_encoder *_this = (h265_encoder*)obj;
+	h265_encoder *_this = (h265_encoder*) obj;
 	pthread_mutex_lock(&_this->frame_data_queue_mutex);
 	if (_this->frame_data_queue_last_cur >= _this->frame_data_queue_cur + 16) {
 		printf("buffer is too small!");
@@ -190,7 +190,7 @@ static void add_frame(void *obj, const unsigned char *in_data, void *frame_data)
 	write(_this->pin_fd, in_data, _this->width * _this->height * 3);
 }
 
-static void create_encoder(void *user_data, ENCODER_T **mpu) {
+static void create_encoder(void *user_data, ENCODER_T **output_encoder) {
 	ENCODER_T *encoder = (ENCODER_T*) malloc(sizeof(h265_encoder));
 	memset(encoder, 0, sizeof(h265_encoder));
 	strcpy(encoder->name, ENCODER_NAME);
@@ -198,6 +198,10 @@ static void create_encoder(void *user_data, ENCODER_T **mpu) {
 	encoder->init = init;
 	encoder->add_frame = add_frame;
 	encoder->user_data = encoder;
+
+	if (output_encoder) {
+		*output_encoder = encoder;
+	}
 }
 
 static int command_handler(void *user_data, const char *_buff) {

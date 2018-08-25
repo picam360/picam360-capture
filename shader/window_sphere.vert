@@ -1,4 +1,12 @@
-attribute vec4 vPosition;
+#if (__VERSION__ > 120)
+# define IN in
+# define OUT out
+#else
+# define IN attribute
+# define OUT varying
+#endif // __VERSION
+precision mediump float;
+IN vec4 vPosition;
 uniform float scale;
 uniform float frame_aspect_ratio;
 
@@ -24,12 +32,12 @@ uniform float cam1_aov;
 
 const float M_PI = 3.1415926535;
 
-varying float r0;
-varying float r1;
-varying float u0;
-varying float v0;
-varying float u1;
-varying float v1;
+OUT float r0;
+OUT float r1;
+OUT float u0;
+OUT float v0;
+OUT float u1;
+OUT float v1;
 
 void main(void) {
 	vec4 position = vPosition;

@@ -6,8 +6,8 @@
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 #else
-#include <OpenGL/OpenGL.h>
-#include <GLUT/GLUT.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 //#include "GL/gl.h"
 //#include "GL/glut.h"
 //#include "GL/glext.h"
@@ -17,7 +17,7 @@
 
 class GLProgram {
 public:
-	GLProgram(const char *vertex_file, const char *fragment_file);
+	GLProgram(const char *common, const char *vertex_file, const char *fragment_file);
 	virtual ~GLProgram();
 
 	GLuint GetId();
@@ -27,6 +27,7 @@ public:
 	;
 private:
 	GLuint m_vertex_id, m_fragment_id, m_program_id;
+	const char *m_common;
 
 	GLuint LoadShader(GLenum shader_type, const char *source_file);
 	char* ReadFile(const char *file);
@@ -36,7 +37,7 @@ extern "C" {
 
 #endif
 
-void *GLProgram_new(const char *vertex_file, const char *fragment_file);
+void *GLProgram_new(const char *common, const char *vertex_file, const char *fragment_file);
 GLuint GLProgram_GetId(const void *_this);
 void GLProgram_delete(const void *_this);
 

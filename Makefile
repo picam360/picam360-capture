@@ -162,30 +162,6 @@ gl_program.cc.s:
 	$(MAKE) -f CMakeFiles/picam360-capture.bin.dir/build.make CMakeFiles/picam360-capture.bin.dir/gl_program.cc.s
 .PHONY : gl_program.cc.s
 
-h265_encoder.o: h265_encoder.c.o
-.PHONY : h265_encoder.o
-
-# target to build an object file
-h265_encoder.c.o:
-	$(MAKE) -f CMakeFiles/picam360-capture.bin.dir/build.make CMakeFiles/picam360-capture.bin.dir/h265_encoder.c.o
-.PHONY : h265_encoder.c.o
-
-h265_encoder.i: h265_encoder.c.i
-.PHONY : h265_encoder.i
-
-# target to preprocess a source file
-h265_encoder.c.i:
-	$(MAKE) -f CMakeFiles/picam360-capture.bin.dir/build.make CMakeFiles/picam360-capture.bin.dir/h265_encoder.c.i
-.PHONY : h265_encoder.c.i
-
-h265_encoder.s: h265_encoder.c.s
-.PHONY : h265_encoder.s
-
-# target to generate assembly for a file
-h265_encoder.c.s:
-	$(MAKE) -f CMakeFiles/picam360-capture.bin.dir/build.make CMakeFiles/picam360-capture.bin.dir/h265_encoder.c.s
-.PHONY : h265_encoder.c.s
-
 manual_mpu.o: manual_mpu.c.o
 .PHONY : manual_mpu.o
 
@@ -369,9 +345,6 @@ help:
 	@echo "... gl_program.o"
 	@echo "... gl_program.i"
 	@echo "... gl_program.s"
-	@echo "... h265_encoder.o"
-	@echo "... h265_encoder.i"
-	@echo "... h265_encoder.s"
 	@echo "... manual_mpu.o"
 	@echo "... manual_mpu.i"
 	@echo "... manual_mpu.s"

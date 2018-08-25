@@ -19,8 +19,8 @@
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 #else
-#include <OpenGL/OpenGL.h>
-#include <GLUT/GLUT.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 //#include "GL/gl.h"
 //#include "GL/glut.h"
 //#include "GL/glext.h"
@@ -77,6 +77,7 @@ void add_text(vector_t * vVector, texture_font_t * font, wchar_t * text, vec4 * 
 }
 
 void init_menu(uint32_t font_size) {
+#ifdef USE_GLES
 	// all the shaders have at least texture unit 0 active so
 	// activate it now and leave it active
 	glActiveTexture(GL_TEXTURE0);
@@ -94,6 +95,7 @@ void init_menu(uint32_t font_size) {
 	lg_freetypegles.model.program = GLProgram_new("shader/freetypegles.vert", "shader/freetypegles.frag");
 #ifdef USE_GLES
 	texture_atlas_upload(lg_freetypegles.atlas);
+#endif
 #endif
 }
 void deinit_menu() {

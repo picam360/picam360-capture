@@ -1,5 +1,13 @@
-attribute vec4 vPosition;
-varying vec2 tcoord;
+#if (__VERSION__ > 120)
+# define IN in
+# define OUT out
+#else
+# define IN attribute
+# define OUT varying
+#endif // __VERSION
+precision mediump float;
+IN vec4 vPosition;
+OUT vec2 tcoord;
 
 void main(void) {
 	vec4 pos = vPosition;

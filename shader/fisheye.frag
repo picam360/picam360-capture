@@ -1,4 +1,15 @@
-varying vec2 tcoord;
+#if (__VERSION__ > 120)
+# define IN in
+# define OUT out
+# define texture2D texture
+# define gl_FragColor FragColor
+layout (location=0) out vec4 FragColor;
+#else
+# define IN attribute
+# define OUT varying
+#endif // __VERSION
+precision mediump float;
+IN vec2 tcoord;
 uniform sampler2D cam_texture;
 uniform sampler2D logo_texture;
 uniform float pixel_size;

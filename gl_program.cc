@@ -1,4 +1,3 @@
-
 #include "gl_program.h"
 #include <assert.h>
 #include <errno.h>
@@ -8,8 +7,9 @@
 #include <cstring>
 #include <chrono>
 
-GLProgram::GLProgram(const char *vertex_file, const char *fragment_file) {
+GLProgram::GLProgram(const char *common, const char *vertex_file, const char *fragment_file) {
 	GLint status;
+	m_common = common;
 	m_program_id = glCreateProgram();
 
 	m_vertex_id = LoadShader(GL_VERTEX_SHADER, vertex_file);
@@ -83,15 +83,19 @@ char* GLProgram::ReadFile(const char *file) {
 	std::FILE *fp = std::fopen(file, "rb");
 	char *ret = NULL;
 	size_t length;
+	size_t common_length = m_common ? strlen(m_common) : 0;
 
 	if (fp) {
 		std::fseek(fp, 0, SEEK_END);
 		length = std::ftell(fp);
 		std::fseek(fp, 0, SEEK_SET);
 
-		ret = new char[length + 1];
-		length = std::fread(ret, 1, length, fp);
-		ret[length] = '\0';
+		ret = new char[common_length + length + 1];
+		if (common_length) {
+			strncpy(ret, m_common, common_length);
+		}
+		length = std::fread(ret + common_length, 1, length, fp);
+		ret[common_length + length] = '\0';
 
 		std::fclose(fp);
 	}
@@ -99,15 +103,12 @@ char* GLProgram::ReadFile(const char *file) {
 	return ret;
 }
 
-void *GLProgram_new(const char *vertex_file, const char *fragment_file)
-{
-	return (void*)new GLProgram(vertex_file, fragment_file);
+void *GLProgram_new(const char *common, const char *vertex_file, const char *fragment_file) {
+	return (void*) new GLProgram(common, vertex_file, fragment_file);
 }
-GLuint GLProgram_GetId(const void *_this)
-{
-	return ((GLProgram*)_this)->GetId();
+GLuint GLProgram_GetId(const void *_this) {
+	return ((GLProgram*) _this)->GetId();
 }
-void GLProgram_delete(const void *_this)
-{
-	delete ((GLProgram*)_this);
+void GLProgram_delete(const void *_this) {
+	delete ((GLProgram*) _this);
 }

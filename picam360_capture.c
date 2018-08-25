@@ -20,22 +20,7 @@
 #include "bcm_host.h"
 #endif
 
-#ifdef USE_GLES
-#include "GLES2/gl2.h"
-#include "EGL/egl.h"
-#include "EGL/eglext.h"
-#else
-#include <OpenGL/OpenGL.h>
-#include <GLUT/GLUT.h>
-//#include "GL/gl.h"
-//#include "GL/glut.h"
-//#include "GL/glext.h"
-#endif
-
 #include "picam360_capture.h"
-#include "video.h"
-#include "mjpeg_decoder.h"
-#include "video_direct.h"
 #include "picam360_tools.h"
 #include "gl_program.h"
 #include "auto_calibration.h"
@@ -264,6 +249,25 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	// Enable back face culling.
 	glEnable(GL_CULL_FACE);
+#else
+	if (glfwInit() == GL_FALSE) {
+		printf("error on glfwInit\n");
+	}
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	state->screen_width = 640;
+	state->screen_height = 480;
+	state->glfw_window = glfwCreateWindow(state->screen_width, state->screen_height, "picam360", NULL, NULL);
+
+	glfwMakeContextCurrent(state->glfw_window);
+
+	if (glewInit() != GLEW_OK) {
+		printf("error on glewInit\n");
+	}
+	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
 #endif
 }
 
@@ -286,7 +290,7 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	return 0;
 }
 
-int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out) {
+int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out) {
 	GLuint vbo;
 
 	int n = 2 * (num_of_steps + 1) * num_of_steps;
@@ -333,6 +337,21 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out) {
 	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
+
+#ifdef GLES
+#else
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+
+	if (vao_out != NULL)
+		*vao_out = vao;
+#endif
 
 	if (vbo_out != NULL)
 		*vbo_out = vbo;
@@ -416,36 +435,41 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
  ***********************************************************/
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 	float maxfov = 150.0;
+#ifdef GLES
+	char *common = "#version 100\n";
+#else
+	char *common = "#version 330\n";
+#endif
 
-	board_mesh(64, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo_nop);
+	board_mesh(64, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo_nop, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vao);
 	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular.vert", "shader/equirectangular.frag");
+		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new(common, "shader/equirectangular.vert", "shader/equirectangular.frag");
 	} else {
-		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new("shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
+		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new(common, "shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
 	}
 
-	board_mesh(64, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo_nop);
+	board_mesh(64, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo_nop, &state->model_data[OPERATION_MODE_PICAM360MAP].vao);
 	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new("shader/picam360map.vert", "shader/picam360map.frag");
+		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map.vert", "shader/picam360map.frag");
 	} else {
-		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new("shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag");
+		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag");
 	}
 
-	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop);
-	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new("shader/fisheye.vert", "shader/fisheye.frag");
+	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop, &state->model_data[OPERATION_MODE_FISHEYE].vao);
+	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new(common, "shader/fisheye.vert", "shader/fisheye.frag");
 
-	board_mesh(1, &state->model_data[OPERATION_MODE_CALIBRATION].vbo, &state->model_data[OPERATION_MODE_CALIBRATION].vbo_nop);
-	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new("shader/calibration.vert", "shader/calibration.frag");
+	board_mesh(1, &state->model_data[OPERATION_MODE_CALIBRATION].vbo, &state->model_data[OPERATION_MODE_CALIBRATION].vbo_nop, &state->model_data[OPERATION_MODE_CALIBRATION].vao);
+	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new(common, "shader/calibration.vert", "shader/calibration.frag");
 
 	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[OPERATION_MODE_WINDOW].vbo, &state->model_data[OPERATION_MODE_WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new("shader/window.vert", "shader/window.frag");
+		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window.vert", "shader/window.frag");
 	} else {
-		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new("shader/window_sphere.vert", "shader/window_sphere.frag");
+		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window_sphere.vert", "shader/window_sphere.frag");
 	}
 
-	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop);
-	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new("shader/board.vert", "shader/board.frag");
+	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop, &state->model_data[OPERATION_MODE_BOARD].vao);
+	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new(common, "shader/board.vert", "shader/board.frag");
 }
 
 /***********************************************************
@@ -461,7 +485,6 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  *
  ***********************************************************/
 static void destroy_egl_images(PICAM360CAPTURE_T *state) {
-#ifdef USE_GLES
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 			if (state->cam_texture[i][j] != 0) {
@@ -469,17 +492,17 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 				glDeleteTextures(1, &state->cam_texture[i][j]);
 				state->cam_texture[i][j] = 0;
 			}
+#ifdef USE_GLES
 			if (state->egl_image[i][j] != 0) {
 				if (!eglDestroyImageKHR(state->display, (EGLImageKHR) state->egl_image[i][j]))
 				printf("eglDestroyImageKHR failed.");
 				state->egl_image[i][j] = NULL;
 			}
+#endif
 		}
 	}
-#endif
 }
 static void update_egl_images(PICAM360CAPTURE_T *state) {
-#ifdef USE_GLES
 	destroy_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
@@ -493,6 +516,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+#ifdef USE_GLES
 			/* Create EGL Image */
 			state->egl_image[i][j] = eglCreateImageKHR(state->display, state->context, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i][j], 0);
 
@@ -500,9 +524,9 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 				printf("eglCreateImageKHR failed.\n");
 				exit(1);
 			}
+#endif
 		}
 	}
-#endif
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
 
@@ -511,12 +535,13 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 	update_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
-		// Start rendering
-		if (state->codec_type == MJPEG) {
-			//TODO:create decoder
+		for (int i = 0; state->decoder_factories[i] != NULL; i++) {
+			if (strncmp(state->decoder_factories[i]->name, state->decoder_name, sizeof(state->decoder_name)) == 0) {
+				state->decoder_factories[i]->create_decoder(state->decoder_factories[i]->user_data, &state->decoders[i]);
+			}
 		}
 		if (state->decoders[i]) {
-			state->decoders[i]->init(state->decoders[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], state->glfw_window, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 		}
 	}
 }
@@ -622,6 +647,7 @@ static void init_options(PICAM360CAPTURE_T *state) {
 							dlclose(handle);
 							continue;
 						}
+						printf("plugin %s loaded.\n", state->plugin_paths[i]);
 						state->plugin_host.add_plugin(plugin);
 					}
 				}
@@ -812,6 +838,14 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			break;
 		case 's':
 			frame->output_mode = OUTPUT_MODE_STREAM;
+			for (int i = 0; state->encoder_factories[i] != NULL; i++) {
+				if (strncmp(state->encoder_factories[i]->name, optarg, sizeof(frame->encoder)) == 0) {
+					state->encoder_factories[i]->create_encoder(state->encoder_factories[i]->user_data, &frame->encoder);
+				}
+			}
+			if (frame->encoder == NULL) {
+				printf("%s is not supported\n", optarg);
+			}
 			//h264 or mjpeg
 			if (strcasecmp(optarg, "h265") == 0) {
 				frame->output_type = OUTPUT_TYPE_H265;
@@ -967,7 +1001,6 @@ void frame_handler() {
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
-			//TODO: state->encoder_factories[]->create_encoder(state->encoder_factories[], &frame->encoder);
 			frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, 4000 * ratio, fps, stream_callback, NULL);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
@@ -983,7 +1016,6 @@ void frame_handler() {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
 			float kbps = frame->kbps;
-			char *dummy_path = (frame->output_type == OUTPUT_TYPE_H265) ? "stream.h265" : (frame->output_type == OUTPUT_TYPE_H264) ? "stream.h264" : "stream.mjpeg";
 			if (kbps == 0) {
 				float ave_sq = sqrt((float) frame->width * (float) frame->height) / 1.2;
 				if (frame->output_type == OUTPUT_TYPE_H265) {
@@ -1030,7 +1062,6 @@ void frame_handler() {
 					}
 				}
 			}
-			//TODO: state->encoder_factories[]->create_encoder(state->encoder_factories[], &frame->encoder);
 			frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, kbps * ratio, fps, stream_callback, frame);
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
@@ -1197,6 +1228,9 @@ void frame_handler() {
 			redraw_scene(state, frame, &state->model_data[OPERATION_MODE_BOARD]);
 #ifdef USE_GLES
 			eglSwapBuffers(state->display, state->surface);
+#else
+			glfwSwapBuffers(state->glfw_window);
+			glfwPollEvents();
 #endif
 		}
 		if (frame) {
@@ -2282,6 +2316,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
 		state->plugin_host.add_mpu_factory = add_mpu_factory;
+		state->plugin_host.add_decoder_factory = add_decoder_factory;
+		state->plugin_host.add_encoder_factory = add_encoder_factory;
 		state->plugin_host.add_status = add_status;
 		state->plugin_host.add_watch = add_watch;
 		state->plugin_host.add_plugin = add_plugin;
@@ -3523,7 +3559,7 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
-	state->codec_type = H264;
+	strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name));
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
@@ -3531,7 +3567,7 @@ int main(int argc, char *argv[]) {
 	state->camera_horizon_r_bias = 1.0;
 	state->refraction = 1.0;
 	state->rtp_play_speed = 1.0;
-	strncpy(state->default_view_coordinate_mode, "manual", 64);
+	strncpy(state->default_view_coordinate_mode, "manual", sizeof(state->default_view_coordinate_mode));
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
 		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -3566,13 +3602,8 @@ int main(int argc, char *argv[]) {
 	umask(0000);
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:w:h:n:psd:i:r:F:v:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
-		case 'c':
-			if (strcasecmp(optarg, "mjpeg") == 0) {
-				state->codec_type = MJPEG;
-			}
-			break;
 		case 'w':
 			sscanf(optarg, "%d", &state->cam_width);
 			break;
@@ -3643,17 +3674,17 @@ int main(int argc, char *argv[]) {
 	//menu
 	_init_menu();
 
-	// Setup the model world
-	init_model_proj(state);
-
-	// initialise the OGLES texture(s)
-	init_textures(state);
-
 	// init plugin
 	init_plugins(state);
 
 	//init options
 	init_options(state);
+
+	// Setup the model world
+	init_model_proj(state);
+
+	// initialise the OGLES texture(s)
+	init_textures(state);
 
 	//init rtp
 	_init_rtp(state);
@@ -3979,9 +4010,13 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1, GL_FALSE, (GLfloat*) unif_matrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1, GL_FALSE, (GLfloat*) unif_matrix_1);
 
+#ifdef GLES
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
+#else
+	glBindVertexArray(model->vao);
+#endif
 
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
@@ -3989,9 +4024,13 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	glFlush();
 
-	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+#ifdef GLES
+	glDisableVertexAttribArray(loc);
+#else
+	glBindVertexArray(0);
+#endif
 }
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
@@ -4012,9 +4051,13 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 	glUniform1f(glGetUniformLocation(program, "tex_scalex"), (state->stereo) ? 0.5 : 1.0);
 
+#ifdef GLES
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
+#else
+	glBindVertexArray(model->vao);
+#endif
 
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
@@ -4037,9 +4080,13 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	}
 
-	glDisableVertexAttribArray(loc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+#ifdef GLES
+	glDisableVertexAttribArray(loc);
+#else
+	glBindVertexArray(0);
+#endif
 }
 
 static void get_info_str(char *buff, int buff_len) {

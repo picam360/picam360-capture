@@ -40,3 +40,6 @@ Makefile
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake
+/gdbcmd
+/config.json
+/.picam360_history

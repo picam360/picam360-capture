@@ -32,8 +32,8 @@
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 #else
-#include <OpenGL/OpenGL.h>
-#include <GLUT/GLUT.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 //#include "GL/gl.h"
 //#include "GL/glut.h"
 //#include "GL/glext.h"
@@ -59,9 +59,6 @@ enum OUTPUT_TYPE {
 };
 enum OPERATION_MODE {
 	OPERATION_MODE_NONE, OPERATION_MODE_BOARD, OPERATION_MODE_WINDOW, OPERATION_MODE_PICAM360MAP, OPERATION_MODE_EQUIRECTANGULAR, OPERATION_MODE_FISHEYE, OPERATION_MODE_CALIBRATION
-};
-enum CODEC_TYPE {
-	H264, MJPEG
 };
 
 struct _PICAM360CAPTURE_T;
@@ -129,7 +126,6 @@ typedef struct _FRAME_T {
 	int frame_num;
 	double frame_elapsed;
 	bool is_recording;
-	void *recorder;
 
 	enum OPERATION_MODE operation_mode;
 	enum OUTPUT_MODE output_mode;
@@ -162,6 +158,7 @@ typedef struct {
 	void *program;
 	GLuint vbo;
 	GLuint vbo_nop;
+	GLuint vao;
 } MODEL_T;
 typedef struct _PICAM360CAPTURE_T {
 	PLUGIN_HOST_T plugin_host;
@@ -171,9 +168,9 @@ typedef struct _PICAM360CAPTURE_T {
 	bool stereo;
 	bool conf_sync;
 	bool video_direct;
-	enum CODEC_TYPE codec_type;
-	uint32_t screen_width;
-	uint32_t screen_height;
+	char decoder_name[32];
+	int32_t screen_width;
+	int32_t screen_height;
 	uint32_t cam_width;
 	uint32_t cam_height;
 // OpenGL|ES objects
@@ -181,6 +178,8 @@ typedef struct _PICAM360CAPTURE_T {
 	EGLDisplay display;
 	EGLSurface surface;
 	EGLContext context;
+#else
+	GLFWwindow *glfw_window;
 #endif
 	int active_cam;
 	int num_of_cam;

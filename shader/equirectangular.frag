@@ -1,3 +1,14 @@
+#if (__VERSION__ > 120)
+# define IN in
+# define OUT out
+# define texture2D texture
+# define gl_FragColor FragColor
+layout (location=0) out vec4 FragColor;
+#else
+# define IN attribute
+# define OUT varying
+#endif // __VERSION
+precision mediump float;
 uniform mat4 unif_matrix;
 uniform mat4 unif_matrix_1;
 uniform sampler2D cam0_texture;
@@ -9,12 +20,12 @@ uniform float cam0_aov;
 
 const float M_PI = 3.1415926535;
 
-varying float r0;
-varying float r1;
-varying float u0;
-varying float v0;
-varying float u1;
-varying float v1;
+OUT float r0;
+OUT float r1;
+OUT float u0;
+OUT float v0;
+OUT float u1;
+OUT float v1;
 
 void main(void) {
 	if (r0 < cam0_aov / 360.0 - overlap) {

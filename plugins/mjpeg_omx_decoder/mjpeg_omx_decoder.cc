@@ -15,7 +15,10 @@
 #include <sys/time.h>
 #include <list>
 
-#include "mjpeg_decoder.h"
+#include "mjpeg_omx_decoder.h"
+
+#define PLUGIN_NAME "mjpeg_omx_decoder"
+#define DECODER_NAME "mjpeg_omx"
 
 #define RTP_MAXPAYLOADSIZE (8*1024-12)
 #define TIMEOUT_MS 2000
@@ -633,7 +636,7 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 	}
 }
 
-void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
+static void decode(void *user_data, int cam_num, unsigned char *data, int data_len) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
@@ -686,7 +689,7 @@ void mjpeg_decode(int cam_num, unsigned char *data, int data_len) {
 	}
 
 }
-void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
+static void init(void *user_data, PLUGIN_HOST_T *plugin_host, int cam_num,
 		void **egl_images, int egl_image_num) {
 	lg_plugin_host = plugin_host;
 
@@ -703,7 +706,7 @@ void init_mjpeg_decoder(PLUGIN_HOST_T *plugin_host, int cam_num,
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
 			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
-void deinit_mjpeg_decoder(int cam_num) {
+static void release(void *user_data, int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
@@ -714,16 +717,17 @@ void deinit_mjpeg_decoder(int cam_num) {
 
 	delete lg_send_frame_arg[cam_num];
 	lg_send_frame_arg[cam_num] = NULL;
+	free(user_data);
 }
 
-float mjpeg_decoder_get_fps(int cam_num) {
+static float get_fps(void *user_data, int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->fps;
 }
-int mjpeg_decoder_get_frameskip(int cam_num) {
+static int get_frameskip(void *user_data, int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
@@ -731,7 +735,7 @@ int mjpeg_decoder_get_frameskip(int cam_num) {
 	return lg_send_frame_arg[cam_num]->frameskip;
 }
 
-void mjpeg_decoder_switch_buffer(int cam_num) {
+static void switch_buffer(void *user_data, int cam_num) {
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -739,5 +743,61 @@ void mjpeg_decoder_switch_buffer(int cam_num) {
 			1000 * 1000);
 	if (res != 0) {
 		mrevent_trigger(&lg_send_frame_arg[cam_num]->buffer_ready);
+	}
+}
+
+static void create_decoder(void *user_data, DECODER_T **mpu) {
+	DECODER_T *decoder = (DECODER_T*) malloc(sizeof(h265_decoder));
+	memset(decoder, 0, sizeof(h265_decoder));
+	strcpy(decoder->name, DECODER_NAME);
+	decoder->release = release;
+	decoder->init = init;
+	decoder->get_fps = get_fps;
+	decoder->add_frame = add_frame;
+	decoder->get_frameskip = get_frameskip;
+	decoder->decode = decode;
+	decoder->switch_buffer = switch_buffer;
+	decoder->release = release;
+	decoder->user_data = decoder;
+}
+
+static int command_handler(void *user_data, const char *_buff) {
+	return 0;
+}
+
+static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
+}
+
+static void init_options(void *user_data, json_t *options) {
+}
+
+static void save_options(void *user_data, json_t *options) {
+}
+
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+	lg_plugin_host = plugin_host;
+
+	{
+		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
+		memset(plugin, 0, sizeof(PLUGIN_T));
+		strcpy(plugin->name, PLUGIN_NAME);
+		plugin->release = release;
+		plugin->command_handler = command_handler;
+		plugin->event_handler = event_handler;
+		plugin->init_options = init_options;
+		plugin->save_options = save_options;
+		plugin->get_info = NULL;
+		plugin->user_data = plugin;
+
+		*_plugin = plugin;
+	}
+	{
+		DECODER_FACTORY_T *decoder_factory = (DECODER_FACTORY_T*) malloc(sizeof(DECODER_FACTORY_T));
+		memset(decoder_factory, 0, sizeof(DECODER_FACTORY_T));
+		strcpy(decoder_factory->name, DECODER_NAME);
+		decoder_factory->release = release;
+		decoder_factory->create_decoder = create_decoder;
+
+		lg_plugin_host->add_decoder_factory(decoder_factory);
 	}
 }

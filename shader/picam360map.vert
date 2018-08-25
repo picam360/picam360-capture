@@ -1,7 +1,15 @@
+#if (__VERSION__ > 120)
+# define IN in
+# define OUT out
+#else
+# define IN attribute
+# define OUT varying
+#endif // __VERSION
+precision mediump float;
 const int STEPNUM = 256;
 const float STEPNUM_M1 = 255.0;
 
-attribute vec4 vPosition; //[0:1]
+IN vec4 vPosition; //[0:1]
 uniform float scale_x;
 uniform float scale_y;
 uniform float frame_aspect_ratio;
@@ -33,12 +41,12 @@ const float M_PI_DIV_2 = M_PI / 2.0;
 const float M_PI_DIV_4 = M_PI / 4.0;
 const float M_SQRT_2 = 1.4142135623;
 
-varying float r0;
-varying float r1;
-varying float u0;
-varying float v0;
-varying float u1;
-varying float v1;
+OUT float r0;
+OUT float r1;
+OUT float u0;
+OUT float v0;
+OUT float u1;
+OUT float v1;
 
 void main(void) {
 	vec4 position;
