@@ -77,23 +77,8 @@ static void *pout_thread_func(void* arg) {
 	unsigned char *data = malloc(buff_size);
 	ffmpeg_decoder *_this = (ffmpeg_decoder*) arg;
 
-//    GLFWwindow *m_win;
-//    if(glfwInit() == GL_FALSE){
-//    	printf("error on glfwInit\n");
-//    }
-//    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-//    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-//    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-//    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-//
-//    m_win = glfwCreateWindow(640, 480, "picam360", NULL, NULL);
-
-//    glfwMakeContextCurrent(m_win);
 	glfwMakeContextCurrent(_this->glfw_window);
 
-//    if(glewInit() != GLEW_OK){
-//    	printf("error on glewInit\n");
-//    }
 	while ((data_len = read(_this->pout_fd, data, buff_size)) > 0) {
 		//printf("%d ", data_len);
 		for (int i = 0; i < data_len;) {
@@ -107,16 +92,13 @@ static void *pout_thread_func(void* arg) {
 				i = data_len;
 			}
 			if (frame_buffer_cur == frame_size) {
-				if (_this->frame_num == 0) {
-					printf("frame num:%d\n", _this->frame_num);
-					int fd = open("test.rgb", O_CREAT | O_WRONLY | O_TRUNC, /*  */
-					S_IRUSR | S_IWUSR | /* rw */
-					S_IRGRP | S_IWGRP | /* rw */
-					S_IROTH | S_IXOTH);
-					write(fd, frame_buffer, frame_size);
+				lg_plugin_host->lock_texture();
+				{
 					glBindTexture(GL_TEXTURE_2D, _this->cam_texture[0]);
 					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, lg_width, lg_height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame_buffer);
 				}
+				lg_plugin_host->unlock_texture();
+
 				frame_buffer_cur = 0;
 				_this->frame_num++;
 //				if (_this->frame_num % 1000 == 0) {

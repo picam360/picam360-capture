@@ -1225,7 +1225,11 @@ void frame_handler() {
 		}
 		//preview
 		if (frame && frame == state->frame && state->preview) {
-			redraw_scene(state, frame, &state->model_data[OPERATION_MODE_BOARD]);
+			state->plugin_host.lock_texture();
+			{
+				redraw_scene(state, frame, &state->model_data[OPERATION_MODE_BOARD]);
+			}
+			state->plugin_host.unlock_texture();
 #ifdef USE_GLES
 			eglSwapBuffers(state->display, state->surface);
 #else
