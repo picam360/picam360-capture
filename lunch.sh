@@ -21,7 +21,6 @@ STEREO=
 MODE=
 DIRECT=
 FPS=30
-CODEC=MJPEG
 STREAM=
 AUTO_CALIBRATION=
 VIEW_COODINATE=manual
@@ -29,12 +28,10 @@ DEBUG=false
 KBPS=
 FRAME0_PARAM=
 
-while getopts ac:n:w:h:psf:dv:g0: OPT
+while getopts an:w:h:psf:dv:g0: OPT
 do
     case $OPT in
         a)  AUTO_CALIBRATION="-a"
-            ;;
-        c)  CODEC=$OPTARG
             ;;
         n)  CAM_NUM=$OPTARG
             ;;
@@ -67,11 +64,11 @@ sudo killall picam360-capture.bin
 if [ $DEBUG = "true" ]; then
 
 echo b main > gdbcmd
-echo r $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"$FRAME0_PARAM\" >> gdbcmd
+echo r $AUTO_CALIBRATION -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F \"$FRAME0_PARAM\" >> gdbcmd
 gdb ./picam360-capture.bin -x gdbcmd
 
 else
 
-./picam360-capture.bin $AUTO_CALIBRATION -c $CODEC -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "$FRAME0_PARAM"
+./picam360-capture.bin $AUTO_CALIBRATION -n $CAM_NUM -w $CAM_WIDTH -h $CAM_HEIGHT $DIRECT $STEREO $PREVIEW -v $VIEW_COODINATE -F "$FRAME0_PARAM"
 
 fi
