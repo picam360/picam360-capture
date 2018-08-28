@@ -27,6 +27,7 @@
 extern "C" {
 #endif
 
+#define OMX_SKIP64BIT //this would be not need in the future
 #include "bcm_host.h"
 #include "ilclient.h"
 #include "mrevent.h"
@@ -139,6 +140,14 @@ public:
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
+
+typedef struct _mjpeg_omx_decoder {
+	DECODER_T super;
+
+	int cam_num;
+	_SENDFRAME_ARG_T *send_frame_arg;
+} mjpeg_omx_decoder;
+
 
 static void my_fill_buffer_done(void* data, COMPONENT_T* comp) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) data;
@@ -636,12 +645,12 @@ static void parse_xml(char *xml, _FRAME_T *frame) {
 	}
 }
 
-static void decode(void *user_data, int cam_num, unsigned char *data, int data_len) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
-	if (!lg_send_frame_arg[cam_num]) {
+static void decode(void *obj, unsigned char *data, int data_len) {
+	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
+	if (!lg_send_frame_arg[_this->cam_num]) {
 		return;
 	}
-	_SENDFRAME_ARG_T *send_frame_arg = lg_send_frame_arg[cam_num];
+	_SENDFRAME_ARG_T *send_frame_arg = lg_send_frame_arg[_this->cam_num];
 	if (send_frame_arg->active_frame == NULL) {
 		if (data[0] == 0xFF && data[1] == 0xD8) { //SOI
 			send_frame_arg->active_frame = new _FRAME_T;
@@ -689,76 +698,84 @@ static void decode(void *user_data, int cam_num, unsigned char *data, int data_l
 	}
 
 }
-static void init(void *user_data, PLUGIN_HOST_T *plugin_host, int cam_num,
+static void init(void *obj, int cam_num, void *context, void *cam_texture,
 		void **egl_images, int egl_image_num) {
-	lg_plugin_host = plugin_host;
+	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
 
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
-	if (lg_send_frame_arg[cam_num]) {
+	_this->cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
+	if (lg_send_frame_arg[_this->cam_num]) {
 		return;
 	}
-	lg_send_frame_arg[cam_num] = new _SENDFRAME_ARG_T;
-	lg_send_frame_arg[cam_num]->cam_num = cam_num;
-	lg_send_frame_arg[cam_num]->egl_images = egl_images;
-	lg_send_frame_arg[cam_num]->egl_image_num = egl_image_num;
+	lg_send_frame_arg[_this->cam_num] = new _SENDFRAME_ARG_T;
+	lg_send_frame_arg[_this->cam_num]->cam_num = _this->cam_num;
+	lg_send_frame_arg[_this->cam_num]->egl_images = egl_images;
+	lg_send_frame_arg[_this->cam_num]->egl_image_num = egl_image_num;
 
-	lg_send_frame_arg[cam_num]->cam_run = true;
-	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
-			sendframe_thread_func, (void*) lg_send_frame_arg[cam_num]);
+	lg_send_frame_arg[_this->cam_num]->cam_run = true;
+	pthread_create(&lg_send_frame_arg[_this->cam_num]->cam_thread, NULL,
+			sendframe_thread_func, (void*) lg_send_frame_arg[_this->cam_num]);
 }
-static void release(void *user_data, int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
-	if (!lg_send_frame_arg[cam_num]) {
+static void release(void *obj) {
+	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
+
+	if (!lg_send_frame_arg[_this->cam_num]) {
 		return;
 	}
 
-	lg_send_frame_arg[cam_num]->cam_run = false;
-	pthread_join(lg_send_frame_arg[cam_num]->cam_thread, NULL);
+	lg_send_frame_arg[_this->cam_num]->cam_run = false;
+	pthread_join(lg_send_frame_arg[_this->cam_num]->cam_thread, NULL);
 
-	delete lg_send_frame_arg[cam_num];
-	lg_send_frame_arg[cam_num] = NULL;
-	free(user_data);
+	delete lg_send_frame_arg[_this->cam_num];
+	lg_send_frame_arg[_this->cam_num] = NULL;
+	free(obj);
 }
 
-static float get_fps(void *user_data, int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
-	if (!lg_send_frame_arg[cam_num]) {
+static float get_fps(void *obj) {
+	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
+
+	if (!lg_send_frame_arg[_this->cam_num]) {
 		return 0;
 	}
-	return lg_send_frame_arg[cam_num]->fps;
+	return lg_send_frame_arg[_this->cam_num]->fps;
 }
-static int get_frameskip(void *user_data, int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
-	if (!lg_send_frame_arg[cam_num]) {
+static int get_frameskip(void *obj) {
+	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
+
+	if (!lg_send_frame_arg[_this->cam_num]) {
 		return 0;
 	}
-	return lg_send_frame_arg[cam_num]->frameskip;
+	return lg_send_frame_arg[_this->cam_num]->frameskip;
 }
 
-static void switch_buffer(void *user_data, int cam_num) {
-	if (!lg_send_frame_arg[cam_num]) {
+static void switch_buffer(void *obj) {
+	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
+
+	if (!lg_send_frame_arg[_this->cam_num]) {
 		return;
 	}
-	int res = mrevent_wait(&lg_send_frame_arg[cam_num]->buffer_ready,
+	int res = mrevent_wait(&lg_send_frame_arg[_this->cam_num]->buffer_ready,
 			1000 * 1000);
 	if (res != 0) {
-		mrevent_trigger(&lg_send_frame_arg[cam_num]->buffer_ready);
+		mrevent_trigger(&lg_send_frame_arg[_this->cam_num]->buffer_ready);
 	}
 }
 
-static void create_decoder(void *user_data, DECODER_T **mpu) {
-	DECODER_T *decoder = (DECODER_T*) malloc(sizeof(h265_decoder));
-	memset(decoder, 0, sizeof(h265_decoder));
+static void create_decoder(void *user_data, DECODER_T **out_decoder) {
+	DECODER_T *decoder = (DECODER_T*) malloc(sizeof(mjpeg_omx_decoder));
+	memset(decoder, 0, sizeof(mjpeg_omx_decoder));
 	strcpy(decoder->name, DECODER_NAME);
 	decoder->release = release;
 	decoder->init = init;
 	decoder->get_fps = get_fps;
-	decoder->add_frame = add_frame;
 	decoder->get_frameskip = get_frameskip;
 	decoder->decode = decode;
 	decoder->switch_buffer = switch_buffer;
 	decoder->release = release;
 	decoder->user_data = decoder;
+
+	if (out_decoder) {
+		*out_decoder = decoder;
+	}
 }
 
 static int command_handler(void *user_data, const char *_buff) {

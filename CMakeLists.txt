@@ -3,10 +3,10 @@ cmake_minimum_required(VERSION 3.1.3)
 project(picam360-capture)
 
 find_package(PkgConfig REQUIRED)
-include(CheckIncludeFile)
 
-CHECK_INCLUDE_FILE(/opt/vc/include/bcm_host.h BCM_HOST)
+find_file(BCM_HOST bcm_host.h /opt/vc/include)
 if(BCM_HOST)
+	set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/vc/lib/pkgconfig")
 	pkg_check_modules(BCMHOST bcm_host REQUIRED)
 	link_directories( ${BCMHOST_LIBRARY_DIRS} ) # need to upper of add_executable
 endif()
@@ -31,8 +31,6 @@ elseif(UNIX)
 	#add_definitions(-DENABLE_V4L2)
 
 	#check raspberry pi
-	include(CheckIncludeFile)
-	CHECK_INCLUDE_FILE(/opt/vc/include/bcm_host.h BCM_HOST)
 	if(BCM_HOST)
 		message("RASPI")
 		set( USE_GLES ON )

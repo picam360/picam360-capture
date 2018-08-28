@@ -535,16 +535,16 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 	update_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
-		for (int i = 0; state->decoder_factories[i] != NULL; i++) {
-			if (strncmp(state->decoder_factories[i]->name, state->decoder_name, sizeof(state->decoder_name)) == 0) {
-				state->decoder_factories[i]->create_decoder(state->decoder_factories[i]->user_data, &state->decoders[i]);
+		for (int j = 0; state->decoder_factories[j] != NULL; j++) {
+			if (strncmp(state->decoder_factories[j]->name, state->decoder_name, sizeof(state->decoder_name)) == 0) {
+				state->decoder_factories[j]->create_decoder(state->decoder_factories[j]->user_data, &state->decoders[i]);
 			}
 		}
 		if (state->decoders[i]) {
 #ifdef USE_GLES
-			state->decoders[i]->init(state->decoders[i], NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], i, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #else
-			state->decoders[i]->init(state->decoders[i], state->glfw_window, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], i, state->glfw_window, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #endif
 		}
 	}
@@ -568,6 +568,12 @@ static void init_options(PICAM360CAPTURE_T *state) {
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
+		json_t *value = json_object_get(options, "decoder_name");
+		if (value) {
+			strncpy(state->decoder_name, json_string_value(value), sizeof(state->decoder_name) - 1);
+		} else {
+			strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name) - 1);
+		}
 		state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
 		state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
 		state->options.overlap = json_number_value(json_object_get(options, "overlap"));
@@ -683,6 +689,7 @@ static void init_options(PICAM360CAPTURE_T *state) {
 static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
+	json_object_set_new(options, "decoder_name", json_string(state->decoder_name));
 	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
 	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
 	json_object_set_new(options, "overlap", json_real(state->options.overlap));

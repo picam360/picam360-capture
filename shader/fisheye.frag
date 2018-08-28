@@ -5,7 +5,7 @@
 # define gl_FragColor FragColor
 layout (location=0) out vec4 FragColor;
 #else
-# define IN attribute
+# define IN varying
 # define OUT varying
 #endif // __VERSION
 precision mediump float;

@@ -42,6 +42,7 @@ static char lg_options_input_codec[32] = { 'm', 'j', 'p', 'e', 'g' };
 typedef struct _ffmpeg_decoder {
 	DECODER_T super;
 
+	int cam_num;
 	GLFWwindow *glfw_window;
 	GLuint *cam_texture;
 	uint32_t frame_num;
@@ -112,7 +113,7 @@ static void *pout_thread_func(void* arg) {
 
 #define R (0)
 #define W (1)
-static void init(void *obj, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
+static void init(void *obj, int cam_num, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
 	ffmpeg_decoder *_this = (ffmpeg_decoder*) obj;
 	pid_t pid = 0;
 	int pin_fd[2];
@@ -121,6 +122,7 @@ static void init(void *obj, void *context, void *cam_texture, void **egl_images,
 //	_this->user_data = user_data;
 //	_this->width = width;
 //	_this->height = height;
+	_this->cam_num = cam_num;
 	_this->glfw_window = (GLFWwindow*) context;
 	_this->cam_texture = (GLuint*) cam_texture;
 
@@ -166,7 +168,14 @@ static void init(void *obj, void *context, void *cam_texture, void **egl_images,
 #endif
 #elif __linux
 // linux
-#include <editline/history.h>
+			argv[argc++] = "-pix_fmt";
+			argv[argc++] = "uyvy422";
+			argv[argc++] = "-framerate";
+			argv[argc++] = fps_str;
+			argv[argc++] = "-video_size";
+			argv[argc++] = size_str;
+			argv[argc++] = "-i";
+			argv[argc++] = "/dev/video0";
 #elif __unix // all unices not caught above
 // Unix
 #elif __posix
