@@ -16,7 +16,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 
-#ifdef BCMHOST
+#ifdef BCM_HOST
 #include "bcm_host.h"
 #endif
 
@@ -338,7 +338,7 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
 
-#ifdef GLES
+#ifdef USE_GLES
 #else
 	GLuint vao;
 	glGenVertexArrays(1, &vao);
@@ -435,7 +435,7 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
  ***********************************************************/
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 	float maxfov = 150.0;
-#ifdef GLES
+#ifdef USE_GLES
 	char *common = "#version 100\n";
 #else
 	char *common = "#version 330\n";
@@ -541,7 +541,11 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 			}
 		}
 		if (state->decoders[i]) {
+#ifdef USE_GLES
+			state->decoders[i]->init(state->decoders[i], NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+#else
 			state->decoders[i]->init(state->decoders[i], state->glfw_window, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+#endif
 		}
 	}
 }
@@ -3667,7 +3671,7 @@ int main(int argc, char *argv[]) {
 		//frame mutex init
 		pthread_mutex_init(&state->cmd_list_mutex, 0);
 	}
-#if BCMHOST
+#if BCM_HOST
 	bcm_host_init();
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
 #endif
@@ -4014,7 +4018,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1, GL_FALSE, (GLfloat*) unif_matrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1, GL_FALSE, (GLfloat*) unif_matrix_1);
 
-#ifdef GLES
+#ifdef USE_GLES
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
@@ -4030,7 +4034,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-#ifdef GLES
+#ifdef USE_GLES
 	glDisableVertexAttribArray(loc);
 #else
 	glBindVertexArray(0);
@@ -4055,7 +4059,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
 	glUniform1f(glGetUniformLocation(program, "tex_scalex"), (state->stereo) ? 0.5 : 1.0);
 
-#ifdef GLES
+#ifdef USE_GLES
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
@@ -4086,7 +4090,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-#ifdef GLES
+#ifdef USE_GLES
 	glDisableVertexAttribArray(loc);
 #else
 	glBindVertexArray(0);
