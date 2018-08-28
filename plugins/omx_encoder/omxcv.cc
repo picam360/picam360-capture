@@ -320,7 +320,11 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 			void *frame_data = NULL;
 
 			std::unique_lock < std::mutex > lock(m_input_mutex);
-			frame_data = m_frame_data_queue.front();
+			if (m_frame_data_queue.size() == 0) {
+				printf("something wrong! m_frame_data_queue==0\n");
+			} else {
+				frame_data = m_frame_data_queue.front();
+			}
 			m_frame_data_queue.pop_front();
 			lock.unlock();
 

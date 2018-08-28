@@ -27,7 +27,6 @@
 extern "C" {
 #endif
 
-#define OMX_SKIP64BIT //this would be not need in the future
 #include "bcm_host.h"
 #include "ilclient.h"
 #include "mrevent.h"

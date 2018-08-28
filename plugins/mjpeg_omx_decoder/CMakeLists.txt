@@ -26,11 +26,12 @@ elseif(UNIX)
 		message("RASPI")
 		set( USE_GLES ON )
 		add_definitions(-DBCM_HOST)
+		add_definitions(-DOMX_SKIP64BIT) # this would be not need in the future
 		include_directories( ${BCMHOST_INCLUDE_DIRS} )
 		target_link_libraries(mjpeg_omx_decoder ${BCMHOST_LIBRARIES} )
 		
 		include_directories( /opt/vc/src/hello_pi/libs/ilclient )
-		target_link_libraries(mjpeg_omx_decoder ilclient )
+		target_link_libraries(mjpeg_omx_decoder ilclient openmaxil )
 	endif()
 elseif(WIN32)
 	message("WINDOWS")

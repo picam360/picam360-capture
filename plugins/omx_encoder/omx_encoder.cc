@@ -24,8 +24,8 @@
 #include "omx_encoder.h"
 
 #define PLUGIN_NAME "omx_encoder"
-#define MJPEG_ENCODER_NAME "mjpeg_omx"
-#define H264_ENCODER_NAME "h264_omx"
+#define MJPEG_ENCODER_NAME "mjpeg"
+#define H264_ENCODER_NAME "h264"
 
 #define TIMEDIFF(start) (duration_cast<microseconds>(steady_clock::now() - start).count())
 
@@ -66,28 +66,34 @@ static void add_frame(void *obj, const unsigned char *in_data, void *frame_data)
 	}
 }
 
-static void create_mjpeg_encoder(void *obj, ENCODER_T **mpu) {
-	ENCODER_FACTORY_T *_this = (ENCODER_FACTORY_T*) obj;
+static void create_mjpeg_encoder(void *obj, ENCODER_T **out_encoder) {
 	ENCODER_T *encoder = (ENCODER_T*) malloc(sizeof(omx_encoder));
 	memset(encoder, 0, sizeof(omx_encoder));
-	strcpy(encoder->name, _this->name);
+	strncpy(encoder->name, MJPEG_ENCODER_NAME, sizeof(encoder->name));
 	encoder->release = release;
 	encoder->init = init;
 	encoder->add_frame = add_frame;
 	encoder->user_data = encoder;
 	((omx_encoder*)encoder)->codec = "dummy.mjpeg";
+
+	if (out_encoder) {
+		*out_encoder = encoder;
+	}
 }
 
-static void create_h264_encoder(void *obj, ENCODER_T **mpu) {
-	ENCODER_FACTORY_T *_this = (ENCODER_FACTORY_T*) obj;
+static void create_h264_encoder(void *obj, ENCODER_T **out_encoder) {
 	ENCODER_T *encoder = (ENCODER_T*) malloc(sizeof(omx_encoder));
 	memset(encoder, 0, sizeof(omx_encoder));
-	strcpy(encoder->name, _this->name);
+	strncpy(encoder->name, H264_ENCODER_NAME, sizeof(encoder->name));
 	encoder->release = release;
 	encoder->init = init;
 	encoder->add_frame = add_frame;
 	encoder->user_data = encoder;
 	((omx_encoder*)encoder)->codec = "dummy.h264";
+
+	if (out_encoder) {
+		*out_encoder = encoder;
+	}
 }
 
 static int command_handler(void *user_data, const char *_buff) {
