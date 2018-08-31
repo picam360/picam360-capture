@@ -153,6 +153,10 @@ static enum OPERATION_MODE get_operation_mode(const char *mode_string) {
 	}
 }
 
+static void glfwErrorCallback(int num, const char* err_str) {
+	printf("GLFW Error: %s\n", err_str);
+}
+
 /***********************************************************
  * Name: init_ogl
  *
@@ -250,6 +254,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	// Enable back face culling.
 	glEnable(GL_CULL_FACE);
 #else
+	glfwSetErrorCallback(glfwErrorCallback);
 	if (glfwInit() == GL_FALSE) {
 		printf("error on glfwInit\n");
 	}
@@ -264,6 +269,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	glfwMakeContextCurrent(state->glfw_window);
 
+	glewExperimental = GL_TRUE; //avoid glGenVertexArrays crash with glew-1.13
 	if (glewInit() != GLEW_OK) {
 		printf("error on glewInit\n");
 	}
@@ -544,7 +550,9 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 #ifdef USE_GLES
 			state->decoders[i]->init(state->decoders[i], i, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #else
-			state->decoders[i]->init(state->decoders[i], i, state->glfw_window, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
+			state->decoders[i]->init(state->decoders[i], i, win, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #endif
 		}
 	}
