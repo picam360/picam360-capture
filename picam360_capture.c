@@ -278,6 +278,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 }
 
 int load_texture(const char *filename, GLuint *tex_out) {
+	GLenum err;
 	GLuint tex;
 	IplImage *iplImage = cvLoadImage(filename, CV_LOAD_IMAGE_COLOR);
 
@@ -286,8 +287,8 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width, iplImage->height, 0, GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
-	if (glGetError() != GL_NO_ERROR) {
-		printf("glTexImage2D failed. Could not allocate texture buffer.");
+	if ((err = glGetError()) != GL_NO_ERROR) {
+		printf("glTexImage2D failed. Could not allocate texture buffer. %s\n", gluErrorString(err));
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 	if (tex_out != NULL)
@@ -820,6 +821,7 @@ bool inputAvailable() {
 }
 
 FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
+	GLenum err;
 	int opt;
 	int render_width = 512;
 	int render_height = 512;
@@ -910,15 +912,15 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	if (glGetError() != GL_NO_ERROR) {
-		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
+	if ((err = glGetError()) != GL_NO_ERROR) {
+		printf("glTexImage2D failed. Could not allocate texture buffer.\n %s\n", gluErrorString(err));
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frame->texture, 0);
-	if (glGetError() != GL_NO_ERROR) {
-		printf("glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
+	if ((err = glGetError()) != GL_NO_ERROR) {
+		printf("glFramebufferTexture2D failed. Could not allocate framebuffer. %s\n", gluErrorString(err));
 	}
 
 	// Set background color and clear buffers

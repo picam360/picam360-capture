@@ -31,6 +31,30 @@ link_directories(
 	${OPENCV_LIBRARY_DIRS}
 )
 
+#opengl
+if(USE_GLES)
+	message("USE_GLES")
+	add_definitions(-DUSE_GLES)
+	
+	pkg_check_modules(GLES glesv2 REQUIRED)
+	pkg_check_modules(EGL egl REQUIRED)
+	find_package(Freetype REQUIRED)
+	include_directories( ${GLES_INCLUDE_DIRS} ${EGL_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
+	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/src )
+else()
+	find_package(OpenGL REQUIRED)
+	pkg_check_modules(GLEW glew>=2.1 REQUIRED)
+	pkg_check_modules(GLFW glfw3 REQUIRED)
+	find_package(Freetype REQUIRED)
+		
+	include_directories( ${OPENGL_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
+	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl )
+	
+	link_directories( ${OPENGL_LIBRARY_DIRS} ${GLEW_LIBRARY_DIRS} ${GLFW_LIBRARY_DIRS} ${FREETYPE_LIBRARY_DIRS} )
+endif()
+
+#add_executable 
+#target_link_libraries should be define below here
 add_executable(picam360-capture.bin
 	picam360_capture.c
 	rtp.cc
@@ -78,26 +102,10 @@ target_link_libraries(picam360-capture.bin
 
 #opengl
 if(USE_GLES)
-	message("USE_GLES")
-	add_definitions(-DUSE_GLES)
-	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/src )
-	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/libFreetypeGlesRpi.a)
-	
-	pkg_check_modules(GLES glesv2 REQUIRED)
-	pkg_check_modules(EGL egl REQUIRED)
-	find_package(Freetype REQUIRED)
-	include_directories( ${GLES_INCLUDE_DIRS} ${EGL_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
 	target_link_libraries(picam360-capture.bin ${GLES_LIBRARIES} ${EGL_LIBRARIES} ${FREETYPE_LIBRARIES} )
+	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/libFreetypeGlesRpi.a)
 else()
-	find_package(OpenGL REQUIRED)
-	find_package(GLEW REQUIRED)
-	pkg_check_modules(GLFW glfw3 REQUIRED)
-	find_package(Freetype REQUIRED)
-		
-	include_directories( ${OPENGL_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
-	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_LIBRARY} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
-	
-	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl )
+	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
 	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl/libfreetype-gl.a )
 endif()
 
