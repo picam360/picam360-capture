@@ -131,19 +131,32 @@ static void init(void *obj, int cam_num, void *context, void *cam_texture, void 
 	pipe(pout_fd);
 	pid = fork();
 	if (pid == 0) {
-		char mjpeg_str[64];
-		char rgb_str[64];
+		char src_str[128];
+		char rgb_str[128];
 
 		const int MAX_ARGC = 128;
 		int argc = 0;
 		char **argv = malloc(MAX_ARGC * sizeof(char*));
 		argv[argc++] = lg_exe;
 
-		sprintf(mjpeg_str, "image/jpeg,width=%d,height=%d,framerate=%d/1", lg_width, lg_height, lg_fps);
-		sprintf(rgb_str, "video/x-raw,format=BGR,width=%d,height=%d", lg_width, lg_height);
-
 		if (strncmp(lg_options_input_type, "uvc", sizeof(lg_options_input_type)) == 0) {
-#ifdef _WIN64
+#define JETSON
+#ifdef JETSON
+			sprintf(src_str, "video/x-raw(memory:NVMM),format=I420,width=%d,height=%d,framerate=%d/1", lg_width, lg_height, lg_fps);
+			argv[argc++] = "-q";
+			argv[argc++] = "nvcamerasrc";
+			argv[argc++] = "sensor-id=1";
+			argv[argc++] = "!";
+			argv[argc++] = src_str;
+			argv[argc++] = "!";
+			argv[argc++] = "nvvidconv";
+			argv[argc++] = "!";
+			argv[argc++] = "video/x-raw,format=RGBA";
+			argv[argc++] = "!";
+			argv[argc++] = "videoconvert";
+			argv[argc++] = "!";
+			argv[argc++] = "video/x-raw,format=RGB";
+#elif _WIN64
 //define something for Windows (64-bit)
 #elif _WIN32
 //define something for Windows (32-bit)
@@ -159,11 +172,13 @@ static void init(void *obj, int cam_num, void *context, void *cam_texture, void 
 #endif
 #elif __linux
 // linux
-			argv[argc++] = "-e";
+			sprintf(rgb_str, "video/x-raw,format=BGR,width=%d,height=%d", lg_width, lg_height);
+			sprintf(src_str, "image/jpeg,width=%d,height=%d,framerate=%d/1", lg_width, lg_height, lg_fps);
+			argv[argc++] = "-q";
 			argv[argc++] = "v4l2src";
 			argv[argc++] = "device=/dev/video0";
 			argv[argc++] = "!";
-			argv[argc++] = mjpeg_str;
+			argv[argc++] = src_str;
 			argv[argc++] = "!";
 			argv[argc++] = "jpegdec";
 			argv[argc++] = "!";

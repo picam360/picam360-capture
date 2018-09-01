@@ -191,8 +191,8 @@ static void init(void *obj, const int width, const int height, int bitrate_kbps,
 	pipe(pout_fd);
 	pid = fork();
 	if (pid == 0) {
-		char rgb_str[64];
-		char h265_str[64];
+		char rgb_str[128];
+		char bitrate_str[128];
 
 		const int MAX_ARGC = 128;
 		int argc = 0;
@@ -200,7 +200,7 @@ static void init(void *obj, const int width, const int height, int bitrate_kbps,
 		argv[argc++] = lg_exe;
 
 		sprintf(rgb_str, "videoparse format=rgb width=%d height=%d framerate=%d/1", width, height, fps);
-		sprintf(h265_str, "video/x-h265,width=%d,height=%d,framerate=%d/1,stream-format=(string)byte-stream", width, height, fps);
+		sprintf(bitrate_str, "bitrate=%d", bitrate_kbps * 1000);
 
 		//input
 		argv[argc++] = "-q";
@@ -218,8 +218,10 @@ static void init(void *obj, const int width, const int height, int bitrate_kbps,
 		argv[argc++] = "videoconvert";
 		argv[argc++] = "!";
 		argv[argc++] = "omxh265enc";
+		argv[argc++] = "control-rate=2";
+		argv[argc++] = bitrate_str;
 		argv[argc++] = "!";
-		argv[argc++] = h265_str;
+		argv[argc++] = "video/x-h265,stream-format=byte-stream";
 
 		//output
 		argv[argc++] = "!";
