@@ -126,16 +126,19 @@ public:
 		seqnr = ntohs(rtpheader_p->sequencenumber);
 		payloadtype = rtpheader_p->payloadtype;
 		timestamp = ntohl(rtpheader_p->timestamp);
+		ssrc = ntohl(rtpheader_p->ssrc);
 	}
 	void StoreHeader() {
 		struct RTPHeader *rtpheader_p = (struct RTPHeader*) packet;
 		rtpheader_p->sequencenumber = htons(seqnr);
 		rtpheader_p->payloadtype = payloadtype;
 		rtpheader_p->timestamp = htonl(timestamp);
+		rtpheader_p->ssrc = htonl(ssrc);
 	}
 	uint8_t payloadtype;
 	uint16_t seqnr;
 	uint32_t timestamp;
+	uint32_t ssrc;
 	size_t packetlength;
 	uint8_t *packet;
 };
@@ -143,7 +146,6 @@ public:
 typedef struct _RTP_T {
 	bool is_init = false;
 	uint16_t seqnr = 0;
-	uint32_t timestamp = 0;
 	int tx_fd = -1;
 
 	pthread_t buffering_thread;
@@ -339,11 +341,11 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 		if (_this->tx_fd >= 0) {
 
 			_this->seqnr++;
-			_this->timestamp += diff_usec;
 
 			RTPPacket *pack = new RTPPacket(sizeof(RTPHeader));
 			pack->seqnr = _this->seqnr;
-			pack->timestamp = _this->timestamp;
+			pack->timestamp = time.tv_sec;
+			pack->ssrc = time.tv_usec;
 			pack->payloadtype = pt;
 			pack->StoreHeader();
 
