@@ -20,7 +20,8 @@
 #define PLUGIN_NAME "mjpeg_omx_decoder"
 #define DECODER_NAME "mjpeg_omx"
 
-#define RTP_MAXPAYLOADSIZE (8*1024-12)
+#include <rtp.h>
+
 #define TIMEOUT_MS 2000
 
 #ifdef __cplusplus
