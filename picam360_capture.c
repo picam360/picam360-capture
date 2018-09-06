@@ -2458,6 +2458,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				j += len;
 			}
 			rtp_sendpacket(state->rtp, EOI, sizeof(EOI), PT_CAM_BASE);
+			rtp_flush(state->rtp);
 		} else if (frame->output_type == OUTPUT_TYPE_H264) {
 			const unsigned char SC[] = { 0x00, 0x00, 0x00, 0x01 };
 			const unsigned char SOI[] = { 0x4E, 0x41 }; //'N', 'A'
@@ -2537,6 +2538,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				j += len;
 			}
 			rtp_sendpacket(state->rtp, EOI, sizeof(EOI), PT_CAM_BASE);
+			rtp_flush(state->rtp);
 		} else if (frame->output_type == OUTPUT_TYPE_MJPEG) {
 			if (lg_debug_dump) {
 				if (data[0] == 0xFF && data[1] == 0xD8) { //
@@ -2568,6 +2570,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				rtp_sendpacket(state->rtp, data + i, len, PT_CAM_BASE);
 				i += len;
 			}
+			rtp_flush(state->rtp);
 			if (frame->output_fd > 0) {
 				write(frame->output_fd, data, data_len);
 			}
