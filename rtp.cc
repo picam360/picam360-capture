@@ -184,8 +184,8 @@ typedef struct _RTP_T {
 	sockaddr_in rx_addr = { };
 	enum RTP_SOCKET_TYPE rx_socket_type = RTP_SOCKET_TYPE_NONE;
 	enum RTP_SOCKET_TYPE tx_socket_type = RTP_SOCKET_TYPE_NONE;
-	int rx_buffer_size = 8 * 1024;
-	int tx_buffer_size = 8 * 1024;
+	int rx_buffer_size = RTP_MAXPACKETSIZE;
+	int tx_buffer_size = RTP_MAXPACKETSIZE;
 } RTP_T;
 
 int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_len, bool flush) {
