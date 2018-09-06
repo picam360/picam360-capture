@@ -288,7 +288,11 @@ int load_texture(const char *filename, GLuint *tex_out) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width, iplImage->height, 0, GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
 	if ((err = glGetError()) != GL_NO_ERROR) {
+#ifdef USE_GLES
+		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
+#else
 		printf("glTexImage2D failed. Could not allocate texture buffer. %s\n", gluErrorString(err));
+#endif
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 	if (tex_out != NULL)
@@ -913,14 +917,22 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	if ((err = glGetError()) != GL_NO_ERROR) {
+#ifdef USE_GLES
+		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
+#else
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n %s\n", gluErrorString(err));
+#endif
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frame->texture, 0);
 	if ((err = glGetError()) != GL_NO_ERROR) {
+#ifdef USE_GLES
+		printf("glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
+#else
 		printf("glFramebufferTexture2D failed. Could not allocate framebuffer. %s\n", gluErrorString(err));
+#endif
 	}
 
 	// Set background color and clear buffers
