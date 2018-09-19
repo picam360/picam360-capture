@@ -170,6 +170,7 @@ static void glfwErrorCallback(int num, const char* err_str) {
  ***********************************************************/
 static void init_ogl(PICAM360CAPTURE_T *state) {
 #ifdef USE_GLES
+#ifdef BCM_HOST
 	int32_t success = 0;
 	EGLBoolean result;
 	EGLint num_config;
@@ -253,6 +254,60 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	// Enable back face culling.
 	glEnable(GL_CULL_FACE);
+#elif TEGRA
+	EGLBoolean result;
+	EGLint num_config;
+	static const EGLint attribute_list[] = {
+		EGL_RED_SIZE, 8, //
+		EGL_GREEN_SIZE, 8,//
+		EGL_BLUE_SIZE, 8,//
+		EGL_ALPHA_SIZE, 8,//
+		EGL_DEPTH_SIZE, 16,//
+		//EGL_SAMPLES, 4,
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,//
+		EGL_NONE};
+	static const EGLint context_attributes[] = {
+		EGL_CONTEXT_CLIENT_VERSION, 2, //
+		EGL_NONE};
+
+	EGLConfig config;
+
+	// get an EGL display connection
+	state->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	assert(state->display != EGL_NO_DISPLAY);
+
+	// initialize the EGL display connection
+	result = eglInitialize(state->display, NULL, NULL);
+	assert(EGL_FALSE != result);
+
+	// get an appropriate EGL frame buffer configuration
+	result = eglChooseConfig(state->display, attribute_list, &config, 1, &num_config);
+	assert(EGL_FALSE != result);
+
+	//Bind to the right EGL API.
+	result = eglBindAPI(EGL_OPENGL_ES_API);
+	assert(result != EGL_FALSE);
+
+	// create an EGL rendering context
+	state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT, context_attributes);
+	assert(state->context != EGL_NO_CONTEXT);
+
+	//Create an offscreen rendering surface
+	EGLint rendering_attributes[] = {EGL_WIDTH, state->screen_width,
+		EGL_HEIGHT, state->screen_height, EGL_NONE};
+	state->surface = eglCreatePbufferSurface(state->display, config,
+			rendering_attributes);
+
+	// connect the context to the surface
+	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
+	assert(EGL_FALSE != result);
+
+	// Enable back face culling.
+	glEnable(GL_CULL_FACE);
+
+	state->screen_width = 640;
+	state->screen_height = 480;
+#endif
 #else
 	glfwSetErrorCallback(glfwErrorCallback);
 	if (glfwInit() == GL_FALSE) {
@@ -504,11 +559,13 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 				state->cam_texture[i][j] = 0;
 			}
 #ifdef USE_GLES
+#ifdef BCM_HOST
 			if (state->egl_image[i][j] != 0) {
 				if (!eglDestroyImageKHR(state->display, (EGLImageKHR) state->egl_image[i][j]))
 				printf("eglDestroyImageKHR failed.");
 				state->egl_image[i][j] = NULL;
 			}
+#endif
 #endif
 		}
 	}
@@ -528,6 +585,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 #ifdef USE_GLES
+#ifdef BCM_HOST
 			/* Create EGL Image */
 			state->egl_image[i][j] = eglCreateImageKHR(state->display, state->context, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i][j], 0);
 
@@ -535,6 +593,7 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 				printf("eglCreateImageKHR failed.\n");
 				exit(1);
 			}
+#endif
 #endif
 		}
 	}
@@ -553,11 +612,11 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		}
 		if (state->decoders[i]) {
 #ifdef USE_GLES
-			state->decoders[i]->init(state->decoders[i], i, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #else
 			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-			state->decoders[i]->init(state->decoders[i], i, win, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #endif
 		}
 	}

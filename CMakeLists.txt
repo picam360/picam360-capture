@@ -15,6 +15,13 @@ if(BCM_HOST)
 	link_directories( ${BCMHOST_LIBRARY_DIRS} ) # need to upper of add_executable
 endif()
 
+find_file(TEGRA tegra_drm.h /usr/include/drm)
+if(TEGRA)
+	message("TEGRA")
+	set( USE_GLES ON )
+	add_definitions(-DTEGRA)
+endif()
+
 pkg_check_modules(JANSSON jansson REQUIRED)
 pkg_check_modules(LIBEDIT libedit REQUIRED)
 pkg_check_modules(OPENCV opencv REQUIRED)
@@ -38,14 +45,14 @@ if(USE_GLES)
 	
 	pkg_check_modules(GLES glesv2 REQUIRED)
 	pkg_check_modules(EGL egl REQUIRED)
-	find_package(Freetype REQUIRED)
+	pkg_check_modules(FREETYPE freetype2 REQUIRED)
 	include_directories( ${GLES_INCLUDE_DIRS} ${EGL_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
 	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/src )
 else()
 	find_package(OpenGL REQUIRED)
 	pkg_check_modules(GLEW glew>=2.1 REQUIRED)
 	pkg_check_modules(GLFW glfw3 REQUIRED)
-	find_package(Freetype REQUIRED)
+	pkg_check_modules(FREETYPE freetype2 REQUIRED)
 		
 	include_directories( ${OPENGL_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
 	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl )
@@ -77,8 +84,6 @@ if(APPLE)
 elseif(UNIX)
 	message("UNIX or LINUX")
 	#add_definitions(-DENABLE_V4L2)
-
-	#check raspberry pi
 elseif(WIN32)
 	message("WINDOWS")
 endif()
@@ -102,11 +107,11 @@ target_link_libraries(picam360-capture.bin
 
 #opengl
 if(USE_GLES)
-	target_link_libraries(picam360-capture.bin ${GLES_LIBRARIES} ${EGL_LIBRARIES} ${FREETYPE_LIBRARIES} )
 	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/libFreetypeGlesRpi.a)
+	target_link_libraries(picam360-capture.bin ${GLES_LIBRARIES} ${EGL_LIBRARIES} ${FREETYPE_LIBRARIES} )
 else()
-	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
 	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl/libfreetype-gl.a )
+	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
 endif()
 
 option(USE_MPU9250 "Use mpu9250" OFF)
