@@ -265,7 +265,8 @@ void main(void) {
 	}
 }
 )glsl";
-const char * sphere_fragment_shader = R"glsl(#if (__VERSION__ > 120)
+const char * sphere_fragment_shader = R"glsl(
+#if (__VERSION__ > 120)
 # define IN in
 # define OUT out
 # define texture2D texture
@@ -326,6 +327,7 @@ void main(void) {
 	}
 }
 )glsl";
+
 static void init(void *obj, const char *common, int num_of_cam) {
 	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
 

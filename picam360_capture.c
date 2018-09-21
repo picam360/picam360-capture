@@ -394,66 +394,6 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
 	return 0;
 }
 
-int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLuint *vbo_out, GLuint *n_out) {
-	GLuint vbo;
-
-	int n = 2 * (num_of_steps + 1) * num_of_steps;
-	float points[4 * n];
-
-	float theta = theta_degree * M_PI / 180.0;
-	float phi = phi_degree * M_PI / 180.0;
-
-	float start_x = -tan(theta / 2);
-	float start_y = -tan(phi / 2);
-
-	float end_x = tan(theta / 2);
-	float end_y = tan(phi / 2);
-
-	float step_x = (end_x - start_x) / num_of_steps;
-	float step_y = (end_y - start_y) / num_of_steps;
-
-	int idx = 0;
-	int i, j;
-	for (i = 0; i < num_of_steps; i++) {	//x
-		for (j = 0; j <= num_of_steps; j++) {	//y
-			{
-				float x = start_x + step_x * i;
-				float y = start_y + step_y * j;
-				float z = 1.0;
-				float len = sqrt(x * x + y * y + z * z);
-				points[idx++] = x / len;
-				points[idx++] = y / len;
-				points[idx++] = z / len;
-				points[idx++] = 1.0;
-				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-				//		points[idx - 3], points[idx - 2], points[idx - 1]);
-			}
-			{
-				float x = start_x + step_x * (i + 1);
-				float y = start_y + step_y * j;
-				float z = 1.0;
-				float len = sqrt(x * x + y * y + z * z);
-				points[idx++] = x / len;
-				points[idx++] = y / len;
-				points[idx++] = z / len;
-				points[idx++] = 1.0;
-				//printf("x=%f,y=%f,z=%f,w=%f\n", points[idx - 4],
-				//		points[idx - 3], points[idx - 2], points[idx - 1]);
-			}
-		}
-	}
-
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
-
-	if (vbo_out != NULL)
-		*vbo_out = vbo;
-	if (n_out != NULL)
-		*n_out = n;
-
-	return 0;
-}
 
 /***********************************************************
  * Name: init_model_proj
@@ -467,32 +407,17 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
  *
  ***********************************************************/
 static void init_model_proj(PICAM360CAPTURE_T *state) {
-	float maxfov = 150.0;
 #ifdef USE_GLES
 	char *common = "#version 100\n";
 #else
 	char *common = "#version 330\n";
 #endif
 
-	board_mesh(64, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo_nop, &state->model_data[OPERATION_MODE_PICAM360MAP].vao);
-	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map.vert", "shader/picam360map.frag", true);
-	} else {
-		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag", true);
-	}
-
 	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop, &state->model_data[OPERATION_MODE_FISHEYE].vao);
 	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new(common, "shader/fisheye.vert", "shader/fisheye.frag", true);
 
 	board_mesh(1, &state->model_data[OPERATION_MODE_CALIBRATION].vbo, &state->model_data[OPERATION_MODE_CALIBRATION].vbo_nop, &state->model_data[OPERATION_MODE_CALIBRATION].vao);
 	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new(common, "shader/calibration.vert", "shader/calibration.frag", true);
-
-	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[OPERATION_MODE_WINDOW].vbo, &state->model_data[OPERATION_MODE_WINDOW].vbo_nop);
-	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window.vert", "shader/window.frag", true);
-	} else {
-		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window_sphere.vert", "shader/window_sphere.frag", true);
-	}
 
 	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop, &state->model_data[OPERATION_MODE_BOARD].vao);
 	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new(common, "shader/board.vert", "shader/board.frag", true);
