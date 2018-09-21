@@ -60,6 +60,15 @@ typedef struct _DECODER_FACTORY_T {
 	void *user_data;
 } DECODER_FACTORY_T;
 
+typedef struct _RENDERER_T {
+	char name[64];
+	void (*init)(void *user_data, const char *common, int num_of_cam);
+	int (*get_program)(void *user_data);
+	void (*render)(void *user_data);
+	void (*release)(void *user_data);
+	void *user_data;
+} RENDERER_T;
+
 typedef void (*ENCODER_STREAM_CALLBACK)(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
 typedef struct _ENCODER_T {
 	char name[64];
@@ -132,6 +141,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*add_mpu_factory)(MPU_FACTORY_T *factory);
 	void (*add_decoder_factory)(DECODER_FACTORY_T *factory);
 	void (*add_encoder_factory)(ENCODER_FACTORY_T *factory);
+	void (*add_renderer)(RENDERER_T *renderer);
 	void (*add_status)(STATUS_T *status);
 	void (*add_watch)(STATUS_T *status);
 	void (*add_plugin)(PLUGIN_T *plugin);

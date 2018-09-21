@@ -85,7 +85,7 @@ static void save_options(PICAM360CAPTURE_T *state);
 static void init_options_ex(PICAM360CAPTURE_T *state);
 static void save_options_ex(PICAM360CAPTURE_T *state);
 static void exit_func(void);
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat);
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, RENDERER_T *renderer, VECTOR4D_T view_quat);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
 static void get_info_str(char *buff, int buff_len);
@@ -110,47 +110,14 @@ static int end_width(const char *str, const char *suffix) {
 		return 0;
 	return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
-static const char *get_operation_mode_string(enum OPERATION_MODE mode) {
-	switch (mode) {
-	case OPERATION_MODE_BOARD:
-		return "BOARD";
-	case OPERATION_MODE_WINDOW:
-		return "WINDOW";
-	case OPERATION_MODE_PICAM360MAP:
-		return "PICAM360MAP";
-	case OPERATION_MODE_EQUIRECTANGULAR:
-		return "EQUIRECTANGULAR";
-	case OPERATION_MODE_FISHEYE:
-		return "FISHEYE";
-	case OPERATION_MODE_CALIBRATION:
-		return "CALIBRATION";
-	default:
-		return "NONE";
+
+static RENDERER_T *get_renderer(const char *renderer_string) {
+	for (int i = 0; state->renderers[i] != NULL; i++) {
+		if (strncasecmp(state->renderers[i]->name, renderer_string, 64) == 0) {
+			return state->renderers[i];
+		}
 	}
-}
-static enum OPERATION_MODE get_operation_mode(const char *mode_string) {
-	switch (mode_string[0]) {
-	case 'B':
-	case 'b':
-		return OPERATION_MODE_BOARD;
-	case 'W':
-	case 'w':
-		return OPERATION_MODE_WINDOW;
-	case 'P':
-	case 'p':
-		return OPERATION_MODE_PICAM360MAP;
-	case 'E':
-	case 'e':
-		return OPERATION_MODE_EQUIRECTANGULAR;
-	case 'F':
-	case 'f':
-		return OPERATION_MODE_FISHEYE;
-	case 'C':
-	case 'c':
-		return OPERATION_MODE_CALIBRATION;
-	default:
-		return OPERATION_MODE_NONE;
-	}
+	return NULL;
 }
 
 static void glfwErrorCallback(int num, const char* err_str) {
@@ -507,35 +474,28 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	char *common = "#version 330\n";
 #endif
 
-	board_mesh(64, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vbo_nop, &state->model_data[OPERATION_MODE_EQUIRECTANGULAR].vao);
-	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new(common, "shader/equirectangular.vert", "shader/equirectangular.frag");
-	} else {
-		state->model_data[OPERATION_MODE_EQUIRECTANGULAR].program = GLProgram_new(common, "shader/equirectangular_sphere.vert", "shader/equirectangular_sphere.frag");
-	}
-
 	board_mesh(64, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo, &state->model_data[OPERATION_MODE_PICAM360MAP].vbo_nop, &state->model_data[OPERATION_MODE_PICAM360MAP].vao);
 	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map.vert", "shader/picam360map.frag");
+		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map.vert", "shader/picam360map.frag", true);
 	} else {
-		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag");
+		state->model_data[OPERATION_MODE_PICAM360MAP].program = GLProgram_new(common, "shader/picam360map_sphere.vert", "shader/picam360map_sphere.frag", true);
 	}
 
 	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop, &state->model_data[OPERATION_MODE_FISHEYE].vao);
-	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new(common, "shader/fisheye.vert", "shader/fisheye.frag");
+	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new(common, "shader/fisheye.vert", "shader/fisheye.frag", true);
 
 	board_mesh(1, &state->model_data[OPERATION_MODE_CALIBRATION].vbo, &state->model_data[OPERATION_MODE_CALIBRATION].vbo_nop, &state->model_data[OPERATION_MODE_CALIBRATION].vao);
-	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new(common, "shader/calibration.vert", "shader/calibration.frag");
+	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new(common, "shader/calibration.vert", "shader/calibration.frag", true);
 
 	spherewindow_mesh(maxfov, maxfov, 64, &state->model_data[OPERATION_MODE_WINDOW].vbo, &state->model_data[OPERATION_MODE_WINDOW].vbo_nop);
 	if (state->num_of_cam == 1) {
-		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window.vert", "shader/window.frag");
+		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window.vert", "shader/window.frag", true);
 	} else {
-		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window_sphere.vert", "shader/window_sphere.frag");
+		state->model_data[OPERATION_MODE_WINDOW].program = GLProgram_new(common, "shader/window_sphere.vert", "shader/window_sphere.frag", true);
 	}
 
 	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop, &state->model_data[OPERATION_MODE_BOARD].vao);
-	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new(common, "shader/board.vert", "shader/board.frag");
+	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new(common, "shader/board.vert", "shader/board.frag", true);
 }
 
 /***********************************************************
@@ -891,7 +851,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	FRAME_T *frame = malloc(sizeof(FRAME_T));
 	memset(frame, 0, sizeof(FRAME_T));
 	frame->id = state->next_frame_id++;
-	frame->operation_mode = OPERATION_MODE_WINDOW;
+	frame->renderer = state->renderers[0];
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->output_type = OUTPUT_TYPE_NONE;
 	frame->output_fd = -1;
@@ -907,7 +867,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			sscanf(optarg, "%d", &render_height);
 			break;
 		case 'm':
-			frame->operation_mode = get_operation_mode(optarg);
+			frame->renderer = get_renderer(optarg);
 			break;
 		case 'o':
 			frame->output_mode = OUTPUT_MODE_VIDEO;
@@ -1186,7 +1146,7 @@ void frame_handler() {
 					state->split = split + 1;
 
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-					redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], view_quat);
+					redraw_render_texture(state, frame, frame->renderer, view_quat);
 					glFinish();
 					glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1202,7 +1162,7 @@ void frame_handler() {
 				state->split = 0;
 
 				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-				redraw_render_texture(state, frame, &state->model_data[frame->operation_mode], view_quat);
+				redraw_render_texture(state, frame, frame->renderer, view_quat);
 				if (state->menu_visible) {
 					redraw_info(state, frame);
 				}
@@ -1489,7 +1449,7 @@ int _command_handler(const char *_buff) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
 			int id = -1;
-			enum OPERATION_MODE mode = OPERATION_MODE_NONE;
+			RENDERER_T *renderer = NULL;
 			const int kMaxArgs = 32;
 			int argc = 1;
 			char *argv[kMaxArgs];
@@ -1508,13 +1468,13 @@ int _command_handler(const char *_buff) {
 					sscanf(optarg, "%d", &id);
 					break;
 				case 'm':
-					mode = get_operation_mode(optarg);
+					renderer = get_renderer(optarg);
 					break;
 				}
 			}
 			for (FRAME_T *frame_p = state->frame; frame_p != NULL; frame_p = frame_p->next) {
 				if (frame_p->id == id) {
-					frame_p->operation_mode = mode;
+					frame_p->renderer = renderer;
 				}
 			}
 		}
@@ -1935,7 +1895,7 @@ int _command_handler(const char *_buff) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_NEXT);
 	} else if (strncmp(cmd, "back2previouse_menu", sizeof(buff)) == 0) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_BACK);
-	} else if (state->frame != NULL && state->frame->operation_mode == OPERATION_MODE_CALIBRATION) {
+	} else if (state->frame != NULL && strcasecmp(state->frame->renderer->name, "CALIBRATION") == 0) {
 		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
 			char *param = strtok(NULL, " \n");
 			if (param != NULL) {
@@ -2296,6 +2256,35 @@ static void add_encoder_factory(ENCODER_FACTORY_T *encoder_factory) {
 	}
 }
 
+static void add_renderer(RENDERER_T *renderer) {
+#ifdef USE_GLES
+	char *common = "#version 100\n";
+#else
+	char *common = "#version 330\n";
+#endif
+	renderer->init(renderer, common, state->num_of_cam);
+
+	for (int i = 0; state->renderers[i] != (void*) -1; i++) {
+		if (state->renderers[i] == NULL) {
+			state->renderers[i] = renderer;
+			if (state->renderers[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_renderer\n");
+					return;
+				}
+				RENDERER_T **current = state->renderers;
+				state->renderers = malloc(sizeof(RENDERER_T*) * space);
+				memset(state->renderers, 0, sizeof(RENDERER_T*) * space);
+				memcpy(state->renderers, current, sizeof(RENDERER_T*) * i);
+				state->renderers[space - 1] = (void*) -1;
+				free(current);
+			}
+			return;
+		}
+	}
+}
+
 static void add_status(STATUS_T *status) {
 	for (int i = 0; state->statuses[i] != (void*) -1; i++) {
 		if (state->statuses[i] == NULL) {
@@ -2414,6 +2403,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.add_mpu_factory = add_mpu_factory;
 		state->plugin_host.add_decoder_factory = add_decoder_factory;
 		state->plugin_host.add_encoder_factory = add_encoder_factory;
+		state->plugin_host.add_renderer = add_renderer;
 		state->plugin_host.add_status = add_status;
 		state->plugin_host.add_watch = add_watch;
 		state->plugin_host.add_plugin = add_plugin;
@@ -2480,7 +2470,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				int len =
 						sprintf(sei + 5,
 								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-								frame->id, get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
+								frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
 								frame_info->fov, frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
@@ -2560,7 +2550,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				int len =
 						sprintf(sei + 5,
 								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-								frame->id, get_operation_mode_string(frame->operation_mode), frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
+								frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
 								frame_info->fov, frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
@@ -3287,7 +3277,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				if (state->frame) {
-					state->frame->operation_mode = OPERATION_MODE_CALIBRATION;
+					state->frame->renderer = get_renderer("CALIBRATION");
 				}
 			}
 			break;
@@ -3316,7 +3306,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				if (state->frame) {
-					state->frame->operation_mode = OPERATION_MODE_WINDOW;
+					state->frame->renderer = get_renderer("WINDOW");
 				}
 			}
 			break;
@@ -3688,6 +3678,11 @@ int main(int argc, char *argv[]) {
 		state->encoder_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
+		state->renderers = malloc(sizeof(RENDERER_T*) * INITIAL_SPACE);
+		memset(state->renderers, 0, sizeof(RENDERER_T*) * INITIAL_SPACE);
+		state->renderers[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
 		state->watches = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
 		memset(state->watches, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
 		state->watches[INITIAL_SPACE - 1] = (void*) -1;
@@ -3893,22 +3888,18 @@ int main(int argc, char *argv[]) {
  * Returns: void
  *
  ***********************************************************/
-static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model, VECTOR4D_T view_quat) {
+static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, RENDERER_T *renderer, VECTOR4D_T view_quat) {
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 
-	int program = GLProgram_GetId(model->program);
+	int program = renderer->get_program(renderer);
 	glUseProgram(program);
 
 	glViewport(0, 0, frame_width, frame_height);
 
-	glBindBuffer(GL_ARRAY_BUFFER, model->vbo);
 	glActiveTexture(GL_TEXTURE0);
-	if (frame->operation_mode == OPERATION_MODE_CALIBRATION) {
-		glBindTexture(GL_TEXTURE_2D, state->calibration_texture);
-	} else {
-		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
-	}
+	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
+
 	for (int i = 0; i < state->num_of_cam; i++) {
 		if (state->decoders[i]) {
 			state->decoders[i]->switch_buffer(state->decoders[i]);
@@ -3995,7 +3986,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	if (frame->operation_mode == OPERATION_MODE_PICAM360MAP) {
+	if (strcasecmp(frame->renderer->name, "PICAM360MAP") == 0) {
 		const int stepnum = 256;
 		float fov_min = 30;
 		float fov_max = 120;
@@ -4036,7 +4027,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 //				printf("%f,%f\n", x_ary2[i], y_ary2[i]);
 //			}
 //		}
-	} else if (frame->operation_mode == OPERATION_MODE_EQUIRECTANGULAR) {
+	} else if (strcasecmp(frame->renderer->name, "EQUIRECTANGULAR") == 0) {
 		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
 		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);
 	} else {
@@ -4109,27 +4100,12 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, MODE
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1, GL_FALSE, (GLfloat*) unif_matrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1, GL_FALSE, (GLfloat*) unif_matrix_1);
 
-#ifdef USE_GLES
-	GLuint loc = glGetAttribLocation(program, "vPosition");
-	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(loc);
-#else
-	glBindVertexArray(model->vao);
-#endif
-
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
-	glFlush();
+	renderer->render(renderer);
 
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-#ifdef USE_GLES
-	glDisableVertexAttribArray(loc);
-#else
-	glBindVertexArray(0);
-#endif
+	glFlush();
 }
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
@@ -4161,7 +4137,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
-	if (frame->operation_mode == OPERATION_MODE_CALIBRATION) {
+	if (strcasecmp(frame->renderer->name, "CALIBRATION") == 0) {
 		glViewport((state->screen_width - state->screen_height) / 2, 0, (GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
 	} else if (state->stereo) {

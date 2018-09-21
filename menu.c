@@ -92,7 +92,7 @@ void init_menu(uint32_t font_size) {
 			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
-	lg_freetypegles.model.program = GLProgram_new("", "shader/freetypegles.vert", "shader/freetypegles.frag");
+	lg_freetypegles.model.program = GLProgram_new("", "shader/freetypegles.vert", "shader/freetypegles.frag", true);
 #ifdef USE_GLES
 	texture_atlas_upload(lg_freetypegles.atlas);
 #endif
