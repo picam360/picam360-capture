@@ -15,7 +15,8 @@
 #include "gst_encoder.h"
 
 #define PLUGIN_NAME "gst_encoder"
-#define ENCODER_NAME "h265"
+#define H265_ENCODER_NAME "h265"
+#define H264_ENCODER_NAME "h264"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static char *lg_exe = "gst-launch-1.0";
@@ -214,14 +215,25 @@ static void init(void *obj, const int width, const int height, int bitrate_kbps,
 		}
 
 		//convert
-		argv[argc++] = "!";
-		argv[argc++] = "videoconvert";
-		argv[argc++] = "!";
-		argv[argc++] = "omxh265enc";
-		argv[argc++] = "control-rate=2";
-		argv[argc++] = bitrate_str;
-		argv[argc++] = "!";
-		argv[argc++] = "video/x-h265,stream-format=byte-stream";
+		if (strcmp(_this->super.name, H265_ENCODER_NAME) == 0) {
+			argv[argc++] = "!";
+			argv[argc++] = "videoconvert";
+			argv[argc++] = "!";
+			argv[argc++] = "omxh265enc";
+			argv[argc++] = "control-rate=2";
+			argv[argc++] = bitrate_str;
+			argv[argc++] = "!";
+			argv[argc++] = "video/x-h265,stream-format=byte-stream";
+		} else {//h264
+			argv[argc++] = "!";
+			argv[argc++] = "videoconvert";
+			argv[argc++] = "!";
+			argv[argc++] = "omxh264enc";
+			argv[argc++] = "control-rate=2";
+			argv[argc++] = bitrate_str;
+			argv[argc++] = "!";
+			argv[argc++] = "video/x-h264,stream-format=byte-stream";
+		}
 
 		//output
 		argv[argc++] = "!";
@@ -286,9 +298,10 @@ static void add_frame(void *obj, const unsigned char *in_data, void *frame_data)
 }
 
 static void create_encoder(void *user_data, ENCODER_T **output_encoder) {
+	ENCODER_FACTORY_T *encoder_factory = (ENCODER_FACTORY_T*) user_data;
 	ENCODER_T *encoder = (ENCODER_T*) malloc(sizeof(gst_encoder));
 	memset(encoder, 0, sizeof(gst_encoder));
-	strcpy(encoder->name, ENCODER_NAME);
+	strcpy(encoder->name, encoder_factory->name);
 	encoder->release = release;
 	encoder->init = init;
 	encoder->add_frame = add_frame;
@@ -332,9 +345,20 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	{
 		ENCODER_FACTORY_T *encoder_factory = (ENCODER_FACTORY_T*) malloc(sizeof(ENCODER_FACTORY_T));
 		memset(encoder_factory, 0, sizeof(ENCODER_FACTORY_T));
-		strcpy(encoder_factory->name, ENCODER_NAME);
+		strcpy(encoder_factory->name, H265_ENCODER_NAME);
 		encoder_factory->release = release;
 		encoder_factory->create_encoder = create_encoder;
+		encoder_factory->user_data = encoder_factory;
+
+		lg_plugin_host->add_encoder_factory(encoder_factory);
+	}
+	{
+		ENCODER_FACTORY_T *encoder_factory = (ENCODER_FACTORY_T*) malloc(sizeof(ENCODER_FACTORY_T));
+		memset(encoder_factory, 0, sizeof(ENCODER_FACTORY_T));
+		strcpy(encoder_factory->name, H264_ENCODER_NAME);
+		encoder_factory->release = release;
+		encoder_factory->create_encoder = create_encoder;
+		encoder_factory->user_data = encoder_factory;
 
 		lg_plugin_host->add_encoder_factory(encoder_factory);
 	}

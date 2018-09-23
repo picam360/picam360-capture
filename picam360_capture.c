@@ -2369,7 +2369,7 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 			const unsigned char SOI[] = { 0x48, 0x45 }; //'H', 'E'
 			const unsigned char EOI[] = { 0x56, 0x43 }; //'V', 'C'
 			//header pack
-			//printf("debug info h265 len=%d\n", data_len);
+			//printf("debug info h265 len=%d, type=%d\n", data_len, ((data[4] & 0x7e) >> 1));
 			if (frame_info) { // sei for a frame
 				int server_key = frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec;
 				float idle_time_sec = 0;
