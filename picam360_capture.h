@@ -45,7 +45,7 @@
 #include "picam360_capture_plugin.h"
 
 #define TEXTURE_BUFFER_NUM 2
-#define MAX_CAM_NUM 2
+#define MAX_CAM_NUM 8
 #define MAX_OPERATION_NUM 7
 
 enum INPUT_MODE {
