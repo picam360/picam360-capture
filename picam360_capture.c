@@ -394,7 +394,6 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
 	return 0;
 }
 
-
 /***********************************************************
  * Name: init_model_proj
  *
@@ -2395,8 +2394,8 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				int len =
 						sprintf(sei + 5,
 								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-								frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
-								frame_info->fov, frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
+								frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
+								frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
 				sei[1] = (len >> 16) & 0xFF;
@@ -2475,8 +2474,8 @@ static void stream_callback(unsigned char *data, unsigned int data_len, void *fr
 				int len =
 						sprintf(sei + 5,
 								"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-								frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w,
-								frame_info->fov, frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
+								frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
+								frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 				len += 1; //nal header
 				sei[0] = (len >> 24) & 0xFF;
 				sei[1] = (len >> 16) & 0xFF;
@@ -3826,88 +3825,75 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
 
 	for (int i = 0; i < state->num_of_cam; i++) {
-		if (state->decoders[i]) {
-			state->decoders[i]->switch_buffer(state->decoders[i]);
-		}
+//		if (state->decoders[i]) {
+//			state->decoders[i]->switch_buffer(state->decoders[i]);//wait texture updated
+//		}
 		glActiveTexture(GL_TEXTURE1 + i);
 		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
 	}
 
 	//depth axis is z, vertical asis is y
-	float unif_matrix[16];
-	float unif_matrix_1[16];
-	float camera_offset_matrix[16];
-	float camera_matrix[16];
-	float camera_matrix_1[16];
-	float view_matrix[16];
-	float north_matrix[16];
-	float world_matrix[16];
-	mat4_identity(unif_matrix);
-	mat4_identity(unif_matrix_1);
-	mat4_identity(camera_offset_matrix);
-	mat4_identity(camera_matrix);
-	mat4_identity(camera_matrix_1);
-	mat4_identity(view_matrix);
-	mat4_identity(north_matrix);
-	mat4_identity(world_matrix);
-
-	// Rc : camera orientation
-
-	if (state->camera_coordinate_from_device) {
-		mat4_fromQuat(camera_matrix, state->camera_quaternion[0].ary);
-		mat4_fromQuat(camera_matrix_1, state->camera_quaternion[1].ary);
-	} else {
-		//euler Y(yaw)X(pitch)Z(roll)
-		mat4_rotateZ(camera_matrix, camera_matrix, state->camera_roll);
-		mat4_rotateX(camera_matrix, camera_matrix, state->camera_pitch);
-		mat4_rotateY(camera_matrix, camera_matrix, state->camera_yaw);
-
-		mat4_rotateZ(camera_matrix_1, camera_matrix_1, state->camera_roll);
-		mat4_rotateX(camera_matrix_1, camera_matrix_1, state->camera_pitch);
-		mat4_rotateY(camera_matrix_1, camera_matrix_1, state->camera_yaw);
-	}
-
-	// Rco : camera offset
-	//euler Y(yaw)X(pitch)Z(roll)
 	{
-		mat4_rotateZ(camera_offset_matrix, camera_offset_matrix, state->options.cam_offset_roll[0]);
-		mat4_rotateX(camera_offset_matrix, camera_offset_matrix, state->options.cam_offset_pitch[0]);
-		mat4_rotateY(camera_offset_matrix, camera_offset_matrix, state->options.cam_offset_yaw[0]);
-		mat4_multiply(camera_matrix, camera_matrix, camera_offset_matrix); // Rc'=RcoRc
-		mat4_multiply(camera_matrix_1, camera_matrix_1, camera_offset_matrix); // Rc'=RcoRc
+		float cam_attitude[16 * MAX_CAM_NUM];
+		float view_matrix[16];
+		float north_matrix[16];
+		float world_matrix[16];
+
+		{ // Rv : view
+			mat4_identity(view_matrix);
+			mat4_fromQuat(view_matrix, view_quat.ary);
+			mat4_invert(view_matrix, view_matrix);
+		}
+
+		{ // Rn : north
+			mat4_identity(north_matrix);
+			float north_diff = state->plugin_host.get_view_north() - state->plugin_host.get_camera_north();
+			mat4_rotateY(north_matrix, north_matrix, north_diff * M_PI / 180);
+		}
+
+		{ // Rw : view coodinate to world coodinate and view heading to ground initially
+			mat4_identity(world_matrix);
+			mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
+		}
+
+		for (int i = 0; i < state->num_of_cam; i++) {
+			float *unif_matrix = cam_attitude + 16 * i;
+			float cam_matrix[16];
+			{ // Rc : cam orientation
+				mat4_identity(cam_matrix);
+				if (state->camera_coordinate_from_device) {
+					mat4_fromQuat(cam_matrix, state->camera_quaternion[i].ary);
+				} else {
+					//euler Y(yaw)X(pitch)Z(roll)
+					mat4_rotateZ(cam_matrix, cam_matrix, state->camera_roll);
+					mat4_rotateX(cam_matrix, cam_matrix, state->camera_pitch);
+					mat4_rotateY(cam_matrix, cam_matrix, state->camera_yaw);
+				}
+			}
+
+			{ // Rco : cam offset  //euler Y(yaw)X(pitch)Z(roll)
+				float cam_offset_matrix[16];
+				mat4_identity(cam_offset_matrix);
+				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_roll[i]);
+				mat4_rotateX(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_pitch[i]);
+				mat4_rotateY(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_yaw[i]);
+				mat4_invert(cam_offset_matrix, cam_offset_matrix);
+				mat4_multiply(cam_matrix, cam_matrix, cam_offset_matrix); // Rc'=RcoRc
+			}
+
+			{ //RcRv(Rc^-1)RcRw
+				mat4_identity(unif_matrix);
+				mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
+				mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
+				//mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
+				mat4_multiply(unif_matrix, unif_matrix, cam_matrix); // RcRnRvRw
+			}
+			mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
+		}
+		glUniformMatrix4fv(glGetUniformLocation(program, "cam_attitude"), state->num_of_cam, GL_FALSE, (GLfloat*) cam_attitude);
 	}
 
-	// Rv : view
-	{
-		mat4_fromQuat(view_matrix, view_quat.ary);
-		mat4_invert(view_matrix, view_matrix);
-	}
-
-	// Rn
-	{
-		float north_diff = state->plugin_host.get_view_north() - state->plugin_host.get_camera_north();
-		mat4_rotateY(north_matrix, north_matrix, north_diff * M_PI / 180);
-	}
-
-	// Rw : view coodinate to world coodinate and view heading to ground initially
-	mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
-
-	// Rv : view orientation
-	//RcRv(Rc^-1)RcRw
-	mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
-	mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
-	//mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
-	mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRnRvRw
-
-	mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
-
-	mat4_multiply(unif_matrix_1, unif_matrix_1, world_matrix); // Rw
-	mat4_multiply(unif_matrix_1, unif_matrix_1, view_matrix); // RvRw
-	//mat4_multiply(unif_matrix_1, unif_matrix_1, north_matrix); // RnRvRw
-	mat4_multiply(unif_matrix_1, unif_matrix_1, camera_matrix_1); // RcRnRvRw
-
-	mat4_transpose(unif_matrix_1, unif_matrix_1); // this mat4 library is row primary, opengl is column primary
-
+	//these should be into each plugin
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
@@ -3969,61 +3955,40 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 		glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"), aspect_ratio);
 	}
 
+	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
 	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
+	glUniform1i(glGetUniformLocation(program, "num_of_cam"), state->num_of_cam);
 
-	//options start
 	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), state->options.sharpness_gain);
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_offset_yaw", i);
-		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_yaw[i]);
-		if (state->options.config_ex_enabled) {
-			sprintf(buff, "cam%d_offset_x", i);
-			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_x[i] + state->options.cam_offset_x_ex[i]);
-			sprintf(buff, "cam%d_offset_y", i);
-			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i] + state->options.cam_offset_y_ex[i]);
-			sprintf(buff, "cam%d_horizon_r", i);
-			glUniform1f(glGetUniformLocation(program, buff), (state->options.cam_horizon_r[i] + state->options.cam_horizon_r_ex[i]) * state->camera_horizon_r_bias);
-		} else {
-			sprintf(buff, "cam%d_offset_x", i);
-			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_x[i]);
-			sprintf(buff, "cam%d_offset_y", i);
-			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_offset_y[i]);
-			sprintf(buff, "cam%d_horizon_r", i);
-			glUniform1f(glGetUniformLocation(program, buff), state->options.cam_horizon_r[i] * state->camera_horizon_r_bias);
-		}
-		sprintf(buff, "cam%d_aov", i);
-		glUniform1f(glGetUniformLocation(program, buff), state->options.cam_aov[i] / state->refraction);
-	}
-	glUniform1f(glGetUniformLocation(program, "cam_offset_yaw"), state->options.cam_offset_yaw[state->active_cam]);
-	if (state->options.config_ex_enabled) {
-		glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam] + state->options.cam_offset_x_ex[state->active_cam]);
-		glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam] + state->options.cam_offset_y_ex[state->active_cam]);
-		glUniform1f(glGetUniformLocation(program, "cam_horizon_r"),
-				(state->options.cam_horizon_r[state->active_cam] + state->options.cam_horizon_r_ex[state->active_cam]) * state->camera_horizon_r_bias);
-	} else {
-		glUniform1f(glGetUniformLocation(program, "cam_offset_x"), state->options.cam_offset_x[state->active_cam]);
-		glUniform1f(glGetUniformLocation(program, "cam_offset_y"), state->options.cam_offset_y[state->active_cam]);
-		glUniform1f(glGetUniformLocation(program, "cam_horizon_r"), state->options.cam_horizon_r[state->active_cam] * state->camera_horizon_r_bias);
-	}
-	glUniform1f(glGetUniformLocation(program, "cam_aov"), state->options.cam_aov[state->active_cam] / state->refraction);
 	glUniform1f(glGetUniformLocation(program, "color_offset"), state->options.color_offset);
 	glUniform1f(glGetUniformLocation(program, "color_factor"), 1.0 / (1.0 - state->options.color_offset));
 	glUniform1f(glGetUniformLocation(program, "overlap"), state->options.overlap);
-	//options end
 
-	//texture start
-	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
+	int cam_texture[MAX_CAM_NUM];
+	float cam_offset_yaw[MAX_CAM_NUM];
+	float cam_offset_x[MAX_CAM_NUM];
+	float cam_offset_y[MAX_CAM_NUM];
+	float cam_horizon_r[MAX_CAM_NUM];
+	float cam_aov[MAX_CAM_NUM];
 	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_texture", i);
-		glUniform1i(glGetUniformLocation(program, buff), i + 1);
+		cam_texture[i] = i + 1;
+		cam_offset_x[i] = state->options.cam_offset_x[i];
+		cam_offset_y[i] = state->options.cam_offset_y[i];
+		cam_horizon_r[i] = state->options.cam_horizon_r[i];
+		cam_aov[i] = state->options.cam_aov[i];
+		if (state->options.config_ex_enabled) {
+			cam_offset_x[i] += state->options.cam_offset_x_ex[i];
+			cam_offset_y[i] += state->options.cam_offset_y_ex[i];
+			cam_horizon_r[i] += state->options.cam_horizon_r_ex[i];
+		}
+		cam_horizon_r[i] *= state->camera_horizon_r_bias;
+		cam_aov[i] /= state->refraction;
 	}
-	glUniform1i(glGetUniformLocation(program, "cam_texture"), state->active_cam + 1);
-	//texture end
-
-	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix"), 1, GL_FALSE, (GLfloat*) unif_matrix);
-	glUniformMatrix4fv(glGetUniformLocation(program, "unif_matrix_1"), 1, GL_FALSE, (GLfloat*) unif_matrix_1);
+	glUniform1iv(glGetUniformLocation(program, "cam_texture"), state->num_of_cam, cam_texture);
+	glUniform1fv(glGetUniformLocation(program, "cam_offset_x"), state->num_of_cam, cam_offset_x);
+	glUniform1fv(glGetUniformLocation(program, "cam_offset_y"), state->num_of_cam, cam_offset_y);
+	glUniform1fv(glGetUniformLocation(program, "cam_horizon_r"), state->num_of_cam, cam_horizon_r);
+	glUniform1fv(glGetUniformLocation(program, "cam_aov"), state->num_of_cam, cam_aov);
 
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
