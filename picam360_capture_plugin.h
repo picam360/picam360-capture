@@ -64,7 +64,7 @@ typedef struct _RENDERER_T {
 	char name[64];
 	void (*init)(void *user_data, const char *common, int num_of_cam);
 	int (*get_program)(void *user_data);
-	void (*render)(void *user_data);
+	void (*render)(void *user_data, float fov);
 	void (*release)(void *user_data);
 	void *user_data;
 } RENDERER_T;

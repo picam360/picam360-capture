@@ -21,7 +21,6 @@
 #endif
 
 #include "picam360_capture.h"
-#include "picam360_tools.h"
 #include "gl_program.h"
 #include "auto_calibration.h"
 #include "manual_mpu.h"
@@ -3821,19 +3820,24 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 
 	glViewport(0, 0, frame_width, frame_height);
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, state->logo_texture);
+	{ // bind texture
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, state->logo_texture);
+		glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
 
-	for (int i = 0; i < state->num_of_cam; i++) {
-//		if (state->decoders[i]) {
-//			state->decoders[i]->switch_buffer(state->decoders[i]);//wait texture updated
-//		}
-		glActiveTexture(GL_TEXTURE1 + i);
-		glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
+		int cam_texture[MAX_CAM_NUM];
+		for (int i = 0; i < state->num_of_cam; i++) {
+//			if (state->decoders[i]) {
+//				state->decoders[i]->switch_buffer(state->decoders[i]);//wait texture updated
+//			}
+			cam_texture[i] = i + 1;
+			glActiveTexture(GL_TEXTURE1 + i);
+			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
+		}
+		glUniform1iv(glGetUniformLocation(program, "cam_texture"), state->num_of_cam, cam_texture);
 	}
 
-	//depth axis is z, vertical asis is y
-	{
+	{ //cam_attitude //depth axis is z, vertical asis is y
 		float cam_attitude[16 * MAX_CAM_NUM];
 		float view_matrix[16];
 		float north_matrix[16];
@@ -3892,53 +3896,39 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 		}
 		glUniformMatrix4fv(glGetUniformLocation(program, "cam_attitude"), state->num_of_cam, GL_FALSE, (GLfloat*) cam_attitude);
 	}
+	{ //cam_options
+		float cam_offset_yaw[MAX_CAM_NUM];
+		float cam_offset_x[MAX_CAM_NUM];
+		float cam_offset_y[MAX_CAM_NUM];
+		float cam_horizon_r[MAX_CAM_NUM];
+		float cam_aov[MAX_CAM_NUM];
+		for (int i = 0; i < state->num_of_cam; i++) {
+			cam_offset_x[i] = state->options.cam_offset_x[i];
+			cam_offset_y[i] = state->options.cam_offset_y[i];
+			cam_horizon_r[i] = state->options.cam_horizon_r[i];
+			cam_aov[i] = state->options.cam_aov[i];
+			if (state->options.config_ex_enabled) {
+				cam_offset_x[i] += state->options.cam_offset_x_ex[i];
+				cam_offset_y[i] += state->options.cam_offset_y_ex[i];
+				cam_horizon_r[i] += state->options.cam_horizon_r_ex[i];
+			}
+			cam_horizon_r[i] *= state->camera_horizon_r_bias;
+			cam_aov[i] /= state->refraction;
+		}
+		glUniform1fv(glGetUniformLocation(program, "cam_offset_x"), state->num_of_cam, cam_offset_x);
+		glUniform1fv(glGetUniformLocation(program, "cam_offset_y"), state->num_of_cam, cam_offset_y);
+		glUniform1fv(glGetUniformLocation(program, "cam_horizon_r"), state->num_of_cam, cam_horizon_r);
+		glUniform1fv(glGetUniformLocation(program, "cam_aov"), state->num_of_cam, cam_aov);
+
+		glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
+		glUniform1i(glGetUniformLocation(program, "num_of_cam"), state->num_of_cam);
+	}
 
 	//these should be into each plugin
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	if (strcasecmp(frame->renderer->name, "PICAM360MAP") == 0) {
-		const int stepnum = 256;
-		float fov_min = 30;
-		float fov_max = 120;
-		float fov_factor = 1.0 - (MIN(MAX(frame->fov / 2.0, fov_min), fov_max) - fov_min) / (fov_max - fov_min) / 2.0;
-		//float ganma = log(frame->fov / 2.0 / 180.0) / log(1.0 / sqrt(2));
-		//float x_ary[3] = { 0.0, 1.0, sqrt(2) };
-		//float y_ary[3] = { 0.0, frame->fov / 1.2 * M_PI / 180.0, M_PI };
-		float x_ary2[stepnum];
-		float y_ary2[stepnum];
-		POINT_T p0 = { 0.0, 0.0 };
-		POINT_T p1 = { fov_factor, -fov_factor + 1.0 };
-		POINT_T p2 = { 1.0, 1.0 };
-		for (int i = 0; i < stepnum; i++) {
-			POINT_T p = QuadraticBezPoint(p0, p1, p2, (float) i / (stepnum - 1));
-			x_ary2[i] = p.x;
-			y_ary2[i] = p.y;
-		}
-		// invert x y
-		const int stepnum3 = 256;
-		float x_ary3[stepnum3];
-		float y_ary3[stepnum3];
-		for (int i = 0; i < stepnum3; i++) {
-			x_ary3[i] = (float) i / (stepnum3 - 1);
-			for (int j = 0; j < stepnum - 1; j++) {
-				if (x_ary3[i] >= x_ary2[j] && x_ary3[i] <= x_ary2[j + 1]) {
-					float ratio = (x_ary3[i] - x_ary2[j]) / (x_ary2[j + 1] - x_ary2[j]);
-					y_ary3[i] = ratio * (y_ary2[j + 1] - y_ary2[j]) + y_ary2[j];
-					y_ary3[i] *= M_PI;
-					break;
-				}
-			}
-		}
-		glUniform1fv(glGetUniformLocation(program, "r_2_pitch"), stepnum3, y_ary3);
-//		static bool init = false;
-//		if (!init) {
-//			init = true;
-//			for (int i = 0; i < stepnum; i++) {
-//				printf("%f,%f\n", x_ary2[i], y_ary2[i]);
-//			}
-//		}
-	} else if (strcasecmp(frame->renderer->name, "EQUIRECTANGULAR") == 0) {
+	if (strcasecmp(frame->renderer->name, "EQUIRECTANGULAR") == 0) {
 		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
 		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);
 	} else {
@@ -3946,54 +3936,19 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 		float scale = 1.0 / tan(fov_rad / 2);
 		glUniform1f(glGetUniformLocation(program, "scale"), scale);
 	}
-	{
-		float aspect_ratio = (float) state->cam_width / (float) state->cam_height;
-		glUniform1f(glGetUniformLocation(program, "cam_aspect_ratio"), aspect_ratio);
-	}
-	{
-		float aspect_ratio = (float) frame_width / (float) frame_height;
-		glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"), aspect_ratio);
-	}
 
-	glUniform1i(glGetUniformLocation(program, "logo_texture"), 0);
-	glUniform1i(glGetUniformLocation(program, "active_cam"), state->active_cam);
-	glUniform1i(glGetUniformLocation(program, "num_of_cam"), state->num_of_cam);
+	glUniform1f(glGetUniformLocation(program, "cam_aspect_ratio"), (float) state->cam_width / (float) state->cam_height);
+	glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"), (float) frame_width / (float) frame_height);
 
 	glUniform1f(glGetUniformLocation(program, "sharpness_gain"), state->options.sharpness_gain);
 	glUniform1f(glGetUniformLocation(program, "color_offset"), state->options.color_offset);
 	glUniform1f(glGetUniformLocation(program, "color_factor"), 1.0 / (1.0 - state->options.color_offset));
 	glUniform1f(glGetUniformLocation(program, "overlap"), state->options.overlap);
 
-	int cam_texture[MAX_CAM_NUM];
-	float cam_offset_yaw[MAX_CAM_NUM];
-	float cam_offset_x[MAX_CAM_NUM];
-	float cam_offset_y[MAX_CAM_NUM];
-	float cam_horizon_r[MAX_CAM_NUM];
-	float cam_aov[MAX_CAM_NUM];
-	for (int i = 0; i < state->num_of_cam; i++) {
-		cam_texture[i] = i + 1;
-		cam_offset_x[i] = state->options.cam_offset_x[i];
-		cam_offset_y[i] = state->options.cam_offset_y[i];
-		cam_horizon_r[i] = state->options.cam_horizon_r[i];
-		cam_aov[i] = state->options.cam_aov[i];
-		if (state->options.config_ex_enabled) {
-			cam_offset_x[i] += state->options.cam_offset_x_ex[i];
-			cam_offset_y[i] += state->options.cam_offset_y_ex[i];
-			cam_horizon_r[i] += state->options.cam_horizon_r_ex[i];
-		}
-		cam_horizon_r[i] *= state->camera_horizon_r_bias;
-		cam_aov[i] /= state->refraction;
-	}
-	glUniform1iv(glGetUniformLocation(program, "cam_texture"), state->num_of_cam, cam_texture);
-	glUniform1fv(glGetUniformLocation(program, "cam_offset_x"), state->num_of_cam, cam_offset_x);
-	glUniform1fv(glGetUniformLocation(program, "cam_offset_y"), state->num_of_cam, cam_offset_y);
-	glUniform1fv(glGetUniformLocation(program, "cam_horizon_r"), state->num_of_cam, cam_horizon_r);
-	glUniform1fv(glGetUniformLocation(program, "cam_aov"), state->num_of_cam, cam_aov);
-
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 
-	renderer->render(renderer);
+	renderer->render(renderer, frame->fov);
 
 	glFlush();
 }
