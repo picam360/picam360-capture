@@ -298,7 +298,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 #endif
 }
 
-int load_texture(const char *filename, GLuint *tex_out) {
+static int load_texture(const char *filename, uint32_t *tex_out) {
 	GLenum err;
 	GLuint tex;
 	IplImage *iplImage = cvLoadImage(filename, CV_LOAD_IMAGE_COLOR);
@@ -404,6 +404,7 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
  * Returns: void
  *
  ***********************************************************/
+extern void create_rawimage_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 #ifdef USE_GLES
 	char *common = "#version 100\n";
@@ -414,8 +415,11 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop, &state->model_data[OPERATION_MODE_FISHEYE].vao);
 	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new(common, "shader/fisheye.vert", "shader/fisheye.frag", true);
 
-	board_mesh(1, &state->model_data[OPERATION_MODE_CALIBRATION].vbo, &state->model_data[OPERATION_MODE_CALIBRATION].vbo_nop, &state->model_data[OPERATION_MODE_CALIBRATION].vao);
-	state->model_data[OPERATION_MODE_CALIBRATION].program = GLProgram_new(common, "shader/calibration.vert", "shader/calibration.frag", true);
+	{
+		RENDERER_T *renderer = NULL;
+		create_calibration_renderer(&state->plugin_host, &renderer);
+		state->plugin_host.add_renderer(renderer);
+	}
 
 	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop, &state->model_data[OPERATION_MODE_BOARD].vao);
 	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new(common, "shader/board.vert", "shader/board.frag", true);
@@ -483,7 +487,6 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
 
-	load_texture("img/calibration_img.png", &state->calibration_texture);
 	load_texture("img/logo_img.png", &state->logo_texture);
 
 	update_egl_images(state);
@@ -1242,10 +1245,8 @@ int _command_handler(const char *_buff) {
 			sprintf(cmd, "upstream.save");
 			state->plugin_host.send_command(cmd);
 		}
-	} else if (strncmp(cmd, "0", sizeof(buff)) == 0) {
-		state->active_cam = 0;
-	} else if (strncmp(cmd, "1", sizeof(buff)) == 0) {
-		state->active_cam = 1;
+	} else if (cmd[1] == '\0' && cmd[0] >= '0' && cmd[0] <= '9') {
+		state->active_cam = cmd[0] - '0';
 	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
@@ -2313,6 +2314,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_cam_texture_cur = set_cam_texture_cur;
 		state->plugin_host.get_texture_size = get_texture_size;
 		state->plugin_host.set_texture_size = set_texture_size;
+		state->plugin_host.load_texture = load_texture;
 
 		state->plugin_host.get_menu = get_menu;
 		state->plugin_host.get_menu_visible = get_menu_visible;
@@ -3200,6 +3202,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				if (state->frame) {
+					state->frame->tmp_renderer = state->frame->renderer;
 					state->frame->renderer = get_renderer("CALIBRATION");
 				}
 			}
@@ -3229,7 +3232,7 @@ static void calibration_menu_callback(struct _MENU_T *menu, enum MENU_EVENT even
 		case CALIBRATION_CMD_IMAGE_CIRCLE:
 			if (1) {
 				if (state->frame) {
-					state->frame->renderer = get_renderer("WINDOW");
+					state->frame->renderer = state->frame->tmp_renderer;
 				}
 			}
 			break;
@@ -3263,17 +3266,19 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu, enum ME
 	switch (event) {
 	case MENU_EVENT_SELECTED:
 		switch ((int) menu->user_data) {
-		case 0:				//cam
-			break;
-		case 1:				//cam0
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
 			if (1) {
-				state->plugin_host.send_command("0");
-			}
-			menu->selected = false;
-			break;
-		case 2:				//cam1
-			if (1) {
-				state->plugin_host.send_command("1");
+				char name[64];
+				sprintf(name, "%d", (int) menu->user_data - 1);
+				state->plugin_host.send_command(name);
 			}
 			menu->selected = false;
 			break;
@@ -3469,8 +3474,11 @@ static void _init_menu() {
 			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu, menu_new("cam", image_circle_calibration_menu_callback, (void*) 0), INT_MAX);
 			{
 				MENU_T *sub_menu = image_circle_cam_menu;
-				menu_add_submenu(sub_menu, menu_new("0", image_circle_calibration_menu_callback, (void*) 1), INT_MAX);
-				menu_add_submenu(sub_menu, menu_new("1", image_circle_calibration_menu_callback, (void*) 2), INT_MAX);
+				for (int i = 0; i < state->num_of_cam; i++) {
+					char name[64];
+					sprintf(name, "%d", i);
+					menu_add_submenu(sub_menu, menu_new(name, image_circle_calibration_menu_callback, (void*) i + 1), INT_MAX);
+				}
 			}
 			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu, menu_new("x", image_circle_calibration_menu_callback, (void*) 10), INT_MAX);
 			{

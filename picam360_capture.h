@@ -128,6 +128,7 @@ typedef struct _FRAME_T {
 	bool is_recording;
 
 	RENDERER_T *renderer;
+	RENDERER_T *tmp_renderer;
 	enum OUTPUT_MODE output_mode;
 	enum OUTPUT_TYPE output_type;
 	char output_filepath[256];
@@ -189,7 +190,6 @@ typedef struct _PICAM360CAPTURE_T {
 	GLuint cam_texture[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
 	int cam_texture_cur[MAX_CAM_NUM];
 	GLuint logo_texture;
-	GLuint calibration_texture;
 // model rotation vector and direction
 	GLfloat rot_angle_x_inc;
 	GLfloat rot_angle_y_inc;

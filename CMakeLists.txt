@@ -71,8 +71,8 @@ add_executable(picam360-capture.bin
 	gl_program.cc
 	auto_calibration.cc
 	manual_mpu.c
-	picam360_tools.cc
 	menu.c
+	calibration_renderer.c
 )
 
 if(BCM_HOST)
