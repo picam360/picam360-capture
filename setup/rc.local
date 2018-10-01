@@ -11,6 +11,8 @@
 #
 # By default this script does nothing.
 
+USER=pi
+
 # Print the IP address
 _IP=$(hostname -I) || true
 if [ "$_IP" ]; then
@@ -52,7 +54,7 @@ fi
 #
 #  Read environment 
 #
-for line in $(cat /home/pi/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
+for line in $(cat /home/$USER/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
   do
      export $line
   done
@@ -76,13 +78,13 @@ for line in $(cat /home/pi/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
 # lunch driver
 if [ $DRIVER_IP = "127.0.0.1" ]; then
 	echo "lunch driver"
-	su -l pi -c "bash /home/pi/picam360/picam360-driver/lunch.sh -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -f $CAMERA_FPS -n $NUM_OF_CAMERA >/dev/null 2>/dev/null &"
+	su -l $USER -c "bash /home/$USER/picam360/picam360-driver/lunch.sh -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -f $CAMERA_FPS -n $NUM_OF_CAMERA >/dev/null 2>/dev/null &"
 fi
 
 # lunch capture & server
 echo "lunch capture"
 OPTION="-w $CAMERA_HEIGHT -h $CAMERA_HEIGHT -n $NUM_OF_CAMERA"
-su -l pi -c "bash /home/pi/picam360/picam360-capture/lunch.sh $OPTION >/dev/null 2>/dev/null &"
-su -l pi -c "bash /home/pi/picam360/picam360-server/sh/start-app.sh &"
+su -l $USER -c "bash /home/$USER/picam360/picam360-capture/lunch.sh $OPTION >/dev/null 2>/dev/null &"
+su -l $USER -c "bash /home/$USER/picam360/picam360-server/sh/start-app.sh &"
 
 exit 0
