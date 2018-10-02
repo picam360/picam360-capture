@@ -47,6 +47,8 @@
 #define TEXTURE_BUFFER_NUM 2
 #define MAX_CAM_NUM 8
 #define MAX_OPERATION_NUM 7
+#define MAX_QUATERNION_QUEUE_COUNT 128 //keep 1280ms
+#define QUATERNION_QUEUE_RES 10 //10ms
 
 enum INPUT_MODE {
 	INPUT_MODE_NONE, INPUT_MODE_CAM, INPUT_MODE_FILE
@@ -245,6 +247,11 @@ typedef struct _PICAM360CAPTURE_T {
 	RTP_T *rtp;
 	RTP_T *rtcp;
 	float rtp_play_speed;
+
+	char mpu_type[64];
+	MPU_T *mpu;
+	int quaternion_queue_cur;
+	VECTOR4D_T quaternion_queue[MAX_QUATERNION_QUEUE_COUNT];
 
 	char **plugin_paths;
 	PLUGIN_T **plugins;

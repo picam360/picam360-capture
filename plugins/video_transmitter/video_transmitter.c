@@ -53,6 +53,9 @@ static void decode(void *user_data, unsigned char *data, int data_len) {
 		rtp_sendpacket(lg_plugin_host->get_rtp(), data + i, len, PT_CAM_BASE + _this->cam_num);
 		i += len;
 	}
+	if(data[data_len - 1] == 0xD9 && data[data_len - 2] == 0xFF){
+		rtp_flush(lg_plugin_host->get_rtp());
+	}
 }
 
 static float get_fps(void *user_data) {

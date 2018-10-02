@@ -155,6 +155,7 @@ typedef struct _PLUGIN_HOST_T {
 
 	RTP_T *(*get_rtp)();
 	RTP_T *(*get_rtcp)();
+	int (*xmp)(char *buff, int buff_len, int cam_num);
 
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);

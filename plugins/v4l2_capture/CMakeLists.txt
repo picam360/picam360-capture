@@ -5,26 +5,8 @@ project(v4l2_capture)
 
 find_package(PkgConfig REQUIRED)
 
-find_file(BCM_HOST bcm_host.h /opt/vc/include)
-if(BCM_HOST)
-	message("RASPI")
-	set( USE_GLES ON )
-	set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/vc/lib/pkgconfig")
-	pkg_check_modules(BCMHOST bcm_host REQUIRED)
-	add_definitions(-DBCM_HOST)
-	include_directories( ${BCMHOST_INCLUDE_DIRS} )
-	link_directories( ${BCMHOST_LIBRARY_DIRS} ) # need to upper of add_executable
-endif()
-
-find_file(TEGRA tegra_drm.h /usr/include/drm)
-if(TEGRA)
-	message("TEGRA")
-	set( USE_GLES ON )
-	add_definitions(-DTEGRA)
-endif()
-
 add_library(v4l2_capture MODULE
-	v4l2_capture.c
+	v4l2_capture.cc
 	v4l2_handler.c
 )
 set_target_properties(v4l2_capture PROPERTIES
@@ -36,14 +18,17 @@ set_target_properties(v4l2_capture PROPERTIES
     CXX_EXTENSIONS NO # c++11
     PREFIX ""
 )
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
 	
 include_directories(
 	../../include
+	../..
 )
 link_directories(
 )
 
-target_link_libraries(video_reciever
+target_link_libraries(v4l2_capture
 	pthread
 	dl
 )

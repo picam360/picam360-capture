@@ -1923,6 +1923,16 @@ static void *readline_thread_func(void* arg) {
 	return NULL;
 }
 
+static void *quaternion_thread_func(void* arg) {
+	int count = 0;
+	while (1) {
+		int cur = (state->quaternion_queue_cur + 1) % MAX_QUATERNION_QUEUE_COUNT;
+		state->quaternion_queue[cur] = state->mpu->get_quaternion(state->mpu);
+		state->quaternion_queue_cur++;
+		usleep(QUATERNION_QUEUE_RES * 1000);
+	}
+	return NULL;
+}
 ///////////////////////////////////////////
 #if (1) //plugin host methods
 static VECTOR4D_T get_view_quaternion() {
@@ -2088,11 +2098,53 @@ static void set_fov(float value) {
 	state->frame->fov = value;
 }
 
-RTP_T *get_rtp(){
+static RTP_T *get_rtp() {
 	return state->rtp;
 }
-RTP_T *get_rtcp(){
+static RTP_T *get_rtcp() {
 	return state->rtcp;
+}
+
+static int xmp(char *buff, int buff_len, int cam_num) {
+	int xmp_len = 0;
+
+	VECTOR4D_T quat = { };
+	{
+		int video_delay_ms = 0;
+		int cur = (state->quaternion_queue_cur - video_delay_ms / QUATERNION_QUEUE_RES + MAX_QUATERNION_QUEUE_COUNT) % MAX_QUATERNION_QUEUE_COUNT;
+		quat = state->quaternion_queue[cur];
+	}
+	VECTOR4D_T compass = state->mpu->get_compass(state->mpu);
+	VECTOR4D_T camera_offset = state->plugin_host.get_camera_offset(cam_num);
+
+	xmp_len = 0;
+	buff[xmp_len++] = 0xFF;
+	buff[xmp_len++] = 0xE1;
+	buff[xmp_len++] = 0; // size MSB
+	buff[xmp_len++] = 0; // size LSB
+	xmp_len += sprintf(buff + xmp_len, "http://ns.adobe.com/xap/1.0/");
+	buff[xmp_len++] = '\0';
+	xmp_len += sprintf(buff + xmp_len, "<?xpacket begin=\"﻿");
+	buff[xmp_len++] = 0xEF;
+	buff[xmp_len++] = 0xBB;
+	buff[xmp_len++] = 0xBF;
+	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
+	xmp_len += sprintf(buff + xmp_len, "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-drive rev1\">");
+	xmp_len += sprintf(buff + xmp_len, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
+	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
+	xmp_len += sprintf(buff + xmp_len, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x, quat.y, quat.z, quat.w);
+	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", compass.x, compass.y, compass.z);
+	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", state->mpu->get_temperature(state->mpu));
+	xmp_len += sprintf(buff + xmp_len, "<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />", camera_offset.x, camera_offset.y, camera_offset.z, camera_offset.w);
+	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
+	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
+	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
+	xmp_len += sprintf(buff + xmp_len, "<?xpacket end=\"w\"?>");
+	buff[xmp_len++] = '\0';
+	buff[2] = ((xmp_len - 2) >> 8) & 0xFF; // size MSB
+	buff[3] = (xmp_len - 2) & 0xFF; // size LSB
+
+	return xmp_len;
 }
 
 static void send_command(const char *_cmd) {
@@ -2698,14 +2750,6 @@ static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned cha
 
 	if (pt == PT_STATUS) {
 		status_handler((char*) data, data_len);
-	} else if (pt == PT_CAM_BASE + 0) {
-		if (state->plugin_host.decode_video) {
-			state->plugin_host.decode_video(0, (unsigned char*) data, data_len);
-		}
-	} else if (pt == PT_CAM_BASE + 1) {
-		if (state->plugin_host.decode_video) {
-			state->plugin_host.decode_video(1, (unsigned char*) data, data_len);
-		}
 	}
 	return 0;
 }
@@ -3634,6 +3678,7 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
+	strncpy(state->mpu_type, "manual", 64);
 	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
 	strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name));
 	state->video_direct = false;
@@ -3688,7 +3733,7 @@ int main(int argc, char *argv[]) {
 	umask(0000);
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:n:psd:i:r:F:v:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psd:i:r:F:v:M:")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &state->cam_width);
@@ -3723,8 +3768,11 @@ int main(int argc, char *argv[]) {
 		case 'F':
 			strncpy(frame_param, optarg, 256);
 			break;
-		case 'v':
+		case 'V':
 			strncpy(state->default_view_coordinate_mode, optarg, 64);
+			break;
+		case 'M':
+			strncpy(state->mpu_type, optarg, 64);
 			break;
 		default:
 			/* '?' */
@@ -3781,6 +3829,12 @@ int main(int argc, char *argv[]) {
 		sprintf(cmd, "create_frame %s", frame_param);
 		state->plugin_host.send_command(cmd);
 	}
+	//set mpu
+	for (int i = 0; state->mpu_factories[i] != NULL; i++) {
+		if (strncmp(state->mpu_factories[i]->name, state->mpu_type, 64) == 0) {
+			state->mpu_factories[i]->create_mpu(state->mpu_factories[i]->user_data, &state->mpu);
+		}
+	}
 
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
@@ -3791,6 +3845,10 @@ int main(int argc, char *argv[]) {
 	//readline
 	pthread_t readline_thread;
 	pthread_create(&readline_thread, NULL, readline_thread_func, (void*) NULL);
+
+	//quaternion
+	pthread_t quaternion_thread;
+	pthread_create(&quaternion_thread, NULL, quaternion_thread_func, (void*) NULL);
 
 	//status buffer
 	char *status_value = (char*) malloc(RTP_MAXPAYLOADSIZE);
