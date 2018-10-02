@@ -14,12 +14,16 @@
 
 #include "video_reciever.h"
 
+#define PT_CAM_BASE 110
+
 #define PLUGIN_NAME "video_reciever"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 typedef struct _video_reciever {
-	DECODER_T super;
+	CAPTURE_T super;
+
+	int cam_num;
 
 	void *user_data;
 } video_reciever;
@@ -27,8 +31,42 @@ typedef struct _video_reciever {
 static void release(void *obj) {
 	free(obj);
 }
-static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num) {
+static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num, void *user_data) {
+	v4l2_capture *_this = (v4l2_capture*) obj;
+
+	if (data_len == 0) {
+		return -1;
+	}
+
+	if (pt == PT_CAM_BASE + _this->cam_num) {
+		lg_plugin_host->decode_video(_this->cam_num, (unsigned char*) data, data_len);
+	}
 	return 0;
+}
+static void start(void *obj, int cam_num, void *display, void *context, int egl_image_num) {
+	v4l2_capture *_this = (v4l2_capture*) obj;
+
+	_this->cam_num = cam_num;
+
+	rtp_add_callback(lg_plugin_host->get_rtp(), (RTP_CALLBACK) rtp_callback, (void*) _this);
+}
+
+static float get_fps(void *user_data) {
+	return 0;
+}
+
+static void create_capture(void *user_data, CAPTURE_T **out_capture) {
+	CAPTURE_T *capture = (CAPTURE_T*) malloc(sizeof(video_reciever));
+	memset(capture, 0, sizeof(video_reciever));
+	strcpy(capture->name, CAPTURE_NAME);
+	capture->release = release;
+	capture->start = start;
+	capture->get_fps = get_fps;
+	capture->user_data = capture;
+
+	if (out_capture) {
+		*out_capture = capture;
+	}
 }
 
 static int command_handler(void *user_data, const char *_buff) {
@@ -62,11 +100,12 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		*_plugin = plugin;
 	}
 	{
-		DECODER_FACTORY_T *decoder_factory = (DECODER_FACTORY_T*) malloc(sizeof(DECODER_FACTORY_T));
-		memset(decoder_factory, 0, sizeof(DECODER_FACTORY_T));
-		strcpy(decoder_factory->name, DECODER_NAME);
-		decoder_factory->release = release;
+		CAPTURE_FACTORY_T *capture_factory = (CAPTURE_FACTORY_T*) malloc(sizeof(CAPTURE_FACTORY_T));
+		memset(capture_factory, 0, sizeof(CAPTURE_FACTORY_T));
+		strcpy(capture_factory->name, CAPTURE_NAME);
+		capture_factory->release = release;
+		capture_factory->create_capture = create_capture;
 
-		lg_plugin_host->add_decoder_factory(decoder_factory);
+		lg_plugin_host->add_capture_factory(capture_factory);
 	}
 }

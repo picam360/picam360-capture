@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("h265_encoder generating Makefile")
 project(h265_encoder)
 
 add_library(h265_encoder MODULE

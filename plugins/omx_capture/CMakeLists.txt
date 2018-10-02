@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("omx_capture generating Makefile")
 project(omx_capture)
 
 add_library(omx_capture MODULE

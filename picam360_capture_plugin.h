@@ -5,6 +5,7 @@
 #include <jansson.h>//json parser
 #include "quaternion.h"
 #include "menu.h"
+#include "rtp.h"
 
 //0x00** is reserved by system
 #define PICAM360_HOST_NODE_ID 0x0000
@@ -41,6 +42,21 @@ typedef struct _MPU_FACTORY_T {
 	void (*create_mpu)(void *user_data, MPU_T **mpu);
 	void *user_data;
 } MPU_FACTORY_T;
+
+typedef struct _CAPTURE_T {
+	char name[64];
+	void (*start)(void *user_data, int cam_num, void *display, void *context, int n_buffers);
+	float (*get_fps)(void *user_data);
+	void (*release)(void *user_data);
+	void *user_data;
+} CAPTURE_T;
+
+typedef struct _CAPTURE_FACTORY_T {
+	char name[64];
+	void (*release)(void *user_data);
+	void (*create_capture)(void *user_data, CAPTURE_T **capture);
+	void *user_data;
+} CAPTURE_FACTORY_T;
 
 typedef struct _DECODER_T {
 	char name[64];
@@ -137,9 +153,13 @@ typedef struct _PLUGIN_HOST_T {
 	float (*get_fov)();
 	void (*set_fov)(float value);
 
+	RTP_T *(*get_rtp)();
+	RTP_T *(*get_rtcp)();
+
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
 	void (*add_mpu_factory)(MPU_FACTORY_T *factory);
+	void (*add_capture_factory)(CAPTURE_FACTORY_T *factory);
 	void (*add_decoder_factory)(DECODER_FACTORY_T *factory);
 	void (*add_encoder_factory)(ENCODER_FACTORY_T *factory);
 	void (*add_renderer)(RENDERER_T *renderer);

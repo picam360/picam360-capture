@@ -34,6 +34,7 @@
 #include "v4l2_handler.h"
 
 #define PLUGIN_NAME "v4l2_capture"
+#define CAPTURE_NAME "v4l2_capture"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_width = 2048;
@@ -51,7 +52,7 @@ typedef struct _V4l2_CTL_T {
 } V4l2_CTL_T;
 
 typedef struct _v4l2_capture {
-	DECODER_T super;
+	CAPTURE_T super;
 
 	int cam_num;
 	uint32_t frame_num;
@@ -167,7 +168,7 @@ static void *v4l2_thread_func(void* arg) {
 	return NULL;
 }
 
-static void init(void *obj, int cam_num, void *display, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
+static void start(void *obj, int cam_num, void *display, void *context, int egl_image_num) {
 	v4l2_capture *_this = (v4l2_capture*) obj;
 	_this->cam_num = cam_num;
 	pthread_create(&_this->v4l2_thread, NULL, v4l2_thread_func, (void*) _this);
@@ -178,34 +179,20 @@ static void release(void *obj) {
 	free(obj);
 }
 
-static void decode(void *user_data, unsigned char *data, int data_len) {
-}
-
 static float get_fps(void *user_data) {
 	return 0;
 }
+static void create_capture(void *user_data, CAPTURE_T **out_capture) {
+	CAPTURE_T *capture = (CAPTURE_T*) malloc(sizeof(v4l2_capture));
+	memset(capture, 0, sizeof(v4l2_capture));
+	strcpy(capture->name, CAPTURE_NAME);
+	capture->release = release;
+	capture->start = start;
+	capture->get_fps = get_fps;
+	capture->user_data = capture;
 
-static int get_frameskip(void *user_data) {
-	return 0;
-}
-
-static void switch_buffer(void *user_data) {
-}
-
-static void create_decoder(void *user_data, DECODER_T **out_decoder) {
-	DECODER_T *decoder = (DECODER_T*) malloc(sizeof(v4l2_capture));
-	memset(decoder, 0, sizeof(v4l2_capture));
-	strcpy(decoder->name, DECODER_NAME);
-	decoder->release = release;
-	decoder->init = init;
-	decoder->get_fps = get_fps;
-	decoder->get_frameskip = get_frameskip;
-	decoder->decode = decode;
-	decoder->switch_buffer = switch_buffer;
-	decoder->user_data = decoder;
-
-	if (out_decoder) {
-		*out_decoder = decoder;
+	if (out_capture) {
+		*out_capture = capture;
 	}
 }
 
@@ -285,12 +272,12 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		*_plugin = plugin;
 	}
 	{
-		DECODER_FACTORY_T *decoder_factory = (DECODER_FACTORY_T*) malloc(sizeof(DECODER_FACTORY_T));
-		memset(decoder_factory, 0, sizeof(DECODER_FACTORY_T));
-		strcpy(decoder_factory->name, DECODER_NAME);
-		decoder_factory->release = release;
-		decoder_factory->create_decoder = create_decoder;
+		CAPTURE_FACTORY_T *capture_factory = (CAPTURE_FACTORY_T*) malloc(sizeof(CAPTURE_FACTORY_T));
+		memset(capture_factory, 0, sizeof(CAPTURE_FACTORY_T));
+		strcpy(capture_factory->name, CAPTURE_NAME);
+		capture_factory->release = release;
+		capture_factory->create_capture = create_capture;
 
-		lg_plugin_host->add_decoder_factory(decoder_factory);
+		lg_plugin_host->add_capture_factory(capture_factory);
 	}
 }

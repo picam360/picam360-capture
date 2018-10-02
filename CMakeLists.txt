@@ -66,7 +66,7 @@ if(USE_GLES)
 	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/src )
 
 	add_custom_target(freetypeGlesRpi_make
-		COMMAND make -C freetypeGlesRpi
+		COMMAND make -C libs/freetypeGlesRpi
 	)
 	add_dependencies(picam360-capture.bin freetypeGlesRpi_make)
 else()
@@ -124,3 +124,6 @@ endif()
 
 #plugins
 add_subdirectory(plugins)
+if(EXISTS advance_plugins)
+	add_subdirectory(advance_plugins)
+endif()

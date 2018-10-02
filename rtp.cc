@@ -41,28 +41,27 @@ extern "C" {
 #include <signal.h>
 
 #ifdef _WIN64
-   //define something for Windows (64-bit)
+//define something for Windows (64-bit)
 #elif _WIN32
-   //define something for Windows (32-bit)
+//define something for Windows (32-bit)
 #elif __APPLE__
-    #include "TargetConditionals.h"
-    #if TARGET_OS_IPHONE && TARGET_IPHONE_SIMULATOR
-        // define something for simulator
-    #elif TARGET_OS_IPHONE
-        // define something for iphone
-    #else
-        #define TARGET_OS_OSX 1
-        // define something for OSX
-		#define pthread_setname_np(a, b) pthread_setname_np(b)
-    #endif
-#elif __linux
-    // linux
-#elif __unix // all unices not caught above
-    // Unix
-#elif __posix
-    // POSIX
+#include "TargetConditionals.h"
+#if TARGET_OS_IPHONE && TARGET_IPHONE_SIMULATOR
+// define something for simulator
+#elif TARGET_OS_IPHONE
+// define something for iphone
+#else
+#define TARGET_OS_OSX 1
+// define something for OSX
+#define pthread_setname_np(a, b) pthread_setname_np(b)
 #endif
-
+#elif __linux
+// linux
+#elif __unix // all unices not caught above
+// Unix
+#elif __posix
+// POSIX
+#endif
 
 struct RTPHeader {
 #ifdef RTP_BIG_ENDIAN
@@ -86,6 +85,11 @@ struct RTPHeader {
 	uint16_t sequencenumber;
 	uint32_t timestamp;
 	uint32_t ssrc;
+};
+
+struct RTP_CALLBACK_PAIR {
+	RTP_CALLBACK callback;
+	void *user_data;
 };
 
 class RTPPacket {
@@ -173,7 +177,7 @@ typedef struct _RTP_T {
 	uint64_t play_time = 0;
 	float play_speed = 1.0;
 
-	RTP_CALLBACK callback = NULL;
+	std::list<struct RTP_CALLBACK_PAIR> callbacks;
 
 	float bandwidth = 0;
 	float bandwidth_limit = 100 * 1024 * 1024; //100Mbps
@@ -223,8 +227,11 @@ int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_le
 	return data_len;
 }
 
-void rtp_set_callback(RTP_T *_this, RTP_CALLBACK callback) {
-	_this->callback = callback;
+void rtp_add_callback(RTP_T *_this, RTP_CALLBACK callback, void *user_data) {
+	struct RTP_CALLBACK_PAIR pair;
+	pair.callback = callback;
+	pair.user_data = user_data;
+	_this->callbacks.push_back(pair);
 }
 
 void rtp_set_auto_play(RTP_T *_this, bool value) {
@@ -611,8 +618,8 @@ static void *receive_thread_func(void* arg) {
 							}
 							last_timestamp = pack->timestamp;
 						}
-						if (_this->callback) {
-							_this->callback(pack->GetPayloadData(), pack->GetPayloadLength(), pack->GetPayloadType(), pack->GetSequenceNumber());
+						for (std::list<struct RTP_CALLBACK_PAIR>::iterator it = _this->callbacks.begin(); it != _this->callbacks.end(); it++) {
+							(*it).callback(pack->GetPayloadData(), pack->GetPayloadLength(), pack->GetPayloadType(), pack->GetSequenceNumber(), (*it).user_data);
 						}
 						if (_this->record_fd > 0) {
 							pthread_mutex_lock(&_this->record_packet_queue_mlock);

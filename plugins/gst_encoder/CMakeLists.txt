@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("gst_encoder generating Makefile")
 project(gst_encoder)
 
 add_library(gst_encoder MODULE

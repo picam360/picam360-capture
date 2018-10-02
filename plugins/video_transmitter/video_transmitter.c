@@ -14,25 +14,25 @@
 
 #include "video_transmitter.h"
 
+#define PT_CAM_BASE 110
+
 #define PLUGIN_NAME "video_transmitter"
+#define DECODER_NAME "video_transmitter"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 typedef struct _video_transmitter {
 	DECODER_T super;
 
-	//nal
-	bool in_nal;
-	uint32_t nal_len;
-	uint8_t nal_type;
-	uint8_t *nal_buff;
-	uint32_t nal_pos;
+	int cam_num;
 
 	void *user_data;
 } video_transmitter;
 
-static void init(void *obj, int cam_num, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
+static void init(void *obj, int cam_num, void *display, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
+	video_transmitter *_this = (video_transmitter*) obj;
 
+	_this->cam_num = cam_num;
 }
 
 static void release(void *obj) {
@@ -41,78 +41,18 @@ static void release(void *obj) {
 }
 
 static void decode(void *user_data, unsigned char *data, int data_len) {
-	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
-	int last_framecount = send_frame_arg->framecount;
-	struct timeval last_time = { };
-	gettimeofday(&last_time, NULL);
-	while (send_frame_arg->cam_run) {
-		int res = mrevent_wait(&send_frame_arg->frame_ready, 100 * 1000);
-		if (res != 0) {
-			continue;
-		}
-		_FRAME_T *frame;
-		pthread_mutex_lock(&send_frame_arg->frames_mlock);
-		while (1) {
-			frame = *(send_frame_arg->frames.begin());
-			send_frame_arg->frames.pop_front();
-			send_frame_arg->framecount++;
-			if (send_frame_arg->frames.empty()) {
-				mrevent_reset(&send_frame_arg->frame_ready);
-				break;
-			}
-			send_frame_arg->frameskip++;
-			delete frame; //skip frame
-		}
-		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
-		while (send_frame_arg->cam_run) {
-			{ //fps
-				struct timeval time = { };
-				gettimeofday(&time, NULL);
+	video_transmitter *_this = (video_transmitter*) user_data;
 
-				struct timeval diff;
-				timersub(&time, &last_time, &diff);
-				float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-				if (diff_sec > 1.0) {
-					float tmp = (float) (send_frame_arg->framecount - last_framecount) / diff_sec;
-					float w = diff_sec / 10;
-					send_frame_arg->fps = send_frame_arg->fps * (1.0 - w) + tmp * w;
-
-					last_framecount = send_frame_arg->framecount;
-					last_time = time;
-				}
-			}
-			int res = mrevent_wait(&frame->packet_ready, 100 * 1000);
-			if (res != 0) {
-				continue;
-			}
-			_PACKET_T *packet = NULL;
-			pthread_mutex_lock(&frame->packets_mlock);
-			if (!frame->packets.empty()) {
-				packet = *(frame->packets.begin());
-				frame->packets.pop_front();
-			}
-			if (frame->packets.empty()) {
-				mrevent_reset(&frame->packet_ready);
-			}
-			pthread_mutex_unlock(&frame->packets_mlock);
-			if (packet == NULL) {
-				fprintf(stderr, "packet is null\n");
-				continue;
-			}
-			// send the packet
-			rtp_sendpacket(send_frame_arg->rtp, (unsigned char*) packet->data, packet->len,
-			PT_CAM_BASE + send_frame_arg->cam_num);
-			if (packet->eof) {
-				rtp_flush(send_frame_arg->rtp);
-				delete packet;
-				break;
-			} else {
-				delete packet;
-			}
+	for (int i = 0; i < data_len;) {
+		int len;
+		if ((data_len - i) > RTP_MAXPAYLOADSIZE) {
+			len = RTP_MAXPAYLOADSIZE;
+		} else {
+			len = (data_len - i);
 		}
-		delete frame;
+		rtp_sendpacket(lg_plugin_host->get_rtp(), data + i, len, PT_CAM_BASE + _this->cam_num);
+		i += len;
 	}
-	return NULL;
 }
 
 static float get_fps(void *user_data) {

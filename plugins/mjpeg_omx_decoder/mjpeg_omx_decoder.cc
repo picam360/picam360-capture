@@ -698,7 +698,7 @@ static void decode(void *obj, unsigned char *data, int data_len) {
 	}
 
 }
-static void init(void *obj, int cam_num, void *context, void *cam_texture,
+static void init(void *obj, int cam_num, void *display, void *context, void *cam_texture,
 		void **egl_images, int egl_image_num) {
 	mjpeg_omx_decoder *_this = (mjpeg_omx_decoder*) obj;
 

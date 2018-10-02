@@ -24,10 +24,10 @@
 //#include "GL/glext.h"
 #endif
 
-#include "ffmpeg_decoder.h"
+#include "ffmpeg_capture.h"
 
-#define PLUGIN_NAME "ffmpeg_decoder"
-#define DECODER_NAME "ffmpeg"
+#define PLUGIN_NAME "ffmpeg_capture"
+#define CAPTURE_NAME "ffmpeg"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_width = 2048;
@@ -39,8 +39,8 @@ static const int BYTES_PER_PIXEL = 3;
 static char lg_options_input_type[32] = { 'u', 'v', 'c' };
 static char lg_options_input_codec[32] = { 'm', 'j', 'p', 'e', 'g' };
 
-typedef struct _ffmpeg_decoder {
-	DECODER_T super;
+typedef struct _ffmpeg_capture {
+	CAPTURE_T super;
 
 	int cam_num;
 	GLFWwindow *glfw_window;
@@ -67,7 +67,7 @@ typedef struct _ffmpeg_decoder {
 	pthread_t pout_thread;
 	ENCODER_STREAM_CALLBACK callback;
 	void *user_data;
-} ffmpeg_decoder;
+} ffmpeg_capture;
 
 static void *pout_thread_func(void* arg) {
 	unsigned int data_len = 0;
@@ -76,7 +76,7 @@ static void *pout_thread_func(void* arg) {
 	int frame_size = lg_width * lg_height * BYTES_PER_PIXEL;
 	unsigned char *frame_buffer = malloc(frame_size);
 	unsigned char *data = malloc(buff_size);
-	ffmpeg_decoder *_this = (ffmpeg_decoder*) arg;
+	ffmpeg_capture *_this = (ffmpeg_capture*) arg;
 
 	glfwMakeContextCurrent(_this->glfw_window);
 
@@ -113,8 +113,8 @@ static void *pout_thread_func(void* arg) {
 
 #define R (0)
 #define W (1)
-static void init(void *obj, int cam_num, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
-	ffmpeg_decoder *_this = (ffmpeg_decoder*) obj;
+static void start(void *obj, int cam_num, void *display, void *context, int egl_image_num) {
+	ffmpeg_capture *_this = (ffmpeg_capture*) obj;
 	pid_t pid = 0;
 	int pin_fd[2];
 	int pout_fd[2];
@@ -123,7 +123,7 @@ static void init(void *obj, int cam_num, void *context, void *cam_texture, void 
 //	_this->width = width;
 //	_this->height = height;
 	_this->cam_num = cam_num;
-	_this->glfw_window = (GLFWwindow*) context;
+	_this->glfw_window = (GLFWwindow*) display;
 	_this->cam_texture = (GLuint*) cam_texture;
 
 	pipe(pin_fd);
@@ -233,39 +233,28 @@ static void init(void *obj, int cam_num, void *context, void *cam_texture, void 
 	_this->pout_fd = pout_fd[R];
 }
 static void release(void *obj) {
-	ffmpeg_decoder *_this = (ffmpeg_decoder*) obj;
+	ffmpeg_capture *_this = (ffmpeg_capture*) obj;
 	int status;
 	kill(_this->pid, SIGKILL); //send SIGKILL signal to the child process
 	waitpid(_this->pid, &status, 0);
 	free(obj);
 }
-static void decode(void *user_data, unsigned char *data, int data_len) {
-}
 
 static float get_fps(void *user_data) {
 	return 0;
 }
-static int get_frameskip(void *user_data) {
-	return 0;
-}
 
-static void switch_buffer(void *user_data) {
-}
+static void create_capture(void *user_data, CAPTURE_T **out_capture) {
+	CAPTURE_T *capture = (CAPTURE_T*) malloc(sizeof(ffmpeg_capture));
+	memset(capture, 0, sizeof(ffmpeg_capture));
+	strcpy(capture->name, CAPTURE_NAME);
+	capture->release = release;
+	capture->init = init;
+	capture->get_fps = get_fps;
+	capture->user_data = capture;
 
-static void create_decoder(void *user_data, DECODER_T **out_decoder) {
-	DECODER_T *decoder = (DECODER_T*) malloc(sizeof(ffmpeg_decoder));
-	memset(decoder, 0, sizeof(ffmpeg_decoder));
-	strcpy(decoder->name, DECODER_NAME);
-	decoder->release = release;
-	decoder->init = init;
-	decoder->get_fps = get_fps;
-	decoder->get_frameskip = get_frameskip;
-	decoder->decode = decode;
-	decoder->switch_buffer = switch_buffer;
-	decoder->user_data = decoder;
-
-	if (out_decoder) {
-		*out_decoder = decoder;
+	if (out_capture) {
+		*out_capture = capture;
 	}
 }
 
@@ -300,54 +289,12 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		*_plugin = plugin;
 	}
 	{
-		DECODER_FACTORY_T *decoder_factory = (DECODER_FACTORY_T*) malloc(sizeof(DECODER_FACTORY_T));
-		memset(decoder_factory, 0, sizeof(DECODER_FACTORY_T));
-		strcpy(decoder_factory->name, DECODER_NAME);
-		decoder_factory->release = release;
-		decoder_factory->create_decoder = create_decoder;
+		CAPTURE_FACTORY_T *capture_factory = (CAPTURE_FACTORY_T*) malloc(sizeof(CAPTURE_FACTORY_T));
+		memset(capture_factory, 0, sizeof(CAPTURE_FACTORY_T));
+		strcpy(capture_factory->name, CAPTURE_NAME);
+		capture_factory->release = release;
+		capture_factory->create_capture = create_capture;
 
-		lg_plugin_host->add_decoder_factory(decoder_factory);
+		lg_plugin_host->add_capture_factory(capture_factory);
 	}
 }
-
-#ifdef H265_TEST
-static void stream_callback(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data) {
-	int out_fd = (int) user_data;
-	write(out_fd, data, data_len);
-}
-int main(int argc, char *argv[]) {
-	int in_fd = -1;
-	int out_fd = -1;
-	int size = 0;
-	int frame_size = 512 * 512 * 3;
-	unsigned char *frame_buffer = NULL;
-	ffmpeg_decoder *decoder = NULL;
-
-	if (argc < 3) {
-		fprintf(stderr, "argc:%d", argc);
-		return -1;
-	}
-
-	in_fd = open(argv[1], O_RDONLY);
-	if (in_fd < 0) {
-		fprintf(stderr, "in_fd:%s", argv[1]);
-		return -1;
-	}
-	out_fd = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC);
-	if (out_fd < 0) {
-		fprintf(stderr, "out_fd:%s", argv[2]);
-		return -1;
-	}
-
-	frame_buffer = (unsigned char *) malloc(frame_size);
-	decoder = h265_create_decoder(512, 512, 256, 5, stream_callback, (void*) out_fd);
-	while ((size = read(in_fd, frame_buffer, frame_size)) == frame_size) {
-		h265_add_frame(decoder, frame_buffer, NULL);
-		usleep(200 * 1000);
-	}
-	usleep(1000 * 1000);
-	h265_delete_decoder(decoder);
-	close(in_fd);
-	close(out_fd);
-}
-#endif

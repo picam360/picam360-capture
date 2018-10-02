@@ -404,7 +404,7 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
  * Returns: void
  *
  ***********************************************************/
-extern void create_rawimage_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
+extern void create_calibration_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 #ifdef USE_GLES
 	char *common = "#version 100\n";
@@ -491,19 +491,29 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 	update_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
-		for (int j = 0; state->decoder_factories[j] != NULL; j++) {
-			if (strncmp(state->decoder_factories[j]->name, state->decoder_name, sizeof(state->decoder_name)) == 0) {
-				state->decoder_factories[j]->create_decoder(state->decoder_factories[j]->user_data, &state->decoders[i]);
+		for (int j = 0; state->capture_factories[j] != NULL; j++) {
+			if (strncmp(state->capture_factories[j]->name, state->capture_name, sizeof(state->capture_name)) == 0) {
+#ifdef USE_GLES
+				state->captures[i]->start(state->captures[i], i, state->display, state->context, TEXTURE_BUFFER_NUM);
+#else
+				glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+				GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
+				state->captures[i]->start(state->captures[i], i, win, NULL, TEXTURE_BUFFER_NUM);
+#endif
 			}
 		}
-		if (state->decoders[i]) {
+	}
+	for (int i = 0; i < state->num_of_cam; i++) {
+		for (int j = 0; state->decoder_factories[j] != NULL; j++) {
+			if (strncmp(state->decoder_factories[j]->name, state->decoder_name, sizeof(state->decoder_name)) == 0) {
 #ifdef USE_GLES
-			state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+				state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #else
-			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
-			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-			state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+				glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+				GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
+				state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
 #endif
+			}
 		}
 	}
 }
@@ -526,11 +536,21 @@ static void init_options(PICAM360CAPTURE_T *state) {
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
-		json_t *value = json_object_get(options, "decoder_name");
-		if (value) {
-			strncpy(state->decoder_name, json_string_value(value), sizeof(state->decoder_name) - 1);
-		} else {
-			strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name) - 1);
+		{
+			json_t *value = json_object_get(options, "capture_name");
+			if (value) {
+				strncpy(state->capture_name, json_string_value(value), sizeof(state->capture_name) - 1);
+			} else {
+				strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name) - 1);
+			}
+		}
+		{
+			json_t *value = json_object_get(options, "decoder_name");
+			if (value) {
+				strncpy(state->decoder_name, json_string_value(value), sizeof(state->decoder_name) - 1);
+			} else {
+				strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name) - 1);
+			}
 		}
 		state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
 		state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
@@ -647,6 +667,7 @@ static void init_options(PICAM360CAPTURE_T *state) {
 static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
+	json_object_set_new(options, "capture_name", json_string(state->capture_name));
 	json_object_set_new(options, "decoder_name", json_string(state->decoder_name));
 	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
 	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
@@ -2059,12 +2080,21 @@ static bool get_menu_visible() {
 static void set_menu_visible(bool value) {
 	state->menu_visible = value;
 }
+
 static float get_fov() {
 	return state->frame->fov;
 }
 static void set_fov(float value) {
 	state->frame->fov = value;
 }
+
+RTP_T *get_rtp(){
+	return state->rtp;
+}
+RTP_T *get_rtcp(){
+	return state->rtcp;
+}
+
 static void send_command(const char *_cmd) {
 	pthread_mutex_lock(&state->cmd_list_mutex);
 
@@ -2129,6 +2159,28 @@ static void add_mpu_factory(MPU_FACTORY_T *mpu_factory) {
 				memset(state->mpu_factories, 0, sizeof(MPU_FACTORY_T*) * space);
 				memcpy(state->mpu_factories, current, sizeof(MPU_FACTORY_T*) * i);
 				state->mpu_factories[space - 1] = (void*) -1;
+				free(current);
+			}
+			return;
+		}
+	}
+}
+
+static void add_capture_factory(CAPTURE_FACTORY_T *capture_factory) {
+	for (int i = 0; state->capture_factories[i] != (void*) -1; i++) {
+		if (state->capture_factories[i] == NULL) {
+			state->capture_factories[i] = capture_factory;
+			if (state->capture_factories[i + 1] == (void*) -1) {
+				int space = (i + 2) * 2;
+				if (space > 256) {
+					fprintf(stderr, "error on add_capture_factory\n");
+					return;
+				}
+				CAPTURE_FACTORY_T **current = state->capture_factories;
+				state->capture_factories = malloc(sizeof(CAPTURE_FACTORY_T*) * space);
+				memset(state->capture_factories, 0, sizeof(CAPTURE_FACTORY_T*) * space);
+				memcpy(state->capture_factories, current, sizeof(CAPTURE_FACTORY_T*) * i);
+				state->capture_factories[space - 1] = (void*) -1;
 				free(current);
 			}
 			return;
@@ -2322,6 +2374,9 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.get_fov = get_fov;
 		state->plugin_host.set_fov = set_fov;
+
+		state->plugin_host.get_rtp = get_rtp;
+		state->plugin_host.get_rtcp = get_rtcp;
 
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
@@ -2631,7 +2686,7 @@ static void status_handler(char *data, int data_len) {
 	}
 }
 
-static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num) {
+static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num, void *user_data) {
 	if (data_len == 0) {
 		return -1;
 	}
@@ -2762,10 +2817,10 @@ static void init_status() {
 
 static void _init_rtp(PICAM360CAPTURE_T *state) {
 	state->rtp = create_rtp(state->options.rtp_rx_port, state->options.rtp_rx_type, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
-	rtp_set_callback(state->rtp, (RTP_CALLBACK) rtp_callback);
+	rtp_add_callback(state->rtp, (RTP_CALLBACK) rtp_callback, NULL);
 
 	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, state->options.rtcp_tx_ip, state->options.rtcp_tx_port, state->options.rtcp_tx_type, 0);
-	rtp_set_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback);
+	rtp_add_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback, NULL);
 
 	init_status();
 }
@@ -3579,6 +3634,7 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
+	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
 	strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name));
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
@@ -3597,6 +3653,11 @@ int main(int argc, char *argv[]) {
 		state->mpu_factories = malloc(sizeof(MPU_FACTORY_T*) * INITIAL_SPACE);
 		memset(state->mpu_factories, 0, sizeof(MPU_FACTORY_T*) * INITIAL_SPACE);
 		state->mpu_factories[INITIAL_SPACE - 1] = (void*) -1;
+	}
+	{
+		state->capture_factories = malloc(sizeof(CAPTURE_FACTORY_T*) * INITIAL_SPACE);
+		memset(state->capture_factories, 0, sizeof(CAPTURE_FACTORY_T*) * INITIAL_SPACE);
+		state->capture_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
 		state->decoder_factories = malloc(sizeof(DECODER_FACTORY_T*) * INITIAL_SPACE);

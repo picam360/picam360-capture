@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("omx_encoder generating Makefile")
 project(omx_encoder)
 
 find_package(PkgConfig REQUIRED)

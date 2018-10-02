@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.1.3)
 
-project(ffmpeg_decoder)
+message("ffmpeg_capture generating Makefile")
+project(ffmpeg_capture)
 
-add_library(ffmpeg_decoder MODULE
-	ffmpeg_decoder.c
+add_library(ffmpeg_capture MODULE
+	ffmpeg_capture.c
 )
-set_target_properties(ffmpeg_decoder PROPERTIES
+set_target_properties(ffmpeg_capture PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED YES
     C_EXTENSIONS ON # gnu11
@@ -21,7 +22,7 @@ include_directories(
 link_directories(
 )
 
-target_link_libraries(ffmpeg_decoder
+target_link_libraries(ffmpeg_capture
 	pthread
 	dl
 )
@@ -36,10 +37,10 @@ pkg_check_modules(GLFW glfw3 REQUIRED)
 find_package(Freetype REQUIRED)
 	
 include_directories( ${OPENGL_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
-target_link_libraries(ffmpeg_decoder ${OPENGL_LIBRARIES} ${GLEW_LIBRARY} ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
+target_link_libraries(ffmpeg_capture ${OPENGL_LIBRARIES} ${GLEW_LIBRARY} ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES})
 
 
 #post build
-add_custom_command(TARGET ffmpeg_decoder POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ffmpeg_decoder> ${CMAKE_CURRENT_SOURCE_DIR}/../
+add_custom_command(TARGET ffmpeg_capture POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:ffmpeg_capture> ${CMAKE_CURRENT_SOURCE_DIR}/../
 )

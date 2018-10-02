@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("v4l2_capture generating Makefile")
 project(v4l2_capture)
 
 find_package(PkgConfig REQUIRED)

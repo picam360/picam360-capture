@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("gst_decoder generating Makefile")
 project(gst_decoder)
 
 add_library(gst_decoder MODULE

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("equirectangular_renderer generating Makefile")
 project(equirectangular_renderer)
 
 find_package(PkgConfig REQUIRED)

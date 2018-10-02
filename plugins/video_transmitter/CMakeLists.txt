@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("video_reciever generating Makefile")
 project(video_transmitter)
 
 find_package(PkgConfig REQUIRED)

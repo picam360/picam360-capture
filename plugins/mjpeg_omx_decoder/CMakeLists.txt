@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("mjpeg_omx_decoder generating Makefile")
 project(mjpeg_omx_decoder)
 
 find_package(PkgConfig REQUIRED)

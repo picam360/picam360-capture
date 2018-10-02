@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("window_renderer generating Makefile")
 project(window_renderer)
 
 find_package(PkgConfig REQUIRED)
