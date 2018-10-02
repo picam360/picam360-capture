@@ -41,7 +41,7 @@ typedef struct _equirectangular_renderer {
 	RENDERER_T super;
 
 	int num_of_cam;
-	void *program;
+	void *program_obj;
 	GLuint vbo;
 	GLuint vbo_nop;
 	GLuint vao;
@@ -328,51 +328,6 @@ void main(void) {
 }
 )glsl";
 
-static void init(void *obj, const char *common, int num_of_cam) {
-	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
-
-	_this->num_of_cam = num_of_cam;
-
-	board_mesh(64, &_this->vbo, &_this->vbo_nop, &_this->vao);
-	if (_this->num_of_cam == 1) {
-		_this->program = GLProgram_new(common, vertex_shader, fragment_shader, false);
-	} else {
-		_this->program = GLProgram_new(common, sphere_vertex_shader, sphere_fragment_shader, false);
-	}
-}
-static void release(void *obj) {
-	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
-	int status;
-	free(obj);
-}
-static int get_program(void *obj) {
-	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
-	return GLProgram_GetId(_this->program);
-}
-static void render(void *obj) {
-	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
-
-	glBindBuffer(GL_ARRAY_BUFFER, _this->vbo);
-
-#ifdef USE_GLES
-	GLuint loc = glGetAttribLocation(program, "vPosition");
-	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(loc);
-#else
-	glBindVertexArray(model->vao);
-#endif
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, _this->vbo_nop);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-#ifdef USE_GLES
-	glDisableVertexAttribArray(loc);
-#else
-	glBindVertexArray(0);
-#endif
-}
-
 static int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out) {
 	GLuint vbo;
 
@@ -442,6 +397,53 @@ static int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *
 		*n_out = n;
 
 	return 0;
+}
+
+static void init(void *obj, const char *common, int num_of_cam) {
+	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
+
+	_this->num_of_cam = num_of_cam;
+
+	board_mesh(64, &_this->vbo, &_this->vbo_nop, &_this->vao);
+	if (_this->num_of_cam == 1) {
+		_this->program_obj = GLProgram_new(common, vertex_shader, fragment_shader, false);
+	} else {
+		_this->program_obj = GLProgram_new(common, sphere_vertex_shader, sphere_fragment_shader, false);
+	}
+}
+static void release(void *obj) {
+	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
+	int status;
+	free(obj);
+}
+static int get_program(void *obj) {
+	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
+	return GLProgram_GetId(_this->program_obj);
+}
+static void render(void *obj, float fov) {
+	equirectangular_renderer *_this = (equirectangular_renderer*) obj;
+
+	int program = GLProgram_GetId(_this->program_obj);
+
+	glBindBuffer(GL_ARRAY_BUFFER, _this->vbo);
+
+#ifdef USE_GLES
+	GLuint loc = glGetAttribLocation(program, "vPosition");
+	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(loc);
+#else
+	glBindVertexArray(model->vao);
+#endif
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, _this->vbo_nop);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+#ifdef USE_GLES
+	glDisableVertexAttribArray(loc);
+#else
+	glBindVertexArray(0);
+#endif
 }
 
 static void create_renderer(void *user_data, RENDERER_T **out_renderer) {
