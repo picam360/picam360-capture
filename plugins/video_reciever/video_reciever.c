@@ -17,6 +17,7 @@
 #define PT_CAM_BASE 110
 
 #define PLUGIN_NAME "video_reciever"
+#define CAPTURE_NAME "video_reciever"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
@@ -32,7 +33,7 @@ static void release(void *obj) {
 	free(obj);
 }
 static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num, void *user_data) {
-	v4l2_capture *_this = (v4l2_capture*) obj;
+	video_reciever *_this = (video_reciever*) user_data;
 
 	if (data_len == 0) {
 		return -1;
@@ -44,7 +45,7 @@ static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned cha
 	return 0;
 }
 static void start(void *obj, int cam_num, void *display, void *context, int egl_image_num) {
-	v4l2_capture *_this = (v4l2_capture*) obj;
+	video_reciever *_this = (video_reciever*) obj;
 
 	_this->cam_num = cam_num;
 
