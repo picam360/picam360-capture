@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
+message("picam360-capture generating Makefile")
 project(picam360-capture)
 
 find_package(PkgConfig REQUIRED)
@@ -21,6 +22,21 @@ if(TEGRA)
 	set( USE_GLES ON )
 	add_definitions(-DTEGRA)
 endif()
+
+#add_executable 
+#target_link_libraries should be define below here
+add_executable(picam360-capture.bin
+	picam360_capture.c
+	rtp.cc
+	mrevent.c
+	quaternion.c
+	manual_mpu.c
+	gl_program.cc
+	auto_calibration.cc
+	manual_mpu.c
+	menu.c
+	calibration_renderer.c
+)
 
 pkg_check_modules(JANSSON jansson REQUIRED)
 pkg_check_modules(LIBEDIT libedit REQUIRED)
@@ -48,6 +64,11 @@ if(USE_GLES)
 	pkg_check_modules(FREETYPE freetype2 REQUIRED)
 	include_directories( ${GLES_INCLUDE_DIRS} ${EGL_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
 	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetypeGlesRpi/src )
+
+	add_custom_target(freetypeGlesRpi_make
+		COMMAND make -C freetypeGlesRpi
+	)
+	add_dependencies(picam360-capture.bin freetypeGlesRpi_make)
 else()
 	find_package(OpenGL REQUIRED)
 	pkg_check_modules(GLEW glew>=2.1 REQUIRED)
@@ -58,22 +79,9 @@ else()
 	include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl )
 	
 	link_directories( ${OPENGL_LIBRARY_DIRS} ${GLEW_LIBRARY_DIRS} ${GLFW_LIBRARY_DIRS} ${FREETYPE_LIBRARY_DIRS} )
-endif()
 
-#add_executable 
-#target_link_libraries should be define below here
-add_executable(picam360-capture.bin
-	picam360_capture.c
-	rtp.cc
-	mrevent.c
-	quaternion.c
-	manual_mpu.c
-	gl_program.cc
-	auto_calibration.cc
-	manual_mpu.c
-	menu.c
-	calibration_renderer.c
-)
+	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl)
+endif()
 
 if(BCM_HOST)
 	target_link_libraries(picam360-capture.bin ${BCMHOST_LIBRARIES} )
@@ -114,16 +122,5 @@ else()
 	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
 endif()
 
-option(USE_MPU9250 "Use mpu9250" OFF)
-option(USE_ROV_DRIVER "Use rov_driver" OFF)
-
 #plugins
-if(USE_MPU9250)
-	message("enable mpu9250")
-	add_subdirectory(plugins/mpu9250)
-endif()
-
-if(USE_ROV_DRIVER)
-	message("enable rov_driver")
-	add_subdirectory(plugins/rov_driver)
-endif()
+add_subdirectory(plugins)
