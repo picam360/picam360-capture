@@ -419,7 +419,9 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 	return 0;
 }
 void rtp_flush(RTP_T *_this) {
+	pthread_mutex_lock(&_this->mlock);
 	send_via_socket(_this, _this->tx_fd, NULL, 0, true);
+	pthread_mutex_unlock(&_this->mlock);
 }
 
 static void *buffering_thread_func(void* arg) {
