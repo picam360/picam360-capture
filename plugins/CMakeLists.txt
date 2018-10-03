@@ -23,6 +23,8 @@ elseif(WIN32)
 	message("WINDOWS")
 endif()
 
+option(USE_ROV_AGENT "Use ROV agent" OFF)
+
 #common
 add_subdirectory(mpu9250)
 add_subdirectory(video_transmitter)
@@ -30,3 +32,6 @@ add_subdirectory(video_reciever)
 add_subdirectory(window_renderer)
 add_subdirectory(equirectangular_renderer)
 add_subdirectory(h265_encoder)
+if(USE_ROV_AGENT)
+	add_subdirectory(rov_agent)
+endif()

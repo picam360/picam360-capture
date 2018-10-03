@@ -231,11 +231,11 @@ static void *sendframe_thread_func(void* arg) {
 			}
 			// send the packet
 			lg_plugin_host->decode_video(send_frame_arg->cam_num, (unsigned char*) packet->data, packet->len);
-
-			delete packet;
-
 			if (packet->eof) {
+				delete packet;
 				break;
+			} else {
+				delete packet;
 			}
 		}
 		delete frame;

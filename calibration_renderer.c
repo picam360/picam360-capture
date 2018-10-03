@@ -88,25 +88,41 @@ uniform int active_cam;
 uniform float sharpness_gain;
 uniform float cam_aspect_ratio;
 
-void main(void) {	
+sampler2D get_cam_texture(int cam_num) {
+	if(cam_num == 0) return cam_texture[0];
+	if(cam_num == 1) return cam_texture[1];
+	if(cam_num == 2) return cam_texture[2];
+}
+float get_cam_offset_x(int cam_num) {
+	if(cam_num == 0) return cam_offset_x[0];
+	if(cam_num == 1) return cam_offset_x[1];
+	if(cam_num == 2) return cam_offset_x[2];
+}
+float get_cam_offset_y(int cam_num) {
+	if(cam_num == 0) return cam_offset_y[0];
+	if(cam_num == 1) return cam_offset_y[1];
+	if(cam_num == 2) return cam_offset_y[2];
+}
+
+void main(void) {
 	vec4 fc = texture2D(logo_texture, vec2(tcoord.x, tcoord.y));
 	if (fc.g == 0.0) {
-		float u = (tcoord.x + cam_offset_x[active_cam] - 0.5)/cam_aspect_ratio + 0.5;
-		float v = tcoord.y + cam_offset_y[active_cam];
+		float u = (tcoord.x + get_cam_offset_x(active_cam) - 0.5)/cam_aspect_ratio + 0.5;
+		float v = tcoord.y + get_cam_offset_y(active_cam);
 		if (sharpness_gain == 0.0) {
-			fc = texture2D(cam_texture[active_cam], vec2(u, v));
+			fc = texture2D(get_cam_texture(active_cam), vec2(u, v));
 		} else {
 			//sharpness
 			float gain = sharpness_gain;
-			fc = texture2D(cam_texture[active_cam], vec2(u, v))
+			fc = texture2D(get_cam_texture(active_cam), vec2(u, v))
 					* (1.0 + 4.0 * gain);
-			fc -= texture2D(cam_texture[active_cam], vec2(u - 1.0 * pixel_size, v))
+			fc -= texture2D(get_cam_texture(active_cam), vec2(u - 1.0 * pixel_size, v))
 					* gain;
-			fc -= texture2D(cam_texture[active_cam], vec2(u, v - 1.0 * pixel_size))
+			fc -= texture2D(get_cam_texture(active_cam), vec2(u, v - 1.0 * pixel_size))
 					* gain;
-			fc -= texture2D(cam_texture[active_cam], vec2(u, v + 1.0 * pixel_size))
+			fc -= texture2D(get_cam_texture(active_cam), vec2(u, v + 1.0 * pixel_size))
 					* gain;
-			fc -= texture2D(cam_texture[active_cam], vec2(u + 1.0 * pixel_size, v))
+			fc -= texture2D(get_cam_texture(active_cam), vec2(u + 1.0 * pixel_size, v))
 					* gain;
 		}
 	}

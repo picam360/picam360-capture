@@ -493,27 +493,35 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; state->capture_factories[j] != NULL; j++) {
 			if (strncmp(state->capture_factories[j]->name, state->capture_name, sizeof(state->capture_name)) == 0) {
-#ifdef USE_GLES
-				state->captures[i]->start(state->captures[i], i, state->display, state->context, TEXTURE_BUFFER_NUM);
-#else
-				glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
-				GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-				state->captures[i]->start(state->captures[i], i, win, NULL, TEXTURE_BUFFER_NUM);
-#endif
+				state->capture_factories[j]->create_capture(state->capture_factories[j], &state->captures[i]);
+				break;
 			}
+		}
+		if (state->captures[i]) {
+#ifdef USE_GLES
+			state->captures[i]->start(state->captures[i], i, state->display, state->context, TEXTURE_BUFFER_NUM);
+#else
+			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
+			state->captures[i]->start(state->captures[i], i, win, NULL, TEXTURE_BUFFER_NUM);
+#endif
 		}
 	}
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; state->decoder_factories[j] != NULL; j++) {
 			if (strncmp(state->decoder_factories[j]->name, state->decoder_name, sizeof(state->decoder_name)) == 0) {
-#ifdef USE_GLES
-				state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
-#else
-				glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
-				GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-				state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
-#endif
+				state->decoder_factories[j]->create_decoder(state->decoder_factories[j], &state->decoders[i]);
+				break;
 			}
+		}
+		if (state->decoders[i]) {
+#ifdef USE_GLES
+			state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+#else
+			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
+			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
+			state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+#endif
 		}
 	}
 }
@@ -690,17 +698,17 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, buff, json_real(state->options.cam_aov[i]));
 	}
 	{ //rtp
-		json_object_set_new(options, "rtp_rx_port", json_real(state->options.rtp_rx_port));
+		json_object_set_new(options, "rtp_rx_port", json_integer(state->options.rtp_rx_port));
 		json_object_set_new(options, "rtp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_rx_type)));
 		json_object_set_new(options, "rtp_tx_ip", json_string(state->options.rtp_tx_ip));
-		json_object_set_new(options, "rtp_tx_port", json_real(state->options.rtp_tx_port));
+		json_object_set_new(options, "rtp_tx_port", json_integer(state->options.rtp_tx_port));
 		json_object_set_new(options, "rtp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_tx_type)));
 	}
 	{ //rtcp
-		json_object_set_new(options, "rtcp_rx_port", json_real(state->options.rtcp_rx_port));
+		json_object_set_new(options, "rtcp_rx_port", json_integer(state->options.rtcp_rx_port));
 		json_object_set_new(options, "rtcp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_rx_type)));
 		json_object_set_new(options, "rtcp_tx_ip", json_string(state->options.rtcp_tx_ip));
-		json_object_set_new(options, "rtcp_tx_port", json_real(state->options.rtcp_tx_port));
+		json_object_set_new(options, "rtcp_tx_port", json_integer(state->options.rtcp_tx_port));
 		json_object_set_new(options, "rtcp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_tx_type)));
 	}
 
@@ -718,7 +726,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		}
 	}
 
-	json_dump_file(options, CONFIG_FILE, JSON_INDENT(4));
+	json_dump_file(options, CONFIG_FILE, JSON_PRESERVE_ORDER | JSON_INDENT(4) | JSON_REAL_PRECISION(9));
 
 	json_decref(options);
 }
@@ -2429,10 +2437,12 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		state->plugin_host.get_rtp = get_rtp;
 		state->plugin_host.get_rtcp = get_rtcp;
+		state->plugin_host.xmp = xmp;
 
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
 		state->plugin_host.add_mpu_factory = add_mpu_factory;
+		state->plugin_host.add_capture_factory = add_capture_factory;
 		state->plugin_host.add_decoder_factory = add_decoder_factory;
 		state->plugin_host.add_encoder_factory = add_encoder_factory;
 		state->plugin_host.add_renderer = add_renderer;
