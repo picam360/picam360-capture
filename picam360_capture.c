@@ -823,6 +823,9 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 			break;
 		case 'm':
 			frame->renderer = get_renderer(optarg);
+			if (frame->renderer == NULL) {
+				printf("%s rendere is not existing.\n", optarg);
+			}
 			break;
 		case 'o':
 			frame->output_mode = OUTPUT_MODE_VIDEO;
@@ -1715,7 +1718,7 @@ int _command_handler(const char *_buff) {
 				save_options_ex(state);
 			} else { //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_horizon_r %s", param);
+				sprintf(cmd, "upstream.add_camera_horizon_r %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1744,7 +1747,7 @@ int _command_handler(const char *_buff) {
 				save_options_ex(state);
 			} else { //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_x %s", param);
+				sprintf(cmd, "upstream.add_camera_offset_x %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1773,7 +1776,7 @@ int _command_handler(const char *_buff) {
 				save_options_ex(state);
 			} else { //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_y %s", param);
+				sprintf(cmd, "upstream.add_camera_offset_y %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1797,7 +1800,7 @@ int _command_handler(const char *_buff) {
 			}
 			{ //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.picam360_driver.add_camera_offset_yaw %s", param);
+				sprintf(cmd, "upstream.add_camera_offset_yaw %s", param);
 				state->plugin_host.send_command(cmd);
 			}
 
@@ -1934,9 +1937,11 @@ static void *readline_thread_func(void* arg) {
 static void *quaternion_thread_func(void* arg) {
 	int count = 0;
 	while (1) {
-		int cur = (state->quaternion_queue_cur + 1) % MAX_QUATERNION_QUEUE_COUNT;
-		state->quaternion_queue[cur] = state->mpu->get_quaternion(state->mpu);
-		state->quaternion_queue_cur++;
+		if (state->mpu) {
+			int cur = (state->quaternion_queue_cur + 1) % MAX_QUATERNION_QUEUE_COUNT;
+			state->quaternion_queue[cur] = state->mpu->get_quaternion(state->mpu);
+			state->quaternion_queue_cur++;
+		}
 		usleep(QUATERNION_QUEUE_RES * 1000);
 	}
 	return NULL;
@@ -2160,7 +2165,16 @@ static void send_command(const char *_cmd) {
 
 	char *cmd = (char*) _cmd;
 	LIST_T **cur = NULL;
-	if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
+	if (strncmp(cmd, ENDPOINT_DOMAIN, ENDPOINT_DOMAIN_SIZE) == 0) {
+		if (state->options.rtp_rx_port == 0) {
+			//endpoint
+			cur = &state->cmd_list;
+			cmd += ENDPOINT_DOMAIN_SIZE;
+		} else {
+			//send to upstream
+			cur = &state->cmd2upstream_list;
+		}
+	} else if (strncmp(cmd, UPSTREAM_DOMAIN, UPSTREAM_DOMAIN_SIZE) == 0) {
 		cur = &state->cmd2upstream_list;
 		cmd += UPSTREAM_DOMAIN_SIZE;
 	} else {
@@ -2471,8 +2485,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 static char lg_command[256] = { };
 static int lg_command_id = 0;
-static int lg_ack_command_id_to = -1;
-static int lg_ack_command_id_from = -1;
+static int lg_ack_command_id_tx = -1;
+static int lg_ack_command_id_rx = -1;
 
 static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
@@ -2688,7 +2702,7 @@ static int command2upstream_handler() {
 	static struct timeval last_try = { };
 	static bool is_first_try = false;
 	int len = strlen(lg_command);
-	if (len != 0 && lg_command_id != lg_ack_command_id_to) {
+	if (len != 0 && lg_command_id != lg_ack_command_id_tx) {
 		struct timeval s;
 		gettimeofday(&s, NULL);
 		if (!is_first_try) {
@@ -2778,8 +2792,8 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 		int id;
 		char value[256];
 		int num = sscanf((char*) data, "<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id, value);
-		if (num == 2 && id != lg_ack_command_id_from) {
-			lg_ack_command_id_from = id;
+		if (num == 2 && id != lg_ack_command_id_rx) {
+			lg_ack_command_id_rx = id;
 			state->plugin_host.send_command(value);
 		}
 	}
@@ -2794,11 +2808,12 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 #define WATCH_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
                                                (plugin_host)->add_watch(STATUS_VAR(name));
 //status
+static STATUS_T *STATUS_VAR(ack_command_id_rx);
 static STATUS_T *STATUS_VAR(next_frame_id);
 static STATUS_T *STATUS_VAR(info);
 static STATUS_T *STATUS_VAR(menu);
 //watch
-static STATUS_T *STATUS_VAR(ack_command_id);
+static STATUS_T *STATUS_VAR(ack_command_id_tx);
 static STATUS_T *STATUS_VAR(quaternion);
 static STATUS_T *STATUS_VAR(compass);
 static STATUS_T *STATUS_VAR(temperature);
@@ -2811,7 +2826,9 @@ static void status_release(void *user_data) {
 }
 static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (status == STATUS_VAR(next_frame_id)) {
+	if (status == STATUS_VAR(ack_command_id_rx)) {
+		snprintf(buff, buff_len, "%d", lg_ack_command_id_rx);
+	} else if (status == STATUS_VAR(next_frame_id)) {
 		snprintf(buff, buff_len, "%d", state->next_frame_id);
 	} else if (status == STATUS_VAR(info)) {
 		get_info_str(buff, buff_len);
@@ -2821,8 +2838,8 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 }
 static void status_set_value(void *user_data, const char *value) {
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (status == STATUS_VAR(ack_command_id)) {
-		sscanf(value, "%d", &lg_ack_command_id_to);
+	if (status == STATUS_VAR(ack_command_id_tx)) {
+		sscanf(value, "%d", &lg_ack_command_id_tx);
 	} else if (status == STATUS_VAR(quaternion)) {
 		VECTOR4D_T vec = { };
 		sscanf(value, "%f,%f,%f,%f", &vec.x, &vec.y, &vec.z, &vec.w);
@@ -2855,16 +2872,20 @@ static STATUS_T *new_status(const char *name) {
 }
 
 static void init_status() {
+	STATUS_INIT(&state->plugin_host, "", ack_command_id_rx);
 	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, next_frame_id);
 	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, info);
 	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, menu);
-	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id_tx);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, quaternion);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, compass);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, temperature);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, bandwidth);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, cam_fps);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, cam_frameskip);
+
+	strcpy(STATUS_VAR(ack_command_id_rx)->name, "ack_command_id");
+	strcpy(STATUS_VAR(ack_command_id_tx)->name, UPSTREAM_DOMAIN "ack_command_id");
 }
 
 #endif //status block
@@ -3608,28 +3629,28 @@ static void _init_menu() {
 			MENU_T *sub_menu = image_params_menu;
 			{
 				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("brightness", image_params_calibration_menu_callback, NULL), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl brightness=-1"), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl brightness=1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl brightness=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl brightness=1"), INT_MAX);
 			}
 			{
 				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("gamma", image_params_calibration_menu_callback, NULL), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl gamma=-1"), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl gamma=1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl gamma=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl gamma=1"), INT_MAX);
 			}
 			{
 				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("contrast", image_params_calibration_menu_callback, NULL), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl contrast=-1"), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl contrast=1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl contrast=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl contrast=1"), INT_MAX);
 			}
 			{
 				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("saturation", image_params_calibration_menu_callback, NULL), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl saturation=-1"), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl saturation=1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl saturation=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl saturation=1"), INT_MAX);
 			}
 			{
 				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("sharpness", image_params_calibration_menu_callback, NULL), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl sharpness=-1"), INT_MAX);
-				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) "upstream.picam360_driver.add_v4l2_ctl sharpness=1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("-", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl sharpness=-1"), INT_MAX);
+				menu_add_submenu(_sub_menu, menu_new("+", image_params_calibration_menu_callback, (void*) ENDPOINT_DOMAIN "v4l2_capture.add_v4l2_ctl sharpness=1"), INT_MAX);
 			}
 //			{
 //				MENU_T *_sub_menu = menu_add_submenu(sub_menu, menu_new("white_balance_temperature_auto", image_params_calibration_menu_callback, NULL), INT_MAX);
@@ -3827,11 +3848,11 @@ int main(int argc, char *argv[]) {
 	// Setup the model world
 	init_model_proj(state);
 
-	// initialise the OGLES texture(s)
-	init_textures(state);
-
 	//init rtp
 	_init_rtp(state);
+
+	// initialise the OGLES texture(s)
+	init_textures(state);
 
 	//frame id=0
 	if (frame_param[0]) {
@@ -3844,6 +3865,9 @@ int main(int argc, char *argv[]) {
 		if (strncmp(state->mpu_factories[i]->name, state->mpu_type, 64) == 0) {
 			state->mpu_factories[i]->create_mpu(state->mpu_factories[i]->user_data, &state->mpu);
 		}
+	}
+	if (state->mpu == NULL) {
+		printf("something wrong with %s\n", state->mpu_type);
 	}
 
 	static struct timeval last_time = { };
@@ -3949,6 +3973,10 @@ int main(int argc, char *argv[]) {
  *
  ***********************************************************/
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, RENDERER_T *renderer, VECTOR4D_T view_quat) {
+	if (renderer == NULL) {
+		return;
+	}
+
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 

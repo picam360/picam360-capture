@@ -18,7 +18,7 @@
 #include "mjpeg_omx_decoder.h"
 
 #define PLUGIN_NAME "mjpeg_omx_decoder"
-#define DECODER_NAME "mjpeg_omx"
+#define DECODER_NAME "mjpeg_omx_decoder"
 
 #include <rtp.h>
 

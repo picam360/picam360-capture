@@ -177,6 +177,7 @@ typedef struct _RTP_T {
 	uint64_t play_time = 0;
 	float play_speed = 1.0;
 
+	pthread_mutex_t callbacks_mlock = PTHREAD_MUTEX_INITIALIZER;
 	std::list<struct RTP_CALLBACK_PAIR> callbacks;
 
 	float bandwidth = 0;
@@ -231,7 +232,10 @@ void rtp_add_callback(RTP_T *_this, RTP_CALLBACK callback, void *user_data) {
 	struct RTP_CALLBACK_PAIR pair;
 	pair.callback = callback;
 	pair.user_data = user_data;
+
+	pthread_mutex_lock(&_this->callbacks_mlock);
 	_this->callbacks.push_back(pair);
+	pthread_mutex_unlock(&_this->callbacks_mlock);
 }
 
 void rtp_set_auto_play(RTP_T *_this, bool value) {
@@ -618,9 +622,13 @@ static void *receive_thread_func(void* arg) {
 							}
 							last_timestamp = pack->timestamp;
 						}
+
+						pthread_mutex_lock(&_this->callbacks_mlock);
 						for (std::list<struct RTP_CALLBACK_PAIR>::iterator it = _this->callbacks.begin(); it != _this->callbacks.end(); it++) {
 							(*it).callback(pack->GetPayloadData(), pack->GetPayloadLength(), pack->GetPayloadType(), pack->GetSequenceNumber(), (*it).user_data);
 						}
+						pthread_mutex_unlock(&_this->callbacks_mlock);
+
 						if (_this->record_fd > 0) {
 							pthread_mutex_lock(&_this->record_packet_queue_mlock);
 							_this->record_packet_queue.push_back(pack);

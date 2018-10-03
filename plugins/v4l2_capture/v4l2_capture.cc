@@ -16,7 +16,6 @@
 #include <sys/prctl.h>
 #endif
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,7 +28,6 @@ extern "C" {
 }
 #endif
 
-
 #define PLUGIN_NAME "v4l2_capture"
 #define CAPTURE_NAME "v4l2_capture"
 #define CAMERA_NUM 2
@@ -38,10 +36,7 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_width = 2048;
 static int lg_height = 1536;
 static int lg_fps = 15;
-static char *lg_devices[2] = { //
-		"/dev/video0", /**/
-		"/dev/video1", /**/
-		};
+static char lg_devicefiles[CAMERA_NUM][256] = { };
 
 class _PACKET_T {
 public:
@@ -133,9 +128,9 @@ typedef struct _v4l2_capture {
 
 static void set_v4l2_ctl(const char *name, const int value) {
 	for (int i = 0; i < CAMERA_NUM; i++) {
-		if (lg_devices[i][0] != '\0') {
+		if (lg_devicefiles[i][0] != '\0') {
 			char cmd[256];
-			sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d %s", name, value, lg_devices[i]);
+			sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d %s", name, value, lg_devicefiles[i]);
 			system(cmd);
 		}
 	}
@@ -320,7 +315,7 @@ static void start(void *obj, int cam_num, void *display, void *context, int egl_
 
 	_SENDFRAME_ARG_T *send_frame_arg = new _SENDFRAME_ARG_T;
 	send_frame_arg->cam_num = cam_num;
-	strncpy(send_frame_arg->vstream_filepath, lg_devices[cam_num], sizeof(send_frame_arg->vstream_filepath));
+	strncpy(send_frame_arg->vstream_filepath, lg_devicefiles[cam_num], sizeof(send_frame_arg->vstream_filepath));
 	send_frame_arg->cam_width = lg_width;
 	send_frame_arg->cam_height = lg_height;
 	send_frame_arg->cam_fps = lg_fps;
@@ -387,7 +382,7 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 
 static void init_options(void *user_data, json_t *options) {
 	{
-		json_t *v4l2_ctls = json_object_get(options, "v4l2_ctls");
+		json_t *v4l2_ctls = json_object_get(options, PLUGIN_NAME ".v4l2_ctls");
 		const char *key;
 		json_t *value;
 
@@ -399,6 +394,17 @@ static void init_options(void *user_data, json_t *options) {
 			add_v4l2_ctl(ctl);
 		}
 	}
+	for (int i = 0; i < CAMERA_NUM; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
+		json_t *value = json_object_get(options, buff);
+		if (value) {
+			int len = json_string_length(value);
+			if (len < sizeof(lg_devicefiles[i])) {
+				strncpy(lg_devicefiles[i], json_string_value(value), len);
+			}
+		}
+	}
 
 	if (lg_v4l2_ctls) {
 		for (int i = 0; lg_v4l2_ctls[i] != NULL; i++) {
@@ -408,12 +414,19 @@ static void init_options(void *user_data, json_t *options) {
 }
 
 static void save_options(void *user_data, json_t *options) {
+	for (int i = 0; i < CAMERA_NUM; i++) {
+		char buff[256];
+		if (lg_devicefiles[i][0] != 0) {
+			sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
+			json_object_set_new(options, buff, json_string(lg_devicefiles[i]));
+		}
+	}
 	if (lg_v4l2_ctls) {
 		json_t *v4l2_ctls = json_object();
 		for (int i = 0; lg_v4l2_ctls[i] != NULL; i++) {
 			json_object_set(v4l2_ctls, lg_v4l2_ctls[i]->name, json_real(lg_v4l2_ctls[i]->value));
 		}
-		json_object_set_new(options, "v4l2_ctls", v4l2_ctls);
+		json_object_set_new(options, PLUGIN_NAME ".v4l2_ctls", v4l2_ctls);
 	}
 }
 

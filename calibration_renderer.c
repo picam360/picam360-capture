@@ -76,7 +76,8 @@ layout (location=0) out vec4 FragColor;
 
 precision mediump float;
 
-const int MAX_NUM_OF_CAM = 3;
+const int MAX_NUM_OF_CAM =
+		3;
 IN vec2 tcoord;
 uniform sampler2D logo_texture;
 uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
@@ -88,43 +89,77 @@ uniform int active_cam;
 uniform float sharpness_gain;
 uniform float cam_aspect_ratio;
 
-sampler2D get_cam_texture(int cam_num) {
-	if(cam_num == 0) return cam_texture[0];
-	if(cam_num == 1) return cam_texture[1];
-	if(cam_num == 2) return cam_texture[2];
-}
-float get_cam_offset_x(int cam_num) {
-	if(cam_num == 0) return cam_offset_x[0];
-	if(cam_num == 1) return cam_offset_x[1];
-	if(cam_num == 2) return cam_offset_x[2];
-}
-float get_cam_offset_y(int cam_num) {
-	if(cam_num == 0) return cam_offset_y[0];
-	if(cam_num == 1) return cam_offset_y[1];
-	if(cam_num == 2) return cam_offset_y[2];
-}
-
 void main(void) {
 	vec4 fc = texture2D(logo_texture, vec2(tcoord.x, tcoord.y));
 	if (fc.g == 0.0) {
-		float u = (tcoord.x + get_cam_offset_x(active_cam) - 0.5)/cam_aspect_ratio + 0.5;
-		float v = tcoord.y + get_cam_offset_y(active_cam);
+	)glsl"
+#ifdef TEGRA
+	R"glsl(
+		float u = (tcoord.x + cam_offset_x[active_cam] - 0.5)/cam_aspect_ratio + 0.5;
+		float v = tcoord.y + get_cam_offset_y[active_cam];
 		if (sharpness_gain == 0.0) {
-			fc = texture2D(get_cam_texture(active_cam), vec2(u, v));
+			fc = texture2D(cam_texture[active_cam], vec2(u, v));
 		} else {
 			//sharpness
 			float gain = sharpness_gain;
-			fc = texture2D(get_cam_texture(active_cam), vec2(u, v))
+			fc = texture2D(cam_texture[active_cam], vec2(u, v))
 					* (1.0 + 4.0 * gain);
-			fc -= texture2D(get_cam_texture(active_cam), vec2(u - 1.0 * pixel_size, v))
+			fc -= texture2D(cam_texture[active_cam], vec2(u - 1.0 * pixel_size, v))
 					* gain;
-			fc -= texture2D(get_cam_texture(active_cam), vec2(u, v - 1.0 * pixel_size))
+			fc -= texture2D(cam_texture[active_cam], vec2(u, v - 1.0 * pixel_size))
 					* gain;
-			fc -= texture2D(get_cam_texture(active_cam), vec2(u, v + 1.0 * pixel_size))
+			fc -= texture2D(cam_texture[active_cam], vec2(u, v + 1.0 * pixel_size))
 					* gain;
-			fc -= texture2D(get_cam_texture(active_cam), vec2(u + 1.0 * pixel_size, v))
+			fc -= texture2D(cam_texture[active_cam], vec2(u + 1.0 * pixel_size, v))
 					* gain;
 		}
+)glsl"
+#else
+R"glsl(
+		if(active_cam == 0) {
+			const int i = 0;
+			float u = (tcoord.x + cam_offset_x[i] - 0.5)/cam_aspect_ratio + 0.5;
+			float v = tcoord.y + cam_offset_y[i];
+			if (sharpness_gain == 0.0) {
+				fc = texture2D(cam_texture[i], vec2(u, v));
+			} else {
+				//sharpness
+				float gain = sharpness_gain;
+				fc = texture2D(cam_texture[i], vec2(u, v))
+				* (1.0 + 4.0 * gain);
+				fc -= texture2D(cam_texture[i], vec2(u - 1.0 * pixel_size, v))
+				* gain;
+				fc -= texture2D(cam_texture[i], vec2(u, v - 1.0 * pixel_size))
+				* gain;
+				fc -= texture2D(cam_texture[i], vec2(u, v + 1.0 * pixel_size))
+				* gain;
+				fc -= texture2D(cam_texture[i], vec2(u + 1.0 * pixel_size, v))
+				* gain;
+			}
+		} else if(active_cam == 1) {
+			const int i = 1;
+			float u = (tcoord.x + cam_offset_x[i] - 0.5)/cam_aspect_ratio + 0.5;
+			float v = tcoord.y + cam_offset_y[i];
+			if (sharpness_gain == 0.0) {
+				fc = texture2D(cam_texture[i], vec2(u, v));
+			} else {
+				//sharpness
+				float gain = sharpness_gain;
+				fc = texture2D(cam_texture[i], vec2(u, v))
+				* (1.0 + 4.0 * gain);
+				fc -= texture2D(cam_texture[i], vec2(u - 1.0 * pixel_size, v))
+				* gain;
+				fc -= texture2D(cam_texture[i], vec2(u, v - 1.0 * pixel_size))
+				* gain;
+				fc -= texture2D(cam_texture[i], vec2(u, v + 1.0 * pixel_size))
+				* gain;
+				fc -= texture2D(cam_texture[i], vec2(u + 1.0 * pixel_size, v))
+				* gain;
+			}
+		}
+	)glsl"
+#endif
+	R"glsl(
 	}
 	gl_FragColor = fc;
 }
@@ -193,9 +228,9 @@ static int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *
 #endif
 
 	if (vbo_out != NULL)
-		*vbo_out = vbo;
+	*vbo_out = vbo;
 	if (n_out != NULL)
-		*n_out = n;
+	*n_out = n;
 
 	return 0;
 }
