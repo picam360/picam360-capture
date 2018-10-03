@@ -126,13 +126,12 @@ typedef struct _v4l2_capture {
 	_SENDFRAME_ARG_T *send_frame_arg;
 } v4l2_capture;
 
-static void set_v4l2_ctl(const char *name, const int value) {
-	for (int i = 0; i < CAMERA_NUM; i++) {
-		if (lg_devicefiles[i][0] != '\0') {
-			char cmd[256];
-			sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d %s", name, value, lg_devicefiles[i]);
-			system(cmd);
-		}
+static void set_v4l2_ctl(const char *name, const int value, int cam_num) {
+	if (lg_devicefiles[cam_num][0] != '\0') {
+		char cmd[256];
+		sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d %s", name, value, lg_devicefiles[cam_num]);
+		printf("shell:%s\n", cmd);
+		system(cmd);
 	}
 }
 
@@ -322,6 +321,18 @@ static void start(void *obj, int cam_num, void *display, void *context, int egl_
 
 	send_frame_arg->cam_run = true;
 
+	{
+		char cmd[256];
+		sprintf(cmd, "plugins/v4l2_capture/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb %d %s", 30000000, lg_devicefiles[cam_num]);
+		printf("shell:%s\n", cmd);
+		system(cmd);
+	}
+	if (lg_v4l2_ctls) {
+		for (int i = 0; lg_v4l2_ctls[i] != NULL; i++) {
+			set_v4l2_ctl(lg_v4l2_ctls[i]->name, lg_v4l2_ctls[i]->value, cam_num);
+		}
+	}
+
 	pthread_create(&send_frame_arg->cam_thread, NULL, camx_thread_func_v4l2, (void*) send_frame_arg);
 
 	_this->send_frame_arg = send_frame_arg;
@@ -365,7 +376,9 @@ static int command_handler(void *user_data, const char *_buff) {
 				for (int i = 0; lg_v4l2_ctls[i] != NULL; i++) {
 					if (strcmp(lg_v4l2_ctls[i]->name, name) == 0) {
 						lg_v4l2_ctls[i]->value += value;
-						set_v4l2_ctl(lg_v4l2_ctls[i]->name, lg_v4l2_ctls[i]->value);
+						for (int j = 0; j < CAMERA_NUM; j++) {
+							set_v4l2_ctl(lg_v4l2_ctls[i]->name, lg_v4l2_ctls[i]->value, j);
+						}
 						break;
 					}
 				}
@@ -403,12 +416,6 @@ static void init_options(void *user_data, json_t *options) {
 			if (len < sizeof(lg_devicefiles[i])) {
 				strncpy(lg_devicefiles[i], json_string_value(value), len);
 			}
-		}
-	}
-
-	if (lg_v4l2_ctls) {
-		for (int i = 0; lg_v4l2_ctls[i] != NULL; i++) {
-			set_v4l2_ctl(lg_v4l2_ctls[i]->name, lg_v4l2_ctls[i]->value);
 		}
 	}
 }

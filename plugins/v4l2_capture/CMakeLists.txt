@@ -19,6 +19,11 @@ set_target_properties(v4l2_capture PROPERTIES
     PREFIX ""
 )
 
+add_custom_target(Linux_UVC_TestAP_make
+	COMMAND make -C Linux_UVC_TestAP
+)
+add_dependencies(v4l2_capture Linux_UVC_TestAP_make)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
 	
 include_directories(
