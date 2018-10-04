@@ -74,17 +74,11 @@ for line in $(cat /home/$USER/.picam360rc | grep -v '^\s*#' | grep -v '^\s*$')
  if [ "$CAMERA_FPS" = "" ]; then
 	CAMERA_FPS=30
  fi
-
-# lunch driver
-if [ $DRIVER_IP = "127.0.0.1" ]; then
-	echo "lunch driver"
-	su -l $USER -c "bash /home/$USER/picam360/picam360-driver/lunch.sh -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -f $CAMERA_FPS -n $NUM_OF_CAMERA >/dev/null 2>/dev/null &"
-fi
-
+ 
 # lunch capture & server
 echo "lunch capture"
 OPTION="-w $CAMERA_HEIGHT -h $CAMERA_HEIGHT -n $NUM_OF_CAMERA"
-su -l $USER -c "bash /home/$USER/picam360/picam360-capture/lunch.sh $OPTION >/dev/null 2>/dev/null &"
+su -l $USER -c "bash /home/$USER/picam360/picam360-capture/lunch.sh $OPTION >/tmp/picam360_stdout 2>/tmp/picam360_sterr &"
 su -l $USER -c "bash /home/$USER/picam360/picam360-server/sh/start-app.sh &"
 
 exit 0
