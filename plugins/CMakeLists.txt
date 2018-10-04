@@ -24,6 +24,7 @@ elseif(WIN32)
 endif()
 
 option(USE_ROV_AGENT "Use ROV agent" OFF)
+option(USE_ROV_DRIVER "Use ROV driver" OFF)
 
 #common
 add_subdirectory(mpu9250)
@@ -34,4 +35,7 @@ add_subdirectory(equirectangular_renderer)
 add_subdirectory(h265_encoder)
 if(USE_ROV_AGENT)
 	add_subdirectory(rov_agent)
+endif()
+if(USE_ROV_DRIVER)
+	add_subdirectory(rov_driver)
 endif()

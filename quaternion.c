@@ -13,6 +13,7 @@ VECTOR4D_T quaternion_init() {
 	q.y = 0;
 	q.z = 0;
 	q.w = 1;
+	q.t = 0;
 	return q;
 }
 
@@ -22,6 +23,7 @@ VECTOR4D_T quaternion_get_from_x(float rad) {
 	q.y = 0;
 	q.z = 0;
 	q.w = cos(rad * 0.5);
+	q.t = 0;
 	return q;
 }
 
@@ -31,6 +33,7 @@ VECTOR4D_T quaternion_get_from_y(float rad) {
 	q.y = sin(rad * 0.5);
 	q.z = 0;
 	q.w = cos(rad * 0.5);
+	q.t = 0;
 	return q;
 }
 
@@ -40,6 +43,7 @@ VECTOR4D_T quaternion_get_from_z(float rad) {
 	q.y = 0;
 	q.z = sin(rad * 0.5);
 	q.w = cos(rad * 0.5);
+	q.t = 0;
 	return q;
 }
 
@@ -49,6 +53,7 @@ VECTOR4D_T quaternion_multiply(VECTOR4D_T q1, VECTOR4D_T q2) {
 	q.y = -q1.x * q2.z + q1.y * q2.w + q1.z * q2.x + q1.w * q2.y;
 	q.z = q1.x * q2.y - q1.y * q2.x + q1.z * q2.w + q1.w * q2.z;
 	q.w = -q1.x * q2.x - q1.y * q2.y - q1.z * q2.z + q1.w * q2.w;
+	q.t = q1.t;
 	return q;
 }
 
@@ -58,6 +63,7 @@ VECTOR4D_T quaternion_conjugate(VECTOR4D_T a) {
 	q.y = -a.y;
 	q.z = -a.z;
 	q.w = a.w;
+	q.t = a.t;
 	return q;
 }
 
@@ -71,6 +77,7 @@ VECTOR4D_T quaternion_normalize(VECTOR4D_T a) {
 	q.y = a.y / norm;
 	q.z = a.z / norm;
 	q.w = a.w / norm;
+	q.t = a.t;
 	return q;
 }
 

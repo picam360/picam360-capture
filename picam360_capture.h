@@ -248,7 +248,7 @@ typedef struct _PICAM360CAPTURE_T {
 	RTP_T *rtcp;
 	float rtp_play_speed;
 
-	char mpu_type[64];
+	char mpu_name[64];
 	MPU_T *mpu;
 	int quaternion_queue_cur;
 	VECTOR4D_T quaternion_queue[MAX_QUATERNION_QUEUE_COUNT];

@@ -545,6 +545,14 @@ static void init_options(PICAM360CAPTURE_T *state) {
 		fputs(error.text, stderr);
 	} else {
 		{
+			json_t *value = json_object_get(options, "mpu_name");
+			if (value) {
+				strncpy(state->mpu_name, json_string_value(value), sizeof(state->mpu_name) - 1);
+			} else {
+				strncpy(state->mpu_name, "manual", sizeof(state->mpu_name) - 1);
+			}
+		}
+		{
 			json_t *value = json_object_get(options, "capture_name");
 			if (value) {
 				strncpy(state->capture_name, json_string_value(value), sizeof(state->capture_name) - 1);
@@ -675,6 +683,7 @@ static void init_options(PICAM360CAPTURE_T *state) {
 static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
+	json_object_set_new(options, "mpu_name", json_string(state->mpu_name));
 	json_object_set_new(options, "capture_name", json_string(state->capture_name));
 	json_object_set_new(options, "decoder_name", json_string(state->decoder_name));
 	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
@@ -2111,6 +2120,9 @@ static void set_fov(float value) {
 	state->frame->fov = value;
 }
 
+static MPU_T *get_mpu() {
+	return state->mpu;
+}
 static RTP_T *get_rtp() {
 	return state->rtp;
 }
@@ -2449,6 +2461,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_fov = get_fov;
 		state->plugin_host.set_fov = set_fov;
 
+		state->plugin_host.get_mpu = get_mpu;
 		state->plugin_host.get_rtp = get_rtp;
 		state->plugin_host.get_rtcp = get_rtcp;
 		state->plugin_host.xmp = xmp;
@@ -3709,7 +3722,7 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	state->stereo = false;
-	strncpy(state->mpu_type, "manual", 64);
+	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
 	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
 	strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name));
 	state->video_direct = false;
@@ -3764,7 +3777,7 @@ int main(int argc, char *argv[]) {
 	umask(0000);
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:n:psd:i:r:F:v:M:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:n:psd:i:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'w':
 			sscanf(optarg, "%d", &state->cam_width);
@@ -3799,11 +3812,8 @@ int main(int argc, char *argv[]) {
 		case 'F':
 			strncpy(frame_param, optarg, 256);
 			break;
-		case 'V':
+		case 'v':
 			strncpy(state->default_view_coordinate_mode, optarg, 64);
-			break;
-		case 'M':
-			strncpy(state->mpu_type, optarg, 64);
 			break;
 		default:
 			/* '?' */
@@ -3862,12 +3872,12 @@ int main(int argc, char *argv[]) {
 	}
 	//set mpu
 	for (int i = 0; state->mpu_factories[i] != NULL; i++) {
-		if (strncmp(state->mpu_factories[i]->name, state->mpu_type, 64) == 0) {
+		if (strncmp(state->mpu_factories[i]->name, state->mpu_name, 64) == 0) {
 			state->mpu_factories[i]->create_mpu(state->mpu_factories[i]->user_data, &state->mpu);
 		}
 	}
 	if (state->mpu == NULL) {
-		printf("something wrong with %s\n", state->mpu_type);
+		printf("something wrong with %s\n", state->mpu_name);
 	}
 
 	static struct timeval last_time = { };
