@@ -309,7 +309,7 @@ static void *camx_thread_func_v4l2(void* arg) {
 	return NULL;
 }
 
-static void start(void *obj, int cam_num, void *display, void *context, int egl_image_num) {
+static void start(void *obj, int cam_num, void *display, void *context, void *cam_texture, int egl_image_num) {
 	v4l2_capture *_this = (v4l2_capture*) obj;
 
 	_SENDFRAME_ARG_T *send_frame_arg = new _SENDFRAME_ARG_T;

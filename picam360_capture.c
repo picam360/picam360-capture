@@ -499,7 +499,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		}
 		if (state->captures[i]) {
 #ifdef USE_GLES
-			state->captures[i]->start(state->captures[i], i, state->display, state->context, TEXTURE_BUFFER_NUM);
+			state->captures[i]->start(state->captures[i], i, state->display, state->context, state->cam_texture[i], TEXTURE_BUFFER_NUM);
 #else
 			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);

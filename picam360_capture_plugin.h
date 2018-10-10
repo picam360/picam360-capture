@@ -47,7 +47,7 @@ typedef struct _MPU_FACTORY_T {
 
 typedef struct _CAPTURE_T {
 	char name[64];
-	void (*start)(void *user_data, int cam_num, void *display, void *context, int n_buffers);
+	void (*start)(void *user_data, int cam_num, void *display, void *context, void *cam_texture, int n_buffers);
 	float (*get_fps)(void *user_data);
 	void (*release)(void *user_data);
 	void *user_data;

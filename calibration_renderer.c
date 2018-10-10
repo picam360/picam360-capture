@@ -96,7 +96,7 @@ void main(void) {
 #ifdef TEGRA
 	R"glsl(
 		float u = (tcoord.x + cam_offset_x[active_cam] - 0.5)/cam_aspect_ratio + 0.5;
-		float v = tcoord.y + get_cam_offset_y[active_cam];
+		float v = tcoord.y + cam_offset_y[active_cam];
 		if (sharpness_gain == 0.0) {
 			fc = texture2D(cam_texture[active_cam], vec2(u, v));
 		} else {
