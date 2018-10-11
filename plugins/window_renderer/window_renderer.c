@@ -30,13 +30,9 @@
 #include "window_renderer.h"
 
 #define PLUGIN_NAME "window_renderer"
-#define RENDERER_NAME "EQUIRECTANGULAR"
+#define RENDERER_NAME "WINDOW"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
-
-//rtp or uvc
-static char lg_options_input_type[32] = { 'u', 'v', 'c' };
-static char lg_options_input_codec[32] = { 'm', 'j', 'p', 'e', 'g' };
 
 typedef struct _window_renderer {
 	RENDERER_T super;
