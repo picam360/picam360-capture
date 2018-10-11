@@ -66,9 +66,7 @@ enum CODEC_TYPE {
  */
 class OmxCvImpl {
 public:
-	OmxCvImpl(const char *name, int width, int height, int bitrate, int fpsnum =
-			-1, int fpsden = -1, OMXCV_CALLBACK callback = NULL,
-			void *user_data = NULL);
+	OmxCvImpl(const char *name, int width, int height, int bitrate, int fpsnum = -1, int fpsden = -1, OMXCV_CALLBACK callback = NULL, void *user_data = NULL);
 	virtual ~OmxCvImpl();
 
 	bool process(const unsigned char *in_data, void *frame_data);
@@ -107,6 +105,7 @@ private:
 
 	void input_worker();
 	bool write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp);
+	void callback(unsigned char *data, unsigned int data_len);
 	static void my_fill_buffer_done(void* data, COMPONENT_T* comp);
 };
 

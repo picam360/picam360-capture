@@ -307,6 +307,33 @@ void OmxCvImpl::input_worker() {
 	}
 }
 
+void OmxCvImpl::callback(unsigned char *data, unsigned int data_len) {
+	void *frame_data = NULL;
+	if (this->nal_type == 1 || this->nal_type == 5) {
+		std::unique_lock < std::mutex > lock(m_input_mutex);
+		frame_data = m_frame_data_queue.front();
+		m_frame_data_queue.pop_front();
+		lock.unlock();
+	}
+	if (this->nal_type == 7) { //sps & pps combined case
+		for (int i = 0; i < data_len - 4; i++) {
+			if (data[i + 0] == 0 && data[i + 1] == 0 && data[i + 2] == 0 && data[i + 3] == 1) {
+				data[0] = (i - 4) >> 24;
+				data[1] = (i - 4) >> 16;
+				data[2] = (i - 4) >> 8;
+				data[3] = (i - 4) >> 0;
+				m_callback(data, i, frame_data, m_user_data);
+				data[i + 0] = (data_len - i - 4) >> 24;
+				data[i + 1] = (data_len - i - 4) >> 16;
+				data[i + 2] = (data_len - i - 4) >> 8;
+				data[i + 3] = (data_len - i - 4) >> 0;
+				m_callback(data + i, data_len - i, frame_data, m_user_data);
+				return;
+			}
+		}
+	}
+	m_callback(data, data_len, frame_data, m_user_data);
+}
 /**
  * Output muxing routine.
  * @param [in] out Buffer to be saved.
@@ -347,14 +374,8 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 						return true;
 					}
 					if (i + this->nal_len <= data_len) {
-						void *frame_data = NULL;
-						if (this->nal_type == 1 || this->nal_type == 5) {
-							std::unique_lock < std::mutex > lock(m_input_mutex);
-							frame_data = m_frame_data_queue.front();
-							m_frame_data_queue.pop_front();
-							lock.unlock();
-						}
-						m_callback(data + i, this->nal_len, frame_data, m_user_data);
+						this->callback(data + i, this->nal_len);
+
 						i += this->nal_len;
 						this->in_nal = false;
 					} else {
@@ -366,14 +387,7 @@ bool OmxCvImpl::write_data(OMX_BUFFERHEADERTYPE *out, int64_t timestamp) {
 					if (i + rest <= data_len) {
 						memcpy(this->nal_buff + this->nal_pos, data + i, rest);
 
-						void *frame_data = NULL;
-						if (this->nal_type == 1 || this->nal_type == 5) {
-							std::unique_lock < std::mutex > lock(m_input_mutex);
-							frame_data = m_frame_data_queue.front();
-							m_frame_data_queue.pop_front();
-							lock.unlock();
-						}
-						m_callback(this->nal_buff, this->nal_len, frame_data, m_user_data);
+						this->callback(this->nal_buff, this->nal_len);
 
 						free(this->nal_buff);
 						this->nal_buff = NULL;
