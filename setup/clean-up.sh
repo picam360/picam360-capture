@@ -14,6 +14,7 @@ git reset --hard & git pull
 echo "rm history files"
 sudo rm /root/.*_history
 sudo rm /home/pi/.*_history
+sudo rm /home/pi/.ssh/known_hosts
 sudo rm /home/pi/.gitconfig
 sudo rm /home/pi/.xsession-errors*
 sudo rm /home/pi/picam360/picam360-capture/.picam360_history
@@ -45,3 +46,5 @@ case $WPA in
 	*)
 		;;
 esac
+
+sync

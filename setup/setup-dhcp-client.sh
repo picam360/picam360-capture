@@ -1,3 +1,7 @@
+
+CURRENT=$(cd $(dirname $0) && pwd)
+cd $CURRENT
+
 sudo rm /etc/network/interfaces.d/wlan0-dhcp-server
 sudo systemctl disable hostapd
 sudo systemctl disable isc-dhcp-server

@@ -1,3 +1,7 @@
+
+CURRENT=$(cd $(dirname $0) && pwd)
+cd $CURRENT
+
 sudo cp wlan0-dhcp-server /etc/network/interfaces.d/
 sudo systemctl enable hostapd
 sudo systemctl enable isc-dhcp-server
