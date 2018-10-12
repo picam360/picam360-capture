@@ -28,6 +28,10 @@ cp /home/pi/picam360/picam360-capture/config.json.tmp /home/pi/picam360/picam360
 cp /home/pi/picam360/picam360-server/config.json.tmp /home/pi/picam360/picam360-server/config.json
 cp /home/pi/picam360/picam360-server/www/config.json.tmp /home/pi/picam360/picam360-server/www/config.json
 
+echo "auto start up"
+sudo systemctl enable picam360-capture.service
+sudo systemctl enable picam360-server.service
+
 #need to be last because wifi connection will be disable
 echo "disable wpa? [y/N]"
 read WPA

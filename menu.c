@@ -33,6 +33,31 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+static const char * vertex_shader = R"glsl(
+uniform mat4 u_mvp;
+attribute vec3 a_position;
+attribute vec4 a_color;
+attribute vec2 a_st;
+varying vec2 v_frag_uv;
+varying vec4 v_color;
+void main(void) {
+	v_frag_uv = a_st;
+	gl_Position = u_mvp * vec4(a_position, 1);
+	gl_Position.y = -gl_Position.y; //for jpeg coordinate
+	v_color = a_color;
+}
+)glsl";
+
+static const char * fragment_shader = R"glsl(
+precision mediump float;
+uniform sampler2D texture_uniform;
+varying vec2 v_frag_uv;
+varying vec4 v_color;
+void main() {
+	gl_FragColor = vec4(v_color.xyz, v_color.a * texture2D(texture_uniform, v_frag_uv).a);
+}
+)glsl";
+
 typedef struct {
 	void *program;
 	GLuint vbo;
@@ -92,7 +117,7 @@ void init_menu(uint32_t font_size) {
 			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
-	lg_freetypegles.model.program = GLProgram_new("", "shader/freetypegles.vert", "shader/freetypegles.frag", true);
+	lg_freetypegles.model.program = GLProgram_new("", vertex_shader, fragment_shader, false);
 #ifdef USE_GLES
 	texture_atlas_upload(lg_freetypegles.atlas);
 #endif

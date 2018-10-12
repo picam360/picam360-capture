@@ -833,7 +833,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		case 'm':
 			frame->renderer = get_renderer(optarg);
 			if (frame->renderer == NULL) {
-				printf("%s rendere is not existing.\n", optarg);
+				printf("%s renderer is not existing.\n", optarg);
 			}
 			break;
 		case 'o':
@@ -4103,14 +4103,6 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 	//Load in the texture and thresholding parameters.
 	glUniform1f(glGetUniformLocation(program, "split"), state->split);
 	glUniform1f(glGetUniformLocation(program, "pixel_size"), 1.0 / state->cam_width);
-	if (strcasecmp(frame->renderer->name, "EQUIRECTANGULAR") == 0) {
-		glUniform1f(glGetUniformLocation(program, "scale_x"), 1.0);
-		glUniform1f(glGetUniformLocation(program, "scale_y"), 0.5);
-	} else {
-		float fov_rad = frame->fov * M_PI / 180.0;
-		float scale = 1.0 / tan(fov_rad / 2);
-		glUniform1f(glGetUniformLocation(program, "scale"), scale);
-	}
 
 	glUniform1f(glGetUniformLocation(program, "cam_aspect_ratio"), (float) state->cam_width / (float) state->cam_height);
 	glUniform1f(glGetUniformLocation(program, "frame_aspect_ratio"), (float) frame_width / (float) frame_height);

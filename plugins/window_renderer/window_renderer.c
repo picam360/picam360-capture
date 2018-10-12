@@ -46,7 +46,7 @@ typedef struct _window_renderer {
 	void *user_data;
 } window_renderer;
 
-const char * vertex_shader = R"glsl(
+static const char * vertex_shader = R"glsl(
 #if (__VERSION__ > 120)
 # define IN in
 # define OUT out
@@ -54,60 +54,62 @@ const char * vertex_shader = R"glsl(
 # define IN attribute
 # define OUT varying
 #endif // __VERSION
-precision mediump float;
-IN vec4 vPosition;
+precision highp float;
+
+const int MAX_NUM_OF_CAM =
+		3;
+const float M_PI = 3.1415926535;
+const float M_PI_DIV_2 = M_PI / 2.0;
+const float M_PI_DIV_4 = M_PI / 4.0;
+const float M_SQRT_2 = 1.4142135623;
+
+IN vec4 vPosition; //[0:1]
+//options start
 uniform float scale;
 uniform float frame_aspect_ratio;
 
-uniform mat4 unif_matrix;
-uniform mat4 unif_matrix_1;
-uniform sampler2D cam0_texture;
-uniform sampler2D cam1_texture;
 uniform float pixel_size;
 uniform float cam_aspect_ratio;
-//options start
 uniform float sharpness_gain;
-uniform float cam0_offset_yaw;
-uniform float cam0_offset_x;
-uniform float cam0_offset_y;
-uniform float cam0_horizon_r;
-uniform float cam0_aov;
+
+uniform int num_of_cam;
+uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
+uniform mat4 cam_attitude[MAX_NUM_OF_CAM];
+uniform float cam_offset_x[MAX_NUM_OF_CAM];
+uniform float cam_offset_y[MAX_NUM_OF_CAM];
+uniform float cam_horizon_r[MAX_NUM_OF_CAM];
+uniform float cam_aov[MAX_NUM_OF_CAM];
 //options end
 
-const float M_PI = 3.1415926535;
-
-OUT float r0;
-OUT float r1;
-OUT float u0;
-OUT float v0;
-OUT float u1;
-OUT float v1;
+OUT vec3 cam_uvr[MAX_NUM_OF_CAM];
+OUT vec3 logo_uvr;
 
 void main(void) {
 	vec4 position = vPosition;
 	gl_Position = vec4(vPosition.x / vPosition.z * scale, vPosition.y / vPosition.z * scale * frame_aspect_ratio, 1.0, 1.0);
 
-	{
-		vec4 pos = unif_matrix * position;
+	//if(num_of_cam >= 1)
+	{ //cam0
+		const int i = 0;
+		vec4 pos = cam_attitude[i] * position;
 		float pitch = asin(pos.y);
 		float yaw = atan(pos.x, pos.z);
 
-		r0 = (M_PI / 2.0 - pitch) / M_PI;
-		float r2 = r0;
-		r2 = sin(M_PI * 180.0 / cam0_aov * r2) / 2.0;
-		float yaw2 = yaw + M_PI + cam0_offset_yaw;
-		u0 = cam0_horizon_r / cam_aspect_ratio * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
-		v0 = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y;
+		float r = (M_PI / 2.0 - pitch) / M_PI;
+		float r2 = sin(M_PI * 180.0 / cam_aov[i] * r) / 2.0;
+		cam_uvr[i][0] = cam_horizon_r[i] / cam_aspect_ratio * r2 * cos(yaw) + 0.5 + cam_offset_x[i];
+		cam_uvr[i][1] = cam_horizon_r[i] * r2 * sin(yaw) + 0.5 + cam_offset_y[i];
+		cam_uvr[i][2] = r;
 	}
-	{
-		vec4 pos = unif_matrix_1 * position;
-		u1 = pos.x / -pos.y * 0.35 + 0.5;
-		v1 = pos.z / -pos.y * 0.35 + 0.5;
+	{ //logo
+		vec4 pos = cam_attitude[0] * position;
+		logo_uvr[0] = pos.x / -pos.y * 0.35 + 0.5;
+		logo_uvr[1] = pos.z / -pos.y * 0.35 + 0.5;
 	}
 }
 )glsl";
 
-const char * fragment_shader = R"glsl(
+static const char * fragment_shader = R"glsl(
 #if (__VERSION__ > 120)
 # define IN in
 # define OUT out
@@ -118,171 +120,64 @@ layout (location=0) out vec4 FragColor;
 # define IN varying
 # define OUT varying
 #endif // __VERSION
-precision mediump float;
-uniform mat4 unif_matrix;
-uniform mat4 unif_matrix_1;
-uniform sampler2D cam0_texture;
+precision highp float;
+
+const int MAX_NUM_OF_CAM =
+		3;
+const float M_PI = 3.1415926535;
+
+uniform int num_of_cam;
+uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
+uniform float cam_aov[MAX_NUM_OF_CAM];
 uniform sampler2D logo_texture;
 uniform float color_offset;
 uniform float color_factor;
 uniform float overlap;
-uniform float cam0_aov;
 
-const float M_PI = 3.1415926535;
-
-OUT float r0;
-OUT float r1;
-OUT float u0;
-OUT float v0;
-OUT float u1;
-OUT float v1;
+IN vec3 cam_uvr[MAX_NUM_OF_CAM];
+IN vec3 logo_uvr;
 
 void main(void) {
-	if (r0 < cam0_aov / 360.0 - overlap) {
-		if (u0 <= 0.0 || u0 > 1.0 || v0 <= 0.0 || v0 > 1.0) {
-			gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-		} else {
-			vec4 fc = texture2D(cam0_texture, vec2(u0, v0));
-			fc = (fc - color_offset) * color_factor;
-
-			gl_FragColor = fc;
-		}
-	} else {
-		gl_FragColor = texture2D(logo_texture, vec2(u1, v1));
-	}
-}
-)glsl";
-const char * sphere_vertex_shader = R"glsl(
-#if (__VERSION__ > 120)
-# define IN in
-# define OUT out
-#else
-# define IN attribute
-# define OUT varying
-#endif // __VERSION
-precision mediump float;
-IN vec4 vPosition;
-uniform float scale;
-uniform float frame_aspect_ratio;
-
-uniform mat4 unif_matrix;
-uniform mat4 unif_matrix_1;
-uniform sampler2D cam0_texture;
-uniform sampler2D cam1_texture;
-uniform float pixel_size;
-uniform float cam_aspect_ratio;
-//options start
-uniform float sharpness_gain;
-uniform float cam0_offset_yaw;
-uniform float cam0_offset_x;
-uniform float cam0_offset_y;
-uniform float cam0_horizon_r;
-uniform float cam0_aov;
-uniform float cam1_offset_yaw;
-uniform float cam1_offset_x;
-uniform float cam1_offset_y;
-uniform float cam1_horizon_r;
-uniform float cam1_aov;
-//options end
-
-const float M_PI = 3.1415926535;
-
-OUT float r0;
-OUT float r1;
-OUT float u0;
-OUT float v0;
-OUT float u1;
-OUT float v1;
-
-void main(void) {
-	vec4 position = vPosition;
-	gl_Position = vec4(vPosition.x / vPosition.z * scale, vPosition.y / vPosition.z * scale * frame_aspect_ratio, 1.0, 1.0);
-
+	vec4 fcs[MAX_NUM_OF_CAM];
+	float alpha = 0.0;
+	//if(num_of_cam >= 1)
 	{
-		vec4 pos = unif_matrix * position;
-		float pitch = asin(pos.y);
-		float yaw = atan(pos.x, pos.z);
-
-		r0 = (M_PI / 2.0 - pitch) / M_PI;
-		float r2 = r0;
-		r2 = sin(M_PI * 180.0 / cam0_aov * r2) / 2.0;
-		float yaw2 = yaw + M_PI + cam0_offset_yaw;
-		u0 = cam0_horizon_r / cam_aspect_ratio * r2 * cos(yaw2) + 0.5 + cam0_offset_x;
-		v0 = cam0_horizon_r * r2 * sin(yaw2) + 0.5 + cam0_offset_y;
-	}
-	{
-		vec4 pos = unif_matrix_1 * position;
-		float pitch = asin(pos.y);
-		float yaw = atan(pos.x, pos.z);
-		r1 = (M_PI / 2.0 - pitch) / M_PI;
-
-		float r2 = 1.0 - r1;
-		r2 = sin(M_PI * 180.0 / cam1_aov * r2) / 2.0;
-		float yaw2 = -yaw + M_PI + cam1_offset_yaw;
-		u1 = cam1_horizon_r * r2 / cam_aspect_ratio * cos(yaw2) + 0.5 + cam1_offset_x;
-		v1 = cam1_horizon_r * r2 * sin(yaw2) + 0.5 + cam1_offset_y;
-	}
-}
-)glsl";
-const char * sphere_fragment_shader = R"glsl(
-#if (__VERSION__ > 120)
-# define IN in
-# define OUT out
-# define texture2D texture
-# define gl_FragColor FragColor
-layout (location=0) out vec4 FragColor;
-#else
-# define IN varying
-# define OUT varying
-#endif // __VERSION
-precision mediump float;
-uniform mat4 unif_matrix;
-uniform mat4 unif_matrix_1;
-uniform sampler2D cam0_texture;
-uniform sampler2D cam1_texture;
-uniform float color_offset;
-uniform float color_factor;
-uniform float overlap;
-
-const float M_PI = 3.1415926535;
-
-OUT float r0;
-OUT float r1;
-OUT float u0;
-OUT float v0;
-OUT float u1;
-OUT float v1;
-
-void main(void) {
-	vec4 fc0;
-	vec4 fc1;
-	if (r0 < 0.5 + overlap) {
-		if (u0 <= 0.0 || u0 > 1.0 || v0 <= 0.0 || v0 > 1.0) {
-			fc0 = vec4(0.0, 0.0, 0.0, 1.0);
+		const int i = 0;
+		float r_thresh = cam_aov[i] / 360.0;
+		if (cam_uvr[i][2] > r_thresh || cam_uvr[i][0] <= 0.0 || cam_uvr[i][0] > 1.0 || cam_uvr[i][1] <= 0.0 || cam_uvr[i][1] > 1.0) {
+			fcs[i] = vec4(0.0, 0.0, 0.0, 0.0);
 		} else {
-			vec4 fc = texture2D(cam0_texture, vec2(u0, v0));
-			fc = (fc - color_offset) * color_factor;
-
-			fc0 = fc;
+			fcs[i] = texture2D(cam_texture[i], vec2(cam_uvr[i][0], cam_uvr[i][1]));
+			fcs[i].a = 1.0 - cam_uvr[i][2] / r_thresh;
+			alpha += fcs[i].a;
 		}
 	}
-	
-	if (r1 > 0.5 - overlap) {
-		if (u1 <= 0.0 || u1 > 1.0 || v1 <= 0.0 || v1 > 1.0) {
-			fc1 = vec4(0.0, 0.0, 0.0, 1.0);
+	if (num_of_cam >= 2) {
+		const int i = 1;
+		float r_thresh = cam_aov[i] / 360.0;
+		if (cam_uvr[i][2] > r_thresh || cam_uvr[i][0] <= 0.0 || cam_uvr[i][0] > 1.0 || cam_uvr[i][1] <= 0.0 || cam_uvr[i][1] > 1.0) {
+			fcs[i] = vec4(0.0, 0.0, 0.0, 0.0);
 		} else {
-			vec4 fc = texture2D(cam1_texture, vec2(u1, v1));
-			fc = (fc - color_offset) * color_factor;
-
-			fc1 = fc;
+			fcs[i] = texture2D(cam_texture[i], vec2(cam_uvr[i][0], cam_uvr[i][1]));
+			fcs[i].a = 1.0 - cam_uvr[i][2] / r_thresh;
+			alpha += fcs[i].a;
 		}
 	}
-	if (r0 < 0.5 - overlap) {
-		gl_FragColor = fc0;
-	} else if (r0 < 0.5 + overlap) {
-		gl_FragColor = (fc0 * ((0.5 + overlap) - r0) + fc1 * (r0 - (0.5 - overlap))) / (overlap * 2.0);
+	if (alpha == 0.0) {
+		gl_FragColor = texture2D(logo_texture, vec2(logo_uvr.x, logo_uvr.y));
 	} else {
-		gl_FragColor = fc1;
+		vec4 fc = vec4(0.0, 0.0, 0.0, 0.0);
+		//if(num_of_cam >= 1)
+		{
+			const int i = 0;
+			fc += fcs[i] * (fcs[i].a / alpha);
+		}
+		if (num_of_cam >= 2) {
+			const int i = 1;
+			fc += fcs[i] * (fcs[i].a / alpha);
+		}
+		fc = (fc - color_offset) * color_factor;
+		gl_FragColor = fc;
 	}
 }
 )glsl";
@@ -341,9 +236,9 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
 
 	if (vbo_out != NULL)
-		*vbo_out = vbo;
+	*vbo_out = vbo;
 	if (n_out != NULL)
-		*n_out = n;
+	*n_out = n;
 
 	return 0;
 }
@@ -355,11 +250,7 @@ static void init(void *obj, const char *common, int num_of_cam) {
 
 	float maxfov = 150.0;
 	spherewindow_mesh(maxfov, maxfov, 64, &_this->vbo, &_this->vbo_nop, &_this->vao);
-	if (_this->num_of_cam == 1) {
-		_this->program_obj = GLProgram_new(common, vertex_shader, fragment_shader, false);
-	} else {
-		_this->program_obj = GLProgram_new(common, sphere_vertex_shader, sphere_fragment_shader, false);
-	}
+	_this->program_obj = GLProgram_new(common, vertex_shader, fragment_shader, false);
 }
 static void release(void *obj) {
 	window_renderer *_this = (window_renderer*) obj;
@@ -376,6 +267,10 @@ static void render(void *obj, float fov) {
 	int program = GLProgram_GetId(_this->program_obj);
 
 	glBindBuffer(GL_ARRAY_BUFFER, _this->vbo);
+
+	float fov_rad = fov * M_PI / 180.0;
+	float scale = 1.0 / tan(fov_rad / 2);
+	glUniform1f(glGetUniformLocation(program, "scale"), scale);
 
 #ifdef USE_GLES
 	GLuint loc = glGetAttribLocation(program, "vPosition");

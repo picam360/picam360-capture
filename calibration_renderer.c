@@ -42,7 +42,7 @@ typedef struct _calibration_renderer {
 	void *user_data;
 } calibration_renderer;
 
-const char * vertex_shader = R"glsl(
+static const char * vertex_shader = R"glsl(
 #if (__VERSION__ > 120)
 # define IN in
 # define OUT out
@@ -62,7 +62,7 @@ void main(void) {
 }
 )glsl";
 
-const char * fragment_shader = R"glsl(
+static const char * fragment_shader = R"glsl(
 #if (__VERSION__ > 120)
 # define IN in
 # define OUT out
