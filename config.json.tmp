@@ -33,6 +33,7 @@
         "plugins/v4l2_capture.so",
         "plugins/mjpeg_omx_decoder.so",
         "plugins/omx_encoder.so",
+        "plugins/h265_encoder.so",
         "plugins/window_renderer.so",
         "advance_plugins/picam360map_renderer.so"
     ],
