@@ -1,1 +1,0 @@
-sudo cp 10-oculus.rules /etc/udev/rules.d/

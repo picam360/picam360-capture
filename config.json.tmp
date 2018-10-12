@@ -34,8 +34,7 @@
         "plugins/mjpeg_omx_decoder.so",
         "plugins/omx_encoder.so",
         "plugins/h265_encoder.so",
-        "plugins/window_renderer.so",
-        "advance_plugins/picam360map_renderer.so"
+        "plugins/window_renderer.so"
     ],
     "v4l2_capture.cam0_devicefile": "/dev/video0",
     "v4l2_capture.v4l2_ctls": {
