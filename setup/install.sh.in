@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/" ]; then
 	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
@@ -8,6 +8,11 @@ chmod +x setup/picam360-capture
 cp setup/picam360-capture ${CMAKE_INSTALL_PREFIX}/bin
 cp config.json.tmp ${CMAKE_INSTALL_PREFIX}/etc/picam360-capture.conf
 cp setup/picam360-capture.service /etc/systemd/system/
+
+if [ -d "${CMAKE_INSTALL_PREFIX}/include/picam360-capture/" ]; then
+	rm -r ${CMAKE_INSTALL_PREFIX}/include/picam360-capture/
+fi
+cp -r include ${CMAKE_INSTALL_PREFIX}/include/picam360-capture
 
 if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/" ]; then
 	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/

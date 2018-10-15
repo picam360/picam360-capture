@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "../../picam360_capture_plugin.h"
+#include "picam360_capture_plugin.h"
 
 
 #define KOKUYOSEKI_VENDOR 0x062a

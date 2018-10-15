@@ -40,17 +40,17 @@ set(GLSL_HEADERS
 #add_executable 
 #target_link_libraries should be define below here
 add_executable(picam360-capture.bin
-	picam360_capture.c
-	rtp.cc
-	mrevent.c
-	quaternion.c
-	manual_mpu.c
-	gl_program.cc
-	auto_calibration.cc
-	manual_mpu.c
-	menu.c
-	board_renderer.c
-	calibration_renderer.c
+	src/picam360_capture.c
+	src/rtp.cc
+	src/mrevent.c
+	src/quaternion.c
+	src/manual_mpu.c
+	src/gl_program.cc
+	src/auto_calibration.cc
+	src/manual_mpu.c
+	src/menu.c
+	src/board_renderer.c
+	src/calibration_renderer.c
 	${IMAGE_HEADERS}
 	${GLSL_HEADERS}
 )
@@ -60,7 +60,8 @@ pkg_check_modules(LIBEDIT libedit REQUIRED)
 pkg_check_modules(OPENCV opencv REQUIRED)
 
 include_directories(
-	include
+	./
+	./include
 	${JANSSON_INCLUDE_DIRS}
 	${LIBEDIT_INCLUDE_DIRS}
 	${OPENCV_INCLUDE_DIRS}
