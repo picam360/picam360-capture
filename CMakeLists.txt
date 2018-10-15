@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1.3)
 
-message("picam360-capture generating Makefile")
-project(picam360-capture)
+message("picam360-capture.bin generating Makefile")
+project(picam360-capture.bin)
 
 find_package(PkgConfig REQUIRED)
 
@@ -23,6 +23,20 @@ if(TEGRA)
 	add_definitions(-DTEGRA)
 endif()
 
+set(IMAGE_HEADERS
+  "img/logo_png.h"
+  "img/calibration_png.h"
+)
+
+set(GLSL_HEADERS
+  "glsl/board_fsh.h"
+  "glsl/board_vsh.h"
+  "glsl/calibration_fsh.h"
+  "glsl/calibration_vsh.h"
+  "glsl/freetype_fsh.h"
+  "glsl/freetype_vsh.h"
+)
+
 #add_executable 
 #target_link_libraries should be define below here
 add_executable(picam360-capture.bin
@@ -35,7 +49,10 @@ add_executable(picam360-capture.bin
 	auto_calibration.cc
 	manual_mpu.c
 	menu.c
+	board_renderer.c
 	calibration_renderer.c
+	${IMAGE_HEADERS}
+	${GLSL_HEADERS}
 )
 
 pkg_check_modules(JANSSON jansson REQUIRED)
@@ -101,6 +118,28 @@ elseif(WIN32)
 	message("WINDOWS")
 endif()
 
+#img
+add_custom_command(OUTPUT ${IMAGE_HEADERS}
+  COMMAND /usr/bin/xxd -i logo.png > logo_png.h
+  COMMAND /usr/bin/xxd -i calibration.png > calibration_png.h
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/img"
+  COMMENT "prepare img include files"
+  VERBATIM
+)
+
+#glsl
+add_custom_command(OUTPUT ${GLSL_HEADERS}
+  COMMAND /usr/bin/xxd -i board.fsh > board_fsh.h
+  COMMAND /usr/bin/xxd -i board.vsh > board_vsh.h
+  COMMAND /usr/bin/xxd -i calibration.fsh > calibration_fsh.h
+  COMMAND /usr/bin/xxd -i calibration.vsh > calibration_vsh.h
+  COMMAND /usr/bin/xxd -i freetype.fsh > freetype_fsh.h
+  COMMAND /usr/bin/xxd -i freetype.vsh > freetype_vsh.h
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/glsl"
+  COMMENT "prepare glsl include files"
+  VERBATIM
+)
+
 set_target_properties(picam360-capture.bin PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED YES
@@ -126,6 +165,12 @@ else()
 	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl/libfreetype-gl.a )
 	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
 endif()
+
+#install
+configure_file( setup/picam360-capture.in setup/picam360-capture )
+configure_file( setup/picam360-capture.service.in setup/picam360-capture.service )
+configure_file( setup/install.sh.in setup/install.sh )
+install(CODE "execute_process(COMMAND bash -x setup/install.sh)")
 
 #plugins
 add_subdirectory(plugins)

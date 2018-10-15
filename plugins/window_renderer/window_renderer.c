@@ -26,6 +26,8 @@
 #endif
 
 #include "gl_program.h"
+#include "glsl/window_fsh.h"
+#include "glsl/window_vsh.h"
 
 #include "window_renderer.h"
 
@@ -45,142 +47,6 @@ typedef struct _window_renderer {
 
 	void *user_data;
 } window_renderer;
-
-static const char * vertex_shader = R"glsl(
-#if (__VERSION__ > 120)
-# define IN in
-# define OUT out
-#else
-# define IN attribute
-# define OUT varying
-#endif // __VERSION
-precision highp float;
-
-const int MAX_NUM_OF_CAM =
-		3;
-const float M_PI = 3.1415926535;
-const float M_PI_DIV_2 = M_PI / 2.0;
-const float M_PI_DIV_4 = M_PI / 4.0;
-const float M_SQRT_2 = 1.4142135623;
-
-IN vec4 vPosition; //[0:1]
-//options start
-uniform float scale;
-uniform float frame_aspect_ratio;
-
-uniform float pixel_size;
-uniform float cam_aspect_ratio;
-uniform float sharpness_gain;
-
-uniform int num_of_cam;
-uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
-uniform mat4 cam_attitude[MAX_NUM_OF_CAM];
-uniform float cam_offset_x[MAX_NUM_OF_CAM];
-uniform float cam_offset_y[MAX_NUM_OF_CAM];
-uniform float cam_horizon_r[MAX_NUM_OF_CAM];
-uniform float cam_aov[MAX_NUM_OF_CAM];
-//options end
-
-OUT vec3 cam_uvr[MAX_NUM_OF_CAM];
-OUT vec3 logo_uvr;
-
-void main(void) {
-	vec4 position = vPosition;
-	gl_Position = vec4(vPosition.x / vPosition.z * scale, vPosition.y / vPosition.z * scale * frame_aspect_ratio, 1.0, 1.0);
-
-	//if(num_of_cam >= 1)
-	{ //cam0
-		const int i = 0;
-		vec4 pos = cam_attitude[i] * position;
-		float pitch = asin(pos.y);
-		float yaw = atan(pos.x, pos.z);
-
-		float r = (M_PI / 2.0 - pitch) / M_PI;
-		float r2 = sin(M_PI * 180.0 / cam_aov[i] * r) / 2.0;
-		cam_uvr[i][0] = cam_horizon_r[i] / cam_aspect_ratio * r2 * cos(yaw) + 0.5 + cam_offset_x[i];
-		cam_uvr[i][1] = cam_horizon_r[i] * r2 * sin(yaw) + 0.5 + cam_offset_y[i];
-		cam_uvr[i][2] = r;
-	}
-	{ //logo
-		vec4 pos = cam_attitude[0] * position;
-		logo_uvr[0] = pos.x / -pos.y * 0.35 + 0.5;
-		logo_uvr[1] = pos.z / -pos.y * 0.35 + 0.5;
-	}
-}
-)glsl";
-
-static const char * fragment_shader = R"glsl(
-#if (__VERSION__ > 120)
-# define IN in
-# define OUT out
-# define texture2D texture
-# define gl_FragColor FragColor
-layout (location=0) out vec4 FragColor;
-#else
-# define IN varying
-# define OUT varying
-#endif // __VERSION
-precision highp float;
-
-const int MAX_NUM_OF_CAM =
-		3;
-const float M_PI = 3.1415926535;
-
-uniform int num_of_cam;
-uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
-uniform float cam_aov[MAX_NUM_OF_CAM];
-uniform sampler2D logo_texture;
-uniform float color_offset;
-uniform float color_factor;
-uniform float overlap;
-
-IN vec3 cam_uvr[MAX_NUM_OF_CAM];
-IN vec3 logo_uvr;
-
-void main(void) {
-	vec4 fcs[MAX_NUM_OF_CAM];
-	float alpha = 0.0;
-	//if(num_of_cam >= 1)
-	{
-		const int i = 0;
-		float r_thresh = cam_aov[i] / 360.0;
-		if (cam_uvr[i][2] > r_thresh || cam_uvr[i][0] <= 0.0 || cam_uvr[i][0] > 1.0 || cam_uvr[i][1] <= 0.0 || cam_uvr[i][1] > 1.0) {
-			fcs[i] = vec4(0.0, 0.0, 0.0, 0.0);
-		} else {
-			fcs[i] = texture2D(cam_texture[i], vec2(cam_uvr[i][0], cam_uvr[i][1]));
-			fcs[i].a = 1.0 - cam_uvr[i][2] / r_thresh;
-			alpha += fcs[i].a;
-		}
-	}
-	if (num_of_cam >= 2) {
-		const int i = 1;
-		float r_thresh = cam_aov[i] / 360.0;
-		if (cam_uvr[i][2] > r_thresh || cam_uvr[i][0] <= 0.0 || cam_uvr[i][0] > 1.0 || cam_uvr[i][1] <= 0.0 || cam_uvr[i][1] > 1.0) {
-			fcs[i] = vec4(0.0, 0.0, 0.0, 0.0);
-		} else {
-			fcs[i] = texture2D(cam_texture[i], vec2(cam_uvr[i][0], cam_uvr[i][1]));
-			fcs[i].a = 1.0 - cam_uvr[i][2] / r_thresh;
-			alpha += fcs[i].a;
-		}
-	}
-	if (alpha == 0.0) {
-		gl_FragColor = texture2D(logo_texture, vec2(logo_uvr.x, logo_uvr.y));
-	} else {
-		vec4 fc = vec4(0.0, 0.0, 0.0, 0.0);
-		//if(num_of_cam >= 1)
-		{
-			const int i = 0;
-			fc += fcs[i] * (fcs[i].a / alpha);
-		}
-		if (num_of_cam >= 2) {
-			const int i = 1;
-			fc += fcs[i] * (fcs[i].a / alpha);
-		}
-		fc = (fc - color_offset) * color_factor;
-		gl_FragColor = fc;
-	}
-}
-)glsl";
 
 int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out) {
 	GLuint vbo;
@@ -235,6 +101,20 @@ int spherewindow_mesh(float theta_degree, int phi_degree, int num_of_steps, GLui
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * n, points, GL_STATIC_DRAW);
 
+#ifdef USE_VAO
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+
+	if (vao_out != NULL)
+	*vao_out = vao;
+#endif
+
 	if (vbo_out != NULL)
 	*vbo_out = vbo;
 	if (n_out != NULL)
@@ -250,7 +130,19 @@ static void init(void *obj, const char *common, int num_of_cam) {
 
 	float maxfov = 150.0;
 	spherewindow_mesh(maxfov, maxfov, 64, &_this->vbo, &_this->vbo_nop, &_this->vao);
-	_this->program_obj = GLProgram_new(common, vertex_shader, fragment_shader, false);
+	{
+		const char *fsh_filepath = "/tmp/tmp.fsh";
+		const char *vsh_filepath = "/tmp/tmp.vsh";
+		int fsh_fd = open(fsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		int vsh_fd = open(vsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		write(fsh_fd, window_fsh, window_fsh_len);
+		write(vsh_fd, window_vsh, window_vsh_len);
+		close(fsh_fd);
+		close(vsh_fd);
+		_this->program_obj = GLProgram_new(common, vsh_filepath, fsh_filepath, true);
+		remove(fsh_filepath);
+		remove(vsh_filepath);
+	}
 }
 static void release(void *obj) {
 	window_renderer *_this = (window_renderer*) obj;
@@ -272,22 +164,22 @@ static void render(void *obj, float fov) {
 	float scale = 1.0 / tan(fov_rad / 2);
 	glUniform1f(glGetUniformLocation(program, "scale"), scale);
 
-#ifdef USE_GLES
+#ifdef USE_VAO
+	glBindVertexArray(_this->vao);
+#else
 	GLuint loc = glGetAttribLocation(program, "vPosition");
 	glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(loc);
-#else
-	glBindVertexArray(model->vao);
 #endif
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, _this->vbo_nop);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-#ifdef USE_GLES
-	glDisableVertexAttribArray(loc);
-#else
+#ifdef USE_VAO
 	glBindVertexArray(0);
+#else
+	glDisableVertexAttribArray(loc);
 #endif
 }
 

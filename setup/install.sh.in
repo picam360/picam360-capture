@@ -1,0 +1,19 @@
+#/bin/bash
+
+if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/" ]; then
+	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
+fi
+cp picam360-capture.bin ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
+chmod +x setup/picam360-capture
+cp setup/picam360-capture ${CMAKE_INSTALL_PREFIX}/bin
+cp config.json.tmp ${CMAKE_INSTALL_PREFIX}/etc/picam360-capture.conf
+cp setup/picam360-capture.service /etc/systemd/system/
+
+if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/" ]; then
+	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/
+fi
+cp plugins/*.so ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/
+
+systemctl daemon-reload
+systemctl start picam360-capture.service
+systemctl enable picam360-capture.service

@@ -1,9 +1,9 @@
 #if (__VERSION__ > 120)
-# define IN in
-# define OUT out
+#define IN in
+#define OUT out
 #else
-# define IN attribute
-# define OUT varying
+#define IN attribute
+#define OUT varying
 #endif // __VERSION
 precision mediump float;
 IN vec4 vPosition;

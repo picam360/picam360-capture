@@ -24,6 +24,7 @@
 #include "gl_program.h"
 #include "auto_calibration.h"
 #include "manual_mpu.h"
+#include "img/logo_png.h"
 
 #include <mat4/type.h>
 //#include <mat4/create.h>
@@ -73,8 +74,6 @@
 #ifndef M_PI
 #define M_PI 3.141592654
 #endif
-
-#define CONFIG_FILE "config.json"
 
 static void init_ogl(PICAM360CAPTURE_T *state);
 static void init_model_proj(PICAM360CAPTURE_T *state);
@@ -405,6 +404,7 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
  *
  ***********************************************************/
 extern void create_calibration_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
+extern void create_board_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
 static void init_model_proj(PICAM360CAPTURE_T *state) {
 #ifdef USE_GLES
 	char *common = "#version 100\n";
@@ -412,17 +412,16 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
 	char *common = "#version 330\n";
 #endif
 
-	board_mesh(1, &state->model_data[OPERATION_MODE_FISHEYE].vbo, &state->model_data[OPERATION_MODE_FISHEYE].vbo_nop, &state->model_data[OPERATION_MODE_FISHEYE].vao);
-	state->model_data[OPERATION_MODE_FISHEYE].program = GLProgram_new(common, "shader/fisheye.vert", "shader/fisheye.frag", true);
-
 	{
 		RENDERER_T *renderer = NULL;
 		create_calibration_renderer(&state->plugin_host, &renderer);
 		state->plugin_host.add_renderer(renderer);
 	}
-
-	board_mesh(1, &state->model_data[OPERATION_MODE_BOARD].vbo, &state->model_data[OPERATION_MODE_BOARD].vbo_nop, &state->model_data[OPERATION_MODE_BOARD].vao);
-	state->model_data[OPERATION_MODE_BOARD].program = GLProgram_new(common, "shader/board.vert", "shader/board.frag", true);
+	{
+		RENDERER_T *renderer = NULL;
+		create_board_renderer(&state->plugin_host, &renderer);
+		state->plugin_host.add_renderer(renderer);
+	}
 }
 
 /***********************************************************
@@ -487,7 +486,14 @@ static void update_egl_images(PICAM360CAPTURE_T *state) {
 }
 static void init_textures(PICAM360CAPTURE_T *state) {
 
-	load_texture("img/logo_img.png", &state->logo_texture);
+	{
+		const char *tmp_filepath = "/tmp/tmp.png";
+		int *fd = open(tmp_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		write(fd, logo_png, logo_png_len);
+		close(fd);
+		load_texture(tmp_filepath, &state->logo_texture);
+		remove(tmp_filepath);
+	}
 
 	update_egl_images(state);
 	for (int i = 0; i < state->num_of_cam; i++) {
@@ -503,7 +509,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 #else
 			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-			state->captures[i]->start(state->captures[i], i, win, NULL, TEXTURE_BUFFER_NUM);
+			state->captures[i]->start(state->captures[i], i, win, NULL, NULL, TEXTURE_BUFFER_NUM);
 #endif
 		}
 	}
@@ -540,7 +546,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
  ***********************************************************/
 static void init_options(PICAM360CAPTURE_T *state) {
 	json_error_t error;
-	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
+	json_t *options = json_load_file(state->config_filepath, 0, &error);
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
@@ -735,7 +741,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		}
 	}
 
-	json_dump_file(options, CONFIG_FILE, JSON_PRESERVE_ORDER | JSON_INDENT(4) | JSON_REAL_PRECISION(9));
+	json_dump_file(options, state->config_filepath, JSON_PRESERVE_ORDER | JSON_INDENT(4) | JSON_REAL_PRECISION(9));
 
 	json_decref(options);
 }
@@ -3733,6 +3739,7 @@ int main(int argc, char *argv[]) {
 	state->refraction = 1.0;
 	state->rtp_play_speed = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", sizeof(state->default_view_coordinate_mode));
+	strncpy(state->config_filepath, "config.json", sizeof(state->config_filepath));
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
 		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -3777,25 +3784,16 @@ int main(int argc, char *argv[]) {
 	umask(0000);
 
 	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "w:h:n:psd:i:r:F:v:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:psi:r:F:v:")) != -1) {
 		switch (opt) {
-		case 'w':
-			sscanf(optarg, "%d", &state->cam_width);
-			break;
-		case 'h':
-			sscanf(optarg, "%d", &state->cam_height);
-			break;
-		case 'n':
-			sscanf(optarg, "%d", &state->num_of_cam);
+		case 'c':
+			strncpy(state->config_filepath, optarg, sizeof(state->config_filepath));
 			break;
 		case 'p':
 			state->preview = true;
 			break;
 		case 's':
 			state->stereo = true;
-			break;
-		case 'd':
-			state->video_direct = true;
 			break;
 		case 'r':
 			state->output_raw = true;
@@ -3817,7 +3815,7 @@ int main(int argc, char *argv[]) {
 			break;
 		default:
 			/* '?' */
-			printf("Usage: %s [-w width] [-h height] [-n num_of_cam] [-p] [-s]\n", argv[0]);
+			printf("Usage: %s [-c conf_filepath] [-p] [-s]\n", argv[0]);
 			return -1;
 		}
 	}

@@ -26,13 +26,12 @@
 
 #include "gl_program.h"
 #include "picam360_capture_plugin.h"
-#include "glsl/calibration_fsh.h"
-#include "glsl/calibration_vsh.h"
-#include "img/calibration_png.h"
+#include "glsl/board_fsh.h"
+#include "glsl/board_vsh.h"
 
-#define RENDERER_NAME "CALIBRATION"
+#define RENDERER_NAME "BOARD"
 
-typedef struct _calibration_renderer {
+typedef struct _board_renderer {
 	RENDERER_T super;
 
 	int num_of_cam;
@@ -40,10 +39,9 @@ typedef struct _calibration_renderer {
 	GLuint vbo;
 	GLuint vbo_nop;
 	GLuint vao;
-	uint32_t calibration_texture;
 
 	void *user_data;
-} calibration_renderer;
+} board_renderer;
 
 static int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out) {
 	GLuint vbo;
@@ -116,7 +114,7 @@ static int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *
 }
 
 static void init(void *obj, const char *common, int num_of_cam) {
-	calibration_renderer *_this = (calibration_renderer*) obj;
+	board_renderer *_this = (board_renderer*) obj;
 
 	_this->num_of_cam = num_of_cam;
 
@@ -126,8 +124,8 @@ static void init(void *obj, const char *common, int num_of_cam) {
 		const char *vsh_filepath = "/tmp/tmp.vsh";
 		int fsh_fd = open(fsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
 		int vsh_fd = open(vsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-		write(fsh_fd, calibration_fsh, calibration_fsh_len);
-		write(vsh_fd, calibration_vsh, calibration_vsh_len);
+		write(fsh_fd, board_fsh, board_fsh_len);
+		write(vsh_fd, board_vsh, board_vsh_len);
 		close(fsh_fd);
 		close(vsh_fd);
 		_this->program_obj = GLProgram_new(common, vsh_filepath, fsh_filepath, true);
@@ -136,22 +134,19 @@ static void init(void *obj, const char *common, int num_of_cam) {
 	}
 }
 static void release(void *obj) {
-	calibration_renderer *_this = (calibration_renderer*) obj;
+	board_renderer *_this = (board_renderer*) obj;
 	int status;
 	free(obj);
 }
 static int get_program(void *obj) {
-	calibration_renderer *_this = (calibration_renderer*) obj;
+	board_renderer *_this = (board_renderer*) obj;
 	return GLProgram_GetId(_this->program_obj);
 }
 
 static void render(void *obj, float fov) {
-	calibration_renderer *_this = (calibration_renderer*) obj;
+	board_renderer *_this = (board_renderer*) obj;
 
 	int program = GLProgram_GetId(_this->program_obj);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, _this->calibration_texture);
 
 	glBindBuffer(GL_ARRAY_BUFFER, _this->vbo);
 
@@ -174,9 +169,9 @@ static void render(void *obj, float fov) {
 #endif
 }
 
-void create_calibration_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer) {
-	RENDERER_T *renderer = (RENDERER_T*) malloc(sizeof(calibration_renderer));
-	memset(renderer, 0, sizeof(calibration_renderer));
+void create_board_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer) {
+	RENDERER_T *renderer = (RENDERER_T*) malloc(sizeof(board_renderer));
+	memset(renderer, 0, sizeof(board_renderer));
 	strcpy(renderer->name, RENDERER_NAME);
 	renderer->release = release;
 	renderer->init = init;
@@ -184,15 +179,7 @@ void create_calibration_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_re
 	renderer->render = render;
 	renderer->user_data = renderer;
 
-	calibration_renderer *_this = (calibration_renderer*) renderer;
-	{
-		const char *tmp_filepath = "/tmp/tmp.png";
-		int fd = open(tmp_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-		write(fd, calibration_png, calibration_png_len);
-		close(fd);
-		plugin_host->load_texture(tmp_filepath, &_this->calibration_texture);
-		remove(tmp_filepath);
-	}
+	board_renderer *_this = (board_renderer*) renderer;
 
 	if (out_renderer) {
 		*out_renderer = renderer;

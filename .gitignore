@@ -32,10 +32,9 @@
 *.dSYM/
 *.su
 
-picam360-capture.bin
+picam360-capture
 
 #cmake
-picam360-driver.bin
 Makefile
 CMakeFiles
 CMakeCache.txt

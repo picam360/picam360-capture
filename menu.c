@@ -29,34 +29,11 @@
 #include "texture-atlas.h"
 #include "texture-font.h"
 #include "gl_program.h"
+#include "glsl/freetype_fsh.h"
+#include "glsl/freetype_vsh.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-static const char * vertex_shader = R"glsl(
-uniform mat4 u_mvp;
-attribute vec3 a_position;
-attribute vec4 a_color;
-attribute vec2 a_st;
-varying vec2 v_frag_uv;
-varying vec4 v_color;
-void main(void) {
-	v_frag_uv = a_st;
-	gl_Position = u_mvp * vec4(a_position, 1);
-	gl_Position.y = -gl_Position.y; //for jpeg coordinate
-	v_color = a_color;
-}
-)glsl";
-
-static const char * fragment_shader = R"glsl(
-precision mediump float;
-uniform sampler2D texture_uniform;
-varying vec2 v_frag_uv;
-varying vec4 v_color;
-void main() {
-	gl_FragColor = vec4(v_color.xyz, v_color.a * texture2D(texture_uniform, v_frag_uv).a);
-}
-)glsl";
 
 typedef struct {
 	void *program;
@@ -117,7 +94,19 @@ void init_menu(uint32_t font_size) {
 			L"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
-	lg_freetypegles.model.program = GLProgram_new("", vertex_shader, fragment_shader, false);
+	{
+		const char *fsh_filepath = "/tmp/tmp.fsh";
+		const char *vsh_filepath = "/tmp/tmp.vsh";
+		int fsh_fd = open(fsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		int vsh_fd = open(vsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		write(fsh_fd, freetype_fsh, freetype_fsh_len);
+		write(vsh_fd, freetype_vsh, freetype_vsh_len);
+		close(fsh_fd);
+		close(vsh_fd);
+		lg_freetypegles.model.program = GLProgram_new("", vsh_filepath, fsh_filepath, true);
+		remove(fsh_filepath);
+		remove(vsh_filepath);
+	}
 #ifdef USE_GLES
 	texture_atlas_upload(lg_freetypegles.atlas);
 #endif

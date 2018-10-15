@@ -166,6 +166,7 @@ typedef struct {
 typedef struct _PICAM360CAPTURE_T {
 	PLUGIN_HOST_T plugin_host;
 	pthread_mutex_t mutex;
+	char config_filepath[512];
 	int split;
 	bool preview;
 	bool stereo;

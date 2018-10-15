@@ -113,7 +113,7 @@ static void *pout_thread_func(void* arg) {
 
 #define R (0)
 #define W (1)
-static void start(void *obj, int cam_num, void *display, void *context, int egl_image_num) {
+static void start(void *obj, int cam_num, void *display, void *context, void *cam_texture, int egl_image_num) {
 	ffmpeg_capture *_this = (ffmpeg_capture*) obj;
 	pid_t pid = 0;
 	int pin_fd[2];
@@ -249,7 +249,7 @@ static void create_capture(void *user_data, CAPTURE_T **out_capture) {
 	memset(capture, 0, sizeof(ffmpeg_capture));
 	strcpy(capture->name, CAPTURE_NAME);
 	capture->release = release;
-	capture->init = init;
+	capture->start = start;
 	capture->get_fps = get_fps;
 	capture->user_data = capture;
 

@@ -2,7 +2,7 @@
 Description = picam360-capture daemon
 
 [Service]
-ExecStart = /bin/bash /home/pi/picam360/picam360-capture/lunch.sh >/tmp/picam360_capture_stdout 2>/tmp/picam360_capture_sterr
+ExecStart = /bin/bash ${CMAKE_INSTALL_PREFIX}/bin/picam360-capture
 Restart = always
 Type = simple
 

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture
+./picam360-capture.bin -c ${CMAKE_INSTALL_PREFIX}/etc/picam360-capture.conf

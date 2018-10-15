@@ -23,8 +23,14 @@ if(TEGRA)
 	add_definitions(-DTEGRA)
 endif()
 
+set(GLSL_HEADERS
+  "glsl/window_fsh.h"
+  "glsl/window_vsh.h"
+)
+
 add_library(equirectangular_renderer MODULE
 	equirectangular_renderer.c
+	${GLSL_HEADERS}
 )
 set_target_properties(equirectangular_renderer PROPERTIES
     C_STANDARD 11
@@ -34,6 +40,15 @@ set_target_properties(equirectangular_renderer PROPERTIES
     CXX_STANDARD_REQUIRED YES
     CXX_EXTENSIONS NO # c++11
     PREFIX ""
+)
+
+#glsl
+add_custom_command(OUTPUT ${GLSL_HEADERS}
+  COMMAND /usr/bin/xxd -i equirectangular.fsh > equirectangular_fsh.h
+  COMMAND /usr/bin/xxd -i equirectangular.vsh > equirectangular_vsh.h
+  WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/glsl"
+  COMMENT "prepare glsl include files"
+  VERBATIM
 )
 	
 include_directories(
