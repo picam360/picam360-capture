@@ -436,7 +436,7 @@ static void init_model_proj(PICAM360CAPTURE_T *state) {
  * Returns: void
  *
  ***********************************************************/
-static void destroy_egl_images(PICAM360CAPTURE_T *state) {
+static void deinit_textures(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
 			if (state->cam_texture[i][j] != 0) {
@@ -444,43 +444,6 @@ static void destroy_egl_images(PICAM360CAPTURE_T *state) {
 				glDeleteTextures(1, &state->cam_texture[i][j]);
 				state->cam_texture[i][j] = 0;
 			}
-#ifdef USE_GLES
-#ifdef BCM_HOST
-			if (state->egl_image[i][j] != 0) {
-				if (!eglDestroyImageKHR(state->display, (EGLImageKHR) state->egl_image[i][j]))
-				printf("eglDestroyImageKHR failed.");
-				state->egl_image[i][j] = NULL;
-			}
-#endif
-#endif
-		}
-	}
-}
-static void update_egl_images(PICAM360CAPTURE_T *state) {
-	destroy_egl_images(state);
-	for (int i = 0; i < state->num_of_cam; i++) {
-		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
-			glGenTextures(1, &state->cam_texture[i][j]);
-
-			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width, state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-#ifdef USE_GLES
-#ifdef BCM_HOST
-			/* Create EGL Image */
-			state->egl_image[i][j] = eglCreateImageKHR(state->display, state->context, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer) state->cam_texture[i][j], 0);
-
-			if (state->egl_image[i][j] == EGL_NO_IMAGE_KHR) {
-				printf("eglCreateImageKHR failed.\n");
-				exit(1);
-			}
-#endif
-#endif
 		}
 	}
 }
@@ -495,7 +458,20 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		remove(tmp_filepath);
 	}
 
-	update_egl_images(state);
+	for (int i = 0; i < state->num_of_cam; i++) {
+		for (int j = 0; j < TEXTURE_BUFFER_NUM; j++) {
+			glGenTextures(1, &state->cam_texture[i][j]);
+
+			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][j]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, state->cam_width, state->cam_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+	}
+
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; state->capture_factories[j] != NULL; j++) {
 			if (strncmp(state->capture_factories[j]->name, state->capture_name, sizeof(state->capture_name)) == 0) {
@@ -522,11 +498,11 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		}
 		if (state->decoders[i]) {
 #ifdef USE_GLES
-			state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], i, state->display, state->context, state->cam_texture[i], TEXTURE_BUFFER_NUM);
 #else
 			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-			state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], state->egl_image[i], TEXTURE_BUFFER_NUM);
+			state->decoders[i]->init(state->decoders[i], i, win, NULL, state->cam_texture[i], TEXTURE_BUFFER_NUM);
 #endif
 		}
 	}
@@ -744,7 +720,7 @@ static void exit_func(void)
 // Function to be passed to atexit().
 {
 #ifdef USE_GLES
-	destroy_egl_images(state);
+	deinit_textures(state);
 
 	// clear screen
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -2061,10 +2037,6 @@ static void set_texture_size(uint32_t width, uint32_t height) {
 	} else {
 		state->cam_width = width;
 		state->cam_height = height;
-		state->create_egl_image_required = true;
-		while (state->create_egl_image_required) {
-			usleep(1000); //this is not time critical implementation
-		}
 	}
 	pthread_mutex_unlock(&state->texture_size_mutex);
 }
@@ -3926,10 +3898,6 @@ int main(int argc, char *argv[]) {
 			if (res != 0) {
 				continue; // skip
 			}
-		}
-		if (state->create_egl_image_required) {
-			update_egl_images(state);
-			state->create_egl_image_required = false;
 		}
 		frame_handler();
 		command_handler();

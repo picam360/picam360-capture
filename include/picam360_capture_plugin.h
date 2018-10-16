@@ -62,7 +62,7 @@ typedef struct _CAPTURE_FACTORY_T {
 
 typedef struct _DECODER_T {
 	char name[64];
-	void (*init)(void *user_data, int cam_num, void *display, void *context, void *cam_texture, void **egl_images, int egl_image_num);
+	void (*init)(void *user_data, int cam_num, void *display, void *context, void *cam_texture, int n_buffers);
 	float (*get_fps)(void *user_data);
 	int (*get_frameskip)(void *user_data);
 	void (*decode)(void *user_data, unsigned char *data, int data_len);

@@ -29,7 +29,7 @@ typedef struct _video_transmitter {
 	void *user_data;
 } video_transmitter;
 
-static void init(void *obj, int cam_num, void *display, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
+static void init(void *obj, int cam_num, void *display, void *context, void *cam_texture, int n_buffers) {
 	video_transmitter *_this = (video_transmitter*) obj;
 
 	_this->cam_num = cam_num;

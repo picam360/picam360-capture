@@ -114,7 +114,7 @@ static void *pout_thread_func(void* arg) {
 
 #define R (0)
 #define W (1)
-static void init(void *obj, int cam_num, void *context, void *cam_texture, void **egl_images, int egl_image_num) {
+static void init(void *obj, int cam_num, void *context, void *cam_texture, int n_buffers) {
 	gst_decoder *_this = (gst_decoder*) obj;
 	pid_t pid = 0;
 	int pin_fd[2];

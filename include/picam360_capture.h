@@ -189,8 +189,6 @@ typedef struct _PICAM360CAPTURE_T {
 	int active_cam;
 	int num_of_cam;
 	pthread_t thread[MAX_CAM_NUM];
-	bool create_egl_image_required;
-	void* egl_image[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
 	GLuint cam_texture[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
 	int cam_texture_cur[MAX_CAM_NUM];
 	GLuint logo_texture;
