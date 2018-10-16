@@ -550,6 +550,8 @@ static void init_options(PICAM360CAPTURE_T *state) {
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
+		state->num_of_cam = json_number_value(json_object_get(options, "num_of_cam"));
+		state->num_of_cam = MAX(1, MIN(state->num_of_cam, MAX_CAM_NUM));
 		{
 			json_t *value = json_object_get(options, "mpu_name");
 			if (value) {
@@ -577,7 +579,7 @@ static void init_options(PICAM360CAPTURE_T *state) {
 		state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
 		state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
 		state->options.overlap = json_number_value(json_object_get(options, "overlap"));
-		for (int i = 0; i < MAX_CAM_NUM; i++) {
+		for (int i = 0; i < state->num_of_cam; i++) {
 			char buff[256];
 			sprintf(buff, "cam%d_offset_pitch", i);
 			state->options.cam_offset_pitch[i] = json_number_value(json_object_get(options, buff));
@@ -625,50 +627,6 @@ static void init_options(PICAM360CAPTURE_T *state) {
 			state->options.rtcp_tx_port = json_number_value(json_object_get(options, "rtcp_tx_port"));
 			state->options.rtcp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_tx_type")));
 		}
-		{
-			json_t *plugin_paths = json_object_get(options, "plugin_paths");
-			if (json_is_array(plugin_paths)) {
-				int size = json_array_size(plugin_paths);
-				state->plugin_paths = (char**) malloc(sizeof(char*) * (size + 1));
-				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
-
-				for (int i = 0; i < size; i++) {
-					json_t *value = json_array_get(plugin_paths, i);
-					int len = json_string_length(value);
-					state->plugin_paths[i] = (char*) malloc(sizeof(char) * (len + 1));
-					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
-					strncpy(state->plugin_paths[i], json_string_value(value), len);
-					if (len > 0) {
-						void *handle = dlopen(state->plugin_paths[i], RTLD_LAZY);
-						if (!handle) {
-							fprintf(stderr, "%s\n", dlerror());
-							continue;
-						}
-						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(handle, "create_plugin");
-						if (!create_plugin) {
-							fprintf(stderr, "%s\n", dlerror());
-							dlclose(handle);
-							continue;
-						}
-						PLUGIN_T *plugin = NULL;
-						create_plugin(&state->plugin_host, &plugin);
-						if (!plugin) {
-							fprintf(stderr, "%s\n", "create_plugin fail.");
-							dlclose(handle);
-							continue;
-						}
-						printf("plugin %s loaded.\n", state->plugin_paths[i]);
-						state->plugin_host.add_plugin(plugin);
-					}
-				}
-			}
-		}
-
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			if (state->plugins[i]->init_options) {
-				state->plugins[i]->init_options(state->plugins[i]->user_data, options);
-			}
-		}
 
 		json_decref(options);
 	}
@@ -689,13 +647,14 @@ static void init_options(PICAM360CAPTURE_T *state) {
 static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
+	json_object_set_new(options, "num_of_cam", json_integer(state->num_of_cam));
 	json_object_set_new(options, "mpu_name", json_string(state->mpu_name));
 	json_object_set_new(options, "capture_name", json_string(state->capture_name));
 	json_object_set_new(options, "decoder_name", json_string(state->decoder_name));
 	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
 	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
 	json_object_set_new(options, "overlap", json_real(state->options.overlap));
-	for (int i = 0; i < MAX_CAM_NUM; i++) {
+	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_pitch", i);
 		json_object_set_new(options, buff, json_real(state->options.cam_offset_pitch[i]));
@@ -750,7 +709,7 @@ static void init_options_ex(PICAM360CAPTURE_T *state) {
 	json_error_t error;
 	json_t *options = json_load_file(state->options.config_ex_filepath, 0, &error);
 	if (options != NULL) {
-		for (int i = 0; i < MAX_CAM_NUM; i++) {
+		for (int i = 0; i < state->num_of_cam; i++) {
 			char buff[256];
 			sprintf(buff, "cam%d_offset_x", i);
 			state->options.cam_offset_x_ex[i] = json_number_value(json_object_get(options, buff));
@@ -765,7 +724,7 @@ static void init_options_ex(PICAM360CAPTURE_T *state) {
 static void save_options_ex(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
-	for (int i = 0; i < MAX_CAM_NUM; i++) {
+	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_x", i);
 		json_object_set_new(options, buff, json_real(state->options.cam_offset_x_ex[i]));
@@ -1719,12 +1678,12 @@ int _command_handler(const char *_buff) {
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
-				for (int i = 0; i < MAX_CAM_NUM; i++) {
+				for (int i = 0; i < state->num_of_cam; i++) {
 					cam_horizon_r[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					cam_horizon_r[cam_num] += value;
 				}
 			}
@@ -1748,12 +1707,12 @@ int _command_handler(const char *_buff) {
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
-				for (int i = 0; i < MAX_CAM_NUM; i++) {
+				for (int i = 0; i < state->num_of_cam; i++) {
 					cam_offset_x[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					cam_offset_x[cam_num] += value;
 				}
 			}
@@ -1777,12 +1736,12 @@ int _command_handler(const char *_buff) {
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
-				for (int i = 0; i < MAX_CAM_NUM; i++) {
+				for (int i = 0; i < state->num_of_cam; i++) {
 					cam_offset_y[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					cam_offset_y[cam_num] += value;
 				}
 			}
@@ -1804,12 +1763,12 @@ int _command_handler(const char *_buff) {
 			float value = 0;
 			if (param[0] == '*') {
 				sscanf(param, "*=%f", &value);
-				for (int i = 0; i < MAX_CAM_NUM; i++) {
+				for (int i = 0; i < state->num_of_cam; i++) {
 					state->options.cam_offset_yaw[i] += value;
 				}
 			} else {
 				sscanf(param, "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					state->options.cam_offset_yaw[cam_num] += value;
 				}
 			}
@@ -1994,7 +1953,7 @@ static VECTOR4D_T get_camera_offset(int cam_num) {
 	VECTOR4D_T ret = { };
 	pthread_mutex_lock(&state->mutex);
 
-	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+	if (cam_num >= 0 && cam_num < state->num_of_cam) {
 		ret.x = state->options.cam_offset_x[cam_num];
 		ret.y = state->options.cam_offset_y[cam_num];
 		ret.z = state->options.cam_offset_yaw[cam_num];
@@ -2011,7 +1970,7 @@ static void set_camera_offset(int cam_num, VECTOR4D_T value) {
 
 	pthread_mutex_lock(&state->mutex);
 
-	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+	if (cam_num >= 0 && cam_num < state->num_of_cam) {
 		state->options.cam_offset_x[cam_num] = value.x;
 		state->options.cam_offset_y[cam_num] = value.y;
 		state->options.cam_offset_yaw[cam_num] = value.z;
@@ -2025,7 +1984,7 @@ static VECTOR4D_T get_camera_quaternion(int cam_num) {
 	VECTOR4D_T ret = { };
 	pthread_mutex_lock(&state->mutex);
 
-	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+	if (cam_num >= 0 && cam_num < state->num_of_cam) {
 		ret = state->camera_quaternion[cam_num];
 	} else {
 		ret = state->camera_quaternion[MAX_CAM_NUM];
@@ -2037,7 +1996,7 @@ static VECTOR4D_T get_camera_quaternion(int cam_num) {
 static void set_camera_quaternion(int cam_num, VECTOR4D_T value) {
 	pthread_mutex_lock(&state->mutex);
 
-	if (cam_num >= 0 && cam_num < MAX_CAM_NUM) {
+	if (cam_num >= 0 && cam_num < state->num_of_cam) {
 		state->camera_quaternion[cam_num] = value;
 	}
 	state->camera_quaternion[MAX_CAM_NUM] = value; //latest
@@ -2490,6 +2449,60 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		MPU_FACTORY_T *mpu_factory = NULL;
 		create_manual_mpu_factory(&mpu_factory);
 		state->plugin_host.add_mpu_factory(mpu_factory);
+	}
+
+	//load plugins
+	json_error_t error;
+	json_t *options = json_load_file(state->config_filepath, 0, &error);
+	if (options == NULL) {
+		fputs(error.text, stderr);
+	} else {
+		{
+			json_t *plugin_paths = json_object_get(options, "plugin_paths");
+			if (json_is_array(plugin_paths)) {
+				int size = json_array_size(plugin_paths);
+				state->plugin_paths = (char**) malloc(sizeof(char*) * (size + 1));
+				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
+
+				for (int i = 0; i < size; i++) {
+					json_t *value = json_array_get(plugin_paths, i);
+					int len = json_string_length(value);
+					state->plugin_paths[i] = (char*) malloc(sizeof(char) * (len + 1));
+					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
+					strncpy(state->plugin_paths[i], json_string_value(value), len);
+					if (len > 0) {
+						void *handle = dlopen(state->plugin_paths[i], RTLD_LAZY);
+						if (!handle) {
+							fprintf(stderr, "%s\n", dlerror());
+							continue;
+						}
+						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(handle, "create_plugin");
+						if (!create_plugin) {
+							fprintf(stderr, "%s\n", dlerror());
+							dlclose(handle);
+							continue;
+						}
+						PLUGIN_T *plugin = NULL;
+						create_plugin(&state->plugin_host, &plugin);
+						if (!plugin) {
+							fprintf(stderr, "%s\n", "create_plugin fail.");
+							dlclose(handle);
+							continue;
+						}
+						printf("plugin %s loaded.\n", state->plugin_paths[i]);
+						state->plugin_host.add_plugin(plugin);
+					}
+				}
+			}
+		}
+
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]->init_options) {
+				state->plugins[i]->init_options(state->plugins[i]->user_data, options);
+			}
+		}
+
+		json_decref(options);
 	}
 }
 
@@ -3740,6 +3753,7 @@ int main(int argc, char *argv[]) {
 	state->rtp_play_speed = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual", sizeof(state->default_view_coordinate_mode));
 	strncpy(state->config_filepath, "config.json", sizeof(state->config_filepath));
+
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
 		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -3820,8 +3834,11 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	//init options
+	init_options(state);
+
 	{ //mrevent & mutex init
-		for (int i = 0; i < MAX_CAM_NUM; i++) {
+		for (int i = 0; i < state->num_of_cam; i++) {
 			mrevent_init(&state->request_frame_event[i]);
 			mrevent_trigger(&state->request_frame_event[i]);
 			mrevent_init(&state->arrived_frame_event[i]);
@@ -3849,9 +3866,6 @@ int main(int argc, char *argv[]) {
 
 	// init plugin
 	init_plugins(state);
-
-	//init options
-	init_options(state);
 
 	// Setup the model world
 	init_model_proj(state);
