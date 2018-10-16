@@ -59,9 +59,14 @@ link_directories(
 )
 
 target_link_libraries(window_renderer
+	${CMAKE_CURRENT_SOURCE_DIR}/../../libs/picam360-common/libpicam360-common.a
 	pthread
 	dl
 )
+
+if(APPLE)
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -lc++")
+endif()
 
 #packages
 find_package(PkgConfig REQUIRED)
@@ -80,6 +85,13 @@ else()
 	pkg_check_modules(GLFW glfw3 REQUIRED)
 		
 	include_directories( ${OPENGL_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} )
+endif()
+
+#opengl
+if(USE_GLES)
+	target_link_libraries(window_renderer ${GLES_LIBRARIES} ${EGL_LIBRARIES})
+else()
+	target_link_libraries(window_renderer ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES})
 endif()
 
 #post build

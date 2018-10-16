@@ -3,6 +3,7 @@
 if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/" ]; then
 	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
 fi
+cp libs/picam360-common/libpicam360-common.a ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
 cp picam360-capture.bin ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
 chmod +x setup/picam360-capture
 cp setup/picam360-capture ${CMAKE_INSTALL_PREFIX}/bin
@@ -13,6 +14,7 @@ if [ -d "${CMAKE_INSTALL_PREFIX}/include/picam360-capture/" ]; then
 	rm -r ${CMAKE_INSTALL_PREFIX}/include/picam360-capture/
 fi
 cp -r include ${CMAKE_INSTALL_PREFIX}/include/picam360-capture
+cp -r libs/picam360-common/include/* ${CMAKE_INSTALL_PREFIX}/include/picam360-capture/
 
 if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/" ]; then
 	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/

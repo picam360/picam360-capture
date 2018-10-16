@@ -32,7 +32,7 @@
 *.dSYM/
 *.su
 
-picam360-capture
+picam360-capture.bin
 
 #cmake
 Makefile

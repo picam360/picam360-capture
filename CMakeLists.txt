@@ -41,11 +41,7 @@ set(GLSL_HEADERS
 #target_link_libraries should be define below here
 add_executable(picam360-capture.bin
 	src/picam360_capture.c
-	src/rtp.cc
-	src/mrevent.c
-	src/quaternion.c
 	src/manual_mpu.c
-	src/gl_program.cc
 	src/auto_calibration.cc
 	src/manual_mpu.c
 	src/menu.c
@@ -55,6 +51,9 @@ add_executable(picam360-capture.bin
 	${GLSL_HEADERS}
 )
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/picam360-common)
+add_dependencies(picam360-capture.bin picam360-common)
+
 pkg_check_modules(JANSSON jansson REQUIRED)
 pkg_check_modules(LIBEDIT libedit REQUIRED)
 pkg_check_modules(OPENCV opencv REQUIRED)
@@ -62,6 +61,7 @@ pkg_check_modules(OPENCV opencv REQUIRED)
 include_directories(
 	./
 	./include
+	./libs/picam360-common/include
 	${JANSSON_INCLUDE_DIRS}
 	${LIBEDIT_INCLUDE_DIRS}
 	${OPENCV_INCLUDE_DIRS}
@@ -104,6 +104,7 @@ else()
 	link_directories( ${OPENGL_LIBRARY_DIRS} ${GLEW_LIBRARY_DIRS} ${GLFW_LIBRARY_DIRS} ${FREETYPE_LIBRARY_DIRS} )
 
 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl)
+	add_dependencies(picam360-capture.bin freetype-gl)
 endif()
 
 if(BCM_HOST)
@@ -151,6 +152,7 @@ set_target_properties(picam360-capture.bin PROPERTIES
 )
 
 target_link_libraries(picam360-capture.bin
+	${CMAKE_CURRENT_SOURCE_DIR}/libs/picam360-common/libpicam360-common.a
 	${JANSSON_LIBRARIES}
 	${LIBEDIT_LIBRARIES}
 	${OPENCV_LIBRARIES}

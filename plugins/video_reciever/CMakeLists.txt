@@ -26,9 +26,14 @@ link_directories(
 )
 
 target_link_libraries(video_reciever
+	${CMAKE_CURRENT_SOURCE_DIR}/../../libs/picam360-common/libpicam360-common.a
 	pthread
 	dl
 )
+
+if(APPLE)
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -lc++")
+endif()
 
 #post build
 add_custom_command(TARGET video_reciever POST_BUILD
