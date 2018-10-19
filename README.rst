@@ -36,11 +36,11 @@ Building picam360-capture from Scratch
 UNIX/Mac OSX/
 ^^^^^^^^^^^^^
 
-You need to have a C++ compiler (supporting C++11) and a ``make`` installed.
-Run the ``cmake`` script you find in the source directory of picam360-capture.
-You can use the ``--help`` option to see the supported options.
+You need to have a C++ compiler (supporting C++11) and a ``cmake``, a ``make`` installed.
+Run the ``cmake /path/to/CMakeList.txt`` in the source directory of picam360-capture.
+You can use the ``--list`` option to see the supported options.
 You may use the ``--prefix=<install_prefix>`` option to specify a custom
-installation directory for picam360-capture. You can run the ``cmake`` script from
+installation directory for picam360-capture. You can run the ``cmake /path/to/CMakeList.txt`` from
 within the picam360-capture source directory or any other build directory of your
 choice. Once this has finished successfully, run ``make`` and
 ``make install``.  In summary::

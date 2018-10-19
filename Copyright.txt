@@ -1,4 +1,4 @@
-picam360-capture - Cross Platform Makefile Generator
+picam360-capture - Panoramic video streamer
 Copyright 2015-2018 OHMYDIGIFAB, Co., Ltd. and Contributors
 All rights reserved.
 
@@ -33,7 +33,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following individuals and institutions are among the Contributors:
 
-* Takuma Hirayama <takuma.hirayama@ohmydigifab.com>
+* OHMYDIGIFAB <info@ohmydigifab.com>
+* Takuma Hirayama <takuma.hirayama@gmail.com>
 
 See version control history for details of individual contributions.
 
