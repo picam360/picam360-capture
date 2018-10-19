@@ -4,9 +4,9 @@ picam360-capture
 Introduction
 ============
 
-This is capture software of picam360 camera.
+This is video streamer software of `picam360`.
 
-.. _`picam360 Home Page`: https://www.picam360.com
+.. _`picam360`: https://www.picam360.com
 
 picam360-capture is maintained and supported by `OHMYDIGIFAB`_ and developed in
 collaboration with a productive community of contributors.
