@@ -33,7 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following individuals and institutions are among the Contributors:
 
-* OHMYDIGIFAB <info@ohmydigifab.com>
+* OHMYDIGIFAB <picam360@ohmydigifab.com>
 * Takuma Hirayama <takuma.hirayama@gmail.com>
 
 See version control history for details of individual contributions.
