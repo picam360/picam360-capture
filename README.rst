@@ -46,4 +46,5 @@ choice. Once this has finished successfully, run ``make`` and
 ``make install``.  In summary::
  $ sudo apt-get install cmake libjansson-dev libedit-dev libopencv-dev
  $ git clone https://github.com/picam360/picam360-capture.git
+ $ cd picam360-capture
  $ cmake . && make && sudo make install
