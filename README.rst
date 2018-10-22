@@ -44,5 +44,6 @@ installation directory for picam360-capture. You can run the ``cmake /path/to/CM
 within the picam360-capture source directory or any other build directory of your
 choice. Once this has finished successfully, run ``make`` and
 ``make install``.  In summary::
-
+ $ sudo apt-get install cmake libjansson-dev libedit-dev libopencv-dev
+ $ git clone https://github.com/picam360/picam360-capture.git
  $ cmake . && make && sudo make install
