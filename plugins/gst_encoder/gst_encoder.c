@@ -86,16 +86,20 @@ static void *pout_thread_func(void* arg) {
 				nal_header_count++;
 			} else if (nal_header_count == 3 && data[i] == 1) {
 				if (_this->nal_len != 0) {
-					if (_this->nal_len + i > nal_buff_size) {
-						char *new_buff;
-						nal_buff_size += data_len;
-						new_buff = malloc(nal_buff_size);
-						memcpy(new_buff, _this->nal_buff, _this->nal_len);
-						free(_this->nal_buff);
-						_this->nal_buff = new_buff;
+					int len = (i + 1) - 4 - data_cur;
+					if (len > 0) {
+						if (_this->nal_len + len > nal_buff_size) {
+							char *new_buff;
+							nal_buff_size += len;
+							new_buff = malloc(nal_buff_size);
+							memcpy(new_buff, _this->nal_buff, _this->nal_len);
+							free(_this->nal_buff);
+							_this->nal_buff = new_buff;
+						}
+						memcpy(_this->nal_buff + _this->nal_len, data + data_cur, len);
 					}
+					_this->nal_len += len;
 					//new nal
-					memcpy(_this->nal_buff + _this->nal_len, data + data_cur, i);
 					_this->nal_len += i - 4;
 					_this->nal_buff[0] = ((_this->nal_len - 4) >> 24) & 0xff;
 					_this->nal_buff[1] = ((_this->nal_len - 4) >> 16) & 0xff;
@@ -116,16 +120,19 @@ static void *pout_thread_func(void* arg) {
 			}
 		}
 		if (_this->nal_len != 0) {
-			if (_this->nal_len + data_len - data_cur > nal_buff_size) {
-				char *new_buff;
-				nal_buff_size += data_len;
-				new_buff = malloc(nal_buff_size);
-				memcpy(new_buff, _this->nal_buff, _this->nal_len);
-				free(_this->nal_buff);
-				_this->nal_buff = new_buff;
+			int len = data_len - data_cur;
+			if (len > 0) {
+				if (_this->nal_len + len > nal_buff_size) {
+					char *new_buff;
+					nal_buff_size += len;
+					new_buff = malloc(nal_buff_size);
+					memcpy(new_buff, _this->nal_buff, _this->nal_len);
+					free(_this->nal_buff);
+					_this->nal_buff = new_buff;
+				}
+				memcpy(_this->nal_buff + _this->nal_len, data + data_cur, len);
 			}
-			memcpy(_this->nal_buff + _this->nal_len, data + data_cur, data_len - data_cur);
-			_this->nal_len += data_len - data_cur;
+			_this->nal_len += len;
 		}
 #else
 		for (int i = 0; i < data_len;) {
@@ -224,7 +231,7 @@ static void init(void *obj, const int width, const int height, int bitrate_kbps,
 			argv[argc++] = bitrate_str;
 			argv[argc++] = "!";
 			argv[argc++] = "video/x-h265,stream-format=byte-stream";
-		} else {//h264
+		} else { //h264
 			argv[argc++] = "!";
 			argv[argc++] = "videoconvert";
 			argv[argc++] = "!";

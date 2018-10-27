@@ -506,6 +506,17 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 #endif
 		}
 	}
+	{
+		for (int j = 0; state->capture_factories[j] != NULL; j++) {
+			if (strncmp(state->capture_factories[j]->name, state->audio_capture_name, sizeof(state->audio_capture_name)) == 0) {
+				state->capture_factories[j]->create_capture(state->capture_factories[j], &state->audio_capture);
+				break;
+			}
+		}
+		if (state->audio_capture) {
+			state->audio_capture->start(state->audio_capture, 0, NULL, NULL, NULL, 0);
+		}
+	}
 }
 //------------------------------------------------------------------------------
 
@@ -532,24 +543,24 @@ static void init_options(PICAM360CAPTURE_T *state) {
 			json_t *value = json_object_get(options, "mpu_name");
 			if (value) {
 				strncpy(state->mpu_name, json_string_value(value), sizeof(state->mpu_name) - 1);
-			} else {
-				strncpy(state->mpu_name, "manual", sizeof(state->mpu_name) - 1);
 			}
 		}
 		{
 			json_t *value = json_object_get(options, "capture_name");
 			if (value) {
 				strncpy(state->capture_name, json_string_value(value), sizeof(state->capture_name) - 1);
-			} else {
-				strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name) - 1);
 			}
 		}
 		{
 			json_t *value = json_object_get(options, "decoder_name");
 			if (value) {
 				strncpy(state->decoder_name, json_string_value(value), sizeof(state->decoder_name) - 1);
-			} else {
-				strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name) - 1);
+			}
+		}
+		{
+			json_t *value = json_object_get(options, "audio_capture_name");
+			if (value) {
+				strncpy(state->audio_capture_name, json_string_value(value), sizeof(state->audio_capture_name) - 1);
 			}
 		}
 		state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
@@ -627,6 +638,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 	json_object_set_new(options, "mpu_name", json_string(state->mpu_name));
 	json_object_set_new(options, "capture_name", json_string(state->capture_name));
 	json_object_set_new(options, "decoder_name", json_string(state->decoder_name));
+	json_object_set_new(options, "audio_capture_name", json_string(state->audio_capture_name));
 	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
 	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
 	json_object_set_new(options, "overlap", json_real(state->options.overlap));
@@ -3716,6 +3728,7 @@ int main(int argc, char *argv[]) {
 	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
 	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
 	strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name));
+	strncpy(state->audio_capture_name, "none", sizeof(state->audio_capture_name));
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;

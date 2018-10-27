@@ -174,6 +174,7 @@ typedef struct _PICAM360CAPTURE_T {
 	bool video_direct;
 	char capture_name[32];
 	char decoder_name[32];
+	char audio_capture_name[32];
 	int32_t screen_width;
 	int32_t screen_height;
 	uint32_t cam_width;
@@ -235,6 +236,7 @@ typedef struct _PICAM360CAPTURE_T {
 	pthread_mutex_t texture_size_mutex;
 	CAPTURE_T *captures[MAX_CAM_NUM];
 	DECODER_T *decoders[MAX_CAM_NUM];
+	CAPTURE_T *audio_capture;
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;
