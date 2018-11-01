@@ -87,8 +87,8 @@ static void *pout_thread_func(void* arg) {
 			} else if (nal_header_count == 3 && data[i] == 1) {
 				if (_this->nal_len != 0) {
 					int len = (i + 1) - 4 - data_cur;
-					if (len > 0) {
-						if (_this->nal_len + len > nal_buff_size) {
+					if (len > 0) { // avoid garbage data
+						if (_this->nal_len + len > nal_buff_size) { // resize buffer
 							char *new_buff;
 							nal_buff_size += len;
 							new_buff = malloc(nal_buff_size);
@@ -119,10 +119,10 @@ static void *pout_thread_func(void* arg) {
 				nal_header_count = 0;
 			}
 		}
-		if (_this->nal_len != 0) {
+		if (_this->nal_len != 0) { // avoid garbage data
 			int len = data_len - data_cur;
 			if (len > 0) {
-				if (_this->nal_len + len > nal_buff_size) {
+				if (_this->nal_len + len > nal_buff_size) { // resize buffer
 					char *new_buff;
 					nal_buff_size += len;
 					new_buff = malloc(nal_buff_size);
