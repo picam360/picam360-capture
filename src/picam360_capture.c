@@ -2501,8 +2501,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 static char lg_command[256] = { };
 static int lg_command_id = 0;
-static int lg_ack_command_id_tx = -1;
-static int lg_ack_command_id_rx = -1;
+static int lg_ack_command_id_downstream = -1;
+static int lg_ack_command_id_upstream = -1;
 
 static bool lg_debug_dump = false;
 static int lg_debug_dump_num = 0;
@@ -2718,7 +2718,7 @@ static int command2upstream_handler() {
 	static struct timeval last_try = { };
 	static bool is_first_try = false;
 	int len = strlen(lg_command);
-	if (len != 0 && lg_command_id != lg_ack_command_id_tx) {
+	if (len != 0 && lg_command_id != lg_ack_command_id_upstream) {
 		struct timeval s;
 		gettimeofday(&s, NULL);
 		if (!is_first_try) {
@@ -2808,8 +2808,8 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 		int id;
 		char value[256];
 		int num = sscanf((char*) data, "<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id, value);
-		if (num == 2 && id != lg_ack_command_id_rx) {
-			lg_ack_command_id_rx = id;
+		if (num == 2 && id != lg_ack_command_id_downstream) {
+			lg_ack_command_id_downstream = id;
 			state->plugin_host.send_command(value);
 		}
 	}
@@ -2821,31 +2821,42 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 #define STATUS_VAR(name) lg_status_ ## name
 #define STATUS_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
                                                (plugin_host)->add_status(STATUS_VAR(name));
-#define WATCH_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
-                                               (plugin_host)->add_watch(STATUS_VAR(name));
-//status
-static STATUS_T *STATUS_VAR(ack_command_id_rx);
+#define WATCH_VAR(name) lg_watch_ ## name
+#define WATCH_INIT(plugin_host, prefix, name) WATCH_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_watch(WATCH_VAR(name));
+//status to downstream
+static STATUS_T *STATUS_VAR(ack_command_id);
 static STATUS_T *STATUS_VAR(next_frame_id);
+static STATUS_T *STATUS_VAR(quaternion);
+static STATUS_T *STATUS_VAR(north);
 static STATUS_T *STATUS_VAR(info);
 static STATUS_T *STATUS_VAR(menu);
-//watch
-static STATUS_T *STATUS_VAR(ack_command_id_tx);
-static STATUS_T *STATUS_VAR(quaternion);
-static STATUS_T *STATUS_VAR(compass);
-static STATUS_T *STATUS_VAR(temperature);
-static STATUS_T *STATUS_VAR(bandwidth);
-static STATUS_T *STATUS_VAR(cam_fps);
-static STATUS_T *STATUS_VAR(cam_frameskip);
+//watch status from upstream
+static STATUS_T *WATCH_VAR(ack_command_id);
+static STATUS_T *WATCH_VAR(quaternion);
+static STATUS_T *WATCH_VAR(compass);
+static STATUS_T *WATCH_VAR(temperature);
+static STATUS_T *WATCH_VAR(bandwidth);
+static STATUS_T *WATCH_VAR(cam_fps);
+static STATUS_T *WATCH_VAR(cam_frameskip);
 
 static void status_release(void *user_data) {
 	free(user_data);
 }
 static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (status == STATUS_VAR(ack_command_id_rx)) {
-		snprintf(buff, buff_len, "%d", lg_ack_command_id_rx);
+	if (status == STATUS_VAR(ack_command_id)) {
+		snprintf(buff, buff_len, "%d", lg_ack_command_id_downstream);
 	} else if (status == STATUS_VAR(next_frame_id)) {
 		snprintf(buff, buff_len, "%d", state->next_frame_id);
+	} else if (status == STATUS_VAR(quaternion)) {
+		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
+		snprintf(buff, buff_len, "%f,%f,%f,%f", quat.x, quat.y, quat.z, quat.w);
+	} else if (status == STATUS_VAR(north)) {
+		float north;
+		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
+		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
+		snprintf(buff, buff_len, "%f", north * 180 / M_PI);
 	} else if (status == STATUS_VAR(info)) {
 		get_info_str(buff, buff_len);
 	} else if (status == STATUS_VAR(menu)) {
@@ -2854,25 +2865,25 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 }
 static void status_set_value(void *user_data, const char *value) {
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (status == STATUS_VAR(ack_command_id_tx)) {
-		sscanf(value, "%d", &lg_ack_command_id_tx);
-	} else if (status == STATUS_VAR(quaternion)) {
+	if (status == WATCH_VAR(ack_command_id)) {
+		sscanf(value, "%d", &lg_ack_command_id_upstream);
+	} else if (status == WATCH_VAR(quaternion)) {
 		VECTOR4D_T vec = { };
 		sscanf(value, "%f,%f,%f,%f", &vec.x, &vec.y, &vec.z, &vec.w);
 		state->plugin_host.set_camera_quaternion(-1, vec);
-	} else if (status == STATUS_VAR(compass)) {
+	} else if (status == WATCH_VAR(compass)) {
 		VECTOR4D_T vec = { };
 		sscanf(value, "%f,%f,%f,%f", &vec.x, &vec.y, &vec.z, &vec.w);
 		state->plugin_host.set_camera_compass(vec);
-	} else if (status == STATUS_VAR(temperature)) {
+	} else if (status == WATCH_VAR(temperature)) {
 		float temperature = 0;
 		sscanf(value, "%f", &temperature);
 		state->plugin_host.set_camera_temperature(temperature);
-	} else if (status == STATUS_VAR(bandwidth)) {
+	} else if (status == WATCH_VAR(bandwidth)) {
 		sscanf(value, "%f", &lg_cam_bandwidth);
-	} else if (status == STATUS_VAR(cam_fps)) {
+	} else if (status == WATCH_VAR(cam_fps)) {
 		sscanf(value, "%f,%f", &lg_cam_fps[0], &lg_cam_fps[1]);
-	} else if (status == STATUS_VAR(cam_frameskip)) {
+	} else if (status == WATCH_VAR(cam_frameskip)) {
 		sscanf(value, "%f,%f", &lg_cam_frameskip[0], &lg_cam_frameskip[1]);
 	}
 }
@@ -2888,20 +2899,19 @@ static STATUS_T *new_status(const char *name) {
 }
 
 static void init_status() {
-	STATUS_INIT(&state->plugin_host, "", ack_command_id_rx);
-	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, next_frame_id);
-	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, info);
-	STATUS_INIT(&state->plugin_host, UPSTREAM_DOMAIN, menu);
-	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id_tx);
+	STATUS_INIT(&state->plugin_host, "", ack_command_id);
+	STATUS_INIT(&state->plugin_host, "", next_frame_id);
+	STATUS_INIT(&state->plugin_host, "", quaternion);
+	STATUS_INIT(&state->plugin_host, "", north);
+	STATUS_INIT(&state->plugin_host, "", info);
+	STATUS_INIT(&state->plugin_host, "", menu);
+	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, ack_command_id);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, quaternion);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, compass);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, temperature);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, bandwidth);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, cam_fps);
 	WATCH_INIT(&state->plugin_host, UPSTREAM_DOMAIN, cam_frameskip);
-
-	strcpy(STATUS_VAR(ack_command_id_rx)->name, "ack_command_id");
-	strcpy(STATUS_VAR(ack_command_id_tx)->name, UPSTREAM_DOMAIN "ack_command_id");
 }
 
 #endif //status block
