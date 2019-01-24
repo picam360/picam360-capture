@@ -42,8 +42,7 @@ static float lg_offset_pitch = 0;
 static float lg_offset_yaw = 0;
 static float lg_offset_roll = 0;
 
-static float sub_angle(float a, float b) {
-	float v = a - b;
+static float normalize_angle(float v) {
 	v -= floor(v / 360) * 360;
 	if (v > 180.0) {
 		v -= 360.0;
@@ -51,7 +50,11 @@ static float sub_angle(float a, float b) {
 	return v;
 }
 
-static bool lg_debugdump = false;
+static bool lg_debugdump_compass1 = false;
+static bool lg_debugdump_compass2 = false;
+static bool lg_debugdump_quat1 = false;
+static bool lg_debugdump_quat2 = false;
+static bool lg_debugdump_quat3 = false;
 static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
@@ -77,9 +80,9 @@ static void *threadFunc(void *data) {
 				calib[i] /= (norm == 0 ? 1 : norm);
 			}
 			//convert from mpu coodinate to opengl coodinate
-			lg_compass.ary[0] = calib[1];
-			lg_compass.ary[1] = -calib[0];
-			lg_compass.ary[2] = -calib[2];
+			lg_compass.ary[0] = calib[0];
+			lg_compass.ary[1] = calib[2];
+			lg_compass.ary[2] = -calib[1];
 			lg_compass.ary[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
@@ -97,7 +100,7 @@ static void *threadFunc(void *data) {
 
 			float compass_mat[16] = { };
 			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
-			if (lg_debugdump) {
+			if (lg_debugdump_compass1) {
 				printf("compass1 %f : %f, %f, %f\n", lg_north, compass_mat[0], compass_mat[1], compass_mat[2]);
 			}
 
@@ -105,13 +108,13 @@ static void *threadFunc(void *data) {
 			mat4_multiply(compass_mat, compass_mat, matrix);
 			mat4_transpose(compass_mat, compass_mat);
 
-			if (lg_debugdump) {
-				printf("compass2 %f : %f, %f, %f\n", lg_north, compass_mat[0], compass_mat[1], compass_mat[2]);
-			}
-
 			north = -atan2(compass_mat[0], -compass_mat[2]) * 180 / M_PI; // start from z axis
 
-			lg_north = lg_north + sub_angle(north, lg_north) / (lg_north_count + 1);
+			if (lg_debugdump_compass2) {
+				printf("compass2 %f, %f : %f, %f, %f\n", lg_north, north, compass_mat[0], compass_mat[1], compass_mat[2]);
+			}
+
+			lg_north = normalize_angle(lg_north + normalize_angle(north - lg_north) / (lg_north_count + 1));
 			lg_north_count++;
 			if (lg_north_count > 100) {
 				lg_north_count = 100;
@@ -119,21 +122,22 @@ static void *threadFunc(void *data) {
 		}
 		{ //calib
 			float x, y, z;
-			if (lg_debugdump) {
-				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("original %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
+			quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+			float north_delta = lg_north - y * 180 / M_PI;
+			if (lg_debugdump_quat1) {
+				printf("original %f : %f : %f, %f, %f\n", north_delta, lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 			VECTOR4D_T quat_offset = quaternion_init();
 			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_z(lg_offset_roll));
 			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_x(lg_offset_pitch));
 			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_y(lg_offset_yaw));
 			quat = quaternion_multiply(quat, quat_offset); // Rv=RvoRv
-			if (lg_debugdump) {
+			if (lg_debugdump_quat2) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
 				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
-			quat = quaternion_multiply(quaternion_get_from_y(-lg_north * M_PI / 180), quat); // Rv=RvoRvRn
-			if (lg_debugdump) {
+			quat = quaternion_multiply(quaternion_get_from_y(north_delta * M_PI / 180), quat); // Rv=RvoRvRn
+			if (lg_debugdump_quat3) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
 				printf("north   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
@@ -290,6 +294,11 @@ static void init_options(void *user_data, json_t *options) {
 	lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
 	lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
 	lg_i2c_ch = json_number_value(json_object_get(options, PLUGIN_NAME ".i2c_ch"));
+	lg_debugdump_compass1 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass1"));
+	lg_debugdump_compass2 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass2"));
+	lg_debugdump_quat1 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat1"));
+	lg_debugdump_quat2 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat2"));
+	lg_debugdump_quat3 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat3"));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];

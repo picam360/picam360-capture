@@ -99,6 +99,17 @@ static float lg_cam_fps[MAX_CAM_NUM] = { };
 static float lg_cam_frameskip[MAX_CAM_NUM] = { };
 static float lg_cam_bandwidth = 0;
 
+
+static json_t *json_load_file_without_comment(const char *path, size_t flags, json_error_t *error) {
+	json_t *options;
+	char buff[1024];
+	char *tmp_conf_filepath = "/tmp/picam360-capture.conf.json";
+	snprintf(buff, sizeof(buff), "grep -v -e '^\s*#' %s > %s", path, tmp_conf_filepath);
+	system(buff);
+	options = json_load_file(tmp_conf_filepath, flags, error);
+	return options;
+}
+
 static int end_width(const char *str, const char *suffix) {
 	if (!str || !suffix)
 		return 0;
@@ -533,7 +544,7 @@ static void init_textures(PICAM360CAPTURE_T *state) {
  ***********************************************************/
 static void init_options(PICAM360CAPTURE_T *state) {
 	json_error_t error;
-	json_t *options = json_load_file(state->config_filepath, 0, &error);
+	json_t *options = json_load_file_without_comment(state->config_filepath, 0, &error);
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
@@ -2437,7 +2448,7 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 	//load plugins
 	json_error_t error;
-	json_t *options = json_load_file(state->config_filepath, 0, &error);
+	json_t *options = json_load_file_without_comment(state->config_filepath, 0, &error);
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
@@ -2850,13 +2861,11 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	} else if (status == STATUS_VAR(next_frame_id)) {
 		snprintf(buff, buff_len, "%d", state->next_frame_id);
 	} else if (status == STATUS_VAR(quaternion)) {
-		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
+		VECTOR4D_T quat = state->mpu->get_quaternion(state->mpu);
 		snprintf(buff, buff_len, "%f,%f,%f,%f", quat.x, quat.y, quat.z, quat.w);
 	} else if (status == STATUS_VAR(north)) {
-		float north;
-		VECTOR4D_T quat = state->plugin_host.get_camera_quaternion(-1);
-		quaternion_get_euler(quat, &north, NULL, NULL, EULER_SEQUENCE_YXZ);
-		snprintf(buff, buff_len, "%f", north * 180 / M_PI);
+		float north = state->mpu->get_north(state->mpu);
+		snprintf(buff, buff_len, "%f", north);
 	} else if (status == STATUS_VAR(info)) {
 		get_info_str(buff, buff_len);
 	} else if (status == STATUS_VAR(menu)) {
