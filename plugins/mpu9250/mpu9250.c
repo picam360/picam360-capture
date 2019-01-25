@@ -50,30 +50,42 @@ static float normalize_angle(float v) {
 	return v;
 }
 
+static bool lg_debugdump_compass0 = false;
 static bool lg_debugdump_compass1 = false;
 static bool lg_debugdump_compass2 = false;
+static bool lg_debugdump_quat0 = false;
 static bool lg_debugdump_quat1 = false;
 static bool lg_debugdump_quat2 = false;
 static bool lg_debugdump_quat3 = false;
 static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
+	const int dumpcount = 50;
+	int count = 0;
 	do {
+		count++;
 		ms_update();
 
 		VECTOR4D_T quat = { };
+		VECTOR4D_T com = { };
+		{ //com : convert from mpu coodinate to opengl coodinate
+			com.ary[0] = compass[1];	//opengl x direction raw data 53, 573, 74 : -6, 81, 155
+			com.ary[1] = -compass[0];	//opengl y direction raw data -221, 194, 66 : 260, 356, 113
+			com.ary[2] = -compass[2];	//opengl z direction raw data 10, 308, -113 : 29, 342, 385
+			com.ary[3] = 1.0;			//w
+		}
 		{ //compas : calibration
 			float calib[3];
 			float bias[3];
 			float gain[3];
 			for (int i = 0; i < 3; i++) {
-				if (lg_is_compass_calib) {
-					lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
-					lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+				{ //increment calibration
+					lg_compass_min[i] = MIN(lg_compass_min[i], com.ary[i]);
+					lg_compass_max[i] = MAX(lg_compass_max[i], com.ary[i]);
 				}
 				bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
 				gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-				calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
+				calib[i] = (com.ary[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
 			}
 			float norm = sqrt(calib[0] * calib[0] + calib[1] * calib[1] + calib[2] * calib[2]);
 			for (int i = 0; i < 3; i++) {
@@ -81,9 +93,13 @@ static void *threadFunc(void *data) {
 			}
 			//convert from mpu coodinate to opengl coodinate
 			lg_compass.ary[0] = calib[0];
-			lg_compass.ary[1] = calib[2];
-			lg_compass.ary[2] = -calib[1];
+			lg_compass.ary[1] = calib[1];
+			lg_compass.ary[2] = calib[2];
 			lg_compass.ary[3] = 1.0;
+			if (lg_debugdump_compass0 && (count % dumpcount) == 0) {
+				printf("compass0 %f : %.0f, %.0f, %.0f : %.0f, %.0f, %.0f : %.3f, %.3f, %.3f\n", lg_north, compass[0], compass[1], compass[2], com.ary[0], com.ary[1], com.ary[2], calib[0], calib[1],
+						calib[2]);
+			}
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
 			quat.ary[0] = quaternion[1];	//x
@@ -93,25 +109,56 @@ static void *threadFunc(void *data) {
 		}
 		{ //north
 			float north = 0;
-
-			float matrix[16];
-			mat4_fromQuat(matrix, quat.ary);
-			mat4_invert(matrix, matrix);
-
+			float x, y, z;
 			float compass_mat[16] = { };
-			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
-			if (lg_debugdump_compass1) {
-				printf("compass1 %f : %f, %f, %f\n", lg_north, compass_mat[0], compass_mat[1], compass_mat[2]);
-			}
+			quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+			if (abs(x) < M_PI / 4) {
+				VECTOR4D_T quat_roll_pitch = quaternion_init();
+				quat_roll_pitch = quaternion_multiply(quat_roll_pitch, quaternion_get_from_z(z));
+				quat_roll_pitch = quaternion_multiply(quat_roll_pitch, quaternion_get_from_x(x));
+				quat_roll_pitch = quaternion_multiply(quat_roll_pitch, quaternion_get_from_y(0));
 
-			mat4_transpose(compass_mat, compass_mat);
-			mat4_multiply(compass_mat, compass_mat, matrix);
-			mat4_transpose(compass_mat, compass_mat);
+				float matrix[16];
+				mat4_fromQuat(matrix, quat_roll_pitch.ary);
+				mat4_invert(matrix, matrix);
 
-			north = -atan2(compass_mat[0], -compass_mat[2]) * 180 / M_PI; // start from z axis
+				memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
 
-			if (lg_debugdump_compass2) {
-				printf("compass2 %f, %f : %f, %f, %f\n", lg_north, north, compass_mat[0], compass_mat[1], compass_mat[2]);
+				mat4_transpose(compass_mat, compass_mat);
+				mat4_multiply(compass_mat, compass_mat, matrix);
+				mat4_transpose(compass_mat, compass_mat);
+
+				north = atan2(compass_mat[0], -compass_mat[2]) * 180 / M_PI; // start from z axis
+
+				if (lg_debugdump_compass1 && (count % dumpcount) == 0) {
+					printf("compass1 %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f\n", lg_north, north, x, y, z, lg_compass.ary[0], lg_compass.ary[1], lg_compass.ary[2],
+							compass_mat[0], compass_mat[1], compass_mat[2]);
+				}
+			} else {
+				float x2, y2, z2;
+				quaternion_get_euler(quat, &y2, &z2, &x2, EULER_SEQUENCE_YZX);
+
+				VECTOR4D_T quat_roll_pitch = quaternion_init();
+				quat_roll_pitch = quaternion_multiply(quat_roll_pitch, quaternion_get_from_x(x2));
+				quat_roll_pitch = quaternion_multiply(quat_roll_pitch, quaternion_get_from_z(z2));
+				quat_roll_pitch = quaternion_multiply(quat_roll_pitch, quaternion_get_from_y(0));
+
+				float matrix[16];
+				mat4_fromQuat(matrix, quat_roll_pitch.ary);
+				mat4_invert(matrix, matrix);
+
+				memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
+
+				mat4_transpose(compass_mat, compass_mat);
+				mat4_multiply(compass_mat, compass_mat, matrix);
+				mat4_transpose(compass_mat, compass_mat);
+
+				north = atan2(compass_mat[0], -compass_mat[2]) * 180 / M_PI; // start from z axis
+
+				if (lg_debugdump_compass1 && (count % dumpcount) == 0) {
+					printf("compass1 %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f\n", lg_north, north, x, y, z, x2, y2, z2, lg_compass.ary[0], lg_compass.ary[1], lg_compass.ary[2],
+							compass_mat[0], compass_mat[1], compass_mat[2]);
+				}
 			}
 
 			lg_north = normalize_angle(lg_north + normalize_angle(north - lg_north) / (lg_north_count + 1));
@@ -124,7 +171,7 @@ static void *threadFunc(void *data) {
 			float x, y, z;
 			quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
 			float north_delta = lg_north - y * 180 / M_PI;
-			if (lg_debugdump_quat1) {
+			if (lg_debugdump_quat1 && (count % dumpcount) == 0) {
 				printf("original %f : %f : %f, %f, %f\n", north_delta, lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 			VECTOR4D_T quat_offset = quaternion_init();
@@ -132,12 +179,12 @@ static void *threadFunc(void *data) {
 			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_x(lg_offset_pitch));
 			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_y(lg_offset_yaw));
 			quat = quaternion_multiply(quat, quat_offset); // Rv=RvoRv
-			if (lg_debugdump_quat2) {
+			if (lg_debugdump_quat2 && (count % dumpcount) == 0) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
 				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 			quat = quaternion_multiply(quaternion_get_from_y(north_delta * M_PI / 180), quat); // Rv=RvoRvRn
-			if (lg_debugdump_quat3) {
+			if (lg_debugdump_quat3 && (count % dumpcount) == 0) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
 				printf("north   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
@@ -294,8 +341,10 @@ static void init_options(void *user_data, json_t *options) {
 	lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
 	lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
 	lg_i2c_ch = json_number_value(json_object_get(options, PLUGIN_NAME ".i2c_ch"));
+	lg_debugdump_compass0 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass0"));
 	lg_debugdump_compass1 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass1"));
 	lg_debugdump_compass2 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass2"));
+	lg_debugdump_quat0 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat0"));
 	lg_debugdump_quat1 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat1"));
 	lg_debugdump_quat2 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat2"));
 	lg_debugdump_quat3 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat3"));
