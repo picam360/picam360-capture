@@ -4038,8 +4038,8 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 
 		{ // Rn : north
 			mat4_identity(north_matrix);
-			float north_diff = state->plugin_host.get_view_north() - state->plugin_host.get_camera_north();
-			mat4_rotateY(north_matrix, north_matrix, north_diff * M_PI / 180);
+			float north = state->plugin_host.get_view_north();
+			mat4_rotateY(north_matrix, north_matrix, north * M_PI / 180);
 		}
 
 		{ // Rw : view coodinate to world coodinate and view heading to ground initially
