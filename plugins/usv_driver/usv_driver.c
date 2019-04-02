@@ -14,7 +14,7 @@
 #include <dirent.h>
 #include <pthread.h>
 
-#include "rov_driver.h"
+#include "usv_driver.h"
 
 #include <mat4/identity.h>
 #include <mat4/multiply.h>
@@ -25,7 +25,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define PLUGIN_NAME "rov_driver"
+#define PLUGIN_NAME "usv_driver"
 
 #define PT_STATUS 100
 #define PT_CMD 101

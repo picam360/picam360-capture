@@ -22,6 +22,7 @@ sudo rm -r /home/pi/.config/chromium
 sudo rm -r /home/pi/.cache/chromium
 
 echo "reset pf"
+bash setup-pf.sh
 sudo rm /home/pi/.ssh/ssh-gateway_rsa
 sudo systemctl disable ssh-pf
 sudo systemctl disable www-pf
