@@ -38,7 +38,7 @@ sudo rm -r /home/pi/.config/chromium
 sudo rm -r /home/pi/.cache/chromium
 
 echo "reset pf"
-bash setup-pf.sh
+bash /home/pi/picam360/picam360-capture/setup/setup-pf.sh
 sudo rm /home/pi/.ssh/*.key
 sudo systemctl disable ssh-pf
 sudo systemctl disable www-pf
