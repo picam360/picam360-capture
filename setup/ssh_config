@@ -1,0 +1,43 @@
+Host SSH_PF
+  HostName pf.picam360.com
+  IdentityFile ~/.ssh/ssh-gateway_rsa
+  User ssh-gateway
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null 
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  ExitOnForwardFailure yes
+  RemoteForward 22 localhost:22
+
+Host WWW_PF     
+  HostName pf.picam360.com
+  IdentityFile ~/.ssh/ssh-gateway_rsa
+  User ssh-gateway
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  ExitOnForwardFailure yes
+  RemoteForward 9001 localhost:9001
+
+Host NODEDEBUG_PF     
+  HostName pf.picam360.com
+  IdentityFile ~/.ssh/ssh-gateway_rsa
+  User ssh-gateway
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  ExitOnForwardFailure yes
+  RemoteForward 9229 localhost:9229
+
+Host PYTHONDEBUG_PF     
+  HostName pf.picam360.com
+  IdentityFile ~/.ssh/ssh-gateway_rsa
+  User ssh-gateway
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  ExitOnForwardFailure yes
+  RemoteForward 5678 localhost:5678

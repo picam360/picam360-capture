@@ -1,0 +1,17 @@
+
+[Unit]
+Description=Keep ssh tunnel to specified remote host open
+After=network-online.target
+
+[Service]
+Type=simple
+Environment="LOCAL_ADDR=localhost"
+User=pi
+
+ExecStart=/usr/bin/ssh -NT SSH_PF
+
+RestartSec=30
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -21,6 +21,13 @@ sudo rm /home/pi/picam360/picam360-capture/.picam360_history
 sudo rm -r /home/pi/.config/chromium
 sudo rm -r /home/pi/.cache/chromium
 
+echo "reset pf"
+sudo rm /home/pi/.ssh/ssh-gateway_rsa
+sudo systemctl disable ssh-pf
+sudo systemctl disable www-pf
+sudo systemctl disable nodedebug-pf
+sudo systemctl disable pythondebug-pf
+
 #echo "reset rc.local"
 #sudo cp /home/pi/picam360/picam360-capture/setup/rc.local /etc/rc.local
 
