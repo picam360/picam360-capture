@@ -1,6 +1,6 @@
 Host SSH_PF
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/ssh-gateway_rsa
+  IdentityFile ~/.ssh/22_device.key
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null 
@@ -11,7 +11,7 @@ Host SSH_PF
 
 Host WWW_PF     
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/ssh-gateway_rsa
+  IdentityFile ~/.ssh/9001_device.key
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
@@ -22,7 +22,7 @@ Host WWW_PF
 
 Host NODEDEBUG_PF     
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/ssh-gateway_rsa
+  IdentityFile ~/.ssh/9229_device.key
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
@@ -33,7 +33,7 @@ Host NODEDEBUG_PF
 
 Host PYTHONDEBUG_PF     
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/ssh-gateway_rsa
+  IdentityFile ~/.ssh/5678_device.key
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null

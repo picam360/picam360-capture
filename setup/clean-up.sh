@@ -23,7 +23,7 @@ sudo rm -r /home/pi/.cache/chromium
 
 echo "reset pf"
 bash setup-pf.sh
-sudo rm /home/pi/.ssh/ssh-gateway_rsa
+sudo rm /home/pi/.ssh/*.key
 sudo systemctl disable ssh-pf
 sudo systemctl disable www-pf
 sudo systemctl disable nodedebug-pf
