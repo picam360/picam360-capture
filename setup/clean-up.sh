@@ -5,25 +5,25 @@ cmake .
 make
 sudo make install
 
-cd /home/pi/picam360/armv6l/picam360-server
+cd /home/pi/picam360/picam360-server/armv6l
 sudo rm -r userdata
 mkdir userdata
 git remote set-url origin https://github.com/picam360/picam360-server.git
 git reset --hard & git pull
-echo "make sure armv6l/picam360-server ready"
+echo "make sure picam360-server/armv6l ready manually"
 
-cd /home/pi/picam360/armv7l/picam360-server
+cd /home/pi/picam360/picam360-server/armv7l
 sudo rm -r userdata
 mkdir userdata
 git remote set-url origin https://github.com/picam360/picam360-server.git
 git reset --hard & git pull
-echo "make sure armv7l/picam360-server ready"
+echo "make sure picam360-server/armv7l ready manually"
 
-cd /home/pi/picam360/armv6l/picam360-server/www
+cd /home/pi/picam360/picam360-server/armv6l/www
 git remote set-url origin https://github.com/picam360/picam360-viewer.git
 git reset --hard & git pull
 
-cd /home/pi/picam360/armv7l/picam360-server/www
+cd /home/pi/picam360/picam360-server/armv7l/www
 git remote set-url origin https://github.com/picam360/picam360-viewer.git
 git reset --hard & git pull
 
