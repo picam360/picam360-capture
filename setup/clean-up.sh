@@ -49,10 +49,10 @@ sudo systemctl disable pythondebug-pf
 #sudo cp /home/pi/picam360/picam360-capture/setup/rc.local /etc/rc.local
 
 echo "reset config.json"
-cp /home/pi/picam360/picam360-capture/config.json.tmp /usr/local/etc/picam360-capture.conf
-cp /home/pi/picam360/picam360-server/armv6l/config.json.tmp /usr/local/etc/picam360-server.conf
-cp /home/pi/picam360/picam360-server/armv6l/www/config.json.tmp /var/www/picam360-server/armv6l/www/
-cp /home/pi/picam360/picam360-server/armv7l/www/config.json.tmp /var/www/picam360-server/armv7l/www/
+sudo cp /home/pi/picam360/picam360-capture/config.json.tmp /usr/local/etc/picam360-capture.conf
+sudo cp /home/pi/picam360/picam360-server/armv6l/config.json.tmp /usr/local/etc/picam360-server.conf
+sudo cp /home/pi/picam360/picam360-server/armv6l/www/config.json.tmp /var/www/picam360-server/armv6l/www/
+sudo cp /home/pi/picam360/picam360-server/armv7l/www/config.json.tmp /var/www/picam360-server/armv7l/www/
 
 echo "auto start up"
 sudo systemctl enable picam360-capture.service
