@@ -1,5 +1,7 @@
 #!/bin/bash
 
+systemctl stop picam360-capture.service
+
 if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/" ]; then
 	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/
 fi
