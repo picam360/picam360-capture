@@ -9,23 +9,23 @@ cd /home/pi/picam360/picam360-server/armv6l
 sudo rm -r userdata
 mkdir userdata
 git remote set-url origin https://github.com/picam360/picam360-server.git
-git reset --hard & git pull
+git reset --hard & git pull origin master
 echo "make sure picam360-server/armv6l ready manually"
 
 cd /home/pi/picam360/picam360-server/armv7l
 sudo rm -r userdata
 mkdir userdata
 git remote set-url origin https://github.com/picam360/picam360-server.git
-git reset --hard & git pull
+git reset --hard & git pull origin master
 echo "make sure picam360-server/armv7l ready manually"
 
 cd /home/pi/picam360/picam360-server/armv6l/www
 git remote set-url origin https://github.com/picam360/picam360-viewer.git
-git reset --hard & git pull
+git reset --hard & git pull origin master
 
 cd /home/pi/picam360/picam360-server/armv7l/www
 git remote set-url origin https://github.com/picam360/picam360-viewer.git
-git reset --hard & git pull
+git reset --hard & git pull origin master
 
 echo "rm history files"
 sudo rm /root/.*_history

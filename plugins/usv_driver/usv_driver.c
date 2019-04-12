@@ -41,31 +41,25 @@ static float lg_motor_range = 100;
 #define MOTOR_BASE(value) lg_motor_center + lg_motor_margin * ((value < 0.5 && value > -0.5) ? 0 : (value > 0) ? 1 : -1)
 
 static int lg_light_id[LIGHT_NUM] = { 4, 34 };
-static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
+static int lg_motor_id[MOTOR_NUM] = { 17, 18, 27, 24 };
 
 static float lg_light_value[LIGHT_NUM] = { 0, 0 };
 static float lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
-static float lg_motor_dir[4] = { -1, 1, -1, 1 };
+static float lg_motor_dir[4] = { 1, 1, 1, 1 };
 
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
-static float lg_brake_ps = 5; // percent
-static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
-static VECTOR4D_T lg_offset_quaternion = { .ary = { 0, 0, 0, 1 } };
+static float lg_rudder = 0; //-100 to 100
+static float lg_max_rpm = 6;
+static int lg_thruster_mode = 0; //0:single, 1:double, 2:quad
 
 static bool lg_lowlevel_control = false;
-static bool lg_pid_enabled = false;
-static float lg_yaw_diff = 0;
-static float lg_pitch_diff = 0;
+static bool lg_pid_enabled = true;
 static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
-static float lg_pid_value[3] = { }; //x, z, delta yaw
-static float lg_delta_pid_target[3][4] = { }; //[history][x, z, delta yaw, t]
-
-static float lg_offset_yaw = 0.0;
-static float lg_offset_pitch = 0.0;
-static float lg_offset_roll = 0.0;
+static float lg_pid_value[1] = { }; //delta yaw
+static float lg_delta_pid_target[3][2] = { }; //[history][delta yaw, t]
 
 static void release(void *user_data) {
 	free(user_data);
@@ -132,59 +126,89 @@ static float sub_angle(float a, float b) {
 	}
 	return v;
 }
-static VECTOR4D_T _get_quaternion() {
-	VECTOR4D_T quat = { };
-	MPU_T *mpu = lg_plugin_host->get_mpu();
-	if (mpu) {
-		quat = mpu->get_quaternion(mpu);
-		quat = quaternion_multiply(quat, lg_offset_quaternion); // Rc=RcRcoRc-1Rc=RcRco
-	}
-	return quat;
-}
 
 static bool lg_debugdump = false;
+void *pid_control_single(float t_s, float north) {
+	lg_motor_value[0] = lg_thrust;
+	lg_motor_value[1] = lg_rudder;
+	return NULL;
+}
+void *pid_control_double(float t_s, float north) {
+	if (!lg_pid_enabled) {
+		lg_motor_value[0] = lg_thrust + lg_rudder / 2;
+		lg_motor_value[1] = lg_thrust - lg_rudder / 2;
+		return NULL;
+	}
+
+	static float last_t_s = -1;
+	if (last_t_s < 0) {
+		last_t_s = t_s;
+		return NULL;
+	}
+	float diff_sec = t_s - last_t_s;
+	diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
+	last_t_s = t_s;
+
+	static float last_north = 0;
+	float rpm = sub_angle(last_north, north) / 360 / diff_sec * 60;
+	float target_rpm = lg_rudder * lg_max_rpm / 100;
+	lg_delta_pid_target[0][0] = rpm - target_rpm;
+	lg_delta_pid_target[0][1] = t_s;
+	last_north = north;
+
+	if (lg_delta_pid_target[2][1] == 0) { //skip
+		//increment
+		for (int j = 3 - 1; j >= 1; j--) {
+			for (int k = 0; k < 2; k++) {
+				lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
+			}
+		}
+		return NULL;
+	}
+
+	for (int k = 0; k < 1; k++) {
+		float p_value = lg_p_gain * lg_delta_pid_target[0][k];
+		float d_value = lg_d_gain * (lg_delta_pid_target[0][k] - lg_delta_pid_target[1][k]) / diff_sec;
+		float delta_value = p_value + d_value;
+		lg_pid_value[k] = delta_value;
+		lg_pid_value[k] = MIN(MAX(lg_pid_value[k], -200), 200);
+	}
+
+	//increment
+	for (int j = 3 - 1; j >= 1; j--) {
+		for (int k = 0; k < 2; k++) {
+			lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
+		}
+	}
+
+	if (lg_debugdump) {
+		printf("vehicle : %f, %f, %f\n", rpm, target_rpm, lg_pid_value[0]);
+	}
+
+	{//aply
+		lg_motor_value[0] = lg_thrust + lg_pid_value[0] / 2;
+		lg_motor_value[1] = lg_thrust - lg_pid_value[0] / 2;
+		return NULL;
+	}
+}
+void *pid_control_quad(float t_s, float north) {
+
+}
 void *pid_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "DA PID");
 
-	static float last_time = -1;
 	while (1) {
 		usleep(50 * 1000); //less than 20Hz
 		if (lg_lowlevel_control) {
 			continue;
 		}
 
-		VECTOR4D_T quat = _get_quaternion();
-		if (last_time < 0) { //init last_time
-			last_time = quat.t;
-			continue;
-		}
-		//quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI)); //mpu offset
-		//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
-		float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
-		float unif_matrix[16];
-		float camera_matrix[16];
-		float target_matrix[16];
-		mat4_identity(unif_matrix);
-		mat4_identity(camera_matrix);
-		mat4_identity(target_matrix);
-		mat4_fromQuat(camera_matrix, quat.ary);
-		mat4_fromQuat(target_matrix, lg_target_quaternion.ary);
-		mat4_invert(target_matrix, target_matrix);
-		mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1
-		mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRt-1
-
-		mat4_transpose(vtg, vtg);
-		mat4_multiply(vtg, vtg, unif_matrix);
-		mat4_transpose(vtg, vtg);
-
-		float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-		lg_yaw_diff = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
-		lg_pitch_diff = atan2(xz, -vtg[1]) * 180 / M_PI; //[-180:180]
-
-		//time
-		float diff_sec = quat.t - last_time;
-		if (diff_sec < 1E-6) { //<1us need to wait
-			continue;
+		float north = 0;
+		VECTOR4D_T quat = { };
+		MPU_T *mpu = lg_plugin_host->get_mpu();
+		if (mpu) {
+			north = mpu->get_north(mpu);
+			quat = mpu->get_quaternion(mpu);
 		}
 		//cal
 		//trancate min max
@@ -194,98 +218,22 @@ void *pid_thread_func(void* arg) {
 
 		//trancate min max
 		lg_thrust = MIN(MAX(lg_thrust, -100), 100);
-		//brake
-		lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
-		if (lg_pid_enabled) {
-			float x, y, z;
-			if (lg_debugdump) {
-				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("vehicle : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
-			}
-			if (lg_debugdump) {
-				quaternion_get_euler(lg_target_quaternion, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("target  : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
-			}
+		//trancate min max
+		lg_rudder = MIN(MAX(lg_rudder, -100), 100);
 
-			if (lg_debugdump) {
-				printf("vehicle : %f, %f, %f\n", vtg[0], vtg[1], vtg[2]);
-			}
-
-			static float last_yaw = 0;
-			lg_delta_pid_target[0][0] = cos(lg_yaw_diff * M_PI / 180) * (lg_pitch_diff / 180); // x [-1:1]
-			lg_delta_pid_target[0][1] = sin(lg_yaw_diff * M_PI / 180) * (lg_pitch_diff / 180); // z [-1:1]
-			lg_delta_pid_target[0][2] = sub_angle(lg_yaw_diff, last_yaw) / 180; // delta yaw [-1:1]
-			lg_delta_pid_target[0][3] = quat.t;
-
-			diff_sec = lg_delta_pid_target[0][3] - lg_delta_pid_target[1][3];
-			diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
-
-			for (int k = 0; k < 3; k++) {
-				float p_value = lg_p_gain * (lg_delta_pid_target[0][k] - lg_delta_pid_target[1][k]);
-				float i_value = lg_i_gain * lg_delta_pid_target[0][k] * diff_sec;
-				float d_value = lg_d_gain * (lg_delta_pid_target[0][k] - 2 * lg_delta_pid_target[1][k] + lg_delta_pid_target[2][k]) / diff_sec;
-				float delta_value = p_value + i_value + d_value;
-				lg_pid_value[k] += delta_value;
-				lg_pid_value[k] = MIN(MAX(lg_pid_value[k], -2500), 2500);
-			}
-
-			//increment
-			for (int j = 3 - 1; j >= 1; j--) {
-				for (int k = 0; k < 4; k++) {
-					lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
-				}
-			}
-			last_yaw = lg_yaw_diff;
-
-			// 0 - 1
-			// |   |
-			// 3 - 2
-			float motor_pid_gain[3][MOTOR_NUM] = { //
-					//
-							{ 1, -1, -1, 1 },				// x
-							{ -1, -1, 1, 1 },				// z
-							{ -1, 1, -1, 1 }			// delta yaw
-					};
-			float motor_pid_value[MOTOR_NUM] = { };
-			for (int k = 0; k < 3; k++) {
-				for (int i = 0; i < MOTOR_NUM; i++) {
-					float power_calib = (lg_pid_value[k] > 0 ? 1 : -1) * sqrt(abs(lg_pid_value[k]));
-					motor_pid_value[i] += power_calib * motor_pid_gain[k][i];
-				}
-			}
-			for (int i = 0; i < MOTOR_NUM; i++) {
-				float value = lg_thrust + motor_pid_value[i];
-				float diff = value - lg_motor_value[i];
-				int max_diff = 10;
-				if (abs(diff) > max_diff) {
-					diff = (diff > 0) ? max_diff : -max_diff;
-				}
-				value = lg_motor_value[i] + diff;
-				if (value * lg_motor_value[i] < 0) {
-					value = 0;
-				}
-				lg_motor_value[i] = value;
-			}
-			// end of pid control
-		} else {
-			for (int i = 0; i < MOTOR_NUM; i++) {
-				float value = lg_thrust;
-				float diff = value - lg_motor_value[i];
-				int max_diff = 10;
-				if (abs(diff) > max_diff) {
-					diff = (diff > 0) ? max_diff : -max_diff;
-				}
-				value = lg_motor_value[i] + diff;
-				if (value * lg_motor_value[i] < 0) {
-					value = 0;
-				}
-				lg_motor_value[i] = MIN(MAX(value, -100), 100);
-			}
+		switch (lg_thruster_mode) {
+		case 0:
+			pid_control_single(quat.t, north);
+			break;
+		case 1:
+			pid_control_double(quat.t, north);
+			break;
+		case 2:
+			pid_control_quad(quat.t, north);
+			break;
 		}
 		update_pwm();
-
-		last_time = quat.t;
 	} // end of while
 }
 
@@ -326,26 +274,20 @@ static int command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".increment_thrust", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float v;
-			int num = sscanf(param, "%f", &v);
+			float v1, v2, v3;
+			int num = sscanf(param, "%f,%f,%f", &v1, &v2, &v3);
 
-			if (num == 1) {
-				lg_thrust += v;
-				param = strtok(NULL, " \n");
-				if (param != NULL) {
-					float x, y, z, w;
-					int num = sscanf(param, "%f,%f,%f,%f", &x, &y, &z, &w);
-
-					if (num == 4) {
-						lg_target_quaternion.x = x;
-						lg_target_quaternion.y = y;
-						lg_target_quaternion.z = z;
-						lg_target_quaternion.w = w;
-					}
-				}
+			if (num >= 1) {
+				lg_thrust = v1;
+			}
+			if (num >= 2) {
+				lg_rudder = v2;
+			}
+			if (num >= 3) {
+				lg_thruster_mode = (int) v3;
 			}
 			printf("set_thrust : completed\n");
 		}
@@ -359,20 +301,6 @@ static int command_handler(void *user_data, const char *_buff) {
 				lg_light_strength = v;
 			}
 			printf("set_light_strength : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_target_quaternion", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			float x, y, z, w;
-			int num = sscanf(param, "%f,%f,%f,%f", &x, &y, &z, &w);
-
-			if (num == 4) {
-				lg_target_quaternion.x = x;
-				lg_target_quaternion.y = y;
-				lg_target_quaternion.z = z;
-				lg_target_quaternion.w = w;
-			}
-			printf("set_target_quaternion : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_lowlevel_control", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -391,7 +319,7 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			lg_pid_enabled = (value != 0);
 			lg_thrust = 0;
-			lg_target_quaternion = _get_quaternion();
+			lg_rudder = 0;
 			memset(lg_pid_value, 0, sizeof(lg_pid_value));
 			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
 
@@ -521,16 +449,7 @@ static void init_options(void *user_data, json_t *options) {
 			lg_motor_range = value;
 		}
 	}
-	{
-		lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
-		lg_offset_pitch = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_pitch"));
-		lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
-
-		lg_offset_quaternion = quaternion_init();
-		lg_offset_quaternion = quaternion_multiply(lg_offset_quaternion, quaternion_get_from_z(lg_offset_roll));
-		lg_offset_quaternion = quaternion_multiply(lg_offset_quaternion, quaternion_get_from_x(lg_offset_pitch));
-		lg_offset_quaternion = quaternion_multiply(lg_offset_quaternion, quaternion_get_from_y(lg_offset_yaw));
-	}
+	lg_thruster_mode = (int) json_number_value(json_object_get(options, PLUGIN_NAME ".thruster_mode"));
 
 	init_pwm(); //need motor ids
 }
@@ -559,11 +478,7 @@ static void save_options(void *user_data, json_t *options) {
 		json_object_set_new(options, PLUGIN_NAME ".motor_margin", json_real(lg_motor_margin));
 		json_object_set_new(options, PLUGIN_NAME ".motor_range", json_real(lg_motor_range));
 	}
-	{
-		json_object_set_new(options, PLUGIN_NAME ".offset_yaw", json_real(lg_offset_yaw));
-		json_object_set_new(options, PLUGIN_NAME ".offset_pitch", json_real(lg_offset_pitch));
-		json_object_set_new(options, PLUGIN_NAME ".offset_roll", json_real(lg_offset_roll));
-	}
+	json_object_set_new(options, PLUGIN_NAME ".thruster_mode", json_real(lg_thruster_mode));
 }
 
 #define MAX_INFO_LEN 1024
@@ -582,13 +497,9 @@ static char *get_info(void *user_data) {
 static STATUS_T *STATUS_VAR(light_value);
 static STATUS_T *STATUS_VAR(motor_value);
 static STATUS_T *STATUS_VAR(light_strength);
-static STATUS_T *STATUS_VAR(brake_ps);
 static STATUS_T *STATUS_VAR(thrust);
-static STATUS_T *STATUS_VAR(target_quaternion);
 static STATUS_T *STATUS_VAR(lowlevel_control);
 static STATUS_T *STATUS_VAR(pid_enabled);
-static STATUS_T *STATUS_VAR(yaw_diff);
-static STATUS_T *STATUS_VAR(pitch_diff);
 static STATUS_T *STATUS_VAR(p_gain);
 static STATUS_T *STATUS_VAR(i_gain);
 static STATUS_T *STATUS_VAR(d_gain);
@@ -606,20 +517,12 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_motor_value[0], lg_motor_value[1], lg_motor_value[2], lg_motor_value[3]);
 	} else if (status == STATUS_VAR(light_strength)) {
 		snprintf(buff, buff_len, "%f", lg_light_strength);
-	} else if (status == STATUS_VAR(brake_ps)) {
-		snprintf(buff, buff_len, "%f", lg_brake_ps);
 	} else if (status == STATUS_VAR(thrust)) {
 		snprintf(buff, buff_len, "%f", lg_thrust);
-	} else if (status == STATUS_VAR(target_quaternion)) {
-		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_target_quaternion.x, lg_target_quaternion.y, lg_target_quaternion.z, lg_target_quaternion.w);
 	} else if (status == STATUS_VAR(lowlevel_control)) {
 		snprintf(buff, buff_len, "%d", lg_lowlevel_control ? 1 : 0);
 	} else if (status == STATUS_VAR(pid_enabled)) {
 		snprintf(buff, buff_len, "%d", lg_pid_enabled ? 1 : 0);
-	} else if (status == STATUS_VAR(yaw_diff)) {
-		snprintf(buff, buff_len, "%f", lg_yaw_diff);
-	} else if (status == STATUS_VAR(pitch_diff)) {
-		snprintf(buff, buff_len, "%f", lg_pitch_diff);
 	} else if (status == STATUS_VAR(p_gain)) {
 		snprintf(buff, buff_len, "%f", lg_p_gain);
 	} else if (status == STATUS_VAR(i_gain)) {
@@ -651,13 +554,9 @@ static void init_status() {
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_value);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", motor_value);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_strength);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", brake_ps);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", thrust);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", target_quaternion);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", lowlevel_control);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_enabled);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", yaw_diff);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pitch_diff);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", p_gain);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", i_gain);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", d_gain);
