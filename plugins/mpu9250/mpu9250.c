@@ -45,6 +45,9 @@ static float lg_offset_roll = 0;
 
 static float normalize_angle(float v) {
 	v -= floor(v / 360) * 360;
+	if (v < -180.0) {
+		v += 360.0;
+	}
 	if (v > 180.0) {
 		v -= 360.0;
 	}
@@ -65,15 +68,28 @@ static void *threadFunc(void *data) {
 	int count = 0;
 	do {
 		count++;
-		ms_update();
 
 		VECTOR4D_T quat = { };
 		VECTOR4D_T com = { };
-		{ //com : convert from mpu coodinate to opengl coodinate
-			com.ary[0] = compass[1];	//opengl x direction raw data 53, 573, 74 : -6, 81, 155
-			com.ary[1] = -compass[0];	//opengl y direction raw data -221, 194, 66 : 260, 356, 113
-			com.ary[2] = -compass[2];	//opengl z direction raw data 10, 308, -113 : 29, 342, 385
-			com.ary[3] = 1.0;			//w
+		const int average_count = 5;
+		for (int i = 0; i < average_count; i++) {
+			ms_update();
+			{ //com : convert from mpu coodinate to opengl coodinate
+				com.ary[0] += compass[1];	//opengl x direction raw data 53, 573, 74 : -6, 81, 155
+				com.ary[1] += -compass[0];	//opengl y direction raw data -221, 194, 66 : 260, 356, 113
+				com.ary[2] += -compass[2];	//opengl z direction raw data 10, 308, -113 : 29, 342, 385
+				com.ary[3] += 1.0;			//w
+			}
+			{ //quat : convert from mpu coodinate to opengl coodinate
+				quat.ary[0] += quaternion[1];	//x
+				quat.ary[1] += quaternion[3];	//y : swap y and z
+				quat.ary[2] += -quaternion[2];	//z : swap y and z
+				quat.ary[3] += quaternion[0];	//w
+			}
+		}
+		for (int i = 0; i < 4; i++) {
+			com.ary[i] /= average_count;
+			quat.ary[i] /= average_count;
 		}
 		{ //compas : calibration
 			float calib[3];
@@ -101,12 +117,6 @@ static void *threadFunc(void *data) {
 				printf("compass0 %f : %.0f, %.0f, %.0f : %.0f, %.0f, %.0f : %.3f, %.3f, %.3f\n", lg_north, compass[0], compass[1], compass[2], com.ary[0], com.ary[1], com.ary[2], calib[0], calib[1],
 						calib[2]);
 			}
-		}
-		{ //quat : convert from mpu coodinate to opengl coodinate
-			quat.ary[0] = quaternion[1];	//x
-			quat.ary[1] = quaternion[3];	//y : swap y and z
-			quat.ary[2] = -quaternion[2];	//z : swap y and z
-			quat.ary[3] = quaternion[0];	//w
 		}
 		{ //north
 			float y_rot = 0;
@@ -150,8 +160,8 @@ static void *threadFunc(void *data) {
 			lg_north_delta = normalize_angle(lg_north_delta + normalize_angle(north_delta - lg_north_delta) / (lg_north_count + 1));
 			lg_north = normalize_angle(lg_north + normalize_angle(north - lg_north) / (lg_north_count + 1));
 			lg_north_count++;
-			if (lg_north_count > 100) {
-				lg_north_count = 100;
+			if (lg_north_count > 10) {
+				lg_north_count = 10;
 			}
 
 			if (lg_debugdump_compass1 && (count % dumpcount) == 0) {
