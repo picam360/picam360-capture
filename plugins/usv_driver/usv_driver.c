@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <float.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -50,16 +51,17 @@ static float lg_motor_dir[4] = { 1, 1, 1, 1 };
 static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_rudder = 0; //-100 to 100
+static float lg_target_heading = 0; //-180 to 180
 static float lg_max_rpm = 6;
 static int lg_thruster_mode = 0; //0:single, 1:double, 2:quad
 
+#define PID_NUM 2
 static bool lg_lowlevel_control = false;
 static bool lg_pid_enabled = true;
-static float lg_p_gain = 1.0;
-static float lg_i_gain = 1.0;
-static float lg_d_gain = 1.0;
-static float lg_pid_value[1] = { }; //delta yaw
-static float lg_delta_pid_target[3][2] = { }; //[history][delta yaw, t]
+static bool lg_heading_lock = true;
+static float lg_pid_gain[PID_NUM][3] = { { 1.0, 0.0, 0.0 }, { 1.0, 0.0, 0.0 } };
+static float lg_pid_value[PID_NUM] = { }; //[rpm, heading]
+static float lg_delta_pid_target[3][PID_NUM + 1] = { }; //[history][rpm, heading, t]
 
 static void release(void *user_data) {
 	free(user_data);
@@ -121,6 +123,9 @@ static void update_pwm() {
 static float sub_angle(float a, float b) {
 	float v = a - b;
 	v -= floor(v / 360) * 360;
+	if (v < -180.0) {
+		v += 360.0;
+	}
 	if (v > 180.0) {
 		v -= 360.0;
 	}
@@ -149,43 +154,54 @@ void *pid_control_double(float t_s, float north) {
 	diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
 	last_t_s = t_s;
 
-	static float last_north = 0;
-	float rpm = sub_angle(last_north, north) / 360 / diff_sec * 60;
+	static float last_heading = FLT_MIN;
+	float heading = -north; //clockwise
+	if (last_heading == FLT_MIN) {
+		last_heading = heading;
+		return NULL;
+	}
+	float rpm = sub_angle(heading, last_heading) / 360 / diff_sec * 60;
 	float target_rpm = lg_rudder * lg_max_rpm / 100;
 	lg_delta_pid_target[0][0] = rpm - target_rpm;
-	lg_delta_pid_target[0][1] = t_s;
-	last_north = north;
+	lg_delta_pid_target[0][1] = heading - lg_target_heading;
+	lg_delta_pid_target[0][PID_NUM] = t_s;
+	last_heading = heading;
 
-	if (lg_delta_pid_target[2][1] == 0) { //skip
+	if (lg_delta_pid_target[2][PID_NUM] == 0) { //skip
 		//increment
 		for (int j = 3 - 1; j >= 1; j--) {
-			for (int k = 0; k < 2; k++) {
+			for (int k = 0; k < PID_NUM + 1; k++) {
 				lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
 			}
 		}
 		return NULL;
 	}
 
-	for (int k = 0; k < 1; k++) {
-		float p_value = lg_p_gain * lg_delta_pid_target[0][k];
-		float d_value = lg_d_gain * (lg_delta_pid_target[0][k] - lg_delta_pid_target[1][k]) / diff_sec;
+	for (int k = 0; k < PID_NUM; k++) {
+		float p_value = lg_pid_gain[k][0] * lg_delta_pid_target[0][k];
+		float d_value = lg_pid_gain[k][2] * (lg_delta_pid_target[0][k] - lg_delta_pid_target[1][k]) / diff_sec;
 		float delta_value = p_value + d_value;
 		lg_pid_value[k] = delta_value;
-		lg_pid_value[k] = MIN(MAX(lg_pid_value[k], -200), 200);
 	}
-
 	//increment
 	for (int j = 3 - 1; j >= 1; j--) {
-		for (int k = 0; k < 2; k++) {
+		for (int k = 0; k < PID_NUM + 1; k++) {
 			lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
 		}
 	}
-
-	if (lg_debugdump) {
-		printf("vehicle : %f, %f, %f\n", rpm, target_rpm, lg_pid_value[0]);
+	{		//limit
+		lg_pid_value[0] = MIN(MAX(lg_pid_value[0], -200), 200);		//rpm to thruster differencial
+		lg_pid_value[1] = MIN(MAX(lg_pid_value[1], -100), 100);		//heading to rudder
 	}
 
-	{//aply
+	if (lg_debugdump) {
+		printf("vehicle t=%.3fs: rpm=%.3f, %.3f, %.3f : heading=%.3f, %.3f, %.3f\n", diff_sec, rpm, target_rpm, lg_pid_value[0], heading, lg_target_heading, lg_pid_value[1]);
+	}
+
+	{		//aply
+		if (lg_heading_lock) {
+			lg_rudder = -lg_pid_value[1];		//reverse
+		}
 		lg_motor_value[0] = lg_thrust + lg_pid_value[0] / 2;
 		lg_motor_value[1] = lg_thrust - lg_pid_value[0] / 2;
 		return NULL;
@@ -277,19 +293,31 @@ static int command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float v1, v2, v3;
-			int num = sscanf(param, "%f,%f,%f", &v1, &v2, &v3);
+			float v1, v2;
+			int num = sscanf(param, "%f,%f,%f", &v1, &v2);
 
 			if (num >= 1) {
 				lg_thrust = v1;
 			}
 			if (num >= 2) {
-				lg_rudder = v2;
-			}
-			if (num >= 3) {
-				lg_thruster_mode = (int) v3;
+				if (lg_heading_lock) {
+					lg_target_heading = v2;
+				} else {
+					lg_rudder = v2;
+				}
 			}
 			printf("set_thrust : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_thruster_mode", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float v;
+			int num = sscanf(param, "%f", &v);
+
+			if (num >= 1) {
+				lg_thruster_mode = (int) v;
+			}
+			printf("set_thruster_mode : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -325,44 +353,15 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			printf("set_pid_enabled : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_p_gain", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_heading_lock", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
 			sscanf(param, "%f", &value);
 
-			lg_p_gain = value;
-			lg_thrust = 0;
-			memset(lg_pid_value, 0, sizeof(lg_pid_value));
-			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
+			lg_heading_lock = (value != 0);
 
-			printf("set_p_gain : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_i_gain", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			float value;
-			sscanf(param, "%f", &value);
-
-			lg_i_gain = value;
-			lg_thrust = 0;
-			memset(lg_pid_value, 0, sizeof(lg_pid_value));
-			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
-
-			printf("set_i_gain : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_d_gain", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			float value;
-			sscanf(param, "%f", &value);
-
-			lg_d_gain = value;
-			lg_thrust = 0;
-			memset(lg_pid_value, 0, sizeof(lg_pid_value));
-			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
-
-			printf("set_d_gain : completed\n");
+			printf("set_heading_lock : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -407,9 +406,21 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 }
 
 static void init_options(void *user_data, json_t *options) {
-	lg_p_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".p_gain"));
-	lg_i_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".i_gain"));
-	lg_d_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".d_gain"));
+	{ //pid_gain
+		json_t *ary1 = json_object_get(options, PLUGIN_NAME ".pid_gain");
+		if (json_is_array(ary1)) {
+			int size1 = json_array_size(ary1);
+			for (int i1 = 0; i1 < MIN(size1, PID_NUM); i1++) {
+				json_t *ary2 = json_array_get(ary1, i1);
+				if (json_is_array(ary2)) {
+					int size2 = json_array_size(ary2);
+					for (int i2 = 0; i2 < MIN(size2, 3); i2++) {
+						lg_pid_gain[i1][i2] = json_number_value(json_array_get(ary2, i2));
+					}
+				}
+			}
+		}
+	}
 
 	for (int i = 0; i < LIGHT_NUM; i++) {
 		char buff[256];
@@ -455,9 +466,17 @@ static void init_options(void *user_data, json_t *options) {
 }
 
 static void save_options(void *user_data, json_t *options) {
-	json_object_set_new(options, PLUGIN_NAME ".p_gain", json_real(lg_p_gain));
-	json_object_set_new(options, PLUGIN_NAME ".i_gain", json_real(lg_i_gain));
-	json_object_set_new(options, PLUGIN_NAME ".d_gain", json_real(lg_d_gain));
+	{ //pid_gain
+		json_t *ary1 = json_array();
+		for (int i1 = 0; i1 < PID_NUM; i1++) {
+			json_t *ary2 = json_array();
+			for (int i2 = 0; i2 < 3; i2++) {
+				json_array_append_new(ary2, json_real(lg_pid_gain[i1][i2]));
+			}
+			json_array_append_new(ary1, ary2);
+		}
+		json_object_set_new(options, PLUGIN_NAME ".pid_gain", ary1);
+	}
 
 	for (int i = 0; i < LIGHT_NUM; i++) {
 		char buff[256];
@@ -500,9 +519,6 @@ static STATUS_T *STATUS_VAR(light_strength);
 static STATUS_T *STATUS_VAR(thrust);
 static STATUS_T *STATUS_VAR(lowlevel_control);
 static STATUS_T *STATUS_VAR(pid_enabled);
-static STATUS_T *STATUS_VAR(p_gain);
-static STATUS_T *STATUS_VAR(i_gain);
-static STATUS_T *STATUS_VAR(d_gain);
 static STATUS_T *STATUS_VAR(pid_value);
 static STATUS_T *STATUS_VAR(delta_pid_target);
 
@@ -523,12 +539,6 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 		snprintf(buff, buff_len, "%d", lg_lowlevel_control ? 1 : 0);
 	} else if (status == STATUS_VAR(pid_enabled)) {
 		snprintf(buff, buff_len, "%d", lg_pid_enabled ? 1 : 0);
-	} else if (status == STATUS_VAR(p_gain)) {
-		snprintf(buff, buff_len, "%f", lg_p_gain);
-	} else if (status == STATUS_VAR(i_gain)) {
-		snprintf(buff, buff_len, "%f", lg_i_gain);
-	} else if (status == STATUS_VAR(d_gain)) {
-		snprintf(buff, buff_len, "%f", lg_d_gain);
 	} else if (status == STATUS_VAR(pid_value)) {
 		snprintf(buff, buff_len, "%f,%f,%f", lg_pid_value[0], lg_pid_value[1], lg_pid_value[2]);
 	} else if (status == STATUS_VAR(delta_pid_target)) {
@@ -537,7 +547,7 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 }
 
 static void status_set_value(void *user_data, const char *value) {
-	//STATUS_T *status = (STATUS_T*) user_data;
+//STATUS_T *status = (STATUS_T*) user_data;
 }
 
 static STATUS_T *new_status(const char *name) {
@@ -557,9 +567,6 @@ static void init_status() {
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", thrust);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", lowlevel_control);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_enabled);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", p_gain);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", i_gain);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", d_gain);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_value);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", delta_pid_target);
 }
