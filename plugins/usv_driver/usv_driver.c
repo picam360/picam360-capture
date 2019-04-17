@@ -151,7 +151,9 @@ void *pid_control_double(float t_s, float north) {
 		return NULL;
 	}
 	float diff_sec = t_s - last_t_s;
-	diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
+	if (diff_sec < 0.01) {
+		return NULL;
+	}
 	last_t_s = t_s;
 
 	static float last_heading = FLT_MIN;
@@ -191,7 +193,7 @@ void *pid_control_double(float t_s, float north) {
 	}
 	{		//limit
 		lg_pid_value[0] = MIN(MAX(lg_pid_value[0], -200), 200);		//rpm to thruster differencial
-		lg_pid_value[1] = MIN(MAX(lg_pid_value[1], -100), 100);		//heading to rudder
+		lg_pid_value[1] = MIN(MAX(lg_pid_value[1], -200), 200);		//heading to thruster differencial
 	}
 
 	if (lg_debugdump) {
@@ -200,10 +202,14 @@ void *pid_control_double(float t_s, float north) {
 
 	{		//aply
 		if (lg_heading_lock) {
-			lg_rudder = -lg_pid_value[1];		//reverse
+			float value = lg_pid_value[1];
+			lg_motor_value[0] = lg_thrust + value / 2;
+			lg_motor_value[1] = lg_thrust - value / 2;
+		} else {
+			float value = lg_pid_value[0];
+			lg_motor_value[0] = lg_thrust + value / 2;
+			lg_motor_value[1] = lg_thrust - value / 2;
 		}
-		lg_motor_value[0] = lg_thrust + lg_pid_value[0] / 2;
-		lg_motor_value[1] = lg_thrust - lg_pid_value[0] / 2;
 		return NULL;
 	}
 }

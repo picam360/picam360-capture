@@ -71,7 +71,7 @@ static void *threadFunc(void *data) {
 
 		VECTOR4D_T quat = { };
 		VECTOR4D_T com = { };
-		const int average_count = 5;
+		const int average_count = 3;
 		for (int i = 0; i < average_count; i++) {
 			ms_update();
 			{ //com : convert from mpu coodinate to opengl coodinate
@@ -160,8 +160,8 @@ static void *threadFunc(void *data) {
 			lg_north_delta = normalize_angle(lg_north_delta + normalize_angle(north_delta - lg_north_delta) / (lg_north_count + 1));
 			lg_north = normalize_angle(lg_north + normalize_angle(north - lg_north) / (lg_north_count + 1));
 			lg_north_count++;
-			if (lg_north_count > 10) {
-				lg_north_count = 10;
+			if (lg_north_count > 5) {
+				lg_north_count = 5;
 			}
 
 			if (lg_debugdump_compass1 && (count % dumpcount) == 0) {
