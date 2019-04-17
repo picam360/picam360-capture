@@ -177,8 +177,8 @@ void *pid_control_double(float t_s, float north) {
 	float target_rpm = lg_rudder * lg_max_rpm / 100;
 	lg_delta_pid_target[0][0] = rpm_lpf1 - target_rpm;
 	lg_delta_pid_target[0][1] = rpm_lpf2 - target_rpm;
-	lg_delta_pid_target[0][2] = heading_lpf1 - lg_target_heading;
-	lg_delta_pid_target[0][3] = heading_lpf2 - lg_target_heading;
+	lg_delta_pid_target[0][2] = normalize_angle(heading_lpf1 - lg_target_heading);
+	lg_delta_pid_target[0][3] = normalize_angle(heading_lpf2 - lg_target_heading);
 	lg_delta_pid_target[0][PID_NUM * 2] = t_s;
 	last_heading_lpf1 = heading_lpf1;
 	last_heading_lpf2 = heading_lpf2;
@@ -193,9 +193,14 @@ void *pid_control_double(float t_s, float north) {
 		return NULL;
 	}
 
+	bool is_angle[PID_NUM] = { false, true };
 	for (int k = 0; k < PID_NUM; k++) {
 		float p_value = lg_pid_gain[k][0] * lg_delta_pid_target[0][k * 2];
-		float d_value = lg_pid_gain[k][2] * (lg_delta_pid_target[0][k * 2 + 1] - lg_delta_pid_target[1][k * 2 + 1]) / diff_sec;
+		float diff = (lg_delta_pid_target[0][k * 2 + 1] - lg_delta_pid_target[1][k * 2 + 1]);
+		if (is_angle[k]) {
+			diff = normalize_angle(diff);
+		}
+		float d_value = lg_pid_gain[k][2] * diff / diff_sec;
 		float delta_value = p_value + d_value;
 		lg_pid_value[k] = delta_value;
 	}
@@ -215,15 +220,10 @@ void *pid_control_double(float t_s, float north) {
 	}
 
 	{		//aply
-		if (lg_heading_lock) {
-			float value = lg_pid_value[1];
-			lg_motor_value[0] = lg_thrust + value / 2;
-			lg_motor_value[1] = lg_thrust - value / 2;
-		} else {
-			float value = lg_pid_value[0];
-			lg_motor_value[0] = lg_thrust + value / 2;
-			lg_motor_value[1] = lg_thrust - value / 2;
-		}
+		float lpf_gain = 0.5;
+		float value = (lg_heading_lock ? lg_pid_value[1] : lg_pid_value[0]);
+		lg_motor_value[0] = lg_motor_value[0] * (1 - lpf_gain) + (lg_thrust + value / 2) * lpf_gain;
+		lg_motor_value[1] = lg_motor_value[1] * (1 - lpf_gain) + (lg_thrust - value / 2) * lpf_gain;
 		return NULL;
 	}
 }
@@ -254,9 +254,8 @@ void *pid_thread_func(void* arg) {
 
 		//trancate min max
 		lg_thrust = MIN(MAX(lg_thrust, -100), 100);
-
-		//trancate min max
 		lg_rudder = MIN(MAX(lg_rudder, -100), 100);
+		lg_target_heading = normalize_angle(lg_target_heading);
 
 		switch (lg_thruster_mode) {
 		case 0:
@@ -313,20 +312,21 @@ static int command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float v1, v2;
-			int num = sscanf(param, "%f,%f,%f", &v1, &v2);
+			float v1, v2, v3;
+			int num = sscanf(param, "%f,%f,%f", &v1, &v2, &v3);
 
 			if (num >= 1) {
 				lg_thrust = v1;
 			}
-			if (num >= 2) {
-				if (lg_heading_lock) {
-					lg_target_heading = v2;
-				} else {
-					lg_rudder = v2;
-				}
+			if (num >= 2 && !lg_heading_lock) {
+				lg_rudder = v2;
 			}
-			printf("set_thrust : completed\n");
+			if (num >= 3) {
+				lg_target_heading = v3;
+			}
+			if (lg_debugdump) {
+				printf("%s : completed\n", buff);
+			}
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_thruster_mode", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
