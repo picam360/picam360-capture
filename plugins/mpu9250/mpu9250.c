@@ -37,7 +37,6 @@ static VECTOR4D_T lg_compass = { };
 static VECTOR4D_T lg_quat = { };
 static float lg_north = 0;
 static float lg_north_delta = 0;
-static int lg_north_count = 0;
 
 static float lg_offset_pitch = 0;
 static float lg_offset_yaw = 0;
@@ -54,6 +53,31 @@ static float normalize_angle(float v) {
 	return v;
 }
 
+float median(int n, float x[]) {
+	float temp;
+	int i, j;
+	// the following two loops sort the array x in ascending order
+	for (i = 0; i < n - 1; i++) {
+		for (j = i + 1; j < n; j++) {
+			if (x[j] < x[i]) {
+				// swap elements
+				temp = x[i];
+				x[i] = x[j];
+				x[j] = temp;
+			}
+		}
+	}
+
+	if (n % 2 == 0) {
+		// if there is an even number of elements, return mean of the two elements in the middle
+		return ((x[n / 2] + x[n / 2 - 1]) / 2.0);
+	} else {
+		// else return the element in the middle
+		return x[n / 2];
+	}
+}
+
+#define MEDIAN_COUNT 3
 static bool lg_debugdump_compass0 = false;
 static bool lg_debugdump_compass1 = false;
 static bool lg_debugdump_compass2 = false;
@@ -69,27 +93,28 @@ static void *threadFunc(void *data) {
 	do {
 		count++;
 
+		float quat_med[4][MEDIAN_COUNT] = { };
+		float com_med[4][MEDIAN_COUNT] = { };
 		VECTOR4D_T quat = { };
 		VECTOR4D_T com = { };
-		const int average_count = 3;
-		for (int i = 0; i < average_count; i++) {
+		for (int i = 0; i < MEDIAN_COUNT; i++) {
 			ms_update();
 			{ //com : convert from mpu coodinate to opengl coodinate
-				com.ary[0] += compass[1];	//opengl x direction raw data 53, 573, 74 : -6, 81, 155
-				com.ary[1] += -compass[0];	//opengl y direction raw data -221, 194, 66 : 260, 356, 113
-				com.ary[2] += -compass[2];	//opengl z direction raw data 10, 308, -113 : 29, 342, 385
-				com.ary[3] += 1.0;			//w
+				com_med[0][i] = compass[1];	//opengl x direction raw data 53, 573, 74 : -6, 81, 155
+				com_med[1][i] = -compass[0];	//opengl y direction raw data -221, 194, 66 : 260, 356, 113
+				com_med[2][i] = -compass[2];	//opengl z direction raw data 10, 308, -113 : 29, 342, 385
+				com_med[3][i] = 1.0;			//w
 			}
 			{ //quat : convert from mpu coodinate to opengl coodinate
-				quat.ary[0] += quaternion[1];	//x
-				quat.ary[1] += quaternion[3];	//y : swap y and z
-				quat.ary[2] += -quaternion[2];	//z : swap y and z
-				quat.ary[3] += quaternion[0];	//w
+				quat_med[0][i] = quaternion[1];	//x
+				quat_med[1][i] = quaternion[3];	//y : swap y and z
+				quat_med[2][i] = -quaternion[2];	//z : swap y and z
+				quat_med[3][i] = quaternion[0];	//w
 			}
 		}
 		for (int i = 0; i < 4; i++) {
-			com.ary[i] /= average_count;
-			quat.ary[i] /= average_count;
+			com.ary[i] = median(MEDIAN_COUNT, com_med[i]);
+			quat.ary[i] = median(MEDIAN_COUNT, quat_med[i]);
 		}
 		{ //compas : calibration
 			float calib[3];
@@ -157,12 +182,8 @@ static void *threadFunc(void *data) {
 
 			north_delta = north - y_rot; //north , y : counterclockwise
 
-			lg_north_delta = normalize_angle(lg_north_delta + normalize_angle(north_delta - lg_north_delta) / (lg_north_count + 1));
-			lg_north = normalize_angle(lg_north + normalize_angle(north - lg_north) / (lg_north_count + 1));
-			lg_north_count++;
-			if (lg_north_count > 5) {
-				lg_north_count = 5;
-			}
+			lg_north_delta = north_delta;
+			lg_north = north;
 
 			if (lg_debugdump_compass1 && (count % dumpcount) == 0) {
 				printf("compass1 %.3f, %.3f : %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f : %.3f, %.3f, %.3f\n", lg_north, north, lg_north_delta, north_delta, x * 180 / M_PI,

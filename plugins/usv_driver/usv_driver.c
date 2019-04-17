@@ -61,7 +61,7 @@ static bool lg_pid_enabled = true;
 static bool lg_heading_lock = true;
 static float lg_pid_gain[PID_NUM][3] = { { 1.0, 0.0, 0.0 }, { 1.0, 0.0, 0.0 } };
 static float lg_pid_value[PID_NUM] = { }; //[rpm, heading]
-static float lg_delta_pid_target[3][PID_NUM + 1] = { }; //[history][rpm, heading, t]
+static float lg_delta_pid_target[3][PID_NUM * 2 + 1] = { }; //[history][rpm, rpm_lpf, heading, heading_lpf t]
 
 static void release(void *user_data) {
 	free(user_data);
@@ -120,8 +120,7 @@ static void update_pwm() {
 	close(fd);
 }
 
-static float sub_angle(float a, float b) {
-	float v = a - b;
+static float normalize_angle(float v) {
 	v -= floor(v / 360) * 360;
 	if (v < -180.0) {
 		v += 360.0;
@@ -156,23 +155,38 @@ void *pid_control_double(float t_s, float north) {
 	}
 	last_t_s = t_s;
 
-	static float last_heading = FLT_MIN;
+	static float lpf_gain1 = 0.8;
+	static float lpf_gain2 = 0.2;
+	static float heading_lpf1 = FLT_MIN;
+	static float last_heading_lpf1 = FLT_MIN;
+	static float heading_lpf2 = FLT_MIN;
+	static float last_heading_lpf2 = FLT_MIN;
 	float heading = -north; //clockwise
-	if (last_heading == FLT_MIN) {
-		last_heading = heading;
+	if (heading_lpf1 == FLT_MIN) {
+		heading_lpf1 = heading;
+		last_heading_lpf1 = heading;
+		heading_lpf2 = heading;
+		last_heading_lpf2 = heading;
 		return NULL;
 	}
-	float rpm = sub_angle(heading, last_heading) / 360 / diff_sec * 60;
-	float target_rpm = lg_rudder * lg_max_rpm / 100;
-	lg_delta_pid_target[0][0] = rpm - target_rpm;
-	lg_delta_pid_target[0][1] = heading - lg_target_heading;
-	lg_delta_pid_target[0][PID_NUM] = t_s;
-	last_heading = heading;
+	heading_lpf1 = normalize_angle(heading_lpf1 + normalize_angle(heading - heading_lpf1) * lpf_gain1);
+	heading_lpf2 = normalize_angle(heading_lpf2 + normalize_angle(heading - heading_lpf2) * lpf_gain2);
 
-	if (lg_delta_pid_target[2][PID_NUM] == 0) { //skip
+	float rpm_lpf1 = normalize_angle(heading_lpf1 - last_heading_lpf1) / 360 / diff_sec * 60;
+	float rpm_lpf2 = normalize_angle(heading_lpf2 - last_heading_lpf2) / 360 / diff_sec * 60;
+	float target_rpm = lg_rudder * lg_max_rpm / 100;
+	lg_delta_pid_target[0][0] = rpm_lpf1 - target_rpm;
+	lg_delta_pid_target[0][1] = rpm_lpf2 - target_rpm;
+	lg_delta_pid_target[0][2] = heading_lpf1 - lg_target_heading;
+	lg_delta_pid_target[0][3] = heading_lpf2 - lg_target_heading;
+	lg_delta_pid_target[0][PID_NUM * 2] = t_s;
+	last_heading_lpf1 = heading_lpf1;
+	last_heading_lpf2 = heading_lpf2;
+
+	if (lg_delta_pid_target[2][PID_NUM * 2] == 0) { //skip
 		//increment
 		for (int j = 3 - 1; j >= 1; j--) {
-			for (int k = 0; k < PID_NUM + 1; k++) {
+			for (int k = 0; k < PID_NUM * 2 + 1; k++) {
 				lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
 			}
 		}
@@ -180,14 +194,14 @@ void *pid_control_double(float t_s, float north) {
 	}
 
 	for (int k = 0; k < PID_NUM; k++) {
-		float p_value = lg_pid_gain[k][0] * lg_delta_pid_target[0][k];
-		float d_value = lg_pid_gain[k][2] * (lg_delta_pid_target[0][k] - lg_delta_pid_target[1][k]) / diff_sec;
+		float p_value = lg_pid_gain[k][0] * lg_delta_pid_target[0][k * 2];
+		float d_value = lg_pid_gain[k][2] * (lg_delta_pid_target[0][k * 2 + 1] - lg_delta_pid_target[1][k * 2 + 1]) / diff_sec;
 		float delta_value = p_value + d_value;
 		lg_pid_value[k] = delta_value;
 	}
 	//increment
 	for (int j = 3 - 1; j >= 1; j--) {
-		for (int k = 0; k < PID_NUM + 1; k++) {
+		for (int k = 0; k < PID_NUM * 2 + 1; k++) {
 			lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
 		}
 	}
@@ -197,7 +211,7 @@ void *pid_control_double(float t_s, float north) {
 	}
 
 	if (lg_debugdump) {
-		printf("vehicle t=%.3fs: rpm=%.3f, %.3f, %.3f : heading=%.3f, %.3f, %.3f\n", diff_sec, rpm, target_rpm, lg_pid_value[0], heading, lg_target_heading, lg_pid_value[1]);
+		printf("vehicle t=%.3fs: rpm=%.3f, %.3f, %.3f : heading=%.3f, %.3f, %.3f\n", diff_sec, rpm_lpf1, target_rpm, lg_pid_value[0], heading_lpf1, lg_target_heading, lg_pid_value[1]);
 	}
 
 	{		//aply
