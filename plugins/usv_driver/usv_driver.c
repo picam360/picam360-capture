@@ -581,14 +581,14 @@ static STATUS_T *new_status(const char *name) {
 }
 
 static void init_status() {
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_value);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", motor_value);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_strength);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", thrust);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", lowlevel_control);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_enabled);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_value);
-	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", delta_pid_target);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_value);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", motor_value);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_strength);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", thrust);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", lowlevel_control);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_enabled);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_value);
+//	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", delta_pid_target);
 }
 
 #endif //status block
