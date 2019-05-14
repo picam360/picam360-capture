@@ -36,6 +36,7 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_width = 2048;
 static int lg_height = 1536;
 static int lg_fps = 15;
+static int lg_skip_frame = 0;
 static char lg_devicefiles[CAMERA_NUM][256] = { };
 
 class _PACKET_T {
@@ -265,8 +266,7 @@ static int v4l2_progress_image(const void *p, int size, void *arg) {
 				packet->data[0] = 0xFF;
 				packet->data[1] = 0xD8; //soi marker
 				{ //xmp injection
-					int xmp_len = lg_plugin_host->xmp(packet->data + 2,
-					RTP_MAXPAYLOADSIZE - 2, send_frame_arg->cam_num);
+					int xmp_len = lg_plugin_host->xmp(packet->data + 2, RTP_MAXPAYLOADSIZE - 2, send_frame_arg->cam_num);
 					if (packet->len + xmp_len <= RTP_MAXPAYLOADSIZE) {
 						packet->len += xmp_len;
 					}
@@ -318,6 +318,7 @@ static void start(void *obj, int cam_num, void *display, void *context, void *ca
 	send_frame_arg->cam_width = lg_width;
 	send_frame_arg->cam_height = lg_height;
 	send_frame_arg->cam_fps = lg_fps;
+	send_frame_arg->skip_frame = lg_skip_frame;
 
 	send_frame_arg->cam_run = true;
 
@@ -407,6 +408,30 @@ static void init_options(void *user_data, json_t *options) {
 			add_v4l2_ctl(ctl);
 		}
 	}
+	{
+		json_t *value = json_object_get(options, PLUGIN_NAME ".width");
+		if (value) {
+			lg_width = json_number_value(value);
+		}
+	}
+	{
+		json_t *value = json_object_get(options, PLUGIN_NAME "height");
+		if (value) {
+			lg_height = json_number_value(value);
+		}
+	}
+	{
+		json_t *value = json_object_get(options, PLUGIN_NAME ".fps");
+		if (value) {
+			lg_fps = json_number_value(value);
+		}
+	}
+	{
+		json_t *value = json_object_get(options, PLUGIN_NAME ".skip_frame");
+		if (value) {
+			lg_skip_frame = json_number_value(value);
+		}
+	}
 	for (int i = 0; i < CAMERA_NUM; i++) {
 		char buff[256];
 		sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
@@ -427,6 +452,14 @@ static void save_options(void *user_data, json_t *options) {
 			sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
 			json_object_set_new(options, buff, json_string(lg_devicefiles[i]));
 		}
+	}
+	{
+		json_object_set_new(options, PLUGIN_NAME ".width", json_real(lg_width));
+		json_object_set_new(options, PLUGIN_NAME ".height", json_real(lg_height));
+		json_object_set_new(options, PLUGIN_NAME ".fps", json_real(lg_fps));
+	}
+	if (lg_skip_frame) {
+		json_object_set_new(options, PLUGIN_NAME ".skip_frame", json_real(lg_skip_frame));
 	}
 	if (lg_v4l2_ctls) {
 		json_t *v4l2_ctls = json_object();
