@@ -57,7 +57,7 @@ static int lg_thruster_mode = 0; //0:single, 1:double, 2:quad
 
 #define PID_NUM 2
 static bool lg_lowlevel_control = false;
-static bool lg_pid_enabled = true;
+static bool lg_pid_enabled = false;
 static bool lg_heading_lock = true;
 static float lg_pid_gain[PID_NUM][3] = { { 1.0, 0.0, 0.0 }, { 1.0, 0.0, 0.0 } };
 static float lg_pid_value[PID_NUM] = { }; //[rpm, heading]
@@ -312,8 +312,8 @@ static int command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float v1, v2, v3;
-			int num = sscanf(param, "%f,%f,%f", &v1, &v2, &v3);
+			float v1, v2, v3,v4;
+			int num = sscanf(param, "%f,%f,%f,%f", &v1, &v2, &v3, &v4);
 
 			if (num >= 1) {
 				lg_thrust = v1;
@@ -323,6 +323,9 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			if (num >= 3) {
 				lg_target_heading = v3;
+			}
+			if (num >= 4) {
+				lg_pid_enabled = (v4 != 0);
 			}
 			if (lg_debugdump) {
 				printf("%s : completed\n", buff);
