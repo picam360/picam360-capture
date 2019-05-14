@@ -75,19 +75,19 @@ static void update_pwm() {
 		return;
 	}
 
-	{
-		float value = lg_light_value[0];
-		value = pow(value / 100, 3);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], value);
-		write(fd, cmd, len);
-	}
-
-	{
-		float value = lg_light_value[1];
-		value = pow(value / 100, 3);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], value);
-		write(fd, cmd, len);
-	}
+//	{
+//		float value = lg_light_value[0];
+//		value = pow(value / 100, 3);
+//		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], value);
+//		write(fd, cmd, len);
+//	}
+//
+//	{
+//		float value = lg_light_value[1];
+//		value = pow(value / 100, 3);
+//		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], value);
+//		write(fd, cmd, len);
+//	}
 
 	{
 		float value = lg_motor_value[0];
@@ -368,10 +368,10 @@ static void init_pwm() {
 	if (fd > 0) {
 		char cmd[256];
 		int len;
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
-		write(fd, cmd, len);
+//		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
+//		write(fd, cmd, len);
+//		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
+//		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[0], lg_motor_center);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[1], lg_motor_center);
