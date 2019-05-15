@@ -216,11 +216,16 @@ static void *threadFunc(void *data) {
 			timersub(&time, &lg_base_time, &diff);
 			quat.t = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 		}
+		int cycle_ms = 200;
+		int elapsed_ms = (int) ((quat.t - lg_quat.t) * 1000.0);
+
 		pthread_mutex_lock(&lg_mutex);
 		lg_quat = quat;
 		pthread_mutex_unlock(&lg_mutex);
 
-		usleep(5000);
+		if (elapsed_ms < cycle_ms) {
+			usleep((cycle_ms - elapsed_ms) * 1000);
+		}
 	} while (1);
 	return NULL;
 }

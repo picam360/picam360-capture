@@ -3922,7 +3922,7 @@ int main(int argc, char *argv[]) {
 		if (state->frame_sync) {
 			int res = 0;
 			for (int i = 0; i < state->num_of_cam; i++) {
-				int res = mrevent_wait(&state->arrived_frame_event[i], 1000); //wait 1msec
+				int res = mrevent_wait(&state->arrived_frame_event[i], 10000); //wait 1msec
 				if (res != 0) {
 					break;
 				}

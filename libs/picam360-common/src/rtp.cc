@@ -529,7 +529,7 @@ static void *receive_thread_func(void* arg) {
 	bool xmp = false;
 	RTPPacket *pack = NULL;
 	while (_this->receive_run) {
-		int res = mrevent_wait(&_this->buffering_ready, 1000);
+		int res = mrevent_wait(&_this->buffering_ready, 100000);
 		if (res != 0) {
 			continue;
 		}
@@ -620,7 +620,7 @@ static void *receive_thread_func(void* arg) {
 								} else {
 									mrevent_reset(&_this->play_time_updated);
 								}
-								mrevent_wait(&_this->play_time_updated, 1000);
+								mrevent_wait(&_this->play_time_updated, 100000);
 							}
 							last_timestamp = pack->timestamp;
 						}
@@ -676,7 +676,7 @@ static void *record_thread_func(void* arg) {
 	const uint64_t SYNC_THRESHOLD = 64 * MB; // 64MB
 	RTPPacket *pack;
 	while (_this->record_fd >= 0) {
-		int res = mrevent_wait(&_this->record_packet_ready, 1000);
+		int res = mrevent_wait(&_this->record_packet_ready, 100000);
 		if (res != 0) {
 			continue;
 		}
