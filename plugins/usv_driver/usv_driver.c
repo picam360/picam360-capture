@@ -56,6 +56,7 @@ static float lg_max_rpm = 6;
 static int lg_thruster_mode = 0; //0:single, 1:double, 2:quad
 
 #define PID_NUM 2
+static bool lg_emergency_mode = false;
 static bool lg_lowlevel_control = false;
 static bool lg_pid_enabled = false;
 static bool lg_heading_lock = true;
@@ -224,8 +225,20 @@ void *pid_control_single(float t_s, float north) {
 }
 void *pid_control_double(float t_s, float north) {
 	if (!lg_pid_enabled) {
-		lg_motor_value[0] = lg_thrust + lg_rudder / 2;
-		lg_motor_value[1] = lg_thrust - lg_rudder / 2;
+		float rudder = lg_target_heading / 180;
+		float value_r = lg_thrust + rudder / 2;
+		float value_l = lg_thrust - rudder / 2;
+		if (lg_emergency_mode) {
+			lg_motor_value[0] = 0;
+			lg_motor_value[1] = 0;
+			lg_motor_value[2] = value_r;
+			lg_motor_value[3] = value_l;
+		} else {
+			lg_motor_value[0] = value_r;
+			lg_motor_value[1] = value_l;
+			lg_motor_value[2] = 0;
+			lg_motor_value[3] = 0;
+		}
 		return NULL;
 	}
 
@@ -307,8 +320,19 @@ void *pid_control_double(float t_s, float north) {
 	{		//aply
 		float lpf_gain = 0.5;
 		float value = (lg_heading_lock ? lg_pid_value[1] : lg_pid_value[0]);
-		lg_motor_value[0] = lg_motor_value[0] * (1 - lpf_gain) + (lg_thrust + value / 2) * lpf_gain;
-		lg_motor_value[1] = lg_motor_value[1] * (1 - lpf_gain) + (lg_thrust - value / 2) * lpf_gain;
+		float value_r = lg_motor_value[0] * (1 - lpf_gain) + (lg_thrust + value / 2) * lpf_gain;
+		float value_l = lg_motor_value[1] * (1 - lpf_gain) + (lg_thrust - value / 2) * lpf_gain;
+		if (lg_emergency_mode) {
+			lg_motor_value[0] = 0;
+			lg_motor_value[1] = 0;
+			lg_motor_value[2] = value_r;
+			lg_motor_value[3] = value_l;
+		} else {
+			lg_motor_value[0] = value_r;
+			lg_motor_value[1] = value_l;
+			lg_motor_value[2] = 0;
+			lg_motor_value[3] = 0;
+		}
 		return NULL;
 	}
 }
@@ -446,6 +470,16 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			lg_lowlevel_control = (value != 0);
 			printf("set_lowlevel_control : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_emergency_mode", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value;
+			sscanf(param, "%f", &value);
+
+			lg_emergency_mode = (value != 0);
+
+			printf("set_emergency_mode : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_pid_enabled", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
