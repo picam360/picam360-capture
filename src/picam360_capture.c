@@ -42,7 +42,15 @@
 //json parser
 #include <jansson.h>
 
+#include <opencv2/core/version.hpp>
+#if CV_VERSION_MAJOR >= 3
+#include <opencv2/imgcodecs/imgcodecs_c.h>
+int cvRound(double v) {
+	return round(v);
+}
+#else
 #include <opencv/highgui.h>
+#endif
 
 #ifdef _WIN64
 //define something for Windows (64-bit)
@@ -98,7 +106,6 @@ static PICAM360CAPTURE_T _state, *state = &_state;
 static float lg_cam_fps[MAX_CAM_NUM] = { };
 static float lg_cam_frameskip[MAX_CAM_NUM] = { };
 static float lg_cam_bandwidth = 0;
-
 
 static json_t *json_load_file_without_comment(const char *path, size_t flags, json_error_t *error) {
 	json_t *options;
