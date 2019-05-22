@@ -100,12 +100,15 @@ static void *pout_thread_func(void* arg) {
 					}
 					_this->nal_len += len;
 					//new nal
-					_this->nal_len += i - 4;
 					_this->nal_buff[0] = ((_this->nal_len - 4) >> 24) & 0xff;
 					_this->nal_buff[1] = ((_this->nal_len - 4) >> 16) & 0xff;
 					_this->nal_buff[2] = ((_this->nal_len - 4) >> 8) & 0xff;
 					_this->nal_buff[3] = ((_this->nal_len - 4) >> 0) & 0xff;
-					_this->nal_type = (_this->nal_buff[4] & 0x7e) >> 1;
+					if (_this->super.name[3] == '5') {
+						_this->nal_type = (_this->nal_buff[4] & 0x7e) >> 1;
+					} else {
+						_this->nal_type = (_this->nal_buff[4] & 0x1f);
+					}
 
 					//printf("type=%d : len=%d\n", _this->nal_type, _this->nal_len);
 
@@ -140,7 +143,12 @@ static void *pout_thread_func(void* arg) {
 				_this->in_nal = true;
 				_this->nal_len = data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3];
 				_this->nal_len += 4; //start code
-				_this->nal_type = (data[i + 4] & 0x7e) >> 1;
+				if (_this->super.name[3] == '5') {
+					_this->nal_type = (data[i + 4] & 0x7e) >> 1;
+				} else {
+					_this->nal_type = (data[i + 4] & 0x1f);
+				}
+
 				if (_this->nal_len > 1024 * 1024) {
 					printf("something wrong in h264 stream at %d\n", i);
 					_this->in_nal = false;
