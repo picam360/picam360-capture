@@ -16,6 +16,8 @@
 #include <dlfcn.h>
 #include <errno.h>
 
+#define CONTEXT_SHARING
+
 #ifdef BCM_HOST
 #include "bcm_host.h"
 #endif
@@ -230,15 +232,6 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 //				rendering_attributes);
 //	}
 	assert(state->surface != EGL_NO_SURFACE);
-
-	// connect the context to the surface
-	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
-	assert(EGL_FALSE != result);
-
-	// Enable back face culling.
-	glEnable(GL_CULL_FACE);
-
-	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 #elif TEGRA
 	EGLBoolean result;
 	EGLint num_config;
@@ -281,18 +274,25 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	state->surface = eglCreatePbufferSurface(state->display, state->config,
 			rendering_attributes);
 
+	state->screen_width = 640;
+	state->screen_height = 480;
+#endif
+#ifndef CONTEXT_SHARING
 	// connect the context to the surface
 	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
 	assert(EGL_FALSE != result);
-
-	// Enable back face culling.
-	glEnable(GL_CULL_FACE);
-
-	state->screen_width = 640;
-	state->screen_height = 480;
-
-	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	result = eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	assert(EGL_FALSE != result);
+	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
+	assert(EGL_FALSE != result);
 #endif
+	state->context_tid = pthread_self();
+	state->plugin_host.lock_texture();
+	{
+		// Enable back face culling.
+		glEnable(GL_CULL_FACE);
+	}
+	state->plugin_host.unlock_texture();
 #else
 	glfwSetErrorCallback(glfwErrorCallback);
 	if (glfwInit() == GL_FALSE) {
@@ -491,7 +491,9 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		}
 	}
+}
 
+static void init_agents(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		for (int j = 0; state->capture_factories[j] != NULL; j++) {
 			if (strncmp(state->capture_factories[j]->name, state->capture_name, sizeof(state->capture_name)) == 0) {
@@ -867,37 +869,41 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 		frame->height = render_height;
 	}
 
-	//texture rendering
-	glGenFramebuffers(1, &frame->framebuffer);
+	state->plugin_host.lock_texture();
+	{
+		//texture rendering
+		glGenFramebuffers(1, &frame->framebuffer);
 
-	glGenTextures(1, &frame->texture);
-	glBindTexture(GL_TEXTURE_2D, frame->texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	if ((err = glGetError()) != GL_NO_ERROR) {
+		glGenTextures(1, &frame->texture);
+		glBindTexture(GL_TEXTURE_2D, frame->texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame->width, frame->height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		if ((err = glGetError()) != GL_NO_ERROR) {
 #ifdef USE_GLES
-		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
+			printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 #else
-		printf("glTexImage2D failed. Could not allocate texture buffer.\n %s\n", gluErrorString(err));
+			printf("glTexImage2D failed. Could not allocate texture buffer.\n %s\n", gluErrorString(err));
 #endif
-	}
-	glBindTexture(GL_TEXTURE_2D, 0);
+		}
+		glBindTexture(GL_TEXTURE_2D, 0);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frame->texture, 0);
-	if ((err = glGetError()) != GL_NO_ERROR) {
+		glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frame->texture, 0);
+		if ((err = glGetError()) != GL_NO_ERROR) {
 #ifdef USE_GLES
-		printf("glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
+			printf("glFramebufferTexture2D failed. Could not allocate framebuffer.\n");
 #else
-		printf("glFramebufferTexture2D failed. Could not allocate framebuffer. %s\n", gluErrorString(err));
+			printf("glFramebufferTexture2D failed. Could not allocate framebuffer. %s\n", gluErrorString(err));
 #endif
+		}
+
+		// Set background color and clear buffers
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
-
-	// Set background color and clear buffers
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	state->plugin_host.unlock_texture();
 
 	//buffer memory
 	if (frame->double_size) {
@@ -2049,16 +2055,37 @@ static void decode_video(int cam_num, unsigned char *data, int data_len) {
 static void lock_texture() {
 	pthread_mutex_lock(&state->texture_mutex);
 #ifdef USE_GLES
+#ifdef CONTEXT_SHARING
 	EGLBoolean result;
-	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
+	pthread_t tid = pthread_self();
+	EGLContext context = state->context;
+//	if(state->context_tid != tid) {
+//		EGLint contextAttrs[] =
+//		{
+//			EGL_CONTEXT_CLIENT_VERSION, 2,
+//			EGL_NONE
+//		};
+//
+//		// create a shared context for this thread
+//		state->context_tmp = eglCreateContext(state->display, state->config, state->context, contextAttrs);
+//		context = state->context_tmp;
+//	}
+	result = eglMakeCurrent(state->display, state->surface, state->surface, context);
 	assert(EGL_FALSE != result);
+#endif
 #endif
 }
 static void unlock_texture() {
 #ifdef USE_GLES
+#ifdef CONTEXT_SHARING
 	EGLBoolean result;
+	if(state->context_tmp){
+		eglDestroyContext(state->display, state->context_tmp);
+		state->context_tmp = NULL;
+	}
 	result = eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	assert(EGL_FALSE != result);
+#endif
 #endif
 	pthread_mutex_unlock(&state->texture_mutex);
 }
@@ -2408,7 +2435,7 @@ static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode, cons
 	state->plugin_host.send_command(cmd);
 }
 
-static void init_plugins(PICAM360CAPTURE_T *state) {
+static void init_plugin_host(PICAM360CAPTURE_T *state) {
 	{ //init host
 		state->plugin_host.get_view_quaternion = get_view_quaternion;
 		state->plugin_host.get_view_compass = get_view_compass;
@@ -2465,7 +2492,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 		create_manual_mpu_factory(&mpu_factory);
 		state->plugin_host.add_mpu_factory(mpu_factory);
 	}
-
+}
+static void init_plugins(PICAM360CAPTURE_T *state) {
 	//load plugins
 	json_error_t error;
 	json_t *options = json_load_file_without_comment(state->config_filepath, 0, &error);
@@ -3882,23 +3910,27 @@ int main(int argc, char *argv[]) {
 	printf("Note: ensure you have sufficient gpu_mem configured\n");
 #endif
 
+	init_plugin_host(state);
+
 	// Start OGLES
 	init_ogl(state);
 
-	//menu
-	_init_menu();
+	state->plugin_host.lock_texture();
+	{
+		//menu
+		_init_menu();
+		// Setup the model world
+		init_model_proj(state);
+		//init rtp
+		_init_rtp(state);
+		// initialise the OGLES texture(s)
+		init_textures(state);
+		// init plugin
+		init_plugins(state);
+	}
+	state->plugin_host.unlock_texture();
 
-	// init plugin
-	init_plugins(state);
-
-	// Setup the model world
-	init_model_proj(state);
-
-	//init rtp
-	_init_rtp(state);
-
-	// initialise the OGLES texture(s)
-	init_textures(state);
+	init_agents(state);
 
 	//frame id=0
 	if (frame_param[0]) {

@@ -181,6 +181,8 @@ typedef struct _PICAM360CAPTURE_T {
 	uint32_t cam_height;
 // OpenGL|ES objects
 #ifdef USE_GLES
+	pthread_t context_tid;
+	EGLContext context_tmp;
 	EGLDisplay display;
 	EGLConfig config;
 	EGLSurface surface;
