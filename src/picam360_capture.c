@@ -2057,20 +2057,7 @@ static void lock_texture() {
 #ifdef USE_GLES
 #ifdef CONTEXT_SHARING
 	EGLBoolean result;
-	pthread_t tid = pthread_self();
-	EGLContext context = state->context;
-//	if(state->context_tid != tid) {
-//		EGLint contextAttrs[] =
-//		{
-//			EGL_CONTEXT_CLIENT_VERSION, 2,
-//			EGL_NONE
-//		};
-//
-//		// create a shared context for this thread
-//		state->context_tmp = eglCreateContext(state->display, state->config, state->context, contextAttrs);
-//		context = state->context_tmp;
-//	}
-	result = eglMakeCurrent(state->display, state->surface, state->surface, context);
+	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
 	assert(EGL_FALSE != result);
 #endif
 #endif
@@ -2079,10 +2066,6 @@ static void unlock_texture() {
 #ifdef USE_GLES
 #ifdef CONTEXT_SHARING
 	EGLBoolean result;
-	if(state->context_tmp){
-		eglDestroyContext(state->display, state->context_tmp);
-		state->context_tmp = NULL;
-	}
 	result = eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	assert(EGL_FALSE != result);
 #endif
