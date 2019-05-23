@@ -237,6 +237,8 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	// Enable back face culling.
 	glEnable(GL_CULL_FACE);
+
+	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 #elif TEGRA
 	EGLBoolean result;
 	EGLint num_config;
@@ -253,8 +255,6 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 		EGL_CONTEXT_CLIENT_VERSION, 2, //
 		EGL_NONE};
 
-	EGLConfig config;
-
 	// get an EGL display connection
 	state->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	assert(state->display != EGL_NO_DISPLAY);
@@ -264,7 +264,7 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	assert(EGL_FALSE != result);
 
 	// get an appropriate EGL frame buffer configuration
-	result = eglChooseConfig(state->display, attribute_list, &config, 1, &num_config);
+	result = eglChooseConfig(state->display, attribute_list, &state->config, 1, &num_config);
 	assert(EGL_FALSE != result);
 
 	//Bind to the right EGL API.
@@ -272,13 +272,13 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 	assert(result != EGL_FALSE);
 
 	// create an EGL rendering context
-	state->context = eglCreateContext(state->display, config, EGL_NO_CONTEXT, context_attributes);
+	state->context = eglCreateContext(state->display, state->config, EGL_NO_CONTEXT, context_attributes);
 	assert(state->context != EGL_NO_CONTEXT);
 
 	//Create an offscreen rendering surface
 	EGLint rendering_attributes[] = {EGL_WIDTH, state->screen_width,
 		EGL_HEIGHT, state->screen_height, EGL_NONE};
-	state->surface = eglCreatePbufferSurface(state->display, config,
+	state->surface = eglCreatePbufferSurface(state->display, state->config,
 			rendering_attributes);
 
 	// connect the context to the surface
@@ -290,6 +290,8 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 
 	state->screen_width = 640;
 	state->screen_height = 480;
+
+	eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 #endif
 #else
 	glfwSetErrorCallback(glfwErrorCallback);
@@ -2038,6 +2040,7 @@ static float get_camera_north() {
 static void set_camera_north(float value) {
 	state->camera_north = value;
 }
+
 static void decode_video(int cam_num, unsigned char *data, int data_len) {
 	if (state->decoders[cam_num]) {
 		state->decoders[cam_num]->decode(state->decoders[cam_num], data, data_len);
@@ -2045,8 +2048,18 @@ static void decode_video(int cam_num, unsigned char *data, int data_len) {
 }
 static void lock_texture() {
 	pthread_mutex_lock(&state->texture_mutex);
+#ifdef USE_GLES
+	EGLBoolean result;
+	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
+	assert(EGL_FALSE != result);
+#endif
 }
 static void unlock_texture() {
+#ifdef USE_GLES
+	EGLBoolean result;
+	result = eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	assert(EGL_FALSE != result);
+#endif
 	pthread_mutex_unlock(&state->texture_mutex);
 }
 static void set_cam_texture_cur(int cam_num, int cur) {

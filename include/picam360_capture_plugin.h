@@ -140,6 +140,7 @@ typedef struct _PLUGIN_HOST_T {
 	float (*get_camera_north)();
 	void (*set_camera_north)(float value);
 
+	//gl related
 	void (*decode_video)(int cam_num, unsigned char *data, int data_len);
 	void (*lock_texture)();
 	void (*unlock_texture)();
