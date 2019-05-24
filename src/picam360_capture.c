@@ -426,12 +426,6 @@ int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out
 extern void create_calibration_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
 extern void create_board_renderer(PLUGIN_HOST_T *plugin_host, RENDERER_T **out_renderer);
 static void init_model_proj(PICAM360CAPTURE_T *state) {
-#ifdef USE_GLES
-	char *common = "#version 100\n";
-#else
-	char *common = "#version 330\n";
-#endif
-
 	{
 		RENDERER_T *renderer = NULL;
 		create_calibration_renderer(&state->plugin_host, &renderer);
@@ -558,87 +552,88 @@ static void init_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_load_file_without_comment(state->config_filepath, 0, &error);
 	if (options == NULL) {
 		fputs(error.text, stderr);
-	} else {
-		state->num_of_cam = json_number_value(json_object_get(options, "num_of_cam"));
-		state->num_of_cam = MAX(1, MIN(state->num_of_cam, MAX_CAM_NUM));
-		{
-			json_t *value = json_object_get(options, "mpu_name");
-			if (value) {
-				strncpy(state->mpu_name, json_string_value(value), sizeof(state->mpu_name) - 1);
-			}
-		}
-		{
-			json_t *value = json_object_get(options, "capture_name");
-			if (value) {
-				strncpy(state->capture_name, json_string_value(value), sizeof(state->capture_name) - 1);
-			}
-		}
-		{
-			json_t *value = json_object_get(options, "decoder_name");
-			if (value) {
-				strncpy(state->decoder_name, json_string_value(value), sizeof(state->decoder_name) - 1);
-			}
-		}
-		{
-			json_t *value = json_object_get(options, "audio_capture_name");
-			if (value) {
-				strncpy(state->audio_capture_name, json_string_value(value), sizeof(state->audio_capture_name) - 1);
-			}
-		}
-		state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
-		state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
-		state->options.overlap = json_number_value(json_object_get(options, "overlap"));
-		for (int i = 0; i < state->num_of_cam; i++) {
-			char buff[256];
-			sprintf(buff, "cam%d_offset_pitch", i);
-			state->options.cam_offset_pitch[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, "cam%d_offset_yaw", i);
-			state->options.cam_offset_yaw[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, "cam%d_offset_roll", i);
-			state->options.cam_offset_roll[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, "cam%d_offset_x", i);
-			state->options.cam_offset_x[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, "cam%d_offset_y", i);
-			state->options.cam_offset_y[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, "cam%d_horizon_r", i);
-			state->options.cam_horizon_r[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, "cam%d_aov", i);
-			state->options.cam_aov[i] = json_number_value(json_object_get(options, buff));
-
-			if (state->options.cam_horizon_r[i] == 0) {
-				state->options.cam_horizon_r[i] = 0.8;
-			}
-			if (state->options.cam_aov[i] == 0) {
-				state->options.cam_aov[i] = 245;
-			}
-		}
-		{ //rtp
-			state->options.rtp_rx_port = json_number_value(json_object_get(options, "rtp_rx_port"));
-			state->options.rtp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_rx_type")));
-			json_t *value = json_object_get(options, "rtp_tx_ip");
-			if (value) {
-				strncpy(state->options.rtp_tx_ip, json_string_value(value), sizeof(state->options.rtp_tx_ip) - 1);
-			} else {
-				memset(state->options.rtp_tx_ip, 0, sizeof(state->options.rtp_tx_ip));
-			}
-			state->options.rtp_tx_port = json_number_value(json_object_get(options, "rtp_tx_port"));
-			state->options.rtp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_tx_type")));
-		}
-		{ //rtcp
-			state->options.rtcp_rx_port = json_number_value(json_object_get(options, "rtcp_rx_port"));
-			state->options.rtcp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_rx_type")));
-			json_t *value = json_object_get(options, "rtcp_tx_ip");
-			if (value) {
-				strncpy(state->options.rtcp_tx_ip, json_string_value(value), sizeof(state->options.rtcp_tx_ip) - 1);
-			} else {
-				memset(state->options.rtcp_tx_ip, 0, sizeof(state->options.rtcp_tx_ip));
-			}
-			state->options.rtcp_tx_port = json_number_value(json_object_get(options, "rtcp_tx_port"));
-			state->options.rtcp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_tx_type")));
-		}
-
-		json_decref(options);
+		exit(1);
 	}
+	state->num_of_cam = json_number_value(json_object_get(options, "num_of_cam"));
+	state->num_of_cam = MAX(0, MIN(state->num_of_cam, MAX_CAM_NUM));
+	{
+		json_t *value = json_object_get(options, "mpu_name");
+		if (value) {
+			strncpy(state->mpu_name, json_string_value(value), sizeof(state->mpu_name) - 1);
+		}
+	}
+	{
+		json_t *value = json_object_get(options, "capture_name");
+		if (value) {
+			strncpy(state->capture_name, json_string_value(value), sizeof(state->capture_name) - 1);
+		}
+	}
+	{
+		json_t *value = json_object_get(options, "decoder_name");
+		if (value) {
+			strncpy(state->decoder_name, json_string_value(value), sizeof(state->decoder_name) - 1);
+		}
+	}
+	{
+		json_t *value = json_object_get(options, "audio_capture_name");
+		if (value) {
+			strncpy(state->audio_capture_name, json_string_value(value), sizeof(state->audio_capture_name) - 1);
+		}
+	}
+	state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
+	state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
+	state->options.overlap = json_number_value(json_object_get(options, "overlap"));
+	for (int i = 0; i < state->num_of_cam; i++) {
+		char buff[256];
+		sprintf(buff, "cam%d_offset_pitch", i);
+		state->options.cam_offset_pitch[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, "cam%d_offset_yaw", i);
+		state->options.cam_offset_yaw[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, "cam%d_offset_roll", i);
+		state->options.cam_offset_roll[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, "cam%d_offset_x", i);
+		state->options.cam_offset_x[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, "cam%d_offset_y", i);
+		state->options.cam_offset_y[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, "cam%d_horizon_r", i);
+		state->options.cam_horizon_r[i] = json_number_value(json_object_get(options, buff));
+		sprintf(buff, "cam%d_aov", i);
+		state->options.cam_aov[i] = json_number_value(json_object_get(options, buff));
+
+		if (state->options.cam_horizon_r[i] == 0) {
+			state->options.cam_horizon_r[i] = 0.8;
+		}
+		if (state->options.cam_aov[i] == 0) {
+			state->options.cam_aov[i] = 245;
+		}
+	}
+	{ //rtp
+		state->options.rtp_rx_port = json_number_value(json_object_get(options, "rtp_rx_port"));
+		state->options.rtp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_rx_type")));
+		json_t *value = json_object_get(options, "rtp_tx_ip");
+		if (value) {
+			strncpy(state->options.rtp_tx_ip, json_string_value(value), sizeof(state->options.rtp_tx_ip) - 1);
+		} else {
+			memset(state->options.rtp_tx_ip, 0, sizeof(state->options.rtp_tx_ip));
+		}
+		state->options.rtp_tx_port = json_number_value(json_object_get(options, "rtp_tx_port"));
+		state->options.rtp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_tx_type")));
+	}
+	{ //rtcp
+		state->options.rtcp_rx_port = json_number_value(json_object_get(options, "rtcp_rx_port"));
+		state->options.rtcp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_rx_type")));
+		json_t *value = json_object_get(options, "rtcp_tx_ip");
+		if (value) {
+			strncpy(state->options.rtcp_tx_ip, json_string_value(value), sizeof(state->options.rtcp_tx_ip) - 1);
+		} else {
+			memset(state->options.rtcp_tx_ip, 0, sizeof(state->options.rtcp_tx_ip));
+		}
+		state->options.rtcp_tx_port = json_number_value(json_object_get(options, "rtcp_tx_port"));
+		state->options.rtcp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_tx_type")));
+	}
+	state->options.is_samplerExternalOES = json_number_value(json_object_get(options, "is_samplerExternalOES"));
+
+	json_decref(options);
 }
 //------------------------------------------------------------------------------
 
@@ -695,6 +690,7 @@ static void save_options(PICAM360CAPTURE_T *state) {
 		json_object_set_new(options, "rtcp_tx_port", json_integer(state->options.rtcp_tx_port));
 		json_object_set_new(options, "rtcp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_tx_type)));
 	}
+	json_object_set_new(options, "is_samplerExternalOES", json_integer(state->options.is_samplerExternalOES));
 
 	if (state->plugin_paths) {
 		json_t *plugin_paths = json_array();
@@ -2309,10 +2305,19 @@ static void add_encoder_factory(ENCODER_FACTORY_T *encoder_factory) {
 }
 
 static void add_renderer(RENDERER_T *renderer) {
+	int common_cur = 0;
+	char common[256];
 #ifdef USE_GLES
-	char *common = "#version 100\n";
+	common_cur += sprintf(common + common_cur, "#version 100\n");
+	if(state->options.is_samplerExternalOES) {
+		common_cur += sprintf(common + common_cur, "#extension GL_OES_EGL_image_external: require\n");
+		common_cur += sprintf(common + common_cur, "#define cam_sampler2D samplerExternalOES\n");
+	} else {
+		common_cur += sprintf(common + common_cur, "#define cam_sampler2D sampler2D\n");
+	}
 #else
-	char *common = "#version 330\n";
+	common_cur += sprintf(common + common_cur, "#version 330\n");
+	common_cur += sprintf(common + common_cur, "#define cam_sampler2D sampler2D\n");
 #endif
 	renderer->init(renderer, common, state->num_of_cam);
 

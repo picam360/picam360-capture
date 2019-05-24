@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #ifdef USE_GLES
 #include "GLES2/gl2.h"
+#include "GLES2/gl2ext.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 #else
@@ -98,6 +99,8 @@ typedef struct _OPTIONS_T {
 	char rtcp_tx_ip[256];
 	int rtcp_tx_port;
 	enum RTP_SOCKET_TYPE rtcp_tx_type;
+
+	bool is_samplerExternalOES;
 } OPTIONS_T;
 
 typedef struct _LIST_T {
