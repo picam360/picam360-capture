@@ -156,6 +156,7 @@ typedef struct _PLUGIN_HOST_T {
 	float (*get_fov)();
 	void (*set_fov)(float value);
 
+	DECODER_T *(*get_decoder)(int cam_num);
 	MPU_T *(*get_mpu)();
 	RTP_T *(*get_rtp)();
 	RTP_T *(*get_rtcp)();

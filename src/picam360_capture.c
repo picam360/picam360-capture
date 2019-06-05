@@ -2106,6 +2106,9 @@ static void set_fov(float value) {
 	state->frame->fov = value;
 }
 
+static DECODER_T *get_decoder(int cam_num){
+	return state->decoders[cam_num];
+}
 static MPU_T *get_mpu() {
 	return state->mpu;
 }
@@ -2456,6 +2459,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_fov = get_fov;
 		state->plugin_host.set_fov = set_fov;
 
+		state->plugin_host.get_decoder = get_decoder;
 		state->plugin_host.get_mpu = get_mpu;
 		state->plugin_host.get_rtp = get_rtp;
 		state->plugin_host.get_rtcp = get_rtcp;
