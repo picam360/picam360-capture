@@ -415,7 +415,7 @@ static void init_options(void *user_data, json_t *options) {
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME "height");
+		json_t *value = json_object_get(options, PLUGIN_NAME ".height");
 		if (value) {
 			lg_height = json_number_value(value);
 		}
