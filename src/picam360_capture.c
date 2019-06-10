@@ -1261,6 +1261,7 @@ int _command_handler(const char *_buff) {
 			sprintf(cmd, "upstream.save");
 			state->plugin_host.send_command(cmd);
 		}
+		printf("save config done\n");
 	} else if (cmd[1] == '\0' && cmd[0] >= '0' && cmd[0] <= '9') {
 		state->active_cam = cmd[0] - '0';
 	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
