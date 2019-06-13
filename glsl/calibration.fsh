@@ -14,7 +14,7 @@ precision mediump float;
 const int MAX_NUM_OF_CAM = 3;
 IN vec2 tcoord;
 uniform sampler2D logo_texture;
-uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
+uniform cam_sampler2D cam_texture[MAX_NUM_OF_CAM];
 uniform float cam_offset_x[MAX_NUM_OF_CAM];
 uniform float cam_offset_y[MAX_NUM_OF_CAM];
 uniform float cam_horizon_r[MAX_NUM_OF_CAM];

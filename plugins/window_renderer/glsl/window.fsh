@@ -14,7 +14,7 @@ const int MAX_NUM_OF_CAM = 3;
 const float M_PI = 3.1415926535;
 
 uniform int num_of_cam;
-uniform sampler2D cam_texture[MAX_NUM_OF_CAM];
+uniform cam_sampler2D cam_texture[MAX_NUM_OF_CAM];
 uniform float cam_aov[MAX_NUM_OF_CAM];
 uniform sampler2D logo_texture;
 uniform float color_offset;

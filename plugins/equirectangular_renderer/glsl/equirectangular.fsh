@@ -11,7 +11,7 @@ layout (location=0) out vec4 FragColor;
 precision mediump float;
 uniform mat4 unif_matrix;
 uniform mat4 unif_matrix_1;
-uniform sampler2D cam0_texture;
+uniform cam_sampler2D cam0_texture;
 uniform sampler2D logo_texture;
 uniform float color_offset;
 uniform float color_factor;
