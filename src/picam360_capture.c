@@ -2107,7 +2107,7 @@ static void set_fov(float value) {
 	state->frame->fov = value;
 }
 
-static DECODER_T *get_decoder(int cam_num){
+static DECODER_T *get_decoder(int cam_num) {
 	return state->decoders[cam_num];
 }
 static MPU_T *get_mpu() {
@@ -4043,6 +4043,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 	if (renderer == NULL) {
 		return;
 	}
+	int CAM_GL_TEXTURE_2D = (state->options.is_samplerExternalOES) ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
 
 	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
@@ -4064,7 +4065,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 //			}
 			cam_texture[i] = i + 1;
 			glActiveTexture(GL_TEXTURE1 + i);
-			glBindTexture(GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
+			glBindTexture(CAM_GL_TEXTURE_2D, state->cam_texture[i][state->cam_texture_cur[i]]);
 		}
 		glUniform1iv(glGetUniformLocation(program, "cam_texture"), state->num_of_cam, cam_texture);
 	}
