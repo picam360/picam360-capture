@@ -30,14 +30,15 @@ extern "C" {
 
 #define PLUGIN_NAME "v4l2_capture"
 #define CAPTURE_NAME "v4l2_capture"
-#define CAMERA_NUM 2
+#define MAX_CAM_NUM 8
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_width = 2048;
 static int lg_height = 1536;
 static int lg_fps = 15;
 static int lg_skip_frame = 0;
-static char lg_devicefiles[CAMERA_NUM][256] = { };
+static int lg_mjpeg_kbps = 0;
+static char lg_devicefiles[MAX_CAM_NUM][256] = { };
 
 class _PACKET_T {
 public:
@@ -322,9 +323,9 @@ static void start(void *obj, int cam_num, void *display, void *context, void *ca
 
 	send_frame_arg->cam_run = true;
 
-	{
+	if (lg_mjpeg_kbps) {
 		char cmd[256];
-		sprintf(cmd, "plugins/v4l2_capture/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb %d %s", 30000000, lg_devicefiles[cam_num]);
+		sprintf(cmd, "plugins/v4l2_capture/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb %d %s", lg_mjpeg_kbps * 1000, lg_devicefiles[cam_num]);
 		printf("shell:%s\n", cmd);
 		system(cmd);
 	}
@@ -377,7 +378,7 @@ static int command_handler(void *user_data, const char *_buff) {
 				for (int i = 0; lg_v4l2_ctls[i] != NULL; i++) {
 					if (strcmp(lg_v4l2_ctls[i]->name, name) == 0) {
 						lg_v4l2_ctls[i]->value += value;
-						for (int j = 0; j < CAMERA_NUM; j++) {
+						for (int j = 0; j < MAX_CAM_NUM; j++) {
 							set_v4l2_ctl(lg_v4l2_ctls[i]->name, lg_v4l2_ctls[i]->value, j);
 						}
 						break;
@@ -432,7 +433,13 @@ static void init_options(void *user_data, json_t *options) {
 			lg_skip_frame = json_number_value(value);
 		}
 	}
-	for (int i = 0; i < CAMERA_NUM; i++) {
+	{
+		json_t *value = json_object_get(options, PLUGIN_NAME ".mjpeg_kbps");
+		if (value) {
+			lg_mjpeg_kbps = json_number_value(value);
+		}
+	}
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		char buff[256];
 		sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
 		json_t *value = json_object_get(options, buff);
@@ -446,7 +453,7 @@ static void init_options(void *user_data, json_t *options) {
 }
 
 static void save_options(void *user_data, json_t *options) {
-	for (int i = 0; i < CAMERA_NUM; i++) {
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		char buff[256];
 		if (lg_devicefiles[i][0] != 0) {
 			sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
@@ -460,6 +467,9 @@ static void save_options(void *user_data, json_t *options) {
 	}
 	if (lg_skip_frame) {
 		json_object_set_new(options, PLUGIN_NAME ".skip_frame", json_real(lg_skip_frame));
+	}
+	if (lg_mjpeg_kbps) {
+		json_object_set_new(options, PLUGIN_NAME ".mjpeg_kbps", json_real(lg_mjpeg_kbps));
 	}
 	if (lg_v4l2_ctls) {
 		json_t *v4l2_ctls = json_object();
