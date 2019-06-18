@@ -1103,14 +1103,18 @@ void frame_handler() {
 				frame->img_height = frame->height;
 				state->split = 0;
 
-				glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
-				redraw_render_texture(state, frame, frame->renderer, view_quat);
-				if (state->menu_visible) {
-					redraw_info(state, frame);
+				if (frame->renderer->render2buffer) {
+					frame->renderer->render2buffer(frame->renderer, frame->fov, frame->img_buff, frame->img_width, frame->img_height);
+				} else {
+					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
+					redraw_render_texture(state, frame, frame->renderer, view_quat);
+					if (state->menu_visible) {
+						redraw_info(state, frame);
+					}
+					glFinish();
+					glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
+					glBindFramebuffer(GL_FRAMEBUFFER, 0);
 				}
-				glFinish();
-				glReadPixels(0, 0, frame->width, frame->height, GL_RGB, GL_UNSIGNED_BYTE, image_buffer);
-				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 			state->plugin_host.unlock_texture();
 
@@ -1960,7 +1964,7 @@ static float get_view_north() {
 	return 0;
 }
 
-static VECTOR4D_T get_camera_offset(int cam_num) {
+static int get_number_of_cameras() {
 	return state->num_of_cam;
 }
 static VECTOR4D_T get_camera_offset(int cam_num) {
