@@ -1961,6 +1961,9 @@ static float get_view_north() {
 }
 
 static VECTOR4D_T get_camera_offset(int cam_num) {
+	return state->num_of_cam;
+}
+static VECTOR4D_T get_camera_offset(int cam_num) {
 	VECTOR4D_T ret = { };
 	pthread_mutex_lock(&state->mutex);
 
@@ -2434,6 +2437,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_view_temperature = get_view_temperature;
 		state->plugin_host.get_view_north = get_view_north;
 
+		state->plugin_host.get_number_of_cameras = get_number_of_cameras;
 		state->plugin_host.get_camera_offset = get_camera_offset;
 		state->plugin_host.set_camera_offset = set_camera_offset;
 		state->plugin_host.get_camera_quaternion = get_camera_quaternion;
