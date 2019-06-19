@@ -7,6 +7,8 @@
 #include "menu.h"
 #include "rtp.h"
 
+#define MAX_CAM_NUM 8
+
 //0x00** is reserved by system
 #define PICAM360_HOST_NODE_ID 0x0000
 #define PICAM360_CONTROLLER_NODE_ID 0x0001
@@ -78,12 +80,24 @@ typedef struct _DECODER_FACTORY_T {
 	void *user_data;
 } DECODER_FACTORY_T;
 
+typedef struct _RENDERING_PARAMS_T {
+	float fov;
+	int active_cam;
+	int num_of_cam;
+	float cam_attitude[MAX_CAM_NUM][16];
+	float cam_offset_yaw[MAX_CAM_NUM];
+	float cam_offset_x[MAX_CAM_NUM];
+	float cam_offset_y[MAX_CAM_NUM];
+	float cam_horizon_r[MAX_CAM_NUM];
+	float cam_aov[MAX_CAM_NUM];
+}RENDERING_PARAMS_T;
+
 typedef struct _RENDERER_T {
 	char name[64];
 	void (*init)(void *user_data, const char *common, int num_of_cam);
 	int (*get_program)(void *user_data);
 	void (*render)(void *user_data, float fov);
-	void (*render2buffer)(void *user_data, float fov, unsigned char *buff, int w, int h);
+	void (*render2buffer)(void *user_data, RENDERING_PARAMS_T *params, unsigned char *buff, int w, int h);
 	void (*release)(void *user_data);
 	void *user_data;
 } RENDERER_T;

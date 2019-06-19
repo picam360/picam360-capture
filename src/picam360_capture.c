@@ -93,6 +93,7 @@ static void save_options(PICAM360CAPTURE_T *state);
 static void init_options_ex(PICAM360CAPTURE_T *state);
 static void save_options_ex(PICAM360CAPTURE_T *state);
 static void exit_func(void);
+static void get_rendering_params(PICAM360CAPTURE_T *state, FRAME_T *frame, VECTOR4D_T view_quat, RENDERING_PARAMS_T *params);
 static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, RENDERER_T *renderer, VECTOR4D_T view_quat);
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model);
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame);
@@ -1111,7 +1112,9 @@ void frame_handler() {
 				state->split = 0;
 
 				if (frame->renderer->render2buffer) {
-					frame->renderer->render2buffer(frame->renderer, frame->fov, frame->img_buff, frame->img_width, frame->img_height);
+					RENDERING_PARAMS_T params = {};
+					get_rendering_params(state, frame, view_quat, &params);
+					frame->renderer->render2buffer(frame->renderer, &params, frame->img_buff, frame->img_width, frame->img_height);
 				} else {
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 					redraw_render_texture(state, frame, frame->renderer, view_quat);
@@ -4046,6 +4049,85 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+static void get_rendering_params(PICAM360CAPTURE_T *state, FRAME_T *frame, VECTOR4D_T view_quat, RENDERING_PARAMS_T *params) {
+	{
+		params->fov = frame->fov;
+		params->active_cam = state->active_cam;
+		params->num_of_cam = state->num_of_cam;
+	}
+	{ //cam_attitude //depth axis is z, vertical asis is y
+		float view_matrix[16];
+		float north_matrix[16];
+		float world_matrix[16];
+
+		{ // Rv : view
+			mat4_identity(view_matrix);
+			mat4_fromQuat(view_matrix, view_quat.ary);
+			mat4_invert(view_matrix, view_matrix);
+		}
+
+		{ // Rn : north
+			mat4_identity(north_matrix);
+			float north = state->plugin_host.get_view_north();
+			mat4_rotateY(north_matrix, north_matrix, north * M_PI / 180);
+		}
+
+		{ // Rw : view coodinate to world coodinate and view heading to ground initially
+			mat4_identity(world_matrix);
+			mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
+		}
+
+		for (int i = 0; i < state->num_of_cam; i++) {
+			float *unif_matrix = params->cam_attitude[i];
+			float cam_matrix[16];
+			{ // Rc : cam orientation
+				mat4_identity(cam_matrix);
+				if (state->camera_coordinate_from_device) {
+					mat4_fromQuat(cam_matrix, state->camera_quaternion[i].ary);
+				} else {
+					//euler Y(yaw)X(pitch)Z(roll)
+					mat4_rotateZ(cam_matrix, cam_matrix, state->camera_roll);
+					mat4_rotateX(cam_matrix, cam_matrix, state->camera_pitch);
+					mat4_rotateY(cam_matrix, cam_matrix, state->camera_yaw);
+				}
+			}
+
+			{ // Rco : cam offset  //euler Y(yaw)X(pitch)Z(roll)
+				float cam_offset_matrix[16];
+				mat4_identity(cam_offset_matrix);
+				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_roll[i]);
+				mat4_rotateX(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_pitch[i]);
+				mat4_rotateY(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_yaw[i]);
+				mat4_invert(cam_offset_matrix, cam_offset_matrix);
+				mat4_multiply(cam_matrix, cam_matrix, cam_offset_matrix); // Rc'=RcoRc
+			}
+
+			{ //RcRv(Rc^-1)RcRw
+				mat4_identity(unif_matrix);
+				mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
+				mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
+				//mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
+				mat4_multiply(unif_matrix, unif_matrix, cam_matrix); // RcRnRvRw
+			}
+			mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
+		}
+	}
+	{ //cam_options
+		for (int i = 0; i < state->num_of_cam; i++) {
+			params->cam_offset_x[i] = state->options.cam_offset_x[i];
+			params->cam_offset_y[i] = state->options.cam_offset_y[i];
+			params->cam_horizon_r[i] = state->options.cam_horizon_r[i];
+			params->cam_aov[i] = state->options.cam_aov[i];
+			if (state->options.config_ex_enabled) {
+				params->cam_offset_x[i] += state->options.cam_offset_x_ex[i];
+				params->cam_offset_y[i] += state->options.cam_offset_y_ex[i];
+				params->cam_horizon_r[i] += state->options.cam_horizon_r_ex[i];
+			}
+			params->cam_horizon_r[i] *= state->camera_horizon_r_bias;
+			params->cam_aov[i] /= state->refraction;
+		}
+	}
+}
 /***********************************************************
  * Name: redraw_scene
  *

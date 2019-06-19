@@ -46,7 +46,6 @@
 #include "picam360_capture_plugin.h"
 
 #define TEXTURE_BUFFER_NUM 2
-#define MAX_CAM_NUM 8
 #define MAX_OPERATION_NUM 7
 #define MAX_QUATERNION_QUEUE_COUNT 128 //keep 1280ms
 #define QUATERNION_QUEUE_RES 20 //50hz

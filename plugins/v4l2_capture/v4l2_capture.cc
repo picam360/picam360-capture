@@ -30,7 +30,6 @@ extern "C" {
 
 #define PLUGIN_NAME "v4l2_capture"
 #define CAPTURE_NAME "v4l2_capture"
-#define MAX_CAM_NUM 8
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static int lg_width = 2048;

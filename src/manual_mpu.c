@@ -58,7 +58,7 @@ static void release(void *user_data) {
 
 static void create_mpu(void *user_data, MPU_T **_mpu) {
 	MPU_T_INTERNAL *mpu = (MPU_T_INTERNAL*) malloc(sizeof(MPU_T_INTERNAL));
-	memset(mpu, 0, sizeof(MPU_T));
+	memset(mpu, 0, sizeof(MPU_T_INTERNAL));
 	strcpy(mpu->super.name, MPU_NAME);
 	mpu->super.release = release;
 	mpu->super.get_quaternion = get_quaternion;

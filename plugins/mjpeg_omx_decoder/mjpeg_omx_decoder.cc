@@ -60,7 +60,6 @@ extern "C" {
     (a).nVersion.s.nRevision = OMX_VERSION_REVISION; \
     (a).nVersion.s.nStep = OMX_VERSION_STEP
 
-#define MAX_CAM_NUM 2
 #define TEXTURE_BUFFER_NUM 2
 
 class _PACKET_T {
