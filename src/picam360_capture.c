@@ -978,8 +978,11 @@ void frame_handler() {
 
 		//start & stop recording
 		if (frame->is_recording && frame->output_mode == OUTPUT_MODE_NONE) { //stop record
-			frame->encoder->release(frame->encoder);
-			frame->encoder = NULL;
+
+			if (frame->encoder) {
+				frame->encoder->release(frame->encoder);
+				frame->encoder = NULL;
+			}
 
 			frame->frame_elapsed /= frame->frame_num;
 			printf("stop record : frame num : %d : fps %.3lf\n", frame->frame_num, 1000.0 / frame->frame_elapsed);
@@ -995,7 +998,9 @@ void frame_handler() {
 		if (!frame->is_recording && frame->output_mode == OUTPUT_MODE_VIDEO) {
 			int ratio = frame->double_size ? 2 : 1;
 			float fps = MAX(frame->fps, 1);
-			frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, 4000 * ratio, fps, stream_callback, NULL);
+			if (frame->encoder) {
+				frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, 4000 * ratio, fps, stream_callback, NULL);
+			}
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -1056,7 +1061,9 @@ void frame_handler() {
 					}
 				}
 			}
-			frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, kbps * ratio, fps, stream_callback, frame);
+			if (frame->encoder) {
+				frame->encoder->init(frame->encoder, frame->width * ratio, frame->height, kbps * ratio, fps, stream_callback, frame);
+			}
 			frame->frame_num = 0;
 			frame->frame_elapsed = 0;
 			frame->is_recording = true;
@@ -1140,7 +1147,9 @@ void frame_handler() {
 			break;
 		case OUTPUT_MODE_VIDEO:
 			if (frame->output_fd > 0) {
-				frame->encoder->add_frame(frame->encoder, frame->img_buff, NULL);
+				if (frame->encoder) {
+					frame->encoder->add_frame(frame->encoder, frame->img_buff, NULL);
+				}
 
 				gettimeofday(&f, NULL);
 				elapsed_ms = (f.tv_sec - s.tv_sec) * 1000.0 + (f.tv_usec - s.tv_usec) / 1000.0;
@@ -1155,7 +1164,9 @@ void frame_handler() {
 			if (1) {
 				FRAME_INFO_T *frame_info_p = malloc(sizeof(FRAME_INFO_T));
 				memcpy(frame_info_p, &frame_info, sizeof(FRAME_INFO_T));
-				frame->encoder->add_frame(frame->encoder, frame->img_buff, frame_info_p);
+				if (frame->encoder) {
+					frame->encoder->add_frame(frame->encoder, frame->img_buff, frame_info_p);
+				}
 			}
 
 			gettimeofday(&f, NULL);
