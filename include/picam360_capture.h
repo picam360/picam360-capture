@@ -210,6 +210,9 @@ typedef struct _PICAM360CAPTURE_T {
 	GLfloat distance;
 	GLfloat distance_inc;
 
+	//logo
+	void *logo_image;
+
 	MREVENT_T request_frame_event[MAX_CAM_NUM];
 	MREVENT_T arrived_frame_event[MAX_CAM_NUM];
 	enum INPUT_MODE input_mode;

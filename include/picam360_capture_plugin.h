@@ -164,6 +164,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*get_texture_size)(uint32_t *width_out, uint32_t *height_out);
 	void (*set_texture_size)(uint32_t width, uint32_t height);
 	int (*load_texture)(const char *filename, uint32_t *tex_out);
+	void (*get_logo_image)(uint8_t **pixels, uint32_t *width, uint32_t *height, uint32_t *stride);
 
 	MENU_T *(*get_menu)();
 	bool (*get_menu_visible)();

@@ -341,6 +341,24 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 
 	return 0;
 }
+static void get_logo_image(uint8_t **pixels, uint32_t *width, uint32_t *height, uint32_t *stride) {
+	if (state->logo_image == NULL) {
+		return;
+	}
+	IplImage *ipl_image = (IplImage*) state->logo_image;
+	if (pixels) {
+		*pixels = ipl_image->imageData;
+	}
+	if (width) {
+		*width = ipl_image->width;
+	}
+	if (height) {
+		*height = ipl_image->height;
+	}
+	if (stride) {
+		*stride = ipl_image->widthStep;
+	}
+}
 
 int board_mesh(int num_of_steps, GLuint *vbo_out, GLuint *n_out, GLuint *vao_out) {
 	GLuint vbo;
@@ -470,6 +488,9 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		write(fd, logo_png, logo_png_len);
 		close(fd);
 		load_texture(tmp_filepath, &state->logo_texture);
+
+		state->logo_image = (void*) cvLoadImage(tmp_filepath, CV_LOAD_IMAGE_COLOR);
+
 		remove(tmp_filepath);
 	}
 
@@ -1112,7 +1133,7 @@ void frame_handler() {
 				state->split = 0;
 
 				if (frame->renderer->render2buffer) {
-					RENDERING_PARAMS_T params = {};
+					RENDERING_PARAMS_T params = { };
 					get_rendering_params(state, frame, view_quat, &params);
 					frame->renderer->render2buffer(frame->renderer, &params, frame->img_buff, frame->img_width, frame->img_height);
 				} else {
@@ -2474,6 +2495,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_texture_size = get_texture_size;
 		state->plugin_host.set_texture_size = set_texture_size;
 		state->plugin_host.load_texture = load_texture;
+		state->plugin_host.get_logo_image = get_logo_image;
 
 		state->plugin_host.get_menu = get_menu;
 		state->plugin_host.get_menu_visible = get_menu_visible;
