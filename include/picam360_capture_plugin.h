@@ -81,9 +81,11 @@ typedef struct _DECODER_FACTORY_T {
 } DECODER_FACTORY_T;
 
 typedef struct _RENDERING_PARAMS_T {
+	bool stereo;
 	float fov;
 	int active_cam;
 	int num_of_cam;
+	float cam_offset_matrix[MAX_CAM_NUM][16];
 	float cam_attitude[MAX_CAM_NUM][16];
 	float cam_offset_yaw[MAX_CAM_NUM];
 	float cam_offset_x[MAX_CAM_NUM];

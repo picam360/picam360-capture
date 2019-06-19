@@ -130,6 +130,7 @@ typedef struct _FRAME_T {
 	int frame_num;
 	double frame_elapsed;
 	bool is_recording;
+	bool stereo;
 
 	RENDERER_T *renderer;
 	RENDERER_T *tmp_renderer;
@@ -159,7 +160,7 @@ typedef struct _FRAME_T {
 
 	struct _FRAME_T *next;
 } FRAME_T;
-typedef struct {
+typedef struct _MODEL_T{
 	void *program;
 	GLuint vbo;
 	GLuint vbo_nop;
@@ -171,7 +172,6 @@ typedef struct _PICAM360CAPTURE_T {
 	char config_filepath[512];
 	int split;
 	bool preview;
-	bool stereo;
 	bool conf_sync;
 	bool video_direct;
 	char capture_name[32];

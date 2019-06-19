@@ -1703,9 +1703,27 @@ int _command_handler(const char *_buff) {
 		}
 	} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
+		int id = 0; //default
+		bool value;
 		if (param != NULL) {
-			state->stereo = (param[0] == '1');
+			value = (param[0] == '1');
 			printf("set_stereo %s\n", param);
+			do {
+				param = strtok(NULL, " \n");
+				if (param != NULL) {
+					if (strncmp(param, "id=", 3) == 0) {
+						int num = sscanf(param, "id=%d", &id);
+						if (num == 1) {
+							for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
+								if (frame->id == id) {
+									frame->stereo = value;
+									break;
+								}
+							}
+						}
+					}
+				}
+			} while (param);
 		}
 	} else if (strncmp(cmd, "set_conf_sync", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -3828,7 +3846,6 @@ int main(int argc, char *argv[]) {
 	state->cam_height = 2048;
 	state->num_of_cam = 1;
 	state->preview = false;
-	state->stereo = false;
 	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
 	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
 	strncpy(state->decoder_name, "ffmpeg", sizeof(state->decoder_name));
@@ -3894,9 +3911,6 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'p':
 			state->preview = true;
-			break;
-		case 's':
-			state->stereo = true;
 			break;
 		case 'r':
 			state->output_raw = true;
@@ -4073,6 +4087,7 @@ int main(int argc, char *argv[]) {
 
 static void get_rendering_params(PICAM360CAPTURE_T *state, FRAME_T *frame, VECTOR4D_T view_quat, RENDERING_PARAMS_T *params) {
 	{
+		params->stereo = frame->stereo;
 		params->fov = frame->fov;
 		params->active_cam = state->active_cam;
 		params->num_of_cam = state->num_of_cam;
@@ -4115,7 +4130,7 @@ static void get_rendering_params(PICAM360CAPTURE_T *state, FRAME_T *frame, VECTO
 			}
 
 			{ // Rco : cam offset  //euler Y(yaw)X(pitch)Z(roll)
-				float cam_offset_matrix[16];
+				float *cam_offset_matrix = params->cam_offset_matrix[i];
 				mat4_identity(cam_offset_matrix);
 				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_roll[i]);
 				mat4_rotateX(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_pitch[i]);
@@ -4168,7 +4183,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 	}
 	int CAM_GL_TEXTURE_2D = (state->options.is_samplerExternalOES) ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
 
-	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_width = (frame->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 
 	int program = renderer->get_program(renderer);
@@ -4302,7 +4317,7 @@ static void redraw_render_texture(PICAM360CAPTURE_T *state, FRAME_T *frame, REND
 }
 
 static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *model) {
-	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_width = (frame->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 
 	int program = GLProgram_GetId(model->program);
@@ -4317,7 +4332,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 
 	//Load in the texture and thresholding parameters.
 	glUniform1i(glGetUniformLocation(program, "tex"), 0);
-	glUniform1f(glGetUniformLocation(program, "tex_scalex"), (state->stereo) ? 0.5 : 1.0);
+	glUniform1f(glGetUniformLocation(program, "tex_scalex"), (frame->stereo) ? 0.5 : 1.0);
 
 #ifdef USE_GLES
 	GLuint loc = glGetAttribLocation(program, "vPosition");
@@ -4333,7 +4348,7 @@ static void redraw_scene(PICAM360CAPTURE_T *state, FRAME_T *frame, MODEL_T *mode
 	if (strcasecmp(frame->renderer->name, "CALIBRATION") == 0) {
 		glViewport((state->screen_width - state->screen_height) / 2, 0, (GLsizei) state->screen_height, (GLsizei) state->screen_height);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, model->vbo_nop);
-	} else if (state->stereo) {
+	} else if (frame->stereo) {
 		int offset_x = (state->screen_width / 2 - frame_width) / 2;
 		int offset_y = (state->screen_height - frame_height) / 2;
 		for (int i = 0; i < 2; i++) {
@@ -4404,7 +4419,7 @@ static void get_menu_str(char *_buff, int buff_len) {
 }
 
 static void redraw_info(PICAM360CAPTURE_T *state, FRAME_T *frame) {
-	int frame_width = (state->stereo) ? frame->width / 2 : frame->width;
+	int frame_width = (frame->stereo) ? frame->width / 2 : frame->width;
 	int frame_height = frame->height;
 	const int MAX_INFO_SIZE = 1024;
 	char disp[MAX_INFO_SIZE];
