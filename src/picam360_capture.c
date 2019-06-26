@@ -40,6 +40,7 @@
 #include <mat4/fromQuat.h>
 //#include <mat4/perspective.h>
 #include <mat4/invert.h>
+#include <mat4/determinant.h>
 
 //json parser
 #include <jansson.h>
@@ -1092,7 +1093,7 @@ void frame_handler() {
 			printf("start_record saved to %s : %d kbps\n", frame->output_filepath, (int) kbps);
 		}
 
-		{ //rendering to buffer
+		if (frame->renderer->render2encoder == NULL) { //rendering to buffer
 			VECTOR4D_T view_quat = { .ary = { 0, 0, 0, 1 } };
 			if (frame->view_mpu) {
 				view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
@@ -1132,11 +1133,7 @@ void frame_handler() {
 				frame->img_height = frame->height;
 				state->split = 0;
 
-				if (frame->renderer->render2buffer) {
-					RENDERING_PARAMS_T params = { };
-					get_rendering_params(state, frame, view_quat, &params);
-					frame->renderer->render2buffer(frame->renderer, &params, frame->img_buff, frame->img_width, frame->img_height);
-				} else {
+				{
 					glBindFramebuffer(GL_FRAMEBUFFER, frame->framebuffer);
 					redraw_render_texture(state, frame, frame->renderer, view_quat);
 					if (state->menu_visible) {
@@ -1186,10 +1183,43 @@ void frame_handler() {
 			break;
 		case OUTPUT_MODE_STREAM:
 			if (1) {
-				FRAME_INFO_T *frame_info_p = malloc(sizeof(FRAME_INFO_T));
-				memcpy(frame_info_p, &frame_info, sizeof(FRAME_INFO_T));
 				if (frame->encoder) {
-					frame->encoder->add_frame(frame->encoder, frame->img_buff, frame_info_p);
+					if (frame->renderer->render2encoder) {
+						VECTOR4D_T view_quat = { .ary = { 0, 0, 0, 1 } };
+						if (frame->view_mpu) {
+							view_quat = frame->view_mpu->get_quaternion(frame->view_mpu);
+						}
+
+						{ //store info
+							memcpy(frame_info.client_key, frame->client_key, sizeof(frame_info.client_key));
+							frame_info.server_key = frame->server_key;
+							gettimeofday(&frame_info.before_redraw_render_texture, NULL);
+							frame_info.fov = frame->fov;
+							frame_info.view_quat = view_quat;
+						}
+
+						{ //store info
+							gettimeofday(&frame_info.after_redraw_render_texture, NULL);
+						}
+
+						FRAME_INFO_T *frame_info_p = malloc(sizeof(FRAME_INFO_T));
+						memcpy(frame_info_p, &frame_info, sizeof(FRAME_INFO_T));
+
+						frame->encoder->add_frame(frame->encoder, NULL, frame_info_p);
+
+						state->plugin_host.lock_texture();
+						{
+							RENDERING_PARAMS_T params = { };
+							get_rendering_params(state, frame, view_quat, &params);
+							frame->renderer->render2encoder(frame->renderer, &params, frame->encoder);
+						}
+						state->plugin_host.unlock_texture();
+
+					} else {
+						FRAME_INFO_T *frame_info_p = malloc(sizeof(FRAME_INFO_T));
+						memcpy(frame_info_p, &frame_info, sizeof(FRAME_INFO_T));
+						frame->encoder->add_frame(frame->encoder, frame->img_buff, frame_info_p);
+					}
 				}
 			}
 
@@ -2104,6 +2134,9 @@ static void set_camera_north(float value) {
 	state->camera_north = value;
 }
 
+static void *get_display() {
+	return state->display;
+}
 static void decode_video(int cam_num, unsigned char *data, int data_len) {
 	if (state->decoders[cam_num]) {
 		state->decoders[cam_num]->decode(state->decoders[cam_num], data, data_len);
@@ -2506,6 +2539,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_camera_north = get_camera_north;
 		state->plugin_host.set_camera_north = set_camera_north;
 
+		state->plugin_host.get_display = get_display;
 		state->plugin_host.decode_video = decode_video;
 		state->plugin_host.lock_texture = lock_texture;
 		state->plugin_host.unlock_texture = unlock_texture;
@@ -4147,6 +4181,15 @@ static void get_rendering_params(PICAM360CAPTURE_T *state, FRAME_T *frame, VECTO
 				mat4_multiply(unif_matrix, unif_matrix, cam_matrix); // RcRnRvRw
 			}
 			mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
+//			{
+//				//normalize det = 1
+//				float det = mat4_determinant(unif_matrix);
+//				float det_4 = pow(det, 0.25);
+//				for (int i = 0; i < 16; i++) {
+//					unif_matrix[i] / det_4;
+//				}
+//				//printf("det=%f, %f, %f\n", det, pow(det, 0.25), mat4_determinant(unif_matrix));
+//			}
 		}
 	}
 	{ //cam_options

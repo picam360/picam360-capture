@@ -80,6 +80,15 @@ typedef struct _DECODER_FACTORY_T {
 	void *user_data;
 } DECODER_FACTORY_T;
 
+typedef void (*ENCODER_STREAM_CALLBACK)(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
+typedef struct _ENCODER_T {
+	char name[64];
+	void (*init)(void *user_data, const int width, const int height, int bitrate_kbps, int fps, ENCODER_STREAM_CALLBACK callback, void *user_data2);
+	void (*release)(void *user_data);
+	void (*add_frame)(void *user_data, const unsigned char *in_data, void *frame_data);
+	void *user_data;
+} ENCODER_T;
+
 typedef struct _RENDERING_PARAMS_T {
 	bool stereo;
 	float fov;
@@ -99,19 +108,10 @@ typedef struct _RENDERER_T {
 	void (*init)(void *user_data, const char *common, int num_of_cam);
 	int (*get_program)(void *user_data);
 	void (*render)(void *user_data, float fov);
-	void (*render2buffer)(void *user_data, RENDERING_PARAMS_T *params, unsigned char *buff, int w, int h);
+	void (*render2encoder)(void *user_data, RENDERING_PARAMS_T *params, ENCODER_T *encoder);
 	void (*release)(void *user_data);
 	void *user_data;
 } RENDERER_T;
-
-typedef void (*ENCODER_STREAM_CALLBACK)(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
-typedef struct _ENCODER_T {
-	char name[64];
-	void (*init)(void *user_data, const int width, const int height, int bitrate_kbps, int fps, ENCODER_STREAM_CALLBACK callback, void *user_data2);
-	void (*release)(void *user_data);
-	void (*add_frame)(void *user_data, const unsigned char *in_data, void *frame_data);
-	void *user_data;
-} ENCODER_T;
 
 typedef struct _ENCODER_FACTORY_T {
 	char name[64];
@@ -159,6 +159,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*set_camera_north)(float value);
 
 	//gl related
+	void *(*get_display)();
 	void (*decode_video)(int cam_num, unsigned char *data, int data_len);
 	void (*lock_texture)();
 	void (*unlock_texture)();
