@@ -6,20 +6,20 @@ import threading
 import numpy as np
 
 
-class Picam360(SingletonConfigurable):
+class Camera(SingletonConfigurable):
     
     value = traitlets.Any()
     
     # config
-    width = traitlets.Integer(default_value=224).tag(config=True)
-    height = traitlets.Integer(default_value=224).tag(config=True)
+    width = traitlets.Integer(default_value=640).tag(config=True)
+    height = traitlets.Integer(default_value=480).tag(config=True)
     fps = traitlets.Integer(default_value=30).tag(config=True)
     capture_width = traitlets.Integer(default_value=640).tag(config=True)
-    capture_height = traitlets.Integer(default_value=320).tag(config=True)
+    capture_height = traitlets.Integer(default_value=480).tag(config=True)
 
     def __init__(self, *args, **kwargs):
         self.value = np.empty((self.height, self.width, 3), dtype=np.uint8)
-        super(Picam360, self).__init__(*args, **kwargs)
+        super(Camera, self).__init__(*args, **kwargs)
 
         try:
             self.cap = cv2.VideoCapture(self._gst_str(), cv2.CAP_GSTREAMER)
@@ -47,7 +47,7 @@ class Picam360(SingletonConfigurable):
                 break
                 
     def _gst_str(self):
-        pipeline = 'v4l2src ! video/x-raw,width=%d,height=%d,format=I420,framerate=%d/1 !' 
+        pipeline = 'v4l2src ! video/x-raw,width=%d,height=%d,format=YUY2,framerate=%d/1 !' 
         pipeline += 'videoconvert ! video/x-raw,width=%d,height=%d,format=BGRx ! videoconvert ! appsink'
         return pipeline % (
                 self.capture_width, self.capture_height, self.fps, self.width, self.height)

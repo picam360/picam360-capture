@@ -11,4 +11,5 @@ setup(
     install_requires=[
     ],
     package_data={},
+    zip_safe=False,
 )

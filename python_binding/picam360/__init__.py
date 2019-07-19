@@ -1,1 +1,1 @@
-from .picam360 import Picam360
+from .camera import Camera
