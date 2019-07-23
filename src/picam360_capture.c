@@ -1977,7 +1977,7 @@ int command_handler() {
 			for (int i = 0; state->plugins[i] != NULL; i++) {
 				int name_len = strlen(state->plugins[i]->name);
 				if (strncmp(buff, state->plugins[i]->name, name_len) == 0 && buff[name_len] == '.') {
-					ret = state->plugins[i]->command_handler(state->plugins[i]->user_data, buff);
+					ret = state->plugins[i]->command_handler(state->plugins[i]->user_data, buff + name_len + 1);
 					handled = true;
 				}
 			}
