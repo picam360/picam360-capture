@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <uuid/uuid.h>
 
 #define CONTEXT_SHARING
 
@@ -2682,14 +2683,18 @@ static void send_sei(FRAME_T *frame, FRAME_INFO_T *frame_info, NALU_STREAM_DEF d
 			timersub(&frame_info->after_encoded, &frame_info->after_redraw_render_texture, &diff);
 			encoded_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 		}
+		uuid_t uuid;
+		uuid_generate(uuid);
+		char uuid_str[UUID_STR_LEN];
+		uuid_unparse_upper(uuid, uuid_str);
 
 		unsigned char header_pack[512];
 		char *sei = (char*) header_pack + sizeof(def.SOI);
 		sei[4] = def.SEI_CODE; //nal_type:sei
 		int len =
 				sprintf(sei + 5,
-						"<picam360:frame frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-						frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
+						"<picam360:frame uuid=\"%s\" frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
+						uuid_str, frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
 						frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 		len += 1; //nal header
 		sei[0] = (len >> 24) & 0xFF;

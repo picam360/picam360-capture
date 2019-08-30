@@ -158,6 +158,7 @@ target_link_libraries(picam360-capture.bin
 	${OPENCV_LIBRARIES}
 	pthread
 	dl
+	uuid
 )
 
 #opengl
