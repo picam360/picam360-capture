@@ -809,7 +809,7 @@ FRAME_T *create_frame(PICAM360CAPTURE_T *state, int argc, char *argv[]) {
 	int render_height = 512;
 	FRAME_T *frame = malloc(sizeof(FRAME_T));
 	memset(frame, 0, sizeof(FRAME_T));
-	frame->id = state->next_frame_id++;
+	frame->id = ++state->last_frame_id;//frame id should start from 1
 	frame->renderer = state->renderers[0];
 	frame->output_mode = OUTPUT_MODE_NONE;
 	frame->output_type = OUTPUT_TYPE_NONE;
@@ -2992,7 +2992,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
                                                (plugin_host)->add_watch(WATCH_VAR(name));
 //status to downstream
 static STATUS_T *STATUS_VAR(ack_command_id);
-static STATUS_T *STATUS_VAR(next_frame_id);
+static STATUS_T *STATUS_VAR(last_frame_id);
 static STATUS_T *STATUS_VAR(quaternion);
 static STATUS_T *STATUS_VAR(north);
 static STATUS_T *STATUS_VAR(info);
@@ -3013,8 +3013,8 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
 	if (status == STATUS_VAR(ack_command_id)) {
 		snprintf(buff, buff_len, "%d", lg_ack_command_id_downstream);
-	} else if (status == STATUS_VAR(next_frame_id)) {
-		snprintf(buff, buff_len, "%d", state->next_frame_id);
+	} else if (status == STATUS_VAR(last_frame_id)) {
+		snprintf(buff, buff_len, "%d", state->last_frame_id);
 	} else if (status == STATUS_VAR(quaternion)) {
 		VECTOR4D_T quat = state->mpu->get_quaternion(state->mpu);
 		snprintf(buff, buff_len, "%f,%f,%f,%f", quat.x, quat.y, quat.z, quat.w);
@@ -3064,7 +3064,7 @@ static STATUS_T *new_status(const char *name) {
 
 static void init_status() {
 	STATUS_INIT(&state->plugin_host, "", ack_command_id);
-	STATUS_INIT(&state->plugin_host, "", next_frame_id);
+	STATUS_INIT(&state->plugin_host, "", last_frame_id);
 	STATUS_INIT(&state->plugin_host, "", quaternion);
 	STATUS_INIT(&state->plugin_host, "", north);
 	STATUS_INIT(&state->plugin_host, "", info);
@@ -3897,7 +3897,6 @@ int main(int argc, char *argv[]) {
 	state->cam_width = 2048;
 	state->cam_height = 2048;
 	state->num_of_cam = 1;
-	state->next_frame_id = 1;
 	state->preview = false;
 	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
 	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
