@@ -847,7 +847,7 @@ int delete_rtp(RTP_T **_this_p) {
 void rtp_start_recording(RTP_T *_this, char *path) {
 	rtp_stop_recording(_this);
 	strcpy(_this->record_path, path);
-	_this->record_fd = open(_this->record_path, O_CREAT | O_WRONLY | O_TRUNC);
+	_this->record_fd = open(_this->record_path, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
 	pthread_create(&_this->record_thread, NULL, record_thread_func, (void*) _this);
 }
 

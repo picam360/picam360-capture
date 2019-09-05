@@ -3897,6 +3897,7 @@ int main(int argc, char *argv[]) {
 	state->cam_width = 2048;
 	state->cam_height = 2048;
 	state->num_of_cam = 1;
+	state->next_frame_id = 1;
 	state->preview = false;
 	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
 	strncpy(state->capture_name, "ffmpeg", sizeof(state->capture_name));
