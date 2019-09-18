@@ -3,6 +3,7 @@ Description = picam360-capture daemon
 
 [Service]
 ExecStart = /bin/bash ${CMAKE_INSTALL_PREFIX}/bin/picam360-capture
+ExecStartPost = /bin/sleep 3
 Restart = always
 Type = simple
 
