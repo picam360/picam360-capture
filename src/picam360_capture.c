@@ -2693,8 +2693,8 @@ static void send_sei(FRAME_T *frame, FRAME_INFO_T *frame_info, NALU_STREAM_DEF d
 		sei[4] = def.SEI_CODE; //nal_type:sei
 		int len =
 				sprintf(sei + 5,
-						"<picam360:frame uuid=\"%s\" frame_id=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-						uuid_str, frame->id, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
+						"<picam360:frame uuid=\"%s\" frame_id=\"%d\" frame_width=\"%d\" frame_height=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
+						uuid_str, frame->id, frame->width, frame->height, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
 						frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
 		len += 1; //nal header
 		sei[0] = (len >> 24) & 0xFF;
