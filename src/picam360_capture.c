@@ -2219,6 +2219,9 @@ static RTP_T *get_rtcp() {
 static int xmp(char *buff, int buff_len, int cam_num) {
 	int xmp_len = 0;
 
+	struct timeval timestamp = { };
+	gettimeofday(&timestamp, NULL);
+
 	VECTOR4D_T quat = { };
 	{
 		int video_delay_ms = 0;
@@ -2240,13 +2243,14 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 	buff[xmp_len++] = 0xBB;
 	buff[xmp_len++] = 0xBF;
 	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
-	xmp_len += sprintf(buff + xmp_len, "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-drive rev1\">");
+	xmp_len += sprintf(buff + xmp_len, "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-capture rev1\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x, quat.y, quat.z, quat.w);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", compass.x, compass.y, compass.z);
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", state->mpu->get_temperature(state->mpu));
 	xmp_len += sprintf(buff + xmp_len, "<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />", camera_offset.x, camera_offset.y, camera_offset.z, camera_offset.w);
+	xmp_len += sprintf(buff + xmp_len, "<timestamp sec=\"%ld\" usec=\"%ld\" />", (uint64_t)timestamp.tv_sec, (uint64_t)timestamp.tv_usec);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -2687,7 +2691,7 @@ static int get_frame_info_str(FRAME_T *frame, FRAME_INFO_T *frame_info, char *bu
 
 		uuid_t uuid;
 		uuid_generate(uuid);
-		char uuid_str[UUID_STR_LEN];
+		char uuid_str[37];//UUID_STR_LEN
 		uuid_unparse_upper(uuid, uuid_str);
 
 		len =
