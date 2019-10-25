@@ -38,7 +38,7 @@ picam360-capture.bin
 Makefile
 CMakeFiles
 CMakeCache.txt
-cmake_install.cmake
+*.cmake
 /gdbcmd
 /config.json
 /.picam360_history

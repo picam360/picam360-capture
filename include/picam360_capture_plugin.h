@@ -29,6 +29,28 @@ enum PICAM360_CONTROLLER_EVENT {
 	PICAM360_CONTROLLER_EVENT_NONE, PICAM360_CONTROLLER_EVENT_NEXT, PICAM360_CONTROLLER_EVENT_BACK,
 };
 
+enum PICAM360_IMAGE_TYPE {
+	PICAM360_IMAGE_TYPE_RGB, PICAM360_IMAGE_TYPE_RGBA, PICAM360_IMAGE_TYPE_YUV, PICAM360_IMAGE_TYPE_I420,
+};
+
+enum PICAM360_MEMORY_TYPE {
+	PICAM360_MEMORY_TYPE_PROCESS, PICAM360_MEMORY_TYPE_KERNEL, PICAM360_MEMORY_TYPE_GPU, PICAM360_MEMORY_TYPE_EGL,
+};
+
+#define MAX_NUM_OF_PLANES 3
+typedef struct _PICAM360_IMAGE_T {
+	enum PICAM360_IMAGE_TYPE img_type;
+	enum PICAM360_MEMORY_TYPE mem_type;
+	struct timeval timestamp;
+
+	unsigned int num_of_planes;
+	unsigned int width[MAX_NUM_OF_PLANES];
+	unsigned int height[MAX_NUM_OF_PLANES];
+	unsigned int stride[MAX_NUM_OF_PLANES];
+	unsigned char *pixels[MAX_NUM_OF_PLANES];
+	int id[MAX_NUM_OF_PLANES];//PICAM360_MEMORY_TYPE_EGL
+} PICAM360_IMAGE_T;
+
 typedef struct _MPU_T {
 	char name[64];
 	void (*release)(void *user_data);
@@ -47,20 +69,25 @@ typedef struct _MPU_FACTORY_T {
 	void *user_data;
 } MPU_FACTORY_T;
 
-typedef struct _CAPTURE_T {
+typedef struct _STREAMER_T {
 	char name[64];
-	void (*start)(void *user_data, int cam_num, void *display, void *context, void *cam_texture, int n_buffers);
-	float (*get_fps)(void *user_data);
 	void (*release)(void *user_data);
-	void *user_data;
-} CAPTURE_T;
 
-typedef struct _CAPTURE_FACTORY_T {
+	void (*start)(void *user_data, struct _STREAMER_T *pre_streamer);
+	void (*stop)(void *user_data);
+	void (*wait)(void *user_data);
+	float (*get_fps)(void *user_data);
+	void (*dequeue_buffer)(void *user_data, PICAM360_IMAGE_T *image);
+	void (*enqueue_buffer)(void *user_data, PICAM360_IMAGE_T *image);
+	void *user_data;
+} STREAMER_T;
+
+typedef struct _STREAMER_FACTORY_T {
 	char name[64];
 	void (*release)(void *user_data);
-	void (*create_capture)(void *user_data, CAPTURE_T **capture);
+	void (*create_streamer)(void *user_data, STREAMER_T **streamer);
 	void *user_data;
-} CAPTURE_FACTORY_T;
+} STREAMER_FACTORY_T;
 
 typedef struct _DECODER_T {
 	char name[64];
@@ -168,7 +195,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*get_texture_size)(uint32_t *width_out, uint32_t *height_out);
 	void (*set_texture_size)(uint32_t width, uint32_t height);
 	int (*load_texture)(const char *filename, uint32_t *tex_out);
-	void (*get_logo_image)(uint8_t **pixels, uint32_t *width, uint32_t *height, uint32_t *stride);
+	void (*get_logo_image)(PICAM360_IMAGE_T *img);
 
 	MENU_T *(*get_menu)();
 	bool (*get_menu_visible)();
@@ -186,7 +213,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
 	void (*add_mpu_factory)(MPU_FACTORY_T *factory);
-	void (*add_capture_factory)(CAPTURE_FACTORY_T *factory);
+	void (*add_streamer_factory)(STREAMER_FACTORY_T *factory);
 	void (*add_decoder_factory)(DECODER_FACTORY_T *factory);
 	void (*add_encoder_factory)(ENCODER_FACTORY_T *factory);
 	void (*add_renderer)(RENDERER_T *renderer);

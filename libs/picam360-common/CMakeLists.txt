@@ -23,6 +23,9 @@ if(TEGRA)
 	add_definitions(-DTEGRA)
 endif()
 
+pkg_check_modules(LIBJPEG libjpeg REQUIRED)
+pkg_check_modules(LIBJPEG libpng REQUIRED)
+
 #add_executable 
 #target_link_libraries should be define below here
 add_library(picam360-common STATIC
@@ -30,13 +33,19 @@ add_library(picam360-common STATIC
 	src/mrevent.c
 	src/quaternion.c
 	src/gl_program.cc
+	src/jpeg_loader.c
+	src/png_loader.c
 )
 
 include_directories(
 	./
 	./include
+	${LIBJPEG_INCLUDE_DIRS}
+	${LIBPNG_INCLUDE_DIRS}
 )
 link_directories(
+	${LIBJPEG_LIBRARY_DIRS}
+	${LIBPNG_LIBRARY_DIRS}
 )
 
 #opengl
@@ -83,6 +92,8 @@ set_target_properties(picam360-common PROPERTIES
 target_link_libraries(picam360-common
 	pthread
 	dl
+	${LIBJPEG_LIBRARIES}
+	${LIBPNG_LIBRARIES}
 )
 
 #opengl

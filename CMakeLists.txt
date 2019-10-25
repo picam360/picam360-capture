@@ -42,8 +42,6 @@ set(GLSL_HEADERS
 add_executable(picam360-capture.bin
 	src/picam360_capture.c
 	src/manual_mpu.c
-	src/auto_calibration.cc
-	src/manual_mpu.c
 	src/menu.c
 	src/board_renderer.c
 	src/calibration_renderer.c
@@ -51,12 +49,15 @@ add_executable(picam360-capture.bin
 	${GLSL_HEADERS}
 )
 
+#picam360-common
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/picam360-common)
 add_dependencies(picam360-capture.bin picam360-common)
+target_include_directories(picam360-common PUBLIC libs/picam360-common)
+target_link_libraries(picam360-capture.bin picam360-common)
+link_directories (libs/picam360-common)
 
 pkg_check_modules(JANSSON jansson REQUIRED)
 pkg_check_modules(LIBEDIT libedit REQUIRED)
-pkg_check_modules(OPENCV opencv REQUIRED)
 
 include_directories(
 	./
@@ -64,12 +65,10 @@ include_directories(
 	./libs/picam360-common/include
 	${JANSSON_INCLUDE_DIRS}
 	${LIBEDIT_INCLUDE_DIRS}
-	${OPENCV_INCLUDE_DIRS}
 )
 link_directories(
 	${JANSSON_LIBRARY_DIRS}
 	${LIBEDIT_LIBRARY_DIRS}
-	${OPENCV_LIBRARY_DIRS}
 )
 
 #opengl
@@ -152,10 +151,8 @@ set_target_properties(picam360-capture.bin PROPERTIES
 )
 
 target_link_libraries(picam360-capture.bin
-	${CMAKE_CURRENT_SOURCE_DIR}/libs/picam360-common/libpicam360-common.a
 	${JANSSON_LIBRARIES}
 	${LIBEDIT_LIBRARIES}
-	${OPENCV_LIBRARIES}
 	pthread
 	dl
 	uuid

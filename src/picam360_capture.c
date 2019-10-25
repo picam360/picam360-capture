@@ -16,6 +16,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <uuid/uuid.h>
+#include <limits.h>
 
 #define CONTEXT_SHARING
 
@@ -25,8 +26,8 @@
 
 #include "picam360_capture.h"
 #include "gl_program.h"
-#include "auto_calibration.h"
 #include "manual_mpu.h"
+#include "png_loader.h"
 #include "img/logo_png.h"
 
 #include <mat4/type.h>
@@ -45,16 +46,6 @@
 
 //json parser
 #include <jansson.h>
-
-#include <opencv2/core/version.hpp>
-#if CV_VERSION_MAJOR >= 3
-#include <opencv2/imgcodecs/imgcodecs_c.h>
-int cvRound(double v) {
-	return round(v);
-}
-#else
-#include <opencv/highgui.h>
-#endif
 
 #ifdef _WIN64
 //define something for Windows (64-bit)
@@ -86,6 +77,9 @@ int cvRound(double v) {
 #ifndef M_PI
 #define M_PI 3.141592654
 #endif
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static void init_ogl(PICAM360CAPTURE_T *state);
 static void init_model_proj(PICAM360CAPTURE_T *state);
@@ -323,13 +317,18 @@ static void init_ogl(PICAM360CAPTURE_T *state) {
 static int load_texture(const char *filename, uint32_t *tex_out) {
 	GLenum err;
 	GLuint tex;
-	IplImage *iplImage = cvLoadImage(filename, CV_LOAD_IMAGE_COLOR);
+	PICAM360_IMAGE_T image = {};
+	{
+		state->logo_image.type = PICAM360_IMAGE_TYPE_RGBA;
+		state->logo_image.num_of_planes = 1;
+		load_png(filename, &image.pixels[0], &image.width[0], &image.height[0], &image.stride[0]);
+	}
 
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iplImage->width, iplImage->height, 0, GL_RGB, GL_UNSIGNED_BYTE, iplImage->imageData);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width[0], image.height[0], 0, GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
 	if ((err = glGetError()) != GL_NO_ERROR) {
 #ifdef USE_GLES
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
@@ -343,22 +342,9 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 
 	return 0;
 }
-static void get_logo_image(uint8_t **pixels, uint32_t *width, uint32_t *height, uint32_t *stride) {
-	if (state->logo_image == NULL) {
-		return;
-	}
-	IplImage *ipl_image = (IplImage*) state->logo_image;
-	if (pixels) {
-		*pixels = ipl_image->imageData;
-	}
-	if (width) {
-		*width = ipl_image->width;
-	}
-	if (height) {
-		*height = ipl_image->height;
-	}
-	if (stride) {
-		*stride = ipl_image->widthStep;
+static void get_logo_image(PICAM360_IMAGE_T *img) {
+	if (img) {
+		*img = state->logo_image;
 	}
 }
 
@@ -491,7 +477,10 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 		close(fd);
 		load_texture(tmp_filepath, &state->logo_texture);
 
-		state->logo_image = (void*) cvLoadImage(tmp_filepath, CV_LOAD_IMAGE_COLOR);
+		memset(&state->logo_image, 0, sizeof(PICAM360_IMAGE_T));
+		state->logo_image.type = PICAM360_IMAGE_TYPE_RGBA;
+		state->logo_image.num_of_planes = 1;
+		load_png(tmp_filepath, &state->logo_image.pixels[0], &state->logo_image.width[0], &state->logo_image.height[0], &state->logo_image.stride[0]);
 
 		remove(tmp_filepath);
 	}
@@ -513,19 +502,19 @@ static void init_textures(PICAM360CAPTURE_T *state) {
 
 static void init_agents(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
-		for (int j = 0; state->capture_factories[j] != NULL; j++) {
-			if (strncmp(state->capture_factories[j]->name, state->capture_name, sizeof(state->capture_name)) == 0) {
-				state->capture_factories[j]->create_capture(state->capture_factories[j], &state->captures[i]);
+		for (int j = 0; state->streamer_factories[j] != NULL; j++) {
+			if (strncmp(state->streamer_factories[j]->name, state->capture_name, sizeof(state->capture_name)) == 0) {
+				state->streamer_factories[j]->create_streamer(state->streamer_factories[j], &state->captures[i]);
 				break;
 			}
 		}
 		if (state->captures[i]) {
 #ifdef USE_GLES
-			state->captures[i]->start(state->captures[i], i, state->display, state->context, state->cam_texture[i], TEXTURE_BUFFER_NUM);
+			state->captures[i]->start(state->captures[i], NULL);
 #else
 			glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
 			GLFWwindow *win = glfwCreateWindow(1, 1, "dummy window", 0, state->glfw_window);
-			state->captures[i]->start(state->captures[i], i, win, NULL, NULL, TEXTURE_BUFFER_NUM);
+			state->captures[i]->start(state->captures[i], NULL);
 #endif
 		}
 	}
@@ -547,14 +536,14 @@ static void init_agents(PICAM360CAPTURE_T *state) {
 		}
 	}
 	{
-		for (int j = 0; state->capture_factories[j] != NULL; j++) {
-			if (strncmp(state->capture_factories[j]->name, state->audio_capture_name, sizeof(state->audio_capture_name)) == 0) {
-				state->capture_factories[j]->create_capture(state->capture_factories[j], &state->audio_capture);
+		for (int j = 0; state->streamer_factories[j] != NULL; j++) {
+			if (strncmp(state->streamer_factories[j]->name, state->audio_capture_name, sizeof(state->audio_capture_name)) == 0) {
+				state->streamer_factories[j]->create_streamer(state->streamer_factories[j], &state->audio_capture);
 				break;
 			}
 		}
 		if (state->audio_capture) {
-			state->audio_capture->start(state->audio_capture, 0, NULL, NULL, NULL, 0);
+			state->audio_capture->start(state->audio_capture, NULL);
 		}
 	}
 }
@@ -1568,48 +1557,6 @@ int _command_handler(const char *_buff) {
 				}
 			}
 		}
-	} else if (strncmp(cmd, "start_ac", sizeof(buff)) == 0) {
-		bool checkAcMode = false;
-		for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
-			if (is_auto_calibration(frame)) {
-				checkAcMode = true;
-				break;
-			}
-		}
-		if (!checkAcMode) {
-			char param[256];
-			if (state->frame->output_mode == OUTPUT_MODE_STREAM) {
-				strncpy(param, "-w 256 -h 256 -F -s mjpeg", 256);
-			} else {
-				strncpy(param, "-w 256 -h 256 -F", 256);
-			}
-
-			const int kMaxArgs = 32;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
-			}
-			argv[0] = "auto_calibration";
-			argv[argc] = 0;
-
-			FRAME_T *frame = create_frame(state, argc, argv);
-			set_auto_calibration(frame);
-			frame->next = state->frame;
-			state->frame = frame;
-
-			printf("start_ac\n");
-		}
-	} else if (strncmp(cmd, "stop_ac", sizeof(buff)) == 0) {
-		for (FRAME_T *frame = state->frame; frame != NULL; frame = frame->next) {
-			if (is_auto_calibration(frame)) {
-				frame->delete_after_processed = true;
-				printf("stop_ac\n");
-				break;
-			}
-		}
 	} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL && !state->output_raw) {
@@ -2138,7 +2085,11 @@ static void set_camera_north(float value) {
 }
 
 static void *get_display() {
+#ifdef USE_GLES
 	return state->display;
+#else
+	return state->glfw_window;
+#endif
 }
 static void decode_video(int cam_num, unsigned char *data, int data_len) {
 	if (state->decoders[cam_num]) {
@@ -2342,21 +2293,21 @@ static void add_mpu_factory(MPU_FACTORY_T *mpu_factory) {
 	}
 }
 
-static void add_capture_factory(CAPTURE_FACTORY_T *capture_factory) {
-	for (int i = 0; state->capture_factories[i] != (void*) -1; i++) {
-		if (state->capture_factories[i] == NULL) {
-			state->capture_factories[i] = capture_factory;
-			if (state->capture_factories[i + 1] == (void*) -1) {
+static void add_streamer_factory(STREAMER_FACTORY_T *factory) {
+	for (int i = 0; state->streamer_factories[i] != (void*) -1; i++) {
+		if (state->streamer_factories[i] == NULL) {
+			state->streamer_factories[i] = factory;
+			if (state->streamer_factories[i + 1] == (void*) -1) {
 				int space = (i + 2) * 2;
 				if (space > 256) {
-					fprintf(stderr, "error on add_capture_factory\n");
+					fprintf(stderr, "error on add_streamer_factory\n");
 					return;
 				}
-				CAPTURE_FACTORY_T **current = state->capture_factories;
-				state->capture_factories = malloc(sizeof(CAPTURE_FACTORY_T*) * space);
-				memset(state->capture_factories, 0, sizeof(CAPTURE_FACTORY_T*) * space);
-				memcpy(state->capture_factories, current, sizeof(CAPTURE_FACTORY_T*) * i);
-				state->capture_factories[space - 1] = (void*) -1;
+				STREAMER_FACTORY_T **current = state->streamer_factories;
+				state->streamer_factories = malloc(sizeof(STREAMER_FACTORY_T*) * space);
+				memset(state->streamer_factories, 0, sizeof(STREAMER_FACTORY_T*) * space);
+				memcpy(state->streamer_factories, current, sizeof(STREAMER_FACTORY_T*) * i);
+				state->streamer_factories[space - 1] = (void*) -1;
 				free(current);
 			}
 			return;
@@ -2572,7 +2523,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
 		state->plugin_host.add_mpu_factory = add_mpu_factory;
-		state->plugin_host.add_capture_factory = add_capture_factory;
+		state->plugin_host.add_streamer_factory = add_streamer_factory;
 		state->plugin_host.add_decoder_factory = add_decoder_factory;
 		state->plugin_host.add_encoder_factory = add_encoder_factory;
 		state->plugin_host.add_renderer = add_renderer;
@@ -3678,13 +3629,6 @@ static void image_circle_calibration_menu_callback(struct _MENU_T *menu, enum ME
 			}
 			menu->selected = false;
 			break;
-		case 30:				//start ac
-			if (1) {
-				char cmd[256];
-				snprintf(cmd, 256, "start_ac");
-				state->plugin_host.send_command(cmd);
-			}
-			break;
 		default:
 			break;
 		}
@@ -3844,7 +3788,6 @@ static void _init_menu() {
 				menu_add_submenu(sub_menu, menu_new("-", image_circle_calibration_menu_callback, (void*) 21), INT_MAX);
 				menu_add_submenu(sub_menu, menu_new("+", image_circle_calibration_menu_callback, (void*) 22), INT_MAX);
 			}
-			menu_add_submenu(sub_menu, menu_new("ac", image_circle_calibration_menu_callback, (void*) 30), INT_MAX);
 		}
 		MENU_T *image_params_menu = menu_add_submenu(sub_menu, menu_new("ImageParams", calibration_menu_callback, (void*) CALIBRATION_CMD_IMAGE_PARAMS), INT_MAX);
 		{
@@ -3955,9 +3898,9 @@ int main(int argc, char *argv[]) {
 		state->mpu_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
-		state->capture_factories = malloc(sizeof(CAPTURE_FACTORY_T*) * INITIAL_SPACE);
-		memset(state->capture_factories, 0, sizeof(CAPTURE_FACTORY_T*) * INITIAL_SPACE);
-		state->capture_factories[INITIAL_SPACE - 1] = (void*) -1;
+		state->streamer_factories = malloc(sizeof(STREAMER_FACTORY_T*) * INITIAL_SPACE);
+		memset(state->streamer_factories, 0, sizeof(STREAMER_FACTORY_T*) * INITIAL_SPACE);
+		state->streamer_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
 		state->decoder_factories = malloc(sizeof(DECODER_FACTORY_T*) * INITIAL_SPACE);
