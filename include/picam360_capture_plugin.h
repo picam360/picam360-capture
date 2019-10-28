@@ -69,52 +69,26 @@ typedef struct _MPU_FACTORY_T {
 	void *user_data;
 } MPU_FACTORY_T;
 
-typedef struct _STREAMER_T {
+typedef struct _VSTREAMER_T {
 	char name[64];
 	void (*release)(void *user_data);
 
-	void (*start)(void *user_data, struct _STREAMER_T *pre_streamer);
+	struct _VSTREAMER_T *pre_streamer;
+	struct _VSTREAMER_T *next_streamer;
+	void (*start)(void *user_data);
 	void (*stop)(void *user_data);
-	void (*wait)(void *user_data);
-	float (*get_fps)(void *user_data);
-	void (*dequeue_buffer)(void *user_data, PICAM360_IMAGE_T *image);
-	void (*enqueue_buffer)(void *user_data, PICAM360_IMAGE_T *image);
+	int (*set_param)(void *user_data, const char *param, const char *value);
+	int (*get_param)(void *user_data, const char *param, const char *value, int size);
+	void (*get_image)(void *user_data, PICAM360_IMAGE_T *image, int num, bool blocking);
 	void *user_data;
-} STREAMER_T;
+} VSTREAMER_T;
 
-typedef struct _STREAMER_FACTORY_T {
+typedef struct _VSTREAMER_FACTORY_T {
 	char name[64];
 	void (*release)(void *user_data);
-	void (*create_streamer)(void *user_data, STREAMER_T **streamer);
+	void (*create_vstreamer)(void *user_data, VSTREAMER_T **streamer);
 	void *user_data;
-} STREAMER_FACTORY_T;
-
-typedef struct _DECODER_T {
-	char name[64];
-	void (*init)(void *user_data, int cam_num, void *display, void *context, void *cam_texture, int n_buffers);
-	float (*get_fps)(void *user_data);
-	int (*get_frameskip)(void *user_data);
-	void (*decode)(void *user_data, unsigned char *data, int data_len);
-	void (*switch_buffer)(void *user_data);
-	void (*release)(void *user_data);
-	void *user_data;
-} DECODER_T;
-
-typedef struct _DECODER_FACTORY_T {
-	char name[64];
-	void (*release)(void *user_data);
-	void (*create_decoder)(void *user_data, DECODER_T **decoder);
-	void *user_data;
-} DECODER_FACTORY_T;
-
-typedef void (*ENCODER_STREAM_CALLBACK)(unsigned char *data, unsigned int data_len, void *frame_data, void *user_data);
-typedef struct _ENCODER_T {
-	char name[64];
-	void (*init)(void *user_data, const int width, const int height, int bitrate_kbps, int fps, ENCODER_STREAM_CALLBACK callback, void *user_data2);
-	void (*release)(void *user_data);
-	void (*add_frame)(void *user_data, const unsigned char *in_data, void *frame_data);
-	void *user_data;
-} ENCODER_T;
+} VSTREAMER_FACTORY_T;
 
 typedef struct _RENDERING_PARAMS_T {
 	bool stereo;
@@ -129,23 +103,6 @@ typedef struct _RENDERING_PARAMS_T {
 	float cam_horizon_r[MAX_CAM_NUM];
 	float cam_aov[MAX_CAM_NUM];
 }RENDERING_PARAMS_T;
-
-typedef struct _RENDERER_T {
-	char name[64];
-	void (*init)(void *user_data, const char *common, int num_of_cam);
-	int (*get_program)(void *user_data);
-	void (*render)(void *user_data, float fov);
-	void (*render2encoder)(void *user_data, RENDERING_PARAMS_T *params, ENCODER_T *encoder);
-	void (*release)(void *user_data);
-	void *user_data;
-} RENDERER_T;
-
-typedef struct _ENCODER_FACTORY_T {
-	char name[64];
-	void (*release)(void *user_data);
-	void (*create_encoder)(void *user_data, ENCODER_T **encoder);
-	void *user_data;
-} ENCODER_FACTORY_T;
 
 typedef struct _STATUS_T {
 	char name[64];
@@ -204,7 +161,6 @@ typedef struct _PLUGIN_HOST_T {
 	float (*get_fov)();
 	void (*set_fov)(float value);
 
-	DECODER_T *(*get_decoder)(int cam_num);
 	MPU_T *(*get_mpu)();
 	RTP_T *(*get_rtp)();
 	RTP_T *(*get_rtcp)();
@@ -213,10 +169,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
 	void (*add_mpu_factory)(MPU_FACTORY_T *factory);
-	void (*add_streamer_factory)(STREAMER_FACTORY_T *factory);
-	void (*add_decoder_factory)(DECODER_FACTORY_T *factory);
-	void (*add_encoder_factory)(ENCODER_FACTORY_T *factory);
-	void (*add_renderer)(RENDERER_T *renderer);
+	void (*add_vstreamer_factory)(VSTREAMER_FACTORY_T *factory);
 	void (*add_status)(STATUS_T *status);
 	void (*add_watch)(STATUS_T *status);
 	void (*add_plugin)(PLUGIN_T *plugin);

@@ -19,6 +19,7 @@
 
 #include "picam360_capture_plugin.h"
 
+#define MAX_OSTREAM_NUM 16
 #define TEXTURE_BUFFER_NUM 2
 #define MAX_OPERATION_NUM 7
 #define MAX_QUATERNION_QUEUE_COUNT 128 //keep 1280ms
@@ -91,7 +92,7 @@ typedef struct _FRAME_INFO_T {
 	struct timeval after_encoded;
 } FRAME_INFO_T;
 
-typedef struct _FRAME_T {
+typedef struct _OSTREAM_T {
 	int id;
 	GLuint framebuffer;
 	GLuint texture;
@@ -106,8 +107,9 @@ typedef struct _FRAME_T {
 	bool is_recording;
 	bool stereo;
 
-	RENDERER_T *renderer;
-	RENDERER_T *tmp_renderer;
+	VSTREAMER_T *renderer;
+	VSTREAMER_T *encoder;
+
 	enum OUTPUT_MODE output_mode;
 	enum OUTPUT_TYPE output_type;
 	char output_filepath[256];
@@ -121,7 +123,6 @@ typedef struct _FRAME_T {
 	float fov;
 	//for unif matrix
 	MPU_T *view_mpu;
-	ENCODER_T *encoder;
 
 	// for latency cal
 	char client_key[256];
@@ -129,11 +130,11 @@ typedef struct _FRAME_T {
 
 	void *custom_data;
 	//event
-	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
-	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _FRAME_T *);
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _OSTREAM_T *);
+	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _OSTREAM_T *);
 
-	struct _FRAME_T *next;
-} FRAME_T;
+	VSTREAMER_T *vstreamer;
+} OSTREAM_T;
 typedef struct _MODEL_T {
 	void *program;
 	GLuint vbo;
@@ -148,9 +149,8 @@ typedef struct _PICAM360CAPTURE_T {
 	bool preview;
 	bool conf_sync;
 	bool video_direct;
-	char capture_name[32];
-	char decoder_name[32];
-	char audio_capture_name[32];
+	char vistream_str[256];
+	char aistream_str[256];
 	int32_t screen_width;
 	int32_t screen_height;
 	uint32_t cam_width;
@@ -211,14 +211,15 @@ typedef struct _PICAM360CAPTURE_T {
 	bool camera_coordinate_from_device;
 	char default_view_coordinate_mode[64];
 
-	unsigned int last_frame_id;
-	FRAME_T *frame;
 	MODEL_T model_data[MAX_OPERATION_NUM];
 	pthread_mutex_t texture_mutex;
 	pthread_mutex_t texture_size_mutex;
-	STREAMER_T *captures[MAX_CAM_NUM];
-	DECODER_T *decoders[MAX_CAM_NUM];
-	STREAMER_T *audio_capture;
+
+	VSTREAMER_T *vistreams[MAX_CAM_NUM];
+	VSTREAMER_T *aistream;
+
+	unsigned int last_vostream_id;
+	OSTREAM_T *ostreams[MAX_OSTREAM_NUM];
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;
@@ -239,10 +240,7 @@ typedef struct _PICAM360CAPTURE_T {
 	char **plugin_paths;
 	PLUGIN_T **plugins;
 	MPU_FACTORY_T **mpu_factories;
-	STREAMER_FACTORY_T **streamer_factories;
-	DECODER_FACTORY_T **decoder_factories;
-	ENCODER_FACTORY_T **encoder_factories;
-	RENDERER_T **renderers;
+	VSTREAMER_FACTORY_T **vstreamer_factories;
 	STATUS_T **statuses;
 	STATUS_T **watches;
 	struct _OPTIONS_T options;
