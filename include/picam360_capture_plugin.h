@@ -30,7 +30,7 @@ enum PICAM360_CONTROLLER_EVENT {
 };
 
 enum PICAM360_IMAGE_TYPE {
-	PICAM360_IMAGE_TYPE_RGB, PICAM360_IMAGE_TYPE_RGBA, PICAM360_IMAGE_TYPE_YUV, PICAM360_IMAGE_TYPE_I420,
+	PICAM360_IMAGE_TYPE_BYTE, PICAM360_IMAGE_TYPE_RGB, PICAM360_IMAGE_TYPE_RGBA, PICAM360_IMAGE_TYPE_YUV, PICAM360_IMAGE_TYPE_I420,
 };
 
 enum PICAM360_MEMORY_TYPE {
@@ -49,6 +49,8 @@ typedef struct _PICAM360_IMAGE_T {
 	unsigned int stride[MAX_NUM_OF_PLANES];
 	unsigned char *pixels[MAX_NUM_OF_PLANES];
 	int id[MAX_NUM_OF_PLANES];//PICAM360_MEMORY_TYPE_EGL
+
+	void (*release)(struct _PICAM360_IMAGE_T *_this);
 } PICAM360_IMAGE_T;
 
 typedef struct _MPU_T {
@@ -79,7 +81,7 @@ typedef struct _VSTREAMER_T {
 	void (*stop)(void *user_data);
 	int (*set_param)(void *user_data, const char *param, const char *value);
 	int (*get_param)(void *user_data, const char *param, const char *value, int size);
-	void (*get_image)(void *user_data, PICAM360_IMAGE_T *image, int num, bool blocking);
+	int (*get_image)(void *user_data, PICAM360_IMAGE_T **image_p, int *num_p, bool blocking);
 	void *user_data;
 } VSTREAMER_T;
 

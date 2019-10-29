@@ -43,6 +43,7 @@ add_executable(picam360-capture.bin
 	src/picam360_capture.c
 	src/manual_mpu.c
 	src/menu.c
+	src/egl_handler.c
 #	src/board_renderer.c
 #	src/calibration_renderer.c
 	${IMAGE_HEADERS}

@@ -410,18 +410,8 @@ static void get_rendering_params(PICAM360CAPTURE_T *state, FRAME_T *frame, VECTO
 //		}
 //	}
 //}
-/***********************************************************
- * Name: init_ogl
- *
- * Arguments:
- *       PICAM360CAPTURE_T *state - holds OGLES model info
- *
- * Description: Sets the display, OpenGL|ES context and screen stuff
- *
- * Returns: void
- *
- ***********************************************************/
-static void init_ogl(PICAM360CAPTURE_T *state) {
+
+void init_egl(EGL_HANDLER_T *state) {
 #ifdef USE_GLES
 #ifdef BCM_HOST
 	int32_t success = 0;

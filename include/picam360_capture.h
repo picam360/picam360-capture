@@ -4,8 +4,6 @@
 #ifdef USE_GLES
 #include "GLES2/gl2.h"
 #include "GLES2/gl2ext.h"
-#include "EGL/egl.h"
-#include "EGL/eglext.h"
 #else
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -16,6 +14,7 @@
 #include <pthread.h>
 #include "mrevent.h"
 #include "rtp.h"
+#include "egl_handler.h"
 
 #include "picam360_capture_plugin.h"
 
@@ -149,23 +148,15 @@ typedef struct _PICAM360CAPTURE_T {
 	bool preview;
 	bool conf_sync;
 	bool video_direct;
-	char vistream_str[256];
-	char aistream_str[256];
+	char vistream_def[256];
+	char aistream_def[256];
 	int32_t screen_width;
 	int32_t screen_height;
 	uint32_t cam_width;
 	uint32_t cam_height;
-// OpenGL|ES objects
-#ifdef USE_GLES
-	pthread_t context_tid;
-	EGLContext context_tmp;
-	EGLDisplay display;
-	EGLConfig config;
-	EGLSurface surface;
-	EGLContext context;
-#else
-	GLFWwindow *glfw_window;
-#endif
+
+	EGL_HANDLER_T egl_handler;
+
 	int active_cam;
 	int num_of_cam;
 	pthread_t thread[MAX_CAM_NUM];

@@ -709,7 +709,7 @@ static void *record_thread_func(void* arg) {
 
 		num_of_bytes += len;
 		if (num_of_bytes - last_sync_bytes > SYNC_THRESHOLD) {
-			printf("fsync %lluMB\n", num_of_bytes / MB);
+			printf("fsync %luMB\n", num_of_bytes / MB);
 			last_sync_bytes = num_of_bytes;
 			fsync(fd); //this avoid that file size would be zero after os crash
 		}
@@ -775,7 +775,7 @@ static void *load_thread_func(void* arg) {
 
 		num_of_bytes += raw_pack->packetlength;
 		if (num_of_bytes - last_sync_bytes > SYNC_THRESHOLD) {
-			printf("loading info %lluMB\n", num_of_bytes / MB);
+			printf("loading info %luMB\n", num_of_bytes / MB);
 			last_sync_bytes = num_of_bytes;
 		}
 	}

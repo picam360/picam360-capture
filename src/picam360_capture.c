@@ -18,12 +18,6 @@
 #include <uuid/uuid.h>
 #include <limits.h>
 
-#define CONTEXT_SHARING
-
-#ifdef BCM_HOST
-#include "bcm_host.h"
-#endif
-
 #include "picam360_capture.h"
 #include "manual_mpu.h"
 #include "png_loader.h"
@@ -165,7 +159,7 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	strncpy(buff, _buff, sizeof(buff));
 
 	const int kMaxArgs = 32;
-	int argc = 1;
+	int argc = 0;
 	char *argv[kMaxArgs];
 	char *p = strtok(buff, "|");
 	while (p && argc < kMaxArgs - 1) {
@@ -176,11 +170,11 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	VSTREAMER_T *pre_streamer = NULL;
 	VSTREAMER_T **streamer_p = &streamer;
 	for (int s = 0; s < argc; s++) {
-		int argc2 = 1;
+		int argc2 = 0;
 		char *argv2[kMaxArgs];
 		char *p2 = strtok(argv[s], " ");
-		while (p2 && argc < kMaxArgs - 1) {
-			argv2[argc2++] = p;
+		while (p2 && argc2 < kMaxArgs - 1) {
+			argv2[argc2++] = p2;
 			p2 = strtok(0, " ");
 		}
 		for (int j = 0; state->vstreamer_factories[j] != NULL; j++) {
@@ -189,7 +183,7 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 				if((*streamer_p) == NULL){
 					break;
 				}
-				for (int p = 0; p < argc2; p++) {
+				for (int p = 1; p < argc2; p++) {
 					char *name = argv2[p];
 					char *value = strtok(argv2[p], "=");
 					(*streamer_p)->set_param((*streamer_p), name, value);
@@ -213,7 +207,7 @@ bool delete_vstream(VSTREAMER_T *stream) {
 static void init_istreams(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
-		strncpy(buff, state->vistream_str, sizeof(buff));
+		strncpy(buff, state->vistream_def, sizeof(buff));
 
 		state->vistreams[i] = create_vstream(state, buff);
 		if (state->vistreams[i]) {
@@ -253,15 +247,15 @@ static void init_options(PICAM360CAPTURE_T *state) {
 		}
 	}
 	{
-		json_t *value = json_object_get(options, "vistream_str");
+		json_t *value = json_object_get(options, "vistream_def");
 		if (value) {
-			strncpy(state->vistream_str, json_string_value(value), sizeof(state->vistream_str) - 1);
+			strncpy(state->vistream_def, json_string_value(value), sizeof(state->vistream_def) - 1);
 		}
 	}
 	{
-		json_t *value = json_object_get(options, "aistream_str");
+		json_t *value = json_object_get(options, "aistream_def");
 		if (value) {
-			strncpy(state->aistream_str, json_string_value(value), sizeof(state->aistream_str) - 1);
+			strncpy(state->aistream_def, json_string_value(value), sizeof(state->aistream_def) - 1);
 		}
 	}
 	state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
@@ -337,8 +331,8 @@ static void save_options(PICAM360CAPTURE_T *state) {
 
 	json_object_set_new(options, "num_of_cam", json_integer(state->num_of_cam));
 	json_object_set_new(options, "mpu_name", json_string(state->mpu_name));
-	json_object_set_new(options, "vistream_str", json_string(state->vistream_str));
-	json_object_set_new(options, "aistream_str", json_string(state->aistream_str));
+	json_object_set_new(options, "vistream_def", json_string(state->vistream_def));
+	json_object_set_new(options, "aistream_def", json_string(state->aistream_def));
 	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
 	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
 	json_object_set_new(options, "overlap", json_real(state->options.overlap));
@@ -1200,29 +1194,17 @@ static void set_camera_north(float value) {
 
 static void *get_display() {
 #ifdef USE_GLES
-	return state->display;
+	return state->egl_handler.display;
 #else
-	return state->glfw_window;
+	return state->egl_handler.glfw_window;
 #endif
 }
 static void lock_texture() {
 	pthread_mutex_lock(&state->texture_mutex);
-#ifdef USE_GLES
-#ifdef CONTEXT_SHARING
-	EGLBoolean result;
-	result = eglMakeCurrent(state->display, state->surface, state->surface, state->context);
-	assert(EGL_FALSE != result);
-#endif
-#endif
+	eh_activate_context(&state->egl_handler);
 }
 static void unlock_texture() {
-#ifdef USE_GLES
-#ifdef CONTEXT_SHARING
-	EGLBoolean result;
-	result = eglMakeCurrent(state->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-	assert(EGL_FALSE != result);
-#endif
-#endif
+	eh_deactivate_context(&state->egl_handler);
 	pthread_mutex_unlock(&state->texture_mutex);
 }
 static void set_cam_texture_cur(int cam_num, int cur) {
@@ -1777,8 +1759,8 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
-	strncpy(state->vistream_str, "ffmpeg", sizeof(state->vistream_str));
-	strncpy(state->aistream_str, "none", sizeof(state->aistream_str));
+	strncpy(state->vistream_def, "ffmpeg", sizeof(state->vistream_def));
+	strncpy(state->aistream_def, "none", sizeof(state->aistream_def));
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
@@ -1877,8 +1859,8 @@ int main(int argc, char *argv[]) {
 
 	init_plugin_host(state);
 
-	// Start OGLES
-	//TODO init_ogl(state);
+	// init EGL
+	init_egl(&state->egl_handler);
 
 	state->plugin_host.lock_texture();
 	{
@@ -1896,8 +1878,6 @@ int main(int argc, char *argv[]) {
 	}
 	state->plugin_host.unlock_texture();
 
-	init_istreams(state);
-
 	//frame id=0
 	if (frame_param[0]) {
 		char cmd[256];
@@ -1913,6 +1893,9 @@ int main(int argc, char *argv[]) {
 	if (state->mpu == NULL) {
 		printf("something wrong with %s\n", state->mpu_name);
 	}
+
+	//start vistreams
+	init_istreams(state);
 
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
