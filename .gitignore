@@ -38,6 +38,7 @@ picam360-capture.bin
 Makefile
 CMakeFiles
 CMakeCache.txt
+CMakeDoxyfile.in
 *.cmake
 /gdbcmd
 /config.json

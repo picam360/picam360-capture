@@ -20,8 +20,6 @@ typedef struct _EGL_HANDLER_T {
 	EGLConfig config;
 	EGLSurface surface;
 	EGLContext context;
-#else
-	GLFWwindow *glfw_window;
 #endif
 } EGL_HANDLER_T;
 

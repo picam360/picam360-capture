@@ -29,6 +29,7 @@ pkg_check_modules(LIBJPEG libpng REQUIRED)
 #add_executable 
 #target_link_libraries should be define below here
 add_library(picam360-common STATIC
+	src/reference.c
 	src/rtp.cc
 	src/mrevent.c
 	src/quaternion.c

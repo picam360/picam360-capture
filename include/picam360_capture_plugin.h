@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <jansson.h>//json parser
+#include "reference.h"
 #include "quaternion.h"
 #include "menu.h"
 #include "rtp.h"
@@ -39,6 +40,8 @@ enum PICAM360_MEMORY_TYPE {
 
 #define MAX_NUM_OF_PLANES 3
 typedef struct _PICAM360_IMAGE_T {
+	REFERENCE_H *ref;
+
 	enum PICAM360_IMAGE_TYPE img_type;
 	enum PICAM360_MEMORY_TYPE mem_type;
 	struct timeval timestamp;
@@ -51,8 +54,6 @@ typedef struct _PICAM360_IMAGE_T {
 	int id[MAX_NUM_OF_PLANES];//PICAM360_MEMORY_TYPE_EGL
 	unsigned char *meta;
 	unsigned int meta_size;
-
-	void (*release)(struct _PICAM360_IMAGE_T *_this);
 } PICAM360_IMAGE_T;
 
 typedef struct _MPU_T {

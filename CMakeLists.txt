@@ -41,6 +41,7 @@ set(GLSL_HEADERS
 #target_link_libraries should be define below here
 add_executable(picam360-capture.bin
 	src/picam360_capture.c
+	src/stream_mixer.c
 	src/manual_mpu.c
 	src/menu.c
 	src/egl_handler.c

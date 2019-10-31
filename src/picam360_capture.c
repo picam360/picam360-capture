@@ -19,6 +19,7 @@
 #include <limits.h>
 
 #include "picam360_capture.h"
+#include "stream_mixer.h"
 #include "manual_mpu.h"
 #include "png_loader.h"
 #include "img/logo_png.h"
@@ -214,6 +215,17 @@ static void init_istreams(PICAM360CAPTURE_T *state) {
 			char value[256];
 			sprintf(value, "%d", i);
 			state->vistreams[i]->set_param(state->vistreams[i], "cam_num", value);
+
+			VSTREAMER_T *pre = NULL;
+			VSTREAMER_T **tail_p = &state->vistreams[i];
+			for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
+				if((*tail_p)->next_streamer == NULL) {
+					pre = (*tail_p);
+				}
+			}
+			stream_mixer_create_input(tail_p);
+			(*tail_p)->pre_streamer = pre;
+
 			state->vistreams[i]->start(state->vistreams[i]);
 		}
 	}
@@ -1196,7 +1208,7 @@ static void *get_display() {
 #ifdef USE_GLES
 	return state->egl_handler.display;
 #else
-	return state->egl_handler.glfw_window;
+	return NULL;
 #endif
 }
 static void lock_texture() {
