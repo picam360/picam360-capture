@@ -212,7 +212,7 @@ void stream_mixer_init() {
 	pthread_mutex_init(&lg_mixer.mutex, NULL);
 }
 
-void stream_mixer_create_input(VSTREAMER_T **out_streamer) {
+int stream_mixer_create_input(VSTREAMER_T **out_streamer) {
 	VSTREAMER_T *streamer = (VSTREAMER_T*) malloc(sizeof(stream_mixer_input));
 	memset(streamer, 0, sizeof(stream_mixer_input));
 	strcpy(streamer->name, "MIXER_INPUT");
@@ -223,7 +223,7 @@ void stream_mixer_create_input(VSTREAMER_T **out_streamer) {
 
 	stream_mixer_input *_private = (stream_mixer_input*) streamer;
 	_private->mixer = &lg_mixer;
-	_private->id = ++_private->mixer->input_stream_last_id;
+	_private->id = ++_private->mixer->input_stream_last_id;//id should start from 1
 
 	pthread_mutex_lock(&_private->mixer->mutex);
 	{
@@ -238,9 +238,10 @@ void stream_mixer_create_input(VSTREAMER_T **out_streamer) {
 	if (out_streamer) {
 		*out_streamer = streamer;
 	}
+	return _private->id;
 }
 
-void stream_mixer_create_output(VSTREAMER_T **out_streamer) {
+int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	VSTREAMER_T *streamer = (VSTREAMER_T*) malloc(sizeof(stream_mixer_output));
 	memset(streamer, 0, sizeof(stream_mixer_output));
 	strcpy(streamer->name, "MIXER_OUTPUT");
@@ -251,7 +252,7 @@ void stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 
 	stream_mixer_output *_private = (stream_mixer_output*) streamer;
 	_private->mixer = &lg_mixer;
-	_private->id = ++_private->mixer->output_stream_last_id;
+	_private->id = ++_private->mixer->output_stream_last_id;//id should start from 1
 	mrevent_init(&_private->frame_ready);
 
 	pthread_mutex_lock(&_private->mixer->mutex);
@@ -267,4 +268,5 @@ void stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	if (out_streamer) {
 		*out_streamer = streamer;
 	}
+	return _private->id;
 }

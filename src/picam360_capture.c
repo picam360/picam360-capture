@@ -185,8 +185,8 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 					break;
 				}
 				for (int p = 1; p < argc2; p++) {
-					char *name = argv2[p];
-					char *value = strtok(argv2[p], "=");
+					char *name = strtok(argv2[p], "=");
+					char *value = strtok(NULL, "=");
 					(*streamer_p)->set_param((*streamer_p), name, value);
 				}
 				(*streamer_p)->pre_streamer = pre_streamer;
@@ -512,11 +512,26 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
+
 			if(vostream_p == NULL){
 				printf("over MAX_OSTREAM_NUM\n");
 			} else {
-				(*vostream_p)->vstreamer = create_vstream(state, param);
-				(*vostream_p)->id = ++state->last_vostream_id;//frame id should start from 1
+				VSTREAMER_T *mixer_output = NULL;
+				int id = stream_mixer_create_output(&mixer_output);
+				VSTREAMER_T *vstreamer = create_vstream(state, param);
+				mixer_output->next_streamer = vstreamer;
+				vstreamer->pre_streamer = mixer_output;
+
+				state->last_vostream_id = id;
+				(*vostream_p) = (OSTREAM_T*)malloc(sizeof(OSTREAM_T));
+				(*vostream_p)->vstreamer = mixer_output;
+				(*vostream_p)->id = id;
+
+				char value[256];
+				sprintf(value, "%d", id);
+				vstreamer->set_param(vstreamer, "id", value);
+
+				mixer_output->start(mixer_output);
 			}
 		}
 	} else if (strncmp(cmd, "delete_vostream", sizeof(buff)) == 0) {

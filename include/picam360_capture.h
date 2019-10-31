@@ -106,9 +106,6 @@ typedef struct _OSTREAM_T {
 	bool is_recording;
 	bool stereo;
 
-	VSTREAMER_T *renderer;
-	VSTREAMER_T *encoder;
-
 	enum OUTPUT_MODE output_mode;
 	enum OUTPUT_TYPE output_type;
 	char output_filepath[256];
