@@ -91,7 +91,7 @@ typedef struct _FRAME_INFO_T {
 	struct timeval after_encoded;
 } FRAME_INFO_T;
 
-typedef struct _OSTREAM_T {
+typedef struct _VOSTREAM_T {
 	int id;
 	GLuint framebuffer;
 	GLuint texture;
@@ -126,11 +126,11 @@ typedef struct _OSTREAM_T {
 
 	void *custom_data;
 	//event
-	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _OSTREAM_T *);
-	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _OSTREAM_T *);
+	void (*after_processed_callback)(struct _PICAM360CAPTURE_T *, struct _VOSTREAM_T *);
+	void (*befor_deleted_callback)(struct _PICAM360CAPTURE_T *, struct _VOSTREAM_T *);
 
 	VSTREAMER_T *vstreamer;
-} OSTREAM_T;
+} VOSTREAM_T;
 typedef struct _MODEL_T {
 	void *program;
 	GLuint vbo;
@@ -207,7 +207,7 @@ typedef struct _PICAM360CAPTURE_T {
 	VSTREAMER_T *aistream;
 
 	unsigned int last_vostream_id;
-	OSTREAM_T *ostreams[MAX_OSTREAM_NUM];
+	VOSTREAM_T *vostreams[MAX_OSTREAM_NUM];
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;

@@ -31,6 +31,7 @@ option(USE_ROV_AGENT "Use ROV agent" OFF)
 option(USE_ROV_DRIVER "Use ROV driver" OFF)
 
 #common
+add_subdirectory(rtp_streamer)
 #add_subdirectory(video_transmitter)
 #add_subdirectory(video_reciever)
 #add_subdirectory(window_renderer)

@@ -126,7 +126,7 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 	GLuint tex;
 	PICAM360_IMAGE_T image = {};
 	{
-		state->logo_image.img_type = PICAM360_IMAGE_TYPE_RGBA;
+		memcpy(state->logo_image.img_type, "RGBA", 4);
 		state->logo_image.num_of_planes = 1;
 		load_png(filename, &image.pixels[0], &image.width[0], &image.height[0], &image.stride[0]);
 	}
@@ -178,6 +178,7 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 			argv2[argc2++] = p2;
 			p2 = strtok(0, " ");
 		}
+		bool supported = false;
 		for (int j = 0; state->vstreamer_factories[j] != NULL; j++) {
 			if (strncmp(state->vstreamer_factories[j]->name, argv2[0], sizeof(state->vstreamer_factories[j]->name)) == 0) {
 				state->vstreamer_factories[j]->create_vstreamer(state->vstreamer_factories[j], streamer_p);
@@ -192,8 +193,13 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 				(*streamer_p)->pre_streamer = pre_streamer;
 				pre_streamer = (*streamer_p);
 				streamer_p = &(*streamer_p)->next_streamer;
+
+				supported = true;
 				break;
 			}
+		}
+		if(supported == false){
+			printf("%s : not supported\n", argv2[0]);
 		}
 	}
 
@@ -491,7 +497,7 @@ int _command_handler(const char *_buff) {
 					switch (opt) {
 					case 'o':
 						for(int i=0;i<MAX_OSTREAM_NUM;i++){
-							if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+							if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 								//strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 								//printf("snap %d : %s\n", frame->id, frame->output_filepath);
 								break;
@@ -502,13 +508,13 @@ int _command_handler(const char *_buff) {
 				}
 			}
 		}
-	} else if (strncmp(cmd, "create_ostream", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "create_vostream", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			OSTREAM_T **vostream_p = NULL;
+			VOSTREAM_T **vostream_p = NULL;
 			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->ostreams[i] == NULL){
-					vostream_p = &state->ostreams[i];
+				if(state->vostreams[i] == NULL){
+					vostream_p = &state->vostreams[i];
 					break;
 				}
 			}
@@ -523,7 +529,7 @@ int _command_handler(const char *_buff) {
 				vstreamer->pre_streamer = mixer_output;
 
 				state->last_vostream_id = id;
-				(*vostream_p) = (OSTREAM_T*)malloc(sizeof(OSTREAM_T));
+				(*vostream_p) = (VOSTREAM_T*)malloc(sizeof(VOSTREAM_T));
 				(*vostream_p)->vstreamer = mixer_output;
 				(*vostream_p)->id = id;
 
@@ -562,8 +568,8 @@ int _command_handler(const char *_buff) {
 				}
 			}
 			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
-					state->ostreams[i]->delete_after_processed = true;
+				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
+					state->vostreams[i]->delete_after_processed = true;
 					break;
 				}
 			}
@@ -595,7 +601,7 @@ int _command_handler(const char *_buff) {
 				}
 			}
 			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 					//TODO:set fps
 					break;
 				}
@@ -629,7 +635,7 @@ int _command_handler(const char *_buff) {
 					switch (opt) {
 					case 'o':
 						for(int i=0;i<MAX_OSTREAM_NUM;i++){
-							if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+							if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 								//strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 								//printf("start_record %d : %s\n", frame->id, frame->output_filepath);
 								break;
@@ -664,7 +670,7 @@ int _command_handler(const char *_buff) {
 			}
 			if (id >= 0) {
 				for(int i=0;i<MAX_OSTREAM_NUM;i++){
-					if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+					if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 //						if (frame->output_fd > 0) {
 //							close(frame->output_fd);
 //							frame->output_fd = -1;
@@ -770,7 +776,7 @@ int _command_handler(const char *_buff) {
 
 		if (quat_valid) {
 			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 //					VECTOR4D_T value = { .ary = { x, y, z, w } };
 //					state->plugin_host.lock_texture();
 //					frame->view_mpu->set_quaternion(frame->view_mpu->user_data, value);
@@ -794,7 +800,7 @@ int _command_handler(const char *_buff) {
 			float fov;
 			sscanf(param, "%i=%f", &id, &fov);
 			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 //					frame->fov = fov;
 //					printf("set_fov\n");
 					break;
@@ -815,7 +821,7 @@ int _command_handler(const char *_buff) {
 						int num = sscanf(param, "id=%d", &id);
 						if (num == 1) {
 							for(int i=0;i<MAX_OSTREAM_NUM;i++){
-								if(state->ostreams[i] != NULL && state->ostreams[i]->id == id){
+								if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
 									//frame->stereo = value;
 									break;
 								}
@@ -1629,10 +1635,6 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 ///////////////////////////////////////////////////////
 #if (1) //rtp block
 
-#define PT_STATUS 100
-#define PT_CMD 101
-#define PT_CAM_BASE 110
-
 static char lg_command[256] = { };
 static int lg_command_id = 0;
 static int lg_ack_command_id_downstream = -1;
@@ -1908,7 +1910,7 @@ int main(int argc, char *argv[]) {
 	//frame id=0
 	if (frame_param[0]) {
 		char cmd[256];
-		sprintf(cmd, "create_ostream %s", frame_param);
+		sprintf(cmd, "create_vostream %s", frame_param);
 		state->plugin_host.send_command(cmd);
 	}
 	//set mpu

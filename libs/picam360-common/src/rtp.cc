@@ -152,6 +152,7 @@ typedef struct _RTP_T {
 	uint16_t seqnr = 0;
 	int tx_fd = -1;
 
+	bool buffering_run = false;
 	pthread_t buffering_thread;
 	MREVENT_T buffering_ready;
 	pthread_mutex_t buffering_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
@@ -429,7 +430,7 @@ static void *buffering_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "RTP BUFFERING");
 
 	int srv_fd = -1;
-	while (_this->receive_run) {
+	while (_this->buffering_run) {
 		int rx_fd = -1;
 		switch (_this->rx_socket_type) {
 		case RTP_SOCKET_TYPE_TCP:
@@ -468,7 +469,7 @@ static void *buffering_thread_func(void* arg) {
 		if (rx_fd < 0) {
 			return NULL;
 		}
-		while (_this->receive_run) {
+		while (_this->buffering_run) {
 			RTPPacket *raw_pack = NULL;
 			switch (_this->rx_socket_type) {
 			case RTP_SOCKET_TYPE_TCP:
@@ -790,25 +791,32 @@ RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, 
 
 	rtp_set_buffer_size(_this, _this->rx_buffer_size, _this->tx_buffer_size);
 
-	_this->rx_socket_type = rx_socket_type;
-	_this->tx_socket_type = tx_socket_type;
 	_this->bandwidth_limit = bandwidth_limit;
-	_this->receive_run = true;
 
 	signal(SIGPIPE, SIG_IGN);
 
-	_this->rx_addr.sin_family = AF_INET;
-	_this->rx_addr.sin_port = htons(portbase);
-	_this->rx_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	if(portbase != 0) {
+		_this->rx_socket_type = rx_socket_type;
 
-	_this->tx_addr.sin_family = AF_INET;
-	_this->tx_addr.sin_port = htons(destport);
-	_this->tx_addr.sin_addr.s_addr = inet_addr(destip_str);
+		_this->rx_addr.sin_family = AF_INET;
+		_this->rx_addr.sin_port = htons(portbase);
+		_this->rx_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	pthread_create(&_this->buffering_thread, NULL, buffering_thread_func, (void*) _this);
-	mrevent_init(&_this->buffering_ready);
+		_this->receive_run = true;
+		pthread_create(&_this->receive_thread, NULL, receive_thread_func, (void*) _this);
+	}
 
-	pthread_create(&_this->receive_thread, NULL, receive_thread_func, (void*) _this);
+	if(destport != 0){
+		_this->tx_socket_type = tx_socket_type;
+
+		_this->tx_addr.sin_family = AF_INET;
+		_this->tx_addr.sin_port = htons(destport);
+		_this->tx_addr.sin_addr.s_addr = inet_addr(destip_str);
+
+		_this->buffering_run = true;
+		pthread_create(&_this->buffering_thread, NULL, buffering_thread_func, (void*) _this);
+		mrevent_init(&_this->buffering_ready);
+	}
 
 	mrevent_init(&_this->record_packet_ready);
 	mrevent_init(&_this->play_time_updated);

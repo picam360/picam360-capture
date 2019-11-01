@@ -8,6 +8,10 @@
 #include "menu.h"
 #include "rtp.h"
 
+#define PT_STATUS 100
+#define PT_CMD 101
+#define PT_CAM_BASE 110
+
 #define MAX_CAM_NUM 8
 
 //0x00** is reserved by system
@@ -30,10 +34,6 @@ enum PICAM360_CONTROLLER_EVENT {
 	PICAM360_CONTROLLER_EVENT_NONE, PICAM360_CONTROLLER_EVENT_NEXT, PICAM360_CONTROLLER_EVENT_BACK,
 };
 
-enum PICAM360_IMAGE_TYPE {
-	PICAM360_IMAGE_TYPE_BYTE, PICAM360_IMAGE_TYPE_RGB, PICAM360_IMAGE_TYPE_RGBA, PICAM360_IMAGE_TYPE_YUV, PICAM360_IMAGE_TYPE_I420,
-};
-
 enum PICAM360_MEMORY_TYPE {
 	PICAM360_MEMORY_TYPE_PROCESS, PICAM360_MEMORY_TYPE_KERNEL, PICAM360_MEMORY_TYPE_GPU, PICAM360_MEMORY_TYPE_EGL,
 };
@@ -42,18 +42,19 @@ enum PICAM360_MEMORY_TYPE {
 typedef struct _PICAM360_IMAGE_T {
 	REFERENCE_H *ref;
 
-	enum PICAM360_IMAGE_TYPE img_type;
 	enum PICAM360_MEMORY_TYPE mem_type;
+	char img_type[4];//"RGB"|"RGBA"|"I420"|"YUV"|"JPEG"|"H264"|"VP8"
 	struct timeval timestamp;
+
+	unsigned int meta_size;
+	unsigned char *meta;
 
 	unsigned int num_of_planes;
 	unsigned int width[MAX_NUM_OF_PLANES];
 	unsigned int height[MAX_NUM_OF_PLANES];
 	unsigned int stride[MAX_NUM_OF_PLANES];
-	unsigned char *pixels[MAX_NUM_OF_PLANES];
+	unsigned char *pixels[MAX_NUM_OF_PLANES];//size should be stride*height
 	int id[MAX_NUM_OF_PLANES];//PICAM360_MEMORY_TYPE_EGL
-	unsigned char *meta;
-	unsigned int meta_size;
 } PICAM360_IMAGE_T;
 
 typedef struct _MPU_T {
