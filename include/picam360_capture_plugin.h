@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <jansson.h>//json parser
+#include <uuid/uuid.h>
 #include "reference.h"
 #include "quaternion.h"
 #include "menu.h"
@@ -43,6 +44,8 @@ typedef struct _PICAM360_IMAGE_T {
 	REFERENCE_H *ref;
 
 	enum PICAM360_MEMORY_TYPE mem_type;
+
+	uuid_t uuid;
 	char img_type[4];//"RGB"|"RGBA"|"I420"|"YUV"|"JPEG"|"H264"|"VP8"
 	struct timeval timestamp;
 
@@ -159,6 +162,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*set_texture_size)(uint32_t width, uint32_t height);
 	int (*load_texture)(const char *filename, uint32_t *tex_out);
 	void (*get_logo_image)(PICAM360_IMAGE_T *img);
+	void (*get_rendering_params)(VECTOR4D_T view_quat, RENDERING_PARAMS_T *params);
 
 	MENU_T *(*get_menu)();
 	bool (*get_menu_visible)();

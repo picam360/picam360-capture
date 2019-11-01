@@ -139,6 +139,7 @@ typedef struct _MODEL_T {
 } MODEL_T;
 typedef struct _PICAM360CAPTURE_T {
 	PLUGIN_HOST_T plugin_host;
+	uuid_t uuid;
 	pthread_mutex_t mutex;
 	char config_filepath[512];
 	int split;

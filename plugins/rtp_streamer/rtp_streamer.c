@@ -48,73 +48,40 @@ typedef struct _NALU_STREAM_DEF {
 	unsigned char EOI[2];
 	unsigned char SEI_CODE;
 } NALU_STREAM_DEF;
-//static int get_frame_info_str(FRAME_T *frame, FRAME_INFO_T *frame_info, char *buff){
-//	int len;
-//	if (frame_info) { // sei for a frame
-//		int server_key = frame_info->server_key.tv_sec * 1000 + frame_info->server_key.tv_usec;
-//		float idle_time_sec = 0;
-//		float frame_processed_sec = 0;
-//		float encoded_sec = 0;
-//		if (frame_info->client_key[0] != '\0') {
-//			struct timeval diff;
-//			gettimeofday(&frame_info->after_encoded, NULL);
-//
-//			timersub(&frame_info->before_redraw_render_texture, &frame_info->server_key, &diff);
-//			idle_time_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-//
-//			timersub(&frame_info->after_redraw_render_texture, &frame_info->before_redraw_render_texture, &diff);
-//			frame_processed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-//
-//			timersub(&frame_info->after_encoded, &frame_info->after_redraw_render_texture, &diff);
-//			encoded_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-//		}
-//
-//		uuid_t uuid;
-//		uuid_generate(uuid);
-//		char uuid_str[37];//UUID_STR_LEN
-//		uuid_unparse_upper(uuid, uuid_str);
-//
-//		len =
-//				sprintf(buff,
-//						"<picam360:frame uuid=\"%s\" frame_id=\"%d\" frame_width=\"%d\" frame_height=\"%d\" mode=\"%s\" view_quat=\"%.3f,%.3f,%.3f,%.3f\" fov=\"%.3f\" client_key=\"%s\" server_key=\"%d\" idle_time=\"%.3f\" frame_processed=\"%.3f\" encoded=\"%.3f\" />",
-//						uuid_str, frame->id, frame->width, frame->height, frame->renderer->name, frame_info->view_quat.x, frame_info->view_quat.y, frame_info->view_quat.z, frame_info->view_quat.w, frame_info->fov,
-//						frame_info->client_key, server_key, idle_time_sec, frame_processed_sec, encoded_sec);
-//	} else {
-//		len = sprintf(buff, "<picam360:frame frame_id=\"%d\" />", frame->id);
-//	}
-//	return len;
-//}
-//static void send_xmp(FRAME_T *frame, FRAME_INFO_T *frame_info, NALU_STREAM_DEF def) {
-//	unsigned char header_pack[512];
-//	char *xmp = (char*) header_pack + sizeof(def.SOI);
-//	int len = 0;
-//	len += get_frame_info_str(frame, frame_info, xmp + 4);
-//	xmp[2] = (len >> 8) & 0xFF;
-//	xmp[3] = (len >> 0) & 0xFF;
-//	len += 2; //length code
-//	xmp[0] = 0xFF;
-//	xmp[1] = 0xE1;
-//	len += 2; //xmp code
-//	memcpy(header_pack, def.SOI, sizeof(def.SOI));
-//	len += 2; //SOI
-//	rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
-//}
-//static void send_sei(FRAME_T *frame, FRAME_INFO_T *frame_info, NALU_STREAM_DEF def) {
-//	unsigned char header_pack[512];
-//	char *sei = (char*) header_pack + sizeof(def.SOI);
-//	int len = 0;
-//	sei[4] = def.SEI_CODE; //nal_type:sei
-//	len += 1; //nal header
-//	len += get_frame_info_str(frame, frame_info, sei + 5);
-//	sei[0] = (len >> 24) & 0xFF;
-//	sei[1] = (len >> 16) & 0xFF;
-//	sei[2] = (len >> 8) & 0xFF;
-//	sei[3] = (len >> 0) & 0xFF;
-//	len += 4; //start code
-//	memcpy(header_pack, def.SOI, sizeof(def.SOI));
-//	len += 2; //SOI
-//	rtp_sendpacket(state->rtp, header_pack, len, PT_CAM_BASE);
-//}
+
+static void send_xmp(RTP_T *rtp, PICAM360_IMAGE_T *image, NALU_STREAM_DEF def) {
+	unsigned char header_pack[512];
+	char *xmp = (char*) header_pack + sizeof(def.SOI);
+	int len = image->meta_size;
+	memcpy(xmp + 4, image->meta, image->meta_size);
+	xmp[2] = (len >> 8) & 0xFF;
+	xmp[3] = (len >> 0) & 0xFF;
+	len += 2; //length code
+	xmp[0] = 0xFF;
+	xmp[1] = 0xE1;
+	len += 2; //xmp code
+	memcpy(header_pack, def.SOI, sizeof(def.SOI));
+	len += 2; //SOI
+	rtp_sendpacket(rtp, header_pack, len, PT_CAM_BASE);
+}
+
+static void send_sei(RTP_T *rtp, PICAM360_IMAGE_T *image, NALU_STREAM_DEF def) {
+	unsigned char header_pack[512];
+	char *sei = (char*) header_pack + sizeof(def.SOI);
+	int len = image->meta_size;
+	sei[4] = def.SEI_CODE; //nal_type:sei
+	len += 1; //nal header
+	memcpy(sei + 5, image->meta, image->meta_size);
+	sei[0] = (len >> 24) & 0xFF;
+	sei[1] = (len >> 16) & 0xFF;
+	sei[2] = (len >> 8) & 0xFF;
+	sei[3] = (len >> 0) & 0xFF;
+	len += 4; //start code
+	memcpy(header_pack, def.SOI, sizeof(def.SOI));
+	len += 2; //SOI
+	rtp_sendpacket(rtp, header_pack, len, PT_CAM_BASE);
+}
+
 static void _send_image(RTP_T *rtp, unsigned char *data, unsigned int data_len) {
 	for (int j = 0; j < data_len;) {
 		int len;
@@ -160,14 +127,14 @@ static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
 			|| memcmp(image->img_type, "H265", 4) == 0
 			|| memcmp(image->img_type, "H264", 4) == 0) {
 		//header pack
-		//send_sei(frame, frame_info, def);
+		send_sei(rtp, image, def);
 		rtp_flush(rtp);
 		_send_image(rtp, data, data_len);
 		rtp_sendpacket(rtp, def.EOI, sizeof(def.EOI), PT_CAM_BASE);
 		rtp_flush(rtp);
 	} else if (memcmp(image->img_type, "JPEG", 4) == 0) {
 		//header pack
-		//send_xmp(frame, frame_info, def);
+		send_xmp(rtp, image, def);
 		rtp_flush(rtp);
 		{
 			int cur = 0;
@@ -189,6 +156,7 @@ static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
 		rtp_flush(rtp);
 	}
 }
+
 static void* streaming_thread_fnc(void *obj) {
 	rtp_streamer_private *_this = (rtp_streamer_private*) obj;
 

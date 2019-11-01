@@ -60,6 +60,7 @@ link_directories (libs/picam360-common)
 
 pkg_check_modules(JANSSON jansson REQUIRED)
 pkg_check_modules(LIBEDIT libedit REQUIRED)
+pkg_check_modules(UUID uuid REQUIRED)
 
 include_directories(
 	./
@@ -67,10 +68,12 @@ include_directories(
 	./libs/picam360-common/include
 	${JANSSON_INCLUDE_DIRS}
 	${LIBEDIT_INCLUDE_DIRS}
+	${UUID_INCLUDE_DIRS}
 )
 link_directories(
 	${JANSSON_LIBRARY_DIRS}
 	${LIBEDIT_LIBRARY_DIRS}
+	${UUID_LIBRARY_DIRS}
 )
 
 #opengl
@@ -155,9 +158,9 @@ set_target_properties(picam360-capture.bin PROPERTIES
 target_link_libraries(picam360-capture.bin
 	${JANSSON_LIBRARIES}
 	${LIBEDIT_LIBRARIES}
+	${UUID_LIBRARIES}
 	pthread
 	dl
-	uuid
 )
 
 #opengl

@@ -270,3 +270,14 @@ int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	}
 	return _private->id;
 }
+
+int stream_mixer_get_output(int id, VSTREAMER_T **streamer) {
+	for (stream_mixer_output *node = lg_mixer.output_head; node != NULL;
+			node = node->next) {
+		if(node->id == id) {
+			*streamer = &node->super;
+			return node->id;
+		}
+	}
+	return -1;
+}

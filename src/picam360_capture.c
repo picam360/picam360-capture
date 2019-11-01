@@ -90,17 +90,18 @@ static float lg_cam_fps[MAX_CAM_NUM] = { };
 static float lg_cam_frameskip[MAX_CAM_NUM] = { };
 static float lg_cam_bandwidth = 0;
 
-
 static void loading_callback(void *user_data, int ret) {
 	printf("end of loading\n");
 }
 
-static json_t *json_load_file_without_comment(const char *path, size_t flags, json_error_t *error) {
+static json_t* json_load_file_without_comment(const char *path, size_t flags,
+		json_error_t *error) {
 	int ret;
 	json_t *options;
 	char buff[1024];
 	char *tmp_conf_filepath = "/tmp/picam360-capture.conf.json";
-	snprintf(buff, sizeof(buff), "grep -v -e '^\\s*#' %s > %s", path, tmp_conf_filepath);
+	snprintf(buff, sizeof(buff), "grep -v -e '^\\s*#' %s > %s", path,
+			tmp_conf_filepath);
 	ret = system(buff);
 	options = json_load_file(tmp_conf_filepath, flags, error);
 	return options;
@@ -116,31 +117,33 @@ static int end_width(const char *str, const char *suffix) {
 	return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
 
-static void glfwErrorCallback(int num, const char* err_str) {
+static void glfwErrorCallback(int num, const char *err_str) {
 	printf("GLFW Error: %s\n", err_str);
 }
-
 
 static int load_texture(const char *filename, uint32_t *tex_out) {
 	GLenum err;
 	GLuint tex;
-	PICAM360_IMAGE_T image = {};
+	PICAM360_IMAGE_T image = { };
 	{
 		memcpy(state->logo_image.img_type, "RGBA", 4);
 		state->logo_image.num_of_planes = 1;
-		load_png(filename, &image.pixels[0], &image.width[0], &image.height[0], &image.stride[0]);
+		load_png(filename, &image.pixels[0], &image.width[0], &image.height[0],
+				&image.stride[0]);
 	}
 
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width[0], image.height[0], 0, GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width[0], image.height[0], 0,
+			GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
 	if ((err = glGetError()) != GL_NO_ERROR) {
 #ifdef USE_GLES
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
 #else
-		printf("glTexImage2D failed. Could not allocate texture buffer. %s\n", gluErrorString(err));
+		printf("glTexImage2D failed. Could not allocate texture buffer. %s\n",
+				gluErrorString(err));
 #endif
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -149,13 +152,105 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 
 	return 0;
 }
+
 static void get_logo_image(PICAM360_IMAGE_T *img) {
 	if (img) {
 		*img = state->logo_image;
 	}
 }
 
-VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
+static void get_rendering_params(VECTOR4D_T view_quat, RENDERING_PARAMS_T *params) {
+	{
+		//params->stereo = frame->stereo;
+		//params->fov = frame->fov;
+		params->active_cam = state->active_cam;
+		params->num_of_cam = state->num_of_cam;
+	}
+	{ //cam_attitude //depth axis is z, vertical asis is y
+		float view_matrix[16];
+		float north_matrix[16];
+		float world_matrix[16];
+
+		{ // Rv : view
+			mat4_identity(view_matrix);
+			mat4_fromQuat(view_matrix, view_quat.ary);
+			mat4_invert(view_matrix, view_matrix);
+		}
+
+		{ // Rn : north
+			mat4_identity(north_matrix);
+			float north = state->plugin_host.get_view_north();
+			mat4_rotateY(north_matrix, north_matrix, north * M_PI / 180);
+		}
+
+		{ // Rw : view coodinate to world coodinate and view heading to ground initially
+			mat4_identity(world_matrix);
+			mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
+		}
+
+		for (int i = 0; i < state->num_of_cam; i++) {
+			float *unif_matrix = params->cam_attitude[i];
+			float cam_matrix[16];
+			{ // Rc : cam orientation
+				mat4_identity(cam_matrix);
+				if (state->camera_coordinate_from_device) {
+					mat4_fromQuat(cam_matrix, state->camera_quaternion[i].ary);
+				} else {
+					//euler Y(yaw)X(pitch)Z(roll)
+					mat4_rotateZ(cam_matrix, cam_matrix, state->camera_roll);
+					mat4_rotateX(cam_matrix, cam_matrix, state->camera_pitch);
+					mat4_rotateY(cam_matrix, cam_matrix, state->camera_yaw);
+				}
+			}
+
+			{ // Rco : cam offset  //euler Y(yaw)X(pitch)Z(roll)
+				float *cam_offset_matrix = params->cam_offset_matrix[i];
+				mat4_identity(cam_offset_matrix);
+				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_roll[i]);
+				mat4_rotateX(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_pitch[i]);
+				mat4_rotateY(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_yaw[i]);
+				mat4_invert(cam_offset_matrix, cam_offset_matrix);
+				mat4_multiply(cam_matrix, cam_matrix, cam_offset_matrix); // Rc'=RcoRc
+			}
+
+			{ //RcRv(Rc^-1)RcRw
+				mat4_identity(unif_matrix);
+				mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
+				mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
+				//mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
+				mat4_multiply(unif_matrix, unif_matrix, cam_matrix); // RcRnRvRw
+			}
+			mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
+//			{
+//				//normalize det = 1
+//				float det = mat4_determinant(unif_matrix);
+//				float det_4 = pow(det, 0.25);
+//				for (int i = 0; i < 16; i++) {
+//					unif_matrix[i] / det_4;
+//				}
+//				//printf("det=%f, %f, %f\n", det, pow(det, 0.25), mat4_determinant(unif_matrix));
+//			}
+		}
+	}
+	{ //cam_options
+		for (int i = 0; i < state->num_of_cam; i++) {
+			params->cam_offset_x[i] = state->options.cam_offset_x[i];
+			params->cam_offset_y[i] = state->options.cam_offset_y[i];
+			params->cam_horizon_r[i] = state->options.cam_horizon_r[i];
+			params->cam_aov[i] = state->options.cam_aov[i];
+			if (state->options.config_ex_enabled) {
+				params->cam_offset_x[i] += state->options.cam_offset_x_ex[i];
+				params->cam_offset_y[i] += state->options.cam_offset_y_ex[i];
+				params->cam_horizon_r[i] += state->options.cam_horizon_r_ex[i];
+			}
+			params->cam_horizon_r[i] *= state->camera_horizon_r_bias;
+			params->cam_aov[i] /= state->refraction;
+		}
+	}
+}
+
+
+VSTREAMER_T* create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 
@@ -180,9 +275,11 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 		}
 		bool supported = false;
 		for (int j = 0; state->vstreamer_factories[j] != NULL; j++) {
-			if (strncmp(state->vstreamer_factories[j]->name, argv2[0], sizeof(state->vstreamer_factories[j]->name)) == 0) {
-				state->vstreamer_factories[j]->create_vstreamer(state->vstreamer_factories[j], streamer_p);
-				if((*streamer_p) == NULL){
+			if (strncmp(state->vstreamer_factories[j]->name, argv2[0],
+					sizeof(state->vstreamer_factories[j]->name)) == 0) {
+				state->vstreamer_factories[j]->create_vstreamer(
+						state->vstreamer_factories[j], streamer_p);
+				if ((*streamer_p) == NULL) {
 					break;
 				}
 				for (int p = 1; p < argc2; p++) {
@@ -198,7 +295,7 @@ VSTREAMER_T *create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 				break;
 			}
 		}
-		if(supported == false){
+		if (supported == false) {
 			printf("%s : not supported\n", argv2[0]);
 		}
 	}
@@ -220,12 +317,13 @@ static void init_istreams(PICAM360CAPTURE_T *state) {
 		if (state->vistreams[i]) {
 			char value[256];
 			sprintf(value, "%d", i);
-			state->vistreams[i]->set_param(state->vistreams[i], "cam_num", value);
+			state->vistreams[i]->set_param(state->vistreams[i], "cam_num",
+					value);
 
 			VSTREAMER_T *pre = NULL;
 			VSTREAMER_T **tail_p = &state->vistreams[i];
 			for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
-				if((*tail_p)->next_streamer == NULL) {
+				if ((*tail_p)->next_streamer == NULL) {
 					pre = (*tail_p);
 				}
 			}
@@ -251,50 +349,65 @@ static void init_istreams(PICAM360CAPTURE_T *state) {
  ***********************************************************/
 static void init_options(PICAM360CAPTURE_T *state) {
 	json_error_t error;
-	json_t *options = json_load_file_without_comment(state->config_filepath, 0, &error);
+	json_t *options = json_load_file_without_comment(state->config_filepath, 0,
+			&error);
 	if (options == NULL) {
 		fputs(error.text, stderr);
 		exit(1);
 	}
-	state->num_of_cam = json_number_value(json_object_get(options, "num_of_cam"));
+	state->num_of_cam = json_number_value(
+			json_object_get(options, "num_of_cam"));
 	state->num_of_cam = MAX(0, MIN(state->num_of_cam, MAX_CAM_NUM));
 	{
 		json_t *value = json_object_get(options, "mpu_name");
 		if (value) {
-			strncpy(state->mpu_name, json_string_value(value), sizeof(state->mpu_name) - 1);
+			strncpy(state->mpu_name, json_string_value(value),
+					sizeof(state->mpu_name) - 1);
 		}
 	}
 	{
 		json_t *value = json_object_get(options, "vistream_def");
 		if (value) {
-			strncpy(state->vistream_def, json_string_value(value), sizeof(state->vistream_def) - 1);
+			strncpy(state->vistream_def, json_string_value(value),
+					sizeof(state->vistream_def) - 1);
 		}
 	}
 	{
 		json_t *value = json_object_get(options, "aistream_def");
 		if (value) {
-			strncpy(state->aistream_def, json_string_value(value), sizeof(state->aistream_def) - 1);
+			strncpy(state->aistream_def, json_string_value(value),
+					sizeof(state->aistream_def) - 1);
 		}
 	}
-	state->options.sharpness_gain = json_number_value(json_object_get(options, "sharpness_gain"));
-	state->options.color_offset = json_number_value(json_object_get(options, "color_offset"));
-	state->options.overlap = json_number_value(json_object_get(options, "overlap"));
+	state->options.sharpness_gain = json_number_value(
+			json_object_get(options, "sharpness_gain"));
+	state->options.color_offset = json_number_value(
+			json_object_get(options, "color_offset"));
+	state->options.overlap = json_number_value(
+			json_object_get(options, "overlap"));
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_pitch", i);
-		state->options.cam_offset_pitch[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_offset_pitch[i] = json_number_value(
+				json_object_get(options, buff));
 		sprintf(buff, "cam%d_offset_yaw", i);
-		state->options.cam_offset_yaw[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_offset_yaw[i] = json_number_value(
+				json_object_get(options, buff));
 		sprintf(buff, "cam%d_offset_roll", i);
-		state->options.cam_offset_roll[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_offset_roll[i] = json_number_value(
+				json_object_get(options, buff));
 		sprintf(buff, "cam%d_offset_x", i);
-		state->options.cam_offset_x[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_offset_x[i] = json_number_value(
+				json_object_get(options, buff));
 		sprintf(buff, "cam%d_offset_y", i);
-		state->options.cam_offset_y[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_offset_y[i] = json_number_value(
+				json_object_get(options, buff));
 		sprintf(buff, "cam%d_horizon_r", i);
-		state->options.cam_horizon_r[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_horizon_r[i] = json_number_value(
+				json_object_get(options, buff));
 		sprintf(buff, "cam%d_aov", i);
-		state->options.cam_aov[i] = json_number_value(json_object_get(options, buff));
+		state->options.cam_aov[i] = json_number_value(
+				json_object_get(options, buff));
 
 		if (state->options.cam_horizon_r[i] == 0) {
 			state->options.cam_horizon_r[i] = 0.8;
@@ -304,30 +417,43 @@ static void init_options(PICAM360CAPTURE_T *state) {
 		}
 	}
 	{ //rtp
-		state->options.rtp_rx_port = json_number_value(json_object_get(options, "rtp_rx_port"));
-		state->options.rtp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_rx_type")));
+		state->options.rtp_rx_port = json_number_value(
+				json_object_get(options, "rtp_rx_port"));
+		state->options.rtp_rx_type = rtp_get_rtp_socket_type(
+				json_string_value(json_object_get(options, "rtp_rx_type")));
 		json_t *value = json_object_get(options, "rtp_tx_ip");
 		if (value) {
-			strncpy(state->options.rtp_tx_ip, json_string_value(value), sizeof(state->options.rtp_tx_ip) - 1);
+			strncpy(state->options.rtp_tx_ip, json_string_value(value),
+					sizeof(state->options.rtp_tx_ip) - 1);
 		} else {
-			memset(state->options.rtp_tx_ip, 0, sizeof(state->options.rtp_tx_ip));
+			memset(state->options.rtp_tx_ip, 0,
+					sizeof(state->options.rtp_tx_ip));
 		}
-		state->options.rtp_tx_port = json_number_value(json_object_get(options, "rtp_tx_port"));
-		state->options.rtp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_tx_type")));
+		state->options.rtp_tx_port = json_number_value(
+				json_object_get(options, "rtp_tx_port"));
+		state->options.rtp_tx_type = rtp_get_rtp_socket_type(
+				json_string_value(json_object_get(options, "rtp_tx_type")));
 	}
 	{ //rtcp
-		state->options.rtcp_rx_port = json_number_value(json_object_get(options, "rtcp_rx_port"));
-		state->options.rtcp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_rx_type")));
+		state->options.rtcp_rx_port = json_number_value(
+				json_object_get(options, "rtcp_rx_port"));
+		state->options.rtcp_rx_type = rtp_get_rtp_socket_type(
+				json_string_value(json_object_get(options, "rtcp_rx_type")));
 		json_t *value = json_object_get(options, "rtcp_tx_ip");
 		if (value) {
-			strncpy(state->options.rtcp_tx_ip, json_string_value(value), sizeof(state->options.rtcp_tx_ip) - 1);
+			strncpy(state->options.rtcp_tx_ip, json_string_value(value),
+					sizeof(state->options.rtcp_tx_ip) - 1);
 		} else {
-			memset(state->options.rtcp_tx_ip, 0, sizeof(state->options.rtcp_tx_ip));
+			memset(state->options.rtcp_tx_ip, 0,
+					sizeof(state->options.rtcp_tx_ip));
 		}
-		state->options.rtcp_tx_port = json_number_value(json_object_get(options, "rtcp_tx_port"));
-		state->options.rtcp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_tx_type")));
+		state->options.rtcp_tx_port = json_number_value(
+				json_object_get(options, "rtcp_tx_port"));
+		state->options.rtcp_tx_type = rtp_get_rtp_socket_type(
+				json_string_value(json_object_get(options, "rtcp_tx_type")));
 	}
-	state->options.is_samplerExternalOES = json_number_value(json_object_get(options, "is_samplerExternalOES"));
+	state->options.is_samplerExternalOES = json_number_value(
+			json_object_get(options, "is_samplerExternalOES"));
 
 	json_decref(options);
 }
@@ -349,75 +475,112 @@ static void save_options(PICAM360CAPTURE_T *state) {
 
 	json_object_set_new(options, "num_of_cam", json_integer(state->num_of_cam));
 	json_object_set_new(options, "mpu_name", json_string(state->mpu_name));
-	json_object_set_new(options, "vistream_def", json_string(state->vistream_def));
-	json_object_set_new(options, "aistream_def", json_string(state->aistream_def));
-	json_object_set_new(options, "sharpness_gain", json_real(state->options.sharpness_gain));
-	json_object_set_new(options, "color_offset", json_real(state->options.color_offset));
+	json_object_set_new(options, "vistream_def",
+			json_string(state->vistream_def));
+	json_object_set_new(options, "aistream_def",
+			json_string(state->aistream_def));
+	json_object_set_new(options, "sharpness_gain",
+			json_real(state->options.sharpness_gain));
+	json_object_set_new(options, "color_offset",
+			json_real(state->options.color_offset));
 	json_object_set_new(options, "overlap", json_real(state->options.overlap));
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_pitch", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_pitch[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_pitch[i]));
 		sprintf(buff, "cam%d_offset_yaw", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_yaw[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_yaw[i]));
 		sprintf(buff, "cam%d_offset_roll", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_roll[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_roll[i]));
 		sprintf(buff, "cam%d_offset_x", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_x[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_x[i]));
 		sprintf(buff, "cam%d_offset_y", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_y[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_y[i]));
 		sprintf(buff, "cam%d_horizon_r", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_horizon_r[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_horizon_r[i]));
 		sprintf(buff, "cam%d_aov", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_aov[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_aov[i]));
 	}
 	{ //rtp
-		json_object_set_new(options, "rtp_rx_port", json_integer(state->options.rtp_rx_port));
-		json_object_set_new(options, "rtp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_rx_type)));
-		json_object_set_new(options, "rtp_tx_ip", json_string(state->options.rtp_tx_ip));
-		json_object_set_new(options, "rtp_tx_port", json_integer(state->options.rtp_tx_port));
-		json_object_set_new(options, "rtp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_tx_type)));
+		json_object_set_new(options, "rtp_rx_port",
+				json_integer(state->options.rtp_rx_port));
+		json_object_set_new(options, "rtp_rx_type",
+				json_string(
+						rtp_get_rtp_socket_type_str(
+								state->options.rtp_rx_type)));
+		json_object_set_new(options, "rtp_tx_ip",
+				json_string(state->options.rtp_tx_ip));
+		json_object_set_new(options, "rtp_tx_port",
+				json_integer(state->options.rtp_tx_port));
+		json_object_set_new(options, "rtp_tx_type",
+				json_string(
+						rtp_get_rtp_socket_type_str(
+								state->options.rtp_tx_type)));
 	}
 	{ //rtcp
-		json_object_set_new(options, "rtcp_rx_port", json_integer(state->options.rtcp_rx_port));
-		json_object_set_new(options, "rtcp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_rx_type)));
-		json_object_set_new(options, "rtcp_tx_ip", json_string(state->options.rtcp_tx_ip));
-		json_object_set_new(options, "rtcp_tx_port", json_integer(state->options.rtcp_tx_port));
-		json_object_set_new(options, "rtcp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_tx_type)));
+		json_object_set_new(options, "rtcp_rx_port",
+				json_integer(state->options.rtcp_rx_port));
+		json_object_set_new(options, "rtcp_rx_type",
+				json_string(
+						rtp_get_rtp_socket_type_str(
+								state->options.rtcp_rx_type)));
+		json_object_set_new(options, "rtcp_tx_ip",
+				json_string(state->options.rtcp_tx_ip));
+		json_object_set_new(options, "rtcp_tx_port",
+				json_integer(state->options.rtcp_tx_port));
+		json_object_set_new(options, "rtcp_tx_type",
+				json_string(
+						rtp_get_rtp_socket_type_str(
+								state->options.rtcp_tx_type)));
 	}
-	json_object_set_new(options, "is_samplerExternalOES", json_integer(state->options.is_samplerExternalOES));
+	json_object_set_new(options, "is_samplerExternalOES",
+			json_integer(state->options.is_samplerExternalOES));
 
 	if (state->plugin_paths) {
 		json_t *plugin_paths = json_array();
 		for (int i = 0; state->plugin_paths[i] != NULL; i++) {
-			json_array_append_new(plugin_paths, json_string(state->plugin_paths[i]));
+			json_array_append_new(plugin_paths,
+					json_string(state->plugin_paths[i]));
 		}
 		json_object_set_new(options, "plugin_paths", plugin_paths);
 	}
 
 	for (int i = 0; state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]->save_options) {
-			state->plugins[i]->save_options(state->plugins[i]->user_data, options);
+			state->plugins[i]->save_options(state->plugins[i]->user_data,
+					options);
 		}
 	}
 
-	json_dump_file(options, state->config_filepath, JSON_PRESERVE_ORDER | JSON_INDENT(4) | JSON_REAL_PRECISION(9));
+	json_dump_file(options, state->config_filepath,
+			JSON_PRESERVE_ORDER | JSON_INDENT(4) | JSON_REAL_PRECISION(9));
 
 	json_decref(options);
 }
 
 static void init_options_ex(PICAM360CAPTURE_T *state) {
 	json_error_t error;
-	json_t *options = json_load_file(state->options.config_ex_filepath, 0, &error);
+	json_t *options = json_load_file(state->options.config_ex_filepath, 0,
+			&error);
 	if (options != NULL) {
 		for (int i = 0; i < state->num_of_cam; i++) {
 			char buff[256];
 			sprintf(buff, "cam%d_offset_x", i);
-			state->options.cam_offset_x_ex[i] = json_number_value(json_object_get(options, buff));
+			state->options.cam_offset_x_ex[i] = json_number_value(
+					json_object_get(options, buff));
 			sprintf(buff, "cam%d_offset_y", i);
-			state->options.cam_offset_y_ex[i] = json_number_value(json_object_get(options, buff));
+			state->options.cam_offset_y_ex[i] = json_number_value(
+					json_object_get(options, buff));
 			sprintf(buff, "cam%d_horizon_r", i);
-			state->options.cam_horizon_r_ex[i] = json_number_value(json_object_get(options, buff));
+			state->options.cam_horizon_r_ex[i] = json_number_value(
+					json_object_get(options, buff));
 		}
 	}
 }
@@ -428,11 +591,14 @@ static void save_options_ex(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		sprintf(buff, "cam%d_offset_x", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_x_ex[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_x_ex[i]));
 		sprintf(buff, "cam%d_offset_y", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_offset_y_ex[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_offset_y_ex[i]));
 		sprintf(buff, "cam%d_horizon_r", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_horizon_r_ex[i]));
+		json_object_set_new(options, buff,
+				json_real(state->options.cam_horizon_r_ex[i]));
 	}
 
 	json_dump_file(options, state->options.config_ex_filepath, JSON_INDENT(4));
@@ -447,7 +613,6 @@ static void exit_func(void) {
 
 //==============================================================================
 
-
 int _command_handler(const char *_buff) {
 	int opt;
 	int ret = 0;
@@ -456,7 +621,9 @@ int _command_handler(const char *_buff) {
 	char *cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0 || strncmp(cmd, "q", sizeof(buff)) == 0 || strncmp(cmd, "quit", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0
+			|| strncmp(cmd, "q", sizeof(buff)) == 0
+			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
 		printf("exit\n");
 		exit(0);
 	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
@@ -470,56 +637,19 @@ int _command_handler(const char *_buff) {
 	} else if (cmd[1] == '\0' && cmd[0] >= '0' && cmd[0] <= '9') {
 		state->active_cam = cmd[0] - '0';
 	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
-			int id = -1;
-			const int kMaxArgs = 32;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
-			}
-			argv[0] = cmd;
-			argv[argc] = 0;
-			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "i:o")) != -1) {
-				switch (opt) {
-				case 'i':
-					sscanf(optarg, "%d", &id);
-					break;
-				}
-			}
-			if (id >= 0) {
-				optind = 1; // reset getopt
-				while ((opt = getopt(argc, argv, "i:o:")) != -1) {
-					switch (opt) {
-					case 'o':
-						for(int i=0;i<MAX_OSTREAM_NUM;i++){
-							if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
-								//strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
-								//printf("snap %d : %s\n", frame->id, frame->output_filepath);
-								break;
-							}
-						}
-						break;
-					}
-				}
-			}
-		}
+		//TODO
 	} else if (strncmp(cmd, "create_vostream", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
 			VOSTREAM_T **vostream_p = NULL;
-			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->vostreams[i] == NULL){
+			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+				if (state->vostreams[i] == NULL) {
 					vostream_p = &state->vostreams[i];
 					break;
 				}
 			}
 
-			if(vostream_p == NULL){
+			if (vostream_p == NULL) {
 				printf("over MAX_OSTREAM_NUM\n");
 			} else {
 				VSTREAMER_T *mixer_output = NULL;
@@ -529,7 +659,7 @@ int _command_handler(const char *_buff) {
 				vstreamer->pre_streamer = mixer_output;
 
 				state->last_vostream_id = id;
-				(*vostream_p) = (VOSTREAM_T*)malloc(sizeof(VOSTREAM_T));
+				(*vostream_p) = (VOSTREAM_T*) malloc(sizeof(VOSTREAM_T));
 				(*vostream_p)->vstreamer = mixer_output;
 				(*vostream_p)->id = id;
 
@@ -538,6 +668,8 @@ int _command_handler(const char *_buff) {
 				vstreamer->set_param(vstreamer, "id", value);
 
 				mixer_output->start(mixer_output);
+
+				printf("id=%d : %s\n", state->last_vostream_id, _buff);
 			}
 		}
 	} else if (strncmp(cmd, "delete_vostream", sizeof(buff)) == 0) {
@@ -567,8 +699,9 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
-			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
+			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+				if (state->vostreams[i] != NULL
+						&& state->vostreams[i]->id == id) {
 					state->vostreams[i]->delete_after_processed = true;
 					break;
 				}
@@ -600,8 +733,9 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
-			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
+			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+				if (state->vostreams[i] != NULL
+						&& state->vostreams[i]->id == id) {
 					//TODO:set fps
 					break;
 				}
@@ -634,8 +768,9 @@ int _command_handler(const char *_buff) {
 				while ((opt = getopt(argc, argv, "i:o:")) != -1) {
 					switch (opt) {
 					case 'o':
-						for(int i=0;i<MAX_OSTREAM_NUM;i++){
-							if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
+						for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+							if (state->vostreams[i] != NULL
+									&& state->vostreams[i]->id == id) {
 								//strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
 								//printf("start_record %d : %s\n", frame->id, frame->output_filepath);
 								break;
@@ -669,8 +804,9 @@ int _command_handler(const char *_buff) {
 				}
 			}
 			if (id >= 0) {
-				for(int i=0;i<MAX_OSTREAM_NUM;i++){
-					if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
+				for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+					if (state->vostreams[i] != NULL
+							&& state->vostreams[i]->id == id) {
 //						if (frame->output_fd > 0) {
 //							close(frame->output_fd);
 //							frame->output_fd = -1;
@@ -686,7 +822,8 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL && !state->output_raw) {
-			strncpy(state->output_raw_filepath, param, sizeof(state->output_raw_filepath) - 1);
+			strncpy(state->output_raw_filepath, param,
+					sizeof(state->output_raw_filepath) - 1);
 			state->output_raw = true;
 			printf("start_record_raw saved to %s\n", param);
 		}
@@ -696,13 +833,15 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "load_file", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			strncpy(state->input_filepath, param, sizeof(state->input_filepath) - 1);
+			strncpy(state->input_filepath, param,
+					sizeof(state->input_filepath) - 1);
 			state->input_mode = INPUT_MODE_FILE;
 			state->input_file_cur = -1;
 			state->input_file_size = 0;
 			printf("load_file from %s\n", param);
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff))
+			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			rtp_start_recording(state->rtp, param);
@@ -714,7 +853,8 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			rtp_start_loading(state->rtp, param, true, true, (RTP_LOADING_CALLBACK) loading_callback, NULL);
+			rtp_start_loading(state->rtp, param, true, true,
+					(RTP_LOADING_CALLBACK) loading_callback, NULL);
 			printf("start_loading : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
@@ -741,95 +881,35 @@ int _command_handler(const char *_buff) {
 			state->camera_roll = roll * M_PI / 180.0;
 			printf("set_camera_orientation\n");
 		}
-	} else if (strncmp(cmd, "set_view_quaternion", sizeof(buff)) == 0) {
-		char *param = NULL;
-		int id = 0; //default
-		bool quat_valid = false;
-		float x, y, z, w;
-		bool fov_valid = false;
-		float fov;
-		bool client_key_valid = false;
-		char *client_key = NULL;
-		do {
-			param = strtok(NULL, " \n");
-			if (param != NULL) {
-				if (strncmp(param, "quat=", 5) == 0) {
-					int num = sscanf(param, "quat=%f,%f,%f,%f", &x, &y, &z, &w);
-					if (num == 4) {
-						quat_valid = true;
-					}
-				} else if (strncmp(param, "fov=", 4) == 0) {
-					int num = sscanf(param, "fov=%f", &fov);
-					if (num == 1) {
-						fov_valid = true;
-					}
-				} else if (strncmp(param, "client_key=", 11) == 0) {
-					client_key = param + 11;
-					client_key_valid = true;
-				} else if (strncmp(param, "id=", 3) == 0) {
-					int num = sscanf(param, "id=%d", &id);
-					if (num == 1) {
-					}
-				}
+	} else if (strncmp(cmd, "set_vostream_param", sizeof(buff)) == 0) {
+		int id = -1;
+		const int kMaxArgs = 32;
+		int argc = 0;
+		char *argv[kMaxArgs];
+		char *p = strtok(buff, " ");
+		while (p && argc < kMaxArgs - 1) {
+			if (strncmp(p, "id=", 3) == 0) {
+				sscanf(p, "id=%d", &id);
+			} else {
+				argv[argc++] = p;
 			}
-		} while (param);
+			p = strtok(0, " ");
+		}
 
-		if (quat_valid) {
-			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
-//					VECTOR4D_T value = { .ary = { x, y, z, w } };
-//					state->plugin_host.lock_texture();
-//					frame->view_mpu->set_quaternion(frame->view_mpu->user_data, value);
-//					state->plugin_host.unlock_texture();
-//					//printf("set_view_quaternion\n");
-//					if (fov_valid) {
-//						frame->fov = fov;
-//					}
-//					if (client_key_valid) {
-//						strncpy(frame->client_key, client_key, sizeof(frame->client_key));
-//						gettimeofday(&frame->server_key, NULL);
-//					}
-					break;
-				}
-			}
+		VSTREAMER_T *streamer = NULL;
+		stream_mixer_get_output(id, &streamer);
+
+		if(streamer){
+			streamer = streamer->next_streamer;
+		}else{
+			printf("not existing id=%d\n", id);
 		}
-	} else if (strncmp(cmd, "set_fov", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int id;
-			float fov;
-			sscanf(param, "%i=%f", &id, &fov);
-			for(int i=0;i<MAX_OSTREAM_NUM;i++){
-				if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
-//					frame->fov = fov;
-//					printf("set_fov\n");
-					break;
-				}
+		if(streamer){
+			for (int p = 0; p < argc; p++) {
+				char *name = strtok(argv[p], "=");
+				char *value = strtok(NULL, "=");
+				streamer->set_param(streamer, name, value);
 			}
-		}
-	} else if (strncmp(cmd, "set_stereo", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		int id = 0; //default
-		bool value;
-		if (param != NULL) {
-			value = (param[0] == '1');
-			printf("set_stereo %s\n", param);
-			do {
-				param = strtok(NULL, " \n");
-				if (param != NULL) {
-					if (strncmp(param, "id=", 3) == 0) {
-						int num = sscanf(param, "id=%d", &id);
-						if (num == 1) {
-							for(int i=0;i<MAX_OSTREAM_NUM;i++){
-								if(state->vostreams[i] != NULL && state->vostreams[i]->id == id){
-									//frame->stereo = value;
-									break;
-								}
-							}
-						}
-					}
-				}
-			} while (param);
 		}
 	} else if (strncmp(cmd, "set_conf_sync", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
@@ -846,7 +926,10 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "add_camera_horizon_r", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float *cam_horizon_r = (state->options.config_ex_enabled) ? state->options.cam_horizon_r_ex : state->options.cam_horizon_r;
+			float *cam_horizon_r =
+					(state->options.config_ex_enabled) ?
+							state->options.cam_horizon_r_ex :
+							state->options.cam_horizon_r;
 
 			int cam_num = 0;
 			float value = 0;
@@ -875,7 +958,10 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "add_camera_offset_x", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float *cam_offset_x = (state->options.config_ex_enabled) ? state->options.cam_offset_x_ex : state->options.cam_offset_x;
+			float *cam_offset_x =
+					(state->options.config_ex_enabled) ?
+							state->options.cam_offset_x_ex :
+							state->options.cam_offset_x;
 
 			int cam_num = 0;
 			float value = 0;
@@ -904,7 +990,10 @@ int _command_handler(const char *_buff) {
 	} else if (strncmp(cmd, "add_camera_offset_y", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float *cam_offset_y = (state->options.config_ex_enabled) ? state->options.cam_offset_y_ex : state->options.cam_offset_y;
+			float *cam_offset_y =
+					(state->options.config_ex_enabled) ?
+							state->options.cam_offset_y_ex :
+							state->options.cam_offset_y;
 
 			int cam_num = 0;
 			float value = 0;
@@ -1053,8 +1142,10 @@ int command_handler() {
 			bool handled = false;
 			for (int i = 0; state->plugins[i] != NULL; i++) {
 				int name_len = strlen(state->plugins[i]->name);
-				if (strncmp(buff, state->plugins[i]->name, name_len) == 0 && buff[name_len] == '.') {
-					ret = state->plugins[i]->command_handler(state->plugins[i]->user_data, buff + name_len + 1);
+				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+						&& buff[name_len] == '.') {
+					ret = state->plugins[i]->command_handler(
+							state->plugins[i]->user_data, buff + name_len + 1);
 					handled = true;
 				}
 			}
@@ -1069,7 +1160,7 @@ int command_handler() {
 	return ret;
 }
 
-static void *readline_thread_func(void* arg) {
+static void* readline_thread_func(void *arg) {
 	char *ptr;
 	using_history();
 	read_history(PICAM360_HISTORY_FILE);
@@ -1083,12 +1174,14 @@ static void *readline_thread_func(void* arg) {
 	return NULL;
 }
 
-static void *quaternion_thread_func(void* arg) {
+static void* quaternion_thread_func(void *arg) {
 	int count = 0;
 	while (1) {
 		if (state->mpu) {
-			int cur = (state->quaternion_queue_cur + 1) % MAX_QUATERNION_QUEUE_COUNT;
-			state->quaternion_queue[cur] = state->mpu->get_quaternion(state->mpu);
+			int cur = (state->quaternion_queue_cur + 1)
+					% MAX_QUATERNION_QUEUE_COUNT;
+			state->quaternion_queue[cur] = state->mpu->get_quaternion(
+					state->mpu);
 			state->quaternion_queue_cur++;
 		}
 		usleep(QUATERNION_QUEUE_RES * 1000);
@@ -1096,12 +1189,14 @@ static void *quaternion_thread_func(void* arg) {
 	return NULL;
 }
 
-static void *istream_thread_func(void* arg) {
+static void* istream_thread_func(void *arg) {
 	int count = 0;
 	while (1) {
 		if (state->mpu) {
-			int cur = (state->quaternion_queue_cur + 1) % MAX_QUATERNION_QUEUE_COUNT;
-			state->quaternion_queue[cur] = state->mpu->get_quaternion(state->mpu);
+			int cur = (state->quaternion_queue_cur + 1)
+					% MAX_QUATERNION_QUEUE_COUNT;
+			state->quaternion_queue[cur] = state->mpu->get_quaternion(
+					state->mpu);
 			state->quaternion_queue_cur++;
 		}
 		usleep(QUATERNION_QUEUE_RES * 1000);
@@ -1225,7 +1320,7 @@ static void set_camera_north(float value) {
 	state->camera_north = value;
 }
 
-static void *get_display() {
+static void* get_display() {
 #ifdef USE_GLES
 	return state->egl_handler.display;
 #else
@@ -1261,7 +1356,7 @@ static void set_texture_size(uint32_t width, uint32_t height) {
 	}
 	pthread_mutex_unlock(&state->texture_size_mutex);
 }
-static MENU_T *get_menu() {
+static MENU_T* get_menu() {
 	return state->menu;
 }
 static bool get_menu_visible() {
@@ -1279,13 +1374,13 @@ static void set_fov(float value) {
 	//state->frame->fov = value;
 }
 
-static MPU_T *get_mpu() {
+static MPU_T* get_mpu() {
 	return state->mpu;
 }
-static RTP_T *get_rtp() {
+static RTP_T* get_rtp() {
 	return state->rtp;
 }
-static RTP_T *get_rtcp() {
+static RTP_T* get_rtcp() {
 	return state->rtcp;
 }
 
@@ -1298,7 +1393,9 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 	VECTOR4D_T quat = { };
 	{
 		int video_delay_ms = 0;
-		int cur = (state->quaternion_queue_cur - video_delay_ms / QUATERNION_QUEUE_RES + MAX_QUATERNION_QUEUE_COUNT) % MAX_QUATERNION_QUEUE_COUNT;
+		int cur = (state->quaternion_queue_cur
+				- video_delay_ms / QUATERNION_QUEUE_RES
+				+ MAX_QUATERNION_QUEUE_COUNT) % MAX_QUATERNION_QUEUE_COUNT;
 		quat = state->quaternion_queue[cur];
 	}
 	VECTOR4D_T compass = state->mpu->get_compass(state->mpu);
@@ -1316,14 +1413,25 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 	buff[xmp_len++] = 0xBB;
 	buff[xmp_len++] = 0xBF;
 	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
-	xmp_len += sprintf(buff + xmp_len, "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-capture rev1\">");
-	xmp_len += sprintf(buff + xmp_len, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
+	xmp_len +=
+			sprintf(buff + xmp_len,
+					"<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-capture rev1\">");
+	xmp_len +=
+			sprintf(buff + xmp_len,
+					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
-	xmp_len += sprintf(buff + xmp_len, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x, quat.y, quat.z, quat.w);
-	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", compass.x, compass.y, compass.z);
-	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", state->mpu->get_temperature(state->mpu));
-	xmp_len += sprintf(buff + xmp_len, "<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />", camera_offset.x, camera_offset.y, camera_offset.z, camera_offset.w);
-	xmp_len += sprintf(buff + xmp_len, "<timestamp sec=\"%lu\" usec=\"%lu\" />", (uint64_t)timestamp.tv_sec, (uint64_t)timestamp.tv_usec);
+	xmp_len += sprintf(buff + xmp_len,
+			"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x,
+			quat.y, quat.z, quat.w);
+	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
+			compass.x, compass.y, compass.z);
+	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />",
+			state->mpu->get_temperature(state->mpu));
+	xmp_len += sprintf(buff + xmp_len,
+			"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
+			camera_offset.x, camera_offset.y, camera_offset.z, camera_offset.w);
+	xmp_len += sprintf(buff + xmp_len, "<timestamp sec=\"%lu\" usec=\"%lu\" />",
+			(uint64_t) timestamp.tv_sec, (uint64_t) timestamp.tv_usec);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -1387,7 +1495,8 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 	event_handler(node_id, event_id);
 	for (int i = 0; state->plugins && state->plugins[i] != NULL; i++) {
 		if (state->plugins[i]) {
-			state->plugins[i]->event_handler(state->plugins[i]->user_data, node_id, event_id);
+			state->plugins[i]->event_handler(state->plugins[i]->user_data,
+					node_id, event_id);
 		}
 	}
 }
@@ -1405,7 +1514,8 @@ static void add_mpu_factory(MPU_FACTORY_T *mpu_factory) {
 				MPU_FACTORY_T **current = state->mpu_factories;
 				state->mpu_factories = malloc(sizeof(MPU_FACTORY_T*) * space);
 				memset(state->mpu_factories, 0, sizeof(MPU_FACTORY_T*) * space);
-				memcpy(state->mpu_factories, current, sizeof(MPU_FACTORY_T*) * i);
+				memcpy(state->mpu_factories, current,
+						sizeof(MPU_FACTORY_T*) * i);
 				state->mpu_factories[space - 1] = (void*) -1;
 				free(current);
 			}
@@ -1425,9 +1535,12 @@ static void add_vstreamer_factory(VSTREAMER_FACTORY_T *factory) {
 					return;
 				}
 				VSTREAMER_FACTORY_T **current = state->vstreamer_factories;
-				state->vstreamer_factories = malloc(sizeof(VSTREAMER_FACTORY_T*) * space);
-				memset(state->vstreamer_factories, 0, sizeof(VSTREAMER_FACTORY_T*) * space);
-				memcpy(state->vstreamer_factories, current, sizeof(VSTREAMER_FACTORY_T*) * i);
+				state->vstreamer_factories = malloc(
+						sizeof(VSTREAMER_FACTORY_T*) * space);
+				memset(state->vstreamer_factories, 0,
+						sizeof(VSTREAMER_FACTORY_T*) * space);
+				memcpy(state->vstreamer_factories, current,
+						sizeof(VSTREAMER_FACTORY_T*) * i);
 				state->vstreamer_factories[space - 1] = (void*) -1;
 				free(current);
 			}
@@ -1502,7 +1615,8 @@ static void add_plugin(PLUGIN_T *plugin) {
 	}
 }
 
-static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode, const char *path) {
+static void snap(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
+		const char *path) {
 	char cmd[512];
 	char *mode_str = "";
 	switch (mode) {
@@ -1544,6 +1658,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_texture_size = set_texture_size;
 		state->plugin_host.load_texture = load_texture;
 		state->plugin_host.get_logo_image = get_logo_image;
+		state->plugin_host.get_rendering_params = get_rendering_params;
 
 		state->plugin_host.get_menu = get_menu;
 		state->plugin_host.get_menu_visible = get_menu_visible;
@@ -1577,7 +1692,8 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 static void init_plugins(PICAM360CAPTURE_T *state) {
 	//load plugins
 	json_error_t error;
-	json_t *options = json_load_file_without_comment(state->config_filepath, 0, &error);
+	json_t *options = json_load_file_without_comment(state->config_filepath, 0,
+			&error);
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
@@ -1585,22 +1701,27 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 			json_t *plugin_paths = json_object_get(options, "plugin_paths");
 			if (json_is_array(plugin_paths)) {
 				int size = json_array_size(plugin_paths);
-				state->plugin_paths = (char**) malloc(sizeof(char*) * (size + 1));
+				state->plugin_paths = (char**) malloc(
+						sizeof(char*) * (size + 1));
 				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
 
 				for (int i = 0; i < size; i++) {
 					json_t *value = json_array_get(plugin_paths, i);
 					int len = json_string_length(value);
-					state->plugin_paths[i] = (char*) malloc(sizeof(char) * (len + 1));
+					state->plugin_paths[i] = (char*) malloc(
+							sizeof(char) * (len + 1));
 					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
-					strncpy(state->plugin_paths[i], json_string_value(value), len);
+					strncpy(state->plugin_paths[i], json_string_value(value),
+							len);
 					if (len > 0) {
-						void *handle = dlopen(state->plugin_paths[i], RTLD_LAZY);
+						void *handle = dlopen(state->plugin_paths[i],
+								RTLD_LAZY);
 						if (!handle) {
 							fprintf(stderr, "%s\n", dlerror());
 							continue;
 						}
-						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(handle, "create_plugin");
+						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(
+								handle, "create_plugin");
 						if (!create_plugin) {
 							fprintf(stderr, "%s\n", dlerror());
 							dlclose(handle);
@@ -1622,7 +1743,8 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 
 		for (int i = 0; state->plugins[i] != NULL; i++) {
 			if (state->plugins[i]->init_options) {
-				state->plugins[i]->init_options(state->plugins[i]->user_data, options);
+				state->plugins[i]->init_options(state->plugins[i]->user_data,
+						options);
 			}
 		}
 
@@ -1640,7 +1762,6 @@ static int lg_command_id = 0;
 static int lg_ack_command_id_downstream = -1;
 static int lg_ack_command_id_upstream = -1;
 
-
 static int command2upstream_handler() {
 	static struct timeval last_try = { };
 	static bool is_first_try = false;
@@ -1651,7 +1772,8 @@ static int command2upstream_handler() {
 		if (!is_first_try) {
 			struct timeval diff;
 			timersub(&s, &last_try, &diff);
-			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			float diff_sec = (float) diff.tv_sec
+					+ (float) diff.tv_usec / 1000000;
 			if (diff_sec < 0.050) {
 				return 0;
 			}
@@ -1681,7 +1803,9 @@ static int command2upstream_handler() {
 
 	if (buff) {
 		lg_command_id++;
-		snprintf(lg_command, sizeof(lg_command), "<picam360:command id=\"%d\" value=\"%s\" />", lg_command_id, buff);
+		snprintf(lg_command, sizeof(lg_command),
+				"<picam360:command id=\"%d\" value=\"%s\" />", lg_command_id,
+				buff);
 		free(buff);
 	}
 	return 0;
@@ -1692,11 +1816,14 @@ static void status_handler(char *data, int data_len) {
 		if (data[i] == '<') {
 			char name[64] = UPSTREAM_DOMAIN;
 			char value[256];
-			int num = sscanf(&data[i], "<picam360:status name=\"%63[^\"]\" value=\"%255[^\"]\" />", name + UPSTREAM_DOMAIN_SIZE, value);
+			int num = sscanf(&data[i],
+					"<picam360:status name=\"%63[^\"]\" value=\"%255[^\"]\" />",
+					name + UPSTREAM_DOMAIN_SIZE, value);
 			if (num == 2) {
 				for (int i = 0; state->watches[i] != NULL; i++) {
 					if (strncmp(state->watches[i]->name, name, 64) == 0) {
-						state->watches[i]->set_value(state->watches[i]->user_data, value);
+						state->watches[i]->set_value(
+								state->watches[i]->user_data, value);
 						break;
 					}
 				}
@@ -1705,7 +1832,8 @@ static void status_handler(char *data, int data_len) {
 	}
 }
 
-static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num, void *user_data) {
+static int rtp_callback(unsigned char *data, unsigned int data_len,
+		unsigned char pt, unsigned int seq_num, void *user_data) {
 	if (data_len == 0) {
 		return -1;
 	}
@@ -1721,7 +1849,8 @@ static int rtp_callback(unsigned char *data, unsigned int data_len, unsigned cha
 	return 0;
 }
 
-static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned char pt, unsigned int seq_num) {
+static int rtcp_callback(unsigned char *data, unsigned int data_len,
+		unsigned char pt, unsigned int seq_num) {
 	if (data_len == 0) {
 		return -1;
 	}
@@ -1734,7 +1863,9 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 	if (pt == PT_CMD) {
 		int id;
 		char value[256];
-		int num = sscanf((char*) data, "<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id, value);
+		int num = sscanf((char*) data,
+				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
+				value);
 		if (num == 2 && id != lg_ack_command_id_downstream) {
 			lg_ack_command_id_downstream = id;
 			state->plugin_host.send_command(value);
@@ -1743,12 +1874,15 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len, unsigned ch
 	return 0;
 }
 
-
 static void _init_rtp(PICAM360CAPTURE_T *state) {
-	state->rtp = create_rtp(state->options.rtp_rx_port, state->options.rtp_rx_type, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
+	state->rtp = create_rtp(state->options.rtp_rx_port,
+			state->options.rtp_rx_type, state->options.rtp_tx_ip,
+			state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
 	rtp_add_callback(state->rtp, (RTP_CALLBACK) rtp_callback, NULL);
 
-	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, state->options.rtcp_tx_ip, state->options.rtcp_tx_port, state->options.rtcp_tx_type, 0);
+	state->rtcp = create_rtp(state->options.rtcp_rx_port,
+			state->options.rtcp_rx_type, state->options.rtcp_tx_ip,
+			state->options.rtcp_tx_port, state->options.rtcp_tx_type, 0);
 	rtp_add_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback, NULL);
 }
 
@@ -1762,19 +1896,21 @@ enum SYSTEM_CMD {
 };
 
 enum CALIBRATION_CMD {
-	CALIBRATION_CMD_NONE, CALIBRATION_CMD_SAVE, CALIBRATION_CMD_IMAGE_CIRCLE, CALIBRATION_CMD_IMAGE_PARAMS, CALIBRATION_CMD_VIEWER_COMPASS, CALIBRATION_CMD_VEHICLE_COMPASS,
+	CALIBRATION_CMD_NONE,
+	CALIBRATION_CMD_SAVE,
+	CALIBRATION_CMD_IMAGE_CIRCLE,
+	CALIBRATION_CMD_IMAGE_PARAMS,
+	CALIBRATION_CMD_VIEWER_COMPASS,
+	CALIBRATION_CMD_VEHICLE_COMPASS,
 };
 
 #define PACKET_FOLDER_PATH "/media/usbdisk/packet"
 #define STILL_FOLDER_PATH "/media/usbdisk/still"
 #define VIDEO_FOLDER_PATH "/media/usbdisk/video"
 
-
 #endif //menu block
 
 int main(int argc, char *argv[]) {
-
-	//create_oculus_rift_dk2(NULL, NULL); //this should be first, pthread_create is related
 
 	bool input_file_mode = false;
 	int opt;
@@ -1783,6 +1919,7 @@ int main(int argc, char *argv[]) {
 	// Clear application state
 	const int INITIAL_SPACE = 16;
 	memset(state, 0, sizeof(*state));
+	uuid_generate(state->uuid);
 	state->cam_width = 2048;
 	state->cam_height = 2048;
 	state->num_of_cam = 1;
@@ -1797,8 +1934,10 @@ int main(int argc, char *argv[]) {
 	state->camera_horizon_r_bias = 1.0;
 	state->refraction = 1.0;
 	state->rtp_play_speed = 1.0;
-	strncpy(state->default_view_coordinate_mode, "manual", sizeof(state->default_view_coordinate_mode));
-	strncpy(state->config_filepath, "config.json", sizeof(state->config_filepath));
+	strncpy(state->default_view_coordinate_mode, "manual",
+			sizeof(state->default_view_coordinate_mode));
+	strncpy(state->config_filepath, "config.json",
+			sizeof(state->config_filepath));
 
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -1811,8 +1950,10 @@ int main(int argc, char *argv[]) {
 		state->mpu_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
-		state->vstreamer_factories = malloc(sizeof(VSTREAMER_FACTORY_T*) * INITIAL_SPACE);
-		memset(state->vstreamer_factories, 0, sizeof(VSTREAMER_FACTORY_T*) * INITIAL_SPACE);
+		state->vstreamer_factories = malloc(
+				sizeof(VSTREAMER_FACTORY_T*) * INITIAL_SPACE);
+		memset(state->vstreamer_factories, 0,
+				sizeof(VSTREAMER_FACTORY_T*) * INITIAL_SPACE);
 		state->vstreamer_factories[INITIAL_SPACE - 1] = (void*) -1;
 	}
 	{
@@ -1832,17 +1973,20 @@ int main(int argc, char *argv[]) {
 	while ((opt = getopt(argc, argv, "c:psi:r:F:v:")) != -1) {
 		switch (opt) {
 		case 'c':
-			strncpy(state->config_filepath, optarg, sizeof(state->config_filepath));
+			strncpy(state->config_filepath, optarg,
+					sizeof(state->config_filepath));
 			break;
 		case 'p':
 			state->preview = true;
 			break;
 		case 'r':
 			state->output_raw = true;
-			strncpy(state->output_raw_filepath, optarg, sizeof(state->output_raw_filepath));
+			strncpy(state->output_raw_filepath, optarg,
+					sizeof(state->output_raw_filepath));
 			break;
 		case 'i':
-			strncpy(state->input_filepath, optarg, sizeof(state->input_filepath));
+			strncpy(state->input_filepath, optarg,
+					sizeof(state->input_filepath));
 			state->input_mode = INPUT_MODE_FILE;
 			state->input_file_cur = -1;
 			state->input_file_size = 0;
@@ -1916,7 +2060,8 @@ int main(int argc, char *argv[]) {
 	//set mpu
 	for (int i = 0; state->mpu_factories[i] != NULL; i++) {
 		if (strncmp(state->mpu_factories[i]->name, state->mpu_name, 64) == 0) {
-			state->mpu_factories[i]->create_mpu(state->mpu_factories[i]->user_data, &state->mpu);
+			state->mpu_factories[i]->create_mpu(
+					state->mpu_factories[i]->user_data, &state->mpu);
 		}
 	}
 	if (state->mpu == NULL) {
@@ -1938,7 +2083,8 @@ int main(int argc, char *argv[]) {
 
 	//quaternion
 	pthread_t quaternion_thread;
-	pthread_create(&quaternion_thread, NULL, quaternion_thread_func, (void*) NULL);
+	pthread_create(&quaternion_thread, NULL, quaternion_thread_func,
+			(void*) NULL);
 
 	//status buffer
 	char *status_value = (char*) malloc(RTP_MAXPAYLOADSIZE);
@@ -1970,14 +2116,16 @@ int main(int argc, char *argv[]) {
 //				mrevent_trigger(&state->request_frame_event[i]);
 //			}
 //		}
-		if (input_file_mode && state->input_file_cur == state->input_file_size) {
+		if (input_file_mode
+				&& state->input_file_cur == state->input_file_size) {
 			terminate = true;
 		}
 
 		{ //wait 10msec at least for performance
 			struct timeval diff;
 			timersub(&time, &last_time, &diff);
-			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			float diff_sec = (float) diff.tv_sec
+					+ (float) diff.tv_usec / 1000000;
 			if (diff_sec < 0.010) { //10msec
 				int delay_ms = 10 - (int) (diff_sec * 1000);
 				usleep(delay_ms * 1000);
@@ -1986,27 +2134,33 @@ int main(int argc, char *argv[]) {
 		{ //status
 			struct timeval diff;
 			timersub(&time, &last_statuses_handled_time, &diff);
-			float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			float diff_sec = (float) diff.tv_sec
+					+ (float) diff.tv_usec / 1000000;
 			if (diff_sec > 0.100) { //less than 10Hz
 				int cur = 0;
 				for (int i = 0; state->statuses[i]; i++) {
-					state->statuses[i]->get_value(state->statuses[i]->user_data, status_value, RTP_MAXPAYLOADSIZE);
-					int len = snprintf(status_buffer, RTP_MAXPAYLOADSIZE, "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, status_value);
-					if(len >= RTP_MAXPAYLOADSIZE) {
+					state->statuses[i]->get_value(state->statuses[i]->user_data,
+							status_value, RTP_MAXPAYLOADSIZE);
+					int len = snprintf(status_buffer, RTP_MAXPAYLOADSIZE,
+							"<picam360:status name=\"%s\" value=\"%s\" />",
+							state->statuses[i]->name, status_value);
+					if (len >= RTP_MAXPAYLOADSIZE) {
 						continue;
 					}
 					if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
-						rtp_sendpacket(state->rtp, (unsigned char*) status_packet, cur, PT_STATUS);
+						rtp_sendpacket(state->rtp,
+								(unsigned char*) status_packet, cur, PT_STATUS);
 						cur = 0;
 					}
 					strncpy(status_packet + cur, status_buffer, len);
 					cur += len;
 				}
 				if (cur != 0) {
-					rtp_sendpacket(state->rtp, (unsigned char*) status_packet, cur, PT_STATUS);
+					rtp_sendpacket(state->rtp, (unsigned char*) status_packet,
+							cur, PT_STATUS);
 				}
 				rtp_flush(state->rtp);
-				
+
 				last_statuses_handled_time = time;
 			}
 		}
