@@ -134,7 +134,7 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width[0], image.height[0], 0,
-			GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
+	GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
 	if ((err = glGetError()) != GL_NO_ERROR) {
 #ifdef USE_GLES
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
@@ -151,17 +151,19 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 }
 
 static void get_logo_image(PICAM360_IMAGE_T *img) {
-	if(state->logo_image.pixels[0] == NULL)
-	{
+	if (state->logo_image.pixels[0] == NULL) {
 		//init logo
+		int ret;
 		const char *tmp_filepath = "/tmp/tmp.png";
-		int fd = open(tmp_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-		write(fd, logo_png, logo_png_len);
+		int fd = open(tmp_filepath, O_CREAT | O_WRONLY | O_TRUNC,
+				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		ret = write(fd, logo_png, logo_png_len);
 		close(fd);
 
 		memcpy(state->logo_image.img_type, "RGBA", 4);
 		state->logo_image.num_of_planes = 1;
-		load_png(tmp_filepath, &state->logo_image.pixels[0], &state->logo_image.width[0], &state->logo_image.height[0],
+		load_png(tmp_filepath, &state->logo_image.pixels[0],
+				&state->logo_image.width[0], &state->logo_image.height[0],
 				&state->logo_image.stride[0]);
 
 		remove(tmp_filepath);
@@ -171,7 +173,8 @@ static void get_logo_image(PICAM360_IMAGE_T *img) {
 	}
 }
 
-static void get_rendering_params(VECTOR4D_T view_quat, RENDERING_PARAMS_T *params) {
+static void get_rendering_params(VECTOR4D_T view_quat,
+		RENDERING_PARAMS_T *params) {
 	{
 		//params->stereo = frame->stereo;
 		//params->fov = frame->fov;
@@ -218,9 +221,12 @@ static void get_rendering_params(VECTOR4D_T view_quat, RENDERING_PARAMS_T *param
 			{ // Rco : cam offset  //euler Y(yaw)X(pitch)Z(roll)
 				float *cam_offset_matrix = params->cam_offset_matrix[i];
 				mat4_identity(cam_offset_matrix);
-				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_roll[i]);
-				mat4_rotateX(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_pitch[i]);
-				mat4_rotateY(cam_offset_matrix, cam_offset_matrix, state->options.cam_offset_yaw[i]);
+				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix,
+						state->options.cam_offset_roll[i]);
+				mat4_rotateX(cam_offset_matrix, cam_offset_matrix,
+						state->options.cam_offset_pitch[i]);
+				mat4_rotateY(cam_offset_matrix, cam_offset_matrix,
+						state->options.cam_offset_yaw[i]);
 				mat4_invert(cam_offset_matrix, cam_offset_matrix);
 				mat4_multiply(cam_matrix, cam_matrix, cam_offset_matrix); // Rc'=RcoRc
 			}
@@ -260,7 +266,6 @@ static void get_rendering_params(VECTOR4D_T view_quat, RENDERING_PARAMS_T *param
 		}
 	}
 }
-
 
 VSTREAMER_T* create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	char buff[256];
@@ -315,8 +320,12 @@ VSTREAMER_T* create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	return streamer;
 }
 
-bool delete_vstream(VSTREAMER_T *stream) {
-
+bool delete_vstream(VSTREAMER_T *_stream) {
+	for (VSTREAMER_T *stream = _stream; stream != NULL;) {
+		VSTREAMER_T *tmp = stream;
+		stream = stream->next_streamer;
+		tmp->release(tmp);
+	}
 	return true;
 }
 
@@ -681,7 +690,7 @@ int _command_handler(const char *_buff) {
 
 				mixer_output->start(mixer_output);
 
-				printf("id=%d : %s\n", state->last_vostream_id, _buff);
+				printf("complete id=%d : %s\n", state->last_vostream_id, _buff);
 			}
 		}
 	} else if (strncmp(cmd, "delete_vostream", sizeof(buff)) == 0) {
@@ -711,11 +720,40 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
-			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-				if (state->vostreams[i] != NULL
-						&& state->vostreams[i]->id == id) {
-					state->vostreams[i]->delete_after_processed = true;
-					break;
+
+			if (delete_all) {
+				int id;
+				VSTREAMER_T *streamer = NULL;
+				while(id = stream_mixer_get_output(-1, &streamer) > 0) {
+					if (streamer) {
+						streamer->stop(streamer);
+						delete_vstream(streamer);
+
+						for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+							if (state->vostreams[i] != NULL
+									&& state->vostreams[i]->id == id) {
+								state->vostreams[i] = NULL;
+								break;
+							}
+						}
+						printf("complete %d : %s\n", id, _buff);
+					}
+				}
+			} else {
+				VSTREAMER_T *streamer = NULL;
+				stream_mixer_get_output(id, &streamer);
+				if (streamer) {
+					streamer->stop(streamer);
+					delete_vstream(streamer);
+
+					for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+						if (state->vostreams[i] != NULL
+								&& state->vostreams[i]->id == id) {
+							state->vostreams[i] = NULL;
+							break;
+						}
+					}
+					printf("complete %d : %s\n", id, _buff);
 				}
 			}
 		}
@@ -911,12 +949,12 @@ int _command_handler(const char *_buff) {
 		VSTREAMER_T *streamer = NULL;
 		stream_mixer_get_output(id, &streamer);
 
-		if(streamer){
+		if (streamer) {
 			streamer = streamer->next_streamer;
-		}else{
+		} else {
 			printf("not existing id=%d\n", id);
 		}
-		if(streamer){
+		if (streamer) {
 			for (int p = 0; p < argc; p++) {
 				char *name = strtok(argv[p], "=");
 				char *value = strtok(NULL, "=");
@@ -1785,7 +1823,8 @@ static int command2upstream_handler() {
 				return 0;
 			}
 		}
-		rtp_sendpacket(state->rtcp, (unsigned char*) state->command, len, PT_CMD);
+		rtp_sendpacket(state->rtcp, (unsigned char*) state->command, len,
+				PT_CMD);
 		rtp_flush(state->rtcp);
 		last_try = s;
 		is_first_try = false;
@@ -1809,13 +1848,13 @@ static int command2upstream_handler() {
 	}
 
 	if (buff) {
-		if(state->command_id >= INT_MAX){
+		if (state->command_id >= INT_MAX) {
 			state->command_id = 0;
 		}
-		++state->command_id;//command_id shoud start from 1
+		++state->command_id; //command_id shoud start from 1
 		snprintf(state->command, sizeof(state->command),
-				"<picam360:command id=\"%d\" value=\"%s\" />", state->command_id,
-				buff);
+				"<picam360:command id=\"%d\" value=\"%s\" />",
+				state->command_id, buff);
 		free(buff);
 	}
 	return 0;
@@ -1948,7 +1987,6 @@ int main(int argc, char *argv[]) {
 			sizeof(state->default_view_coordinate_mode));
 	strncpy(state->config_filepath, "config.json",
 			sizeof(state->config_filepath));
-
 
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);

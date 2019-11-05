@@ -100,7 +100,6 @@ typedef struct _VOSTREAM_T {
 	uint32_t img_height;
 	uint32_t width;
 	uint32_t height;
-	bool delete_after_processed;
 	int frame_num;
 	double frame_elapsed;
 	bool is_recording;
@@ -116,9 +115,6 @@ typedef struct _VOSTREAM_T {
 	float kbps;
 	float fps;
 	struct timeval last_updated;
-	float fov;
-	//for unif matrix
-	MPU_T *view_mpu;
 
 	// for latency cal
 	char client_key[256];

@@ -119,11 +119,25 @@ static void input_start(void *user_data) {
 			(void*) _this);
 }
 
+static void input_stop(void *user_data) {
+	stream_mixer_input *_this = (stream_mixer_input*) user_data;
+
+	if(_this->run){
+		_this->run = false;
+		pthread_join(_this->streaming_thread, NULL);
+	}
+
+	if (_this->super.next_streamer) {
+		_this->super.next_streamer->stop(_this->super.next_streamer);
+	}
+}
+
 static void input_release(void *obj) {
 	stream_mixer_input *_this = (stream_mixer_input*) obj;
 
-	_this->run = false;
-	pthread_join(_this->streaming_thread, NULL);
+	if(_this->run){
+		_this->super.stop(&_this->super);
+	}
 
 	pthread_mutex_lock(&_this->mixer->mutex);
 	{
@@ -151,6 +165,14 @@ static void output_start(void *user_data) {
 
 	if (_this->super.next_streamer) {
 		_this->super.next_streamer->start(_this->super.next_streamer);
+	}
+}
+
+static void output_stop(void *user_data) {
+	stream_mixer_output *_this = (stream_mixer_output*) user_data;
+
+	if (_this->super.next_streamer) {
+		_this->super.next_streamer->stop(_this->super.next_streamer);
 	}
 }
 
@@ -218,6 +240,7 @@ int stream_mixer_create_input(VSTREAMER_T **out_streamer) {
 	strcpy(streamer->name, "MIXER_INPUT");
 	streamer->release = input_release;
 	streamer->start = input_start;
+	streamer->stop = input_stop;
 	streamer->get_image = input_get_image;
 	streamer->user_data = streamer;
 
@@ -247,6 +270,7 @@ int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	strcpy(streamer->name, "MIXER_OUTPUT");
 	streamer->release = output_release;
 	streamer->start = output_start;
+	streamer->stop = output_stop;
 	streamer->get_image = output_get_image;
 	streamer->user_data = streamer;
 
@@ -272,6 +296,16 @@ int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 }
 
 int stream_mixer_get_output(int id, VSTREAMER_T **streamer) {
+	*streamer = NULL;
+	if(id < 0){
+		stream_mixer_output *node = lg_mixer.output_head;
+		if(node == NULL){
+			return -1;
+		}else{
+			*streamer = &node->super;
+			return node->id;
+		}
+	}
 	for (stream_mixer_output *node = lg_mixer.output_head; node != NULL;
 			node = node->next) {
 		if(node->id == id) {

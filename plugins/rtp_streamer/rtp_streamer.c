@@ -237,6 +237,19 @@ static void start(void *user_data) {
 			user_data);
 }
 
+static void stop(void *user_data) {
+	rtp_streamer_private *_this = (rtp_streamer_private*) user_data;
+
+	if(_this->run){
+		_this->run = false;
+		pthread_join(_this->streaming_thread, NULL);
+	}
+
+	if (_this->super.next_streamer) {
+		_this->super.next_streamer->stop(_this->super.next_streamer);
+	}
+}
+
 static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		int wait_usec) {
 	rtp_streamer_private *_this = (rtp_streamer_private*) obj;
@@ -259,6 +272,10 @@ static int get_param(void *obj, const char *param, const char *value, int size) 
 static void release(void *obj) {
 	rtp_streamer_private *_this = (rtp_streamer_private*) obj;
 
+	if(_this->run){
+		_this->super.stop(&_this->super);
+	}
+
 	free(obj);
 }
 
@@ -269,6 +286,7 @@ static void create_vstreamer(void *user_data,
 	strcpy(streamer->name, STREAMER_NAME);
 	streamer->release = release;
 	streamer->start = start;
+	streamer->stop = stop;
 	streamer->get_image = get_image;
 	streamer->user_data = streamer;
 
