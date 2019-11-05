@@ -217,9 +217,15 @@ typedef struct _PICAM360CAPTURE_T {
 	MENU_T *menu;
 	bool menu_visible;
 
+	//rtp
 	RTP_T *rtp;
 	RTP_T *rtcp;
 	float rtp_play_speed;
+
+	char command[256];
+	int command_id;
+	int ack_command_id_downstream;
+	int ack_command_id_upstream;
 
 	char mpu_name[64];
 	MPU_T *mpu;

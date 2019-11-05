@@ -24,6 +24,9 @@
 #include "png_loader.h"
 #include "img/logo_png.h"
 
+//handlers
+#include "status_handler.h"
+
 #include <mat4/type.h>
 //#include <mat4/create.h>
 #include <mat4/identity.h>
@@ -125,12 +128,6 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 	GLenum err;
 	GLuint tex;
 	PICAM360_IMAGE_T image = { };
-	{
-		memcpy(state->logo_image.img_type, "RGBA", 4);
-		state->logo_image.num_of_planes = 1;
-		load_png(filename, &image.pixels[0], &image.width[0], &image.height[0],
-				&image.stride[0]);
-	}
 
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -154,6 +151,21 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 }
 
 static void get_logo_image(PICAM360_IMAGE_T *img) {
+	if(state->logo_image.pixels[0] == NULL)
+	{
+		//init logo
+		const char *tmp_filepath = "/tmp/tmp.png";
+		int fd = open(tmp_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		write(fd, logo_png, logo_png_len);
+		close(fd);
+
+		memcpy(state->logo_image.img_type, "RGBA", 4);
+		state->logo_image.num_of_planes = 1;
+		load_png(tmp_filepath, &state->logo_image.pixels[0], &state->logo_image.width[0], &state->logo_image.height[0],
+				&state->logo_image.stride[0]);
+
+		remove(tmp_filepath);
+	}
 	if (img) {
 		*img = state->logo_image;
 	}
@@ -886,14 +898,14 @@ int _command_handler(const char *_buff) {
 		const int kMaxArgs = 32;
 		int argc = 0;
 		char *argv[kMaxArgs];
-		char *p = strtok(buff, " ");
+		char *p = strtok(NULL, " \n");
 		while (p && argc < kMaxArgs - 1) {
 			if (strncmp(p, "id=", 3) == 0) {
 				sscanf(p, "id=%d", &id);
 			} else {
 				argv[argc++] = p;
 			}
-			p = strtok(0, " ");
+			p = strtok(NULL, " \n");
 		}
 
 		VSTREAMER_T *streamer = NULL;
@@ -1757,16 +1769,11 @@ static void init_plugins(PICAM360CAPTURE_T *state) {
 ///////////////////////////////////////////////////////
 #if (1) //rtp block
 
-static char lg_command[256] = { };
-static int lg_command_id = 0;
-static int lg_ack_command_id_downstream = -1;
-static int lg_ack_command_id_upstream = -1;
-
 static int command2upstream_handler() {
 	static struct timeval last_try = { };
 	static bool is_first_try = false;
-	int len = strlen(lg_command);
-	if (len != 0 && lg_command_id != lg_ack_command_id_upstream) {
+	int len = strlen(state->command);
+	if (len != 0 && state->command_id != state->ack_command_id_upstream) {
 		struct timeval s;
 		gettimeofday(&s, NULL);
 		if (!is_first_try) {
@@ -1778,13 +1785,13 @@ static int command2upstream_handler() {
 				return 0;
 			}
 		}
-		rtp_sendpacket(state->rtcp, (unsigned char*) lg_command, len, PT_CMD);
+		rtp_sendpacket(state->rtcp, (unsigned char*) state->command, len, PT_CMD);
 		rtp_flush(state->rtcp);
 		last_try = s;
 		is_first_try = false;
 		return 0;
 	} else {
-		memset(lg_command, 0, sizeof(lg_command));
+		memset(state->command, 0, sizeof(state->command));
 	}
 
 	char *buff = NULL;
@@ -1802,9 +1809,12 @@ static int command2upstream_handler() {
 	}
 
 	if (buff) {
-		lg_command_id++;
-		snprintf(lg_command, sizeof(lg_command),
-				"<picam360:command id=\"%d\" value=\"%s\" />", lg_command_id,
+		if(state->command_id >= INT_MAX){
+			state->command_id = 0;
+		}
+		++state->command_id;//command_id shoud start from 1
+		snprintf(state->command, sizeof(state->command),
+				"<picam360:command id=\"%d\" value=\"%s\" />", state->command_id,
 				buff);
 		free(buff);
 	}
@@ -1866,8 +1876,8 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len,
 		int num = sscanf((char*) data,
 				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
 				value);
-		if (num == 2 && id != lg_ack_command_id_downstream) {
-			lg_ack_command_id_downstream = id;
+		if (num == 2 && id != state->ack_command_id_downstream) {
+			state->ack_command_id_downstream = id;
 			state->plugin_host.send_command(value);
 		}
 	}
@@ -1938,6 +1948,7 @@ int main(int argc, char *argv[]) {
 			sizeof(state->default_view_coordinate_mode));
 	strncpy(state->config_filepath, "config.json",
 			sizeof(state->config_filepath));
+
 
 	{
 		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
@@ -2067,6 +2078,9 @@ int main(int argc, char *argv[]) {
 	if (state->mpu == NULL) {
 		printf("something wrong with %s\n", state->mpu_name);
 	}
+
+	//status handling
+	init_status(state);
 
 	//start vistreams
 	init_istreams(state);
