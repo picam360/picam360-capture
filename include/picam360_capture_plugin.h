@@ -87,7 +87,7 @@ typedef struct _VSTREAMER_T {
 	void (*start)(void *user_data);
 	void (*stop)(void *user_data);
 	int (*set_param)(void *user_data, const char *param, const char *value);
-	int (*get_param)(void *user_data, const char *param, const char *value, int size);
+	int (*get_param)(void *user_data, const char *param, char *value, int size);
 	int (*get_image)(void *user_data, PICAM360_IMAGE_T **image_p, int *num_p, int wait_usec);
 	void *user_data;
 } VSTREAMER_T;

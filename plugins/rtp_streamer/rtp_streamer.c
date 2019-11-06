@@ -96,8 +96,6 @@ static void _send_image(RTP_T *rtp, unsigned char *data, unsigned int data_len) 
 }
 
 static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
-	unsigned char *data = image->pixels[0];
-	unsigned int data_len = image->stride[0];
 	NALU_STREAM_DEF def = { };
 	if (memcmp(image->img_type, "I420", 4) == 0) {
 		NALU_STREAM_DEF _def = { .SC = { 0x00, 0x00, 0x00, 0x01 }, .SOI = {
@@ -123,9 +121,21 @@ static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
 		def = _def;
 	}
 
-	if (memcmp(image->img_type, "I420", 4) == 0
-			|| memcmp(image->img_type, "H265", 4) == 0
+	if (memcmp(image->img_type, "I420", 4) == 0) {
+		//header pack
+		send_sei(rtp, image, def);
+		rtp_flush(rtp);
+		for (int i = 0; i < 3; i++) {
+			unsigned char *data = image->pixels[i];
+			unsigned int data_len = image->stride[i] * image->height[i];
+			_send_image(rtp, data, data_len);
+		}
+		rtp_sendpacket(rtp, def.EOI, sizeof(def.EOI), PT_CAM_BASE);
+		rtp_flush(rtp);
+	} else if (memcmp(image->img_type, "H265", 4) == 0
 			|| memcmp(image->img_type, "H264", 4) == 0) {
+		unsigned char *data = image->pixels[0];
+		unsigned int data_len = image->stride[0];
 		//header pack
 		send_sei(rtp, image, def);
 		rtp_flush(rtp);
@@ -133,6 +143,8 @@ static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
 		rtp_sendpacket(rtp, def.EOI, sizeof(def.EOI), PT_CAM_BASE);
 		rtp_flush(rtp);
 	} else if (memcmp(image->img_type, "JPEG", 4) == 0) {
+		unsigned char *data = image->pixels[0];
+		unsigned int data_len = image->stride[0];
 		//header pack
 		send_xmp(rtp, image, def);
 		rtp_flush(rtp);
@@ -240,7 +252,7 @@ static void start(void *user_data) {
 static void stop(void *user_data) {
 	rtp_streamer_private *_this = (rtp_streamer_private*) user_data;
 
-	if(_this->run){
+	if (_this->run) {
 		_this->run = false;
 		pthread_join(_this->streaming_thread, NULL);
 	}
@@ -266,27 +278,28 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	}
 }
 
-static int get_param(void *obj, const char *param, const char *value, int size) {
+static int get_param(void *obj, const char *param, char *value, int size) {
 }
 
 static void release(void *obj) {
 	rtp_streamer_private *_this = (rtp_streamer_private*) obj;
 
-	if(_this->run){
+	if (_this->run) {
 		_this->super.stop(&_this->super);
 	}
 
 	free(obj);
 }
 
-static void create_vstreamer(void *user_data,
-		VSTREAMER_T **output_streamer) {
+static void create_vstreamer(void *user_data, VSTREAMER_T **output_streamer) {
 	VSTREAMER_T *streamer = (VSTREAMER_T*) malloc(sizeof(rtp_streamer_private));
 	memset(streamer, 0, sizeof(rtp_streamer_private));
 	strcpy(streamer->name, STREAMER_NAME);
 	streamer->release = release;
 	streamer->start = start;
 	streamer->stop = stop;
+	streamer->set_param = set_param;
+	streamer->get_param = get_param;
 	streamer->get_image = get_image;
 	streamer->user_data = streamer;
 
