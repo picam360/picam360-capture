@@ -319,6 +319,7 @@ static int connect_timeout(struct sockaddr_in *client, int timeout) {
 int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt) {
 	pthread_mutex_lock(&_this->mlock);
 	{
+		int ret;
 		static int last_data_len = 0;
 		static struct timeval last_time = { };
 		struct timeval time = { };
@@ -391,9 +392,9 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 				}
 				break;
 			case RTP_SOCKET_TYPE_FIFO:
-				write(_this->tx_fd, header, sizeof(header));
-				write(_this->tx_fd, pack->GetPacketData(), pack->GetPacketLength());
-				write(_this->tx_fd, data, data_len);
+				ret = write(_this->tx_fd, header, sizeof(header));
+				ret = write(_this->tx_fd, pack->GetPacketData(), pack->GetPacketLength());
+				ret = write(_this->tx_fd, data, data_len);
 				break;
 			default:
 				break;
@@ -671,6 +672,7 @@ static void *record_thread_func(void* arg) {
 	RTP_T *_this = (RTP_T*) arg;
 	pthread_setname_np(pthread_self(), "RTP RECORD");
 
+	int ret;
 	uint64_t num_of_bytes = 0;
 	uint64_t last_sync_bytes = 0;
 	const uint64_t MB = 1024 * 1024; // 64MB
@@ -705,8 +707,8 @@ static void *record_thread_func(void* arg) {
 		header[5] = (unsigned char) 't';
 		header[6] = (unsigned char) 'p';
 		header[7] = (unsigned char) '\0';
-		write(fd, header, sizeof(header));
-		write(fd, pack->GetPacketData(), pack->GetPacketLength());
+		ret = write(fd, header, sizeof(header));
+		ret = write(fd, pack->GetPacketData(), pack->GetPacketLength());
 
 		num_of_bytes += len;
 		if (num_of_bytes - last_sync_bytes > SYNC_THRESHOLD) {

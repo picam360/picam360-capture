@@ -295,6 +295,27 @@ int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	return _private->id;
 }
 
+int stream_mixer_get_input(int id, VSTREAMER_T **streamer) {
+	*streamer = NULL;
+	if(id < 0){
+		stream_mixer_input *node = lg_mixer.input_head;
+		if(node == NULL){
+			return -1;
+		}else{
+			*streamer = &node->super;
+			return node->id;
+		}
+	}
+	for (stream_mixer_input *node = lg_mixer.input_head; node != NULL;
+			node = node->next) {
+		if(node->id == id) {
+			*streamer = &node->super;
+			return node->id;
+		}
+	}
+	return -1;
+}
+
 int stream_mixer_get_output(int id, VSTREAMER_T **streamer) {
 	*streamer = NULL;
 	if(id < 0){

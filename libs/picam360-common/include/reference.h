@@ -13,4 +13,4 @@ typedef struct _REFERENCE_H {
 	void *user_data;
 }REFERENCE_H;
 
-void reference_init(REFERENCE_H *obj, REFERENCE_CALLBACK callback, void *user_data);
+void create_reference(REFERENCE_H **out_obj, REFERENCE_CALLBACK callback, void *user_data);

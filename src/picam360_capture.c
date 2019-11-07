@@ -18,6 +18,7 @@
 #include <uuid/uuid.h>
 #include <limits.h>
 
+#include "tools.h"
 #include "picam360_capture.h"
 #include "stream_mixer.h"
 #include "manual_mpu.h"
@@ -329,7 +330,7 @@ bool delete_vstream(VSTREAMER_T *_stream) {
 	return true;
 }
 
-static void init_istreams(PICAM360CAPTURE_T *state) {
+static void init_vistreams(PICAM360CAPTURE_T *state) {
 	for (int i = 0; i < state->num_of_cam; i++) {
 		char buff[256];
 		strncpy(buff, state->vistream_def, sizeof(buff));
@@ -724,7 +725,7 @@ int _command_handler(const char *_buff) {
 			if (delete_all) {
 				int id;
 				VSTREAMER_T *streamer = NULL;
-				while(id = stream_mixer_get_output(-1, &streamer) > 0) {
+				while (id = stream_mixer_get_output(-1, &streamer) > 0) {
 					if (streamer) {
 						streamer->stop(streamer);
 						delete_vstream(streamer);
@@ -787,6 +788,66 @@ int _command_handler(const char *_buff) {
 				if (state->vostreams[i] != NULL
 						&& state->vostreams[i]->id == id) {
 					//TODO:set fps
+					break;
+				}
+			}
+		}
+	} else if (strncmp(cmd, "record_vistream", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			for (int i = 0; i < state->num_of_cam; i++) {
+				char path[257];
+				int len = strlen(param);
+				if(param[len - 1] == '/'){
+					param[len - 1] = '\0';
+					len--;
+				}
+				snprintf(path, sizeof(path) - 1, "%s/%d", param, i);
+				int ret = mkdir_path(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+				if(ret != 0){
+					printf("can not make directory : %s\n", path);
+					return -1;
+				}
+
+				VSTREAMER_T *input = NULL;
+				stream_mixer_get_input(i + 1, &input);
+				for (VSTREAMER_T *streamer = input; streamer != NULL; streamer =
+						streamer->pre_streamer) {
+					if (strcmp(streamer->name, "image_recorder") == 0) {
+						streamer->set_param(streamer, "base_path", path);
+						streamer->set_param(streamer, "mode", "RECORD");
+						break;
+					}
+				}
+			}
+		}
+	} else if (strncmp(cmd, "play_vistream", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			for (int i = 0; i < state->num_of_cam; i++) {
+				char path[257];
+				snprintf(path, sizeof(path) - 1, "%s/%d", param, i);
+
+				VSTREAMER_T *input = NULL;
+				stream_mixer_get_input(i + 1, &input);
+				for (VSTREAMER_T *streamer = input; streamer != NULL; streamer =
+						streamer->pre_streamer) {
+					if (strcmp(streamer->name, "image_recorder") == 0) {
+						streamer->set_param(streamer, "base_path", path);
+						streamer->set_param(streamer, "mode", "PLAY");
+						break;
+					}
+				}
+			}
+		}
+	} else if (strncmp(cmd, "passthrough_vistream", sizeof(buff)) == 0) {
+		for (int i = 0; i < state->num_of_cam; i++) {
+			VSTREAMER_T *input = NULL;
+			stream_mixer_get_input(i + 1, &input);
+			for (VSTREAMER_T *streamer = input; streamer != NULL; streamer =
+					streamer->pre_streamer) {
+				if (strcmp(streamer->name, "image_recorder") == 0) {
+					streamer->set_param(streamer, "mode", "IDLE");
 					break;
 				}
 			}
@@ -1824,7 +1885,7 @@ static int command2upstream_handler() {
 			}
 		}
 		rtp_sendpacket(state->rtcp, (unsigned char*) state->command, len,
-				PT_CMD);
+		PT_CMD);
 		rtp_flush(state->rtcp);
 		last_try = s;
 		is_first_try = false;
@@ -2121,7 +2182,7 @@ int main(int argc, char *argv[]) {
 	init_status(state);
 
 	//start vistreams
-	init_istreams(state);
+	init_vistreams(state);
 
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);

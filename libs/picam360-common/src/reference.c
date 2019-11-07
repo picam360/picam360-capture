@@ -44,7 +44,7 @@ static int release(struct _REFERENCE_H *_this) {
 }
 void create_reference(REFERENCE_H **out_obj, REFERENCE_CALLBACK callback, void *user_data) {
 	REFERENCE_H *obj = (REFERENCE_H*) malloc(sizeof(REFERENCE_H));
-	obj->ref_count = 0;
+	obj->ref_count = 1;
 	obj->addref = addref;
 	obj->release = release;
 	pthread_mutex_init(&obj->mutex, NULL);
