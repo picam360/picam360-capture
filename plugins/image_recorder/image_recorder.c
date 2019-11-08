@@ -33,7 +33,10 @@ typedef struct _image_recorder_private {
 	char base_path[257];
 	enum RECORDER_MODE mode;
 	int framecount;
-	struct timeval timestamp;
+	int framecount_offset;
+	int fps;
+	struct timeval last_timestamp;
+	struct timeval base_timestamp;
 } image_recorder_private;
 
 static void start(void *user_data) {
@@ -215,22 +218,45 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 	}
 	case RECORDER_MODE_PLAY: {
 		char path[512];
-		sprintf(path, "%s/%d.pif", _this->base_path, _this->framecount);
+		sprintf(path, "%s/%d.pif", _this->base_path,
+				_this->framecount - _this->framecount_offset);
 
 		int ret = load_image(path, image_p, num_p);
 		if (ret == 0) {
 			struct timeval diff;
 			float elapsed_sec;
-			timersub(&image_p[0]->timestamp, &_this->timestamp, &diff);
-			elapsed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-			if (elapsed_sec > 0) {
-				usleep(diff.tv_usec);
+
+			struct timeval now;
+			gettimeofday(&now, NULL);
+			if (_this->fps <= 0) {
+				if (_this->framecount >= 1) {
+					timersub(&image_p[0]->timestamp, &_this->last_timestamp, &diff);
+					elapsed_sec = (float) diff.tv_sec
+							+ (float) diff.tv_usec / 1000000;
+					_this->fps = (int) (1.0 / elapsed_sec + 0.5);
+				}
+			} else {
+				float elapsed_sec_target = (float) _this->framecount
+						/ _this->fps;
+
+				timersub(&now, &_this->base_timestamp, &diff);
+				elapsed_sec = (float) diff.tv_sec
+						+ (float) diff.tv_usec / 1000000;
+				elapsed_sec_target -= elapsed_sec;
+				if (elapsed_sec_target > 10) {
+					elapsed_sec_target = 10;
+					printf("something wrong : %s\n", __FILE__);
+				}
+				if (elapsed_sec_target > 0) {
+					usleep(elapsed_sec_target * 1000000);
+				}
 			}
-			_this->timestamp = image_p[0]->timestamp;
+			_this->last_timestamp = image_p[0]->timestamp;
+			gettimeofday(&image_p[0]->timestamp, NULL);
 			_this->framecount++;
 			return 0;
 		}
-		_this->framecount = 0;
+		_this->framecount_offset = _this->framecount;
 		usleep(wait_usec);
 		break;
 	}
@@ -251,6 +277,8 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	if (strcmp(param, "mode") == 0) {
 		_this->mode = RECORDER_MODE_IDLE;
 		_this->framecount = 0;
+		_this->framecount_offset = 0;
+		gettimeofday(&_this->base_timestamp, NULL);
 		if (strcmp(value_str, "IDLE") == 0) {
 			//do nothing
 		} else if (strcmp(value_str, "RECORD") == 0) {
@@ -259,8 +287,9 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 			_this->mode = RECORDER_MODE_PLAY;
 		}
 	} else if (strcmp(param, "base_path") == 0) {
-		int len = snprintf(_this->base_path, sizeof(_this->base_path) - 1, "%s", value_str);
-		if(_this->base_path[len - 1] == '/'){
+		int len = snprintf(_this->base_path, sizeof(_this->base_path) - 1, "%s",
+				value_str);
+		if (_this->base_path[len - 1] == '/') {
 			_this->base_path[len - 1] = '\0';
 			len--;
 		}
