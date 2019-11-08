@@ -95,12 +95,13 @@ void init_menu(uint32_t font_size) {
 			L"`abcdefghijklmnopqrstuvwxyz{|}~");
 
 	{
+		int ret;
 		const char *fsh_filepath = "/tmp/tmp.fsh";
 		const char *vsh_filepath = "/tmp/tmp.vsh";
 		int fsh_fd = open(fsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
 		int vsh_fd = open(vsh_filepath, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-		write(fsh_fd, freetype_fsh, freetype_fsh_len);
-		write(vsh_fd, freetype_vsh, freetype_vsh_len);
+		ret = write(fsh_fd, freetype_fsh, freetype_fsh_len);
+		ret = write(vsh_fd, freetype_vsh, freetype_vsh_len);
 		close(fsh_fd);
 		close(vsh_fd);
 		lg_freetypegles.model.program = GLProgram_new("", vsh_filepath, fsh_filepath, true);

@@ -88,7 +88,7 @@ static void* input_streaming_thread_func(void *obj) {
 
 			for (stream_mixer_input *node = _this->mixer->input_head;
 					node != NULL; node = node->next) {
-				if (node->framecount != _this->framecount) {
+				if (node->framecount < _this->framecount) {
 					new_frame = false;
 					break;
 				}
@@ -204,10 +204,15 @@ static int output_get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		mrevent_reset(&_this->frame_ready);
 	}
 
+	int max_framecount = _this->mixer->input_head->framecount;
 	int min_framecount = _this->mixer->input_head->framecount;
 	for (stream_mixer_input *node = _this->mixer->input_head; node != NULL;
 			node = node->next) {
 		min_framecount = MIN(min_framecount, node->framecount);
+		max_framecount = MAX(min_framecount, node->framecount);
+	}
+	if(max_framecount - min_framecount > BUFFER_NUM){
+		printf("sync error : %s\n", __FILE__);
 	}
 	int cur = (min_framecount - 1) % BUFFER_NUM;
 
