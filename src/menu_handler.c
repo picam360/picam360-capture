@@ -616,7 +616,7 @@ static void system_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	}
 }
 
-static void _init_menu() {
+void init_menu_handler() {
 	init_menu(state->screen_height / 32);
 	state->menu = menu_new("Menu", menu_callback, NULL);
 

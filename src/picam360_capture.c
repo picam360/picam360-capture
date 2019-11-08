@@ -1984,7 +1984,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len,
 	return 0;
 }
 
-static void _init_rtp(PICAM360CAPTURE_T *state) {
+static void init_rtp(PICAM360CAPTURE_T *state) {
 	state->rtp = create_rtp(state->options.rtp_rx_port,
 			state->options.rtp_rx_type, state->options.rtp_tx_ip,
 			state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
@@ -2147,13 +2147,8 @@ int main(int argc, char *argv[]) {
 
 	state->plugin_host.lock_texture();
 	{
-		//menu
-		//TODO _init_menu();
 		// Setup the model world
 		//TODO init_model_proj(state);
-		//init rtp
-		_init_rtp(state);
-		//TODO init_status();
 		// initialise the OGLES texture(s)
 		//TODO init_textures(state);
 		// init plugin
@@ -2177,6 +2172,12 @@ int main(int argc, char *argv[]) {
 	if (state->mpu == NULL) {
 		printf("something wrong with %s\n", state->mpu_name);
 	}
+
+	//menu
+	init_menu_handler();
+
+	//init rtp
+	init_rtp(state);
 
 	//status handling
 	init_status(state);

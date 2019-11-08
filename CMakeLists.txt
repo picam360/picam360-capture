@@ -43,6 +43,7 @@ add_executable(picam360-capture.bin
 	src/tools.c
 	src/picam360_capture.c
 	src/status_handler.c
+	src/menu_handler.c
 	src/stream_mixer.c
 	src/manual_mpu.c
 	src/menu.c
