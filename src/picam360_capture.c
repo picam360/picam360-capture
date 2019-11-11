@@ -27,6 +27,7 @@
 
 //handlers
 #include "status_handler.h"
+#include "menu_handler.h"
 
 #include <mat4/type.h>
 //#include <mat4/create.h>
@@ -1921,7 +1922,7 @@ static int command2upstream_handler() {
 	return 0;
 }
 
-static void status_handler(char *data, int data_len) {
+static void parse_status(char *data, int data_len) {
 	for (int i = 0; i < data_len; i++) {
 		if (data[i] == '<') {
 			char name[64] = UPSTREAM_DOMAIN;
@@ -1954,7 +1955,7 @@ static int rtp_callback(unsigned char *data, unsigned int data_len,
 	last_seq_num = seq_num;
 
 	if (pt == PT_STATUS) {
-		status_handler((char*) data, data_len);
+		parse_status((char*) data, data_len);
 	}
 	return 0;
 }
@@ -1999,26 +2000,6 @@ static void init_rtp(PICAM360CAPTURE_T *state) {
 #endif //rtp block
 
 ///////////////////////////////////////////////////////
-#if (1) //menu block
-
-enum SYSTEM_CMD {
-	SYSTEM_CMD_NONE, SYSTEM_CMD_SHUTDOWN, SYSTEM_CMD_REBOOT, SYSTEM_CMD_EXIT,
-};
-
-enum CALIBRATION_CMD {
-	CALIBRATION_CMD_NONE,
-	CALIBRATION_CMD_SAVE,
-	CALIBRATION_CMD_IMAGE_CIRCLE,
-	CALIBRATION_CMD_IMAGE_PARAMS,
-	CALIBRATION_CMD_VIEWER_COMPASS,
-	CALIBRATION_CMD_VEHICLE_COMPASS,
-};
-
-#define PACKET_FOLDER_PATH "/media/usbdisk/packet"
-#define STILL_FOLDER_PATH "/media/usbdisk/still"
-#define VIDEO_FOLDER_PATH "/media/usbdisk/video"
-
-#endif //menu block
 
 int main(int argc, char *argv[]) {
 
@@ -2145,6 +2126,15 @@ int main(int argc, char *argv[]) {
 	// init EGL
 	init_egl(&state->egl_handler);
 
+	//init rtp
+	init_rtp(state);
+
+	//menu
+	init_menu_handler(state);
+
+	//status handling
+	init_status_handler(state);
+
 	state->plugin_host.lock_texture();
 	{
 		// Setup the model world
@@ -2172,15 +2162,6 @@ int main(int argc, char *argv[]) {
 	if (state->mpu == NULL) {
 		printf("something wrong with %s\n", state->mpu_name);
 	}
-
-	//menu
-	init_menu_handler();
-
-	//init rtp
-	init_rtp(state);
-
-	//status handling
-	init_status(state);
 
 	//start vistreams
 	init_vistreams(state);

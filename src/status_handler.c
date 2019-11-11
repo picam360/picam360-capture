@@ -19,6 +19,7 @@
 #include <limits.h>
 
 #include "status_handler.h"
+#include "menu_handler.h"
 
 static PICAM360CAPTURE_T *state = NULL;
 
@@ -87,8 +88,8 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 		snprintf(buff, buff_len, "%f", north);
 	} else if (status == STATUS_VAR(info)) {
 		get_info_str(buff, buff_len);
-//	} else if (status == STATUS_VAR(menu)) {
-//		get_menu_str(buff, buff_len);
+	} else if (status == STATUS_VAR(menu)) {
+		get_menu_str(buff, buff_len);
 	}
 }
 static void status_set_value(void *user_data, const char *value) {
@@ -120,7 +121,7 @@ static STATUS_T *new_status(const char *name) {
 	return status;
 }
 
-void init_status(PICAM360CAPTURE_T *_state) {
+void init_status_handler(PICAM360CAPTURE_T *_state) {
 	state = _state;
 	STATUS_INIT(&state->plugin_host, "", ack_command_id);
 	STATUS_INIT(&state->plugin_host, "", last_frame_id);

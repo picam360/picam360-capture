@@ -35,13 +35,8 @@ typedef struct _MENU_T {
 	void *user_data;
 } MENU_T;
 
-void init_menu(uint32_t font_size);
-void deinit_menu();
-void menu_redraw(MENU_T *root, char *_status, uint32_t screen_width,
-		uint32_t screen_height, uint32_t frame_width, uint32_t frame_height,
-		bool stereo);
-MENU_T *menu_new(char *name, MENU_CALLBACK callback, void *user_data);
+MENU_T *menu_new(const char *name, MENU_CALLBACK callback, void *user_data);
 void menu_delete(MENU_T **menu);
 MENU_T *menu_add_submenu(MENU_T *parent, MENU_T *child, int idx);
-MENU_T *menu_get_submenu(MENU_T *parent, char *name, bool create_new);
+MENU_T *menu_get_submenu(MENU_T *parent, const char *name, bool create_new);
 void menu_operate(MENU_T *root, enum MENU_OPERATE operate);
