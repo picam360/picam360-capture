@@ -42,47 +42,8 @@ typedef struct _rtp_streamer_private {
 	pthread_t streaming_thread;
 } rtp_streamer_private;
 
-typedef struct _NALU_STREAM_DEF {
-	unsigned char SC[4];
-	unsigned char SOI[2];
-	unsigned char EOI[2];
-	unsigned char SEI_CODE;
-} NALU_STREAM_DEF;
-
-static void send_xmp(RTP_T *rtp, PICAM360_IMAGE_T *image, NALU_STREAM_DEF def) {
-	unsigned char header_pack[512];
-	char *xmp = (char*) header_pack + sizeof(def.SOI);
-	int len = image->meta_size;
-	memcpy(xmp + 4, image->meta, image->meta_size);
-	xmp[2] = (len >> 8) & 0xFF;
-	xmp[3] = (len >> 0) & 0xFF;
-	len += 2; //length code
-	xmp[0] = 0xFF;
-	xmp[1] = 0xE1;
-	len += 2; //xmp code
-	memcpy(header_pack, def.SOI, sizeof(def.SOI));
-	len += 2; //SOI
-	rtp_sendpacket(rtp, header_pack, len, PT_CAM_BASE);
-}
-
-static void send_sei(RTP_T *rtp, PICAM360_IMAGE_T *image, NALU_STREAM_DEF def) {
-	unsigned char header_pack[512];
-	char *sei = (char*) header_pack + sizeof(def.SOI);
-	int len = image->meta_size;
-	sei[4] = def.SEI_CODE; //nal_type:sei
-	len += 1; //nal header
-	memcpy(sei + 5, image->meta, image->meta_size);
-	sei[0] = (len >> 24) & 0xFF;
-	sei[1] = (len >> 16) & 0xFF;
-	sei[2] = (len >> 8) & 0xFF;
-	sei[3] = (len >> 0) & 0xFF;
-	len += 4; //start code
-	memcpy(header_pack, def.SOI, sizeof(def.SOI));
-	len += 2; //SOI
-	rtp_sendpacket(rtp, header_pack, len, PT_CAM_BASE);
-}
-
-static void _send_image(RTP_T *rtp, unsigned char *data, unsigned int data_len) {
+static size_t _write(void *user_data, void *data, size_t data_len) {
+	RTP_T *rtp = (RTP_T*) user_data;
 	for (int j = 0; j < data_len;) {
 		int len;
 		if (j + RTP_MAXPAYLOADSIZE < data_len) {
@@ -93,80 +54,11 @@ static void _send_image(RTP_T *rtp, unsigned char *data, unsigned int data_len) 
 		rtp_sendpacket(rtp, data + j, len, PT_CAM_BASE);
 		j += len;
 	}
+	return data_len;
 }
 
 static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
-	NALU_STREAM_DEF def = { };
-	if (memcmp(image->img_type, "I420", 4) == 0) {
-		NALU_STREAM_DEF _def = { .SC = { 0x00, 0x00, 0x00, 0x01 }, .SOI = {
-				0x49, 0x34 }, //'I', '4'
-				.EOI = { 0x32, 0x30 }, //'2', '0'
-				.SEI_CODE = 40 << 1, };
-		def = _def;
-	} else if (memcmp(image->img_type, "H265", 4) == 0) {
-		NALU_STREAM_DEF _def = { .SC = { 0x00, 0x00, 0x00, 0x01 }, .SOI = {
-				0x48, 0x45 }, //'H', 'E'
-				.EOI = { 0x56, 0x43 }, //'V', 'C'
-				.SEI_CODE = 40 << 1, };
-		def = _def;
-	} else if (memcmp(image->img_type, "H264", 4) == 0) {
-		NALU_STREAM_DEF _def = { .SC = { 0x00, 0x00, 0x00, 0x01 }, .SOI = {
-				0x4E, 0x41 }, //'N', 'A'
-				.EOI = { 0x4C, 0x55 }, //'L', 'U'
-				.SEI_CODE = 6, };
-		def = _def;
-	} else if (memcmp(image->img_type, "JPEG", 4) == 0) {
-		NALU_STREAM_DEF _def = { .SC = { 0x00, 0x00, 0x00, 0x01 }, .SOI = {
-				0xFF, 0xD8 }, .EOI = { 0xFF, 0xD9 }, .SEI_CODE = 0, };
-		def = _def;
-	}
-
-	if (memcmp(image->img_type, "I420", 4) == 0) {
-		//header pack
-		send_sei(rtp, image, def);
-		rtp_flush(rtp);
-		for (int i = 0; i < 3; i++) {
-			unsigned char *data = image->pixels[i];
-			unsigned int data_len = image->stride[i] * image->height[i];
-			_send_image(rtp, data, data_len);
-		}
-		rtp_sendpacket(rtp, def.EOI, sizeof(def.EOI), PT_CAM_BASE);
-		rtp_flush(rtp);
-	} else if (memcmp(image->img_type, "H265", 4) == 0
-			|| memcmp(image->img_type, "H264", 4) == 0) {
-		unsigned char *data = image->pixels[0];
-		unsigned int data_len = image->stride[0];
-		//header pack
-		send_sei(rtp, image, def);
-		rtp_flush(rtp);
-		_send_image(rtp, data, data_len);
-		rtp_sendpacket(rtp, def.EOI, sizeof(def.EOI), PT_CAM_BASE);
-		rtp_flush(rtp);
-	} else if (memcmp(image->img_type, "JPEG", 4) == 0) {
-		unsigned char *data = image->pixels[0];
-		unsigned int data_len = image->stride[0];
-		//header pack
-		send_xmp(rtp, image, def);
-		rtp_flush(rtp);
-		{
-			int cur = 0;
-			for (; cur < data_len; cur++) {
-				if (data[cur + 0] == def.SOI[0]
-						&& data[cur + 1] == def.SOI[1]) {
-					break;
-				}
-			}
-			for (; cur < data_len; data_len--) {
-				if (data[data_len - 2] == def.EOI[0]
-						&& data[data_len - 1] == def.EOI[1]) {
-					break;
-				}
-			}
-			_send_image(rtp, data + (cur + 2), (data_len - 2) - (cur + 2));
-		}
-		rtp_sendpacket(rtp, def.EOI, sizeof(def.EOI), PT_CAM_BASE);
-		rtp_flush(rtp);
-	}
+	save_picam360_image(&image, 1, _write, (void*) rtp);
 }
 
 static void* streaming_thread_fnc(void *obj) {
@@ -198,7 +90,7 @@ static void* streaming_thread_fnc(void *obj) {
 			continue;
 		}
 		int ret;
-		int num;
+		int num = 1;
 		PICAM360_IMAGE_T *image;
 		ret = _this->super.pre_streamer->get_image(_this->super.pre_streamer,
 				&image, &num, 100 * 1000);
@@ -211,6 +103,7 @@ static void* streaming_thread_fnc(void *obj) {
 		}
 
 		send_image(rtp, image);
+		rtp_flush(rtp);
 
 		if (image->ref) {
 			image->ref->release(image->ref);
@@ -274,7 +167,11 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	if (strcmp(param, "port") == 0) {
 		int value = 0;
 		sscanf(value_str, "%d", &value);
-		_this->port = MAX(9100, value);
+		if (9100 <= value && value < 9200) {
+			_this->port = value;
+		} else {
+			printf("error: port=%d is out of range\n", value);
+		}
 	}
 }
 

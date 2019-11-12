@@ -36,7 +36,7 @@ int save_picam360_image(PICAM360_IMAGE_T **images, int num,
 
 	char buff[4 * 1024];
 	int len = 4;
-	len += sprintf(buff + len, "<PICAM360_IMAGE_T ");
+	len += sprintf(buff + len, "<picam360:image ");
 	len += sprintf(buff + len, "version=\"2.0\" ");
 	len += sprintf(buff + len, "uuid=\"%s\" ", uuid_str);
 	len += sprintf(buff + len, "timestamp=\"%ld,%ld\" ",
