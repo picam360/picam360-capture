@@ -338,20 +338,33 @@ static void init_vistreams(PICAM360CAPTURE_T *state) {
 
 		state->vistreams[i] = create_vstream(state, buff);
 		if (state->vistreams[i]) {
-			char value[256];
-			sprintf(value, "%d", i);
-			state->vistreams[i]->set_param(state->vistreams[i], "cam_num",
-					value);
-
-			VSTREAMER_T *pre = NULL;
-			VSTREAMER_T **tail_p = &state->vistreams[i];
-			for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
-				if ((*tail_p)->next_streamer == NULL) {
-					pre = (*tail_p);
+			{//connect mixer input
+				VSTREAMER_T *pre = NULL;
+				VSTREAMER_T **tail_p = &state->vistreams[i];
+				for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
+					if ((*tail_p)->next_streamer == NULL) {
+						pre = (*tail_p);
+					}
+				}
+				stream_mixer_create_input(tail_p);
+				(*tail_p)->pre_streamer = pre;
+			}
+			{//cam_num
+				char value[256];
+				sprintf(value, "%d", i);
+				for (VSTREAMER_T *stream = state->vistreams[i]; stream != NULL;
+						stream = stream->next_streamer) {
+					stream->set_param(stream, "cam_num", value);
 				}
 			}
-			stream_mixer_create_input(tail_p);
-			(*tail_p)->pre_streamer = pre;
+			{//tag
+				char value[256];
+				sprintf(value, "vistream.%d", i);
+				for (VSTREAMER_T *stream = state->vistreams[i]; stream != NULL;
+						stream = stream->next_streamer) {
+					stream->set_param(stream, "tag", value);
+				}
+			}
 
 			state->vistreams[i]->start(state->vistreams[i]);
 		}
@@ -792,194 +805,6 @@ int _command_handler(const char *_buff) {
 					break;
 				}
 			}
-		}
-	} else if (strncmp(cmd, "record_vistream", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
-			for (int i = 0; i < state->num_of_cam; i++) {
-				char path[257];
-				int len = strlen(param);
-				if(param[len - 1] == '/'){
-					param[len - 1] = '\0';
-					len--;
-				}
-				snprintf(path, sizeof(path) - 1, "%s/%d", param, i);
-				int ret = mkdir_path(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-				if(ret != 0){
-					printf("can not make directory : %s\n", path);
-					return -1;
-				}
-
-				VSTREAMER_T *input = NULL;
-				stream_mixer_get_input(i + 1, &input);
-				for (VSTREAMER_T *streamer = input; streamer != NULL; streamer =
-						streamer->pre_streamer) {
-					if (strcmp(streamer->name, "image_recorder") == 0) {
-						streamer->set_param(streamer, "base_path", path);
-						streamer->set_param(streamer, "mode", "RECORD");
-						break;
-					}
-				}
-			}
-		}
-	} else if (strncmp(cmd, "play_vistream", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
-			for (int i = 0; i < state->num_of_cam; i++) {
-				char path[257];
-				snprintf(path, sizeof(path) - 1, "%s/%d", param, i);
-
-				VSTREAMER_T *input = NULL;
-				stream_mixer_get_input(i + 1, &input);
-				for (VSTREAMER_T *streamer = input; streamer != NULL; streamer =
-						streamer->pre_streamer) {
-					if (strcmp(streamer->name, "image_recorder") == 0) {
-						streamer->set_param(streamer, "base_path", path);
-						streamer->set_param(streamer, "mode", "PLAY");
-						break;
-					}
-				}
-			}
-		}
-	} else if (strncmp(cmd, "passthrough_vistream", sizeof(buff)) == 0) {
-		for (int i = 0; i < state->num_of_cam; i++) {
-			VSTREAMER_T *input = NULL;
-			stream_mixer_get_input(i + 1, &input);
-			for (VSTREAMER_T *streamer = input; streamer != NULL; streamer =
-					streamer->pre_streamer) {
-				if (strcmp(streamer->name, "image_recorder") == 0) {
-					streamer->set_param(streamer, "mode", "IDLE");
-					break;
-				}
-			}
-		}
-	} else if (strncmp(cmd, "start_record", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
-			int id = -1;
-			const int kMaxArgs = 32;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
-			}
-			argv[0] = cmd;
-			argv[argc] = 0;
-			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "i:o")) != -1) {
-				switch (opt) {
-				case 'i':
-					sscanf(optarg, "%d", &id);
-					break;
-				}
-			}
-			if (id >= 0) {
-				optind = 1; // reset getopt
-				while ((opt = getopt(argc, argv, "i:o:")) != -1) {
-					switch (opt) {
-					case 'o':
-						for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-							if (state->vostreams[i] != NULL
-									&& state->vostreams[i]->id == id) {
-								//strncpy(frame->output_filepath, optarg, sizeof(frame->output_filepath));
-								//printf("start_record %d : %s\n", frame->id, frame->output_filepath);
-								break;
-							}
-						}
-						break;
-					}
-				}
-			}
-		}
-	} else if (strncmp(cmd, "stop_record", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			int id = -1;
-			const int kMaxArgs = 32;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
-			}
-			argv[0] = cmd;
-			argv[argc] = 0;
-			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "i:")) != -1) {
-				switch (opt) {
-				case 'i':
-					sscanf(optarg, "%d", &id);
-					break;
-				}
-			}
-			if (id >= 0) {
-				for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-					if (state->vostreams[i] != NULL
-							&& state->vostreams[i]->id == id) {
-//						if (frame->output_fd > 0) {
-//							close(frame->output_fd);
-//							frame->output_fd = -1;
-//							printf("stop_record %d\n", frame->id);
-//						} else {
-//							printf("error at stop_record %d\n", frame->id);
-//						}
-						break;
-					}
-				}
-			}
-		}
-	} else if (strncmp(cmd, "start_record_raw", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL && !state->output_raw) {
-			strncpy(state->output_raw_filepath, param,
-					sizeof(state->output_raw_filepath) - 1);
-			state->output_raw = true;
-			printf("start_record_raw saved to %s\n", param);
-		}
-	} else if (strncmp(cmd, "stop_record_raw", sizeof(buff)) == 0) {
-		printf("stop_record_raw\n");
-		state->output_raw = false;
-	} else if (strncmp(cmd, "load_file", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			strncpy(state->input_filepath, param,
-					sizeof(state->input_filepath) - 1);
-			state->input_mode = INPUT_MODE_FILE;
-			state->input_file_cur = -1;
-			state->input_file_size = 0;
-			printf("load_file from %s\n", param);
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_recording", sizeof(buff))
-			== 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			rtp_start_recording(state->rtp, param);
-			printf("start_recording : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".stop_recording", sizeof(buff)) == 0) {
-		rtp_stop_recording(state->rtp);
-		printf("stop_recording : completed\n");
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_loading", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			rtp_start_loading(state->rtp, param, true, true,
-					(RTP_LOADING_CALLBACK) loading_callback, NULL);
-			printf("start_loading : completed\n");
-		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".stop_loading", sizeof(buff)) == 0) {
-		rtp_stop_loading(state->rtp);
-		printf("stop_loading : completed\n");
-	} else if (strncmp(cmd, "cam_mode", sizeof(buff)) == 0) {
-		state->input_mode = INPUT_MODE_CAM;
-	} else if (strncmp(cmd, "get_loading_pos", sizeof(buff)) == 0) {
-		if (state->input_file_size == 0) {
-			printf("%d\n", -1);
-		} else {
-			double ratio = 100 * state->input_file_cur / state->input_file_size;
-			printf("%d\n", (int) ratio);
 		}
 	} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");

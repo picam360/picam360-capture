@@ -9,8 +9,10 @@
 #include <math.h>
 #include <limits.h>
 #include <sys/time.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <assert.h>
+#include <time.h>
 
 #include "image_recorder.h"
 #include "mrevent.h"
@@ -30,6 +32,7 @@ enum RECORDER_MODE {
 typedef struct _image_recorder_private {
 	VSTREAMER_T super;
 
+	char tag[128];
 	char base_path[257];
 	enum RECORDER_MODE mode;
 	int framecount;
@@ -38,6 +41,13 @@ typedef struct _image_recorder_private {
 	struct timeval last_timestamp;
 	struct timeval base_timestamp;
 } image_recorder_private;
+
+#define MAX_IMAGE_RECORDERS 16
+static int lg_image_recorder_count = 0;
+static image_recorder_private *lg_image_recorders[MAX_IMAGE_RECORDERS] = { };
+
+static char lg_record_path[512];
+static enum RECORDER_MODE lg_recorder_mode = RECORDER_MODE_IDLE;
 
 static void start(void *user_data) {
 	image_recorder_private *_this = (image_recorder_private*) user_data;
@@ -98,7 +108,8 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 			gettimeofday(&now, NULL);
 			if (_this->fps <= 0) {
 				if (_this->framecount >= 1) {
-					timersub(&image_p[0]->timestamp, &_this->last_timestamp, &diff);
+					timersub(&image_p[0]->timestamp, &_this->last_timestamp,
+							&diff);
 					elapsed_sec = (float) diff.tv_sec
 							+ (float) diff.tv_usec / 1000000;
 					_this->fps = (int) (1.0 / elapsed_sec + 0.5);
@@ -161,6 +172,8 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 			_this->base_path[len - 1] = '\0';
 			len--;
 		}
+	} else if (strcmp(param, "tag") == 0) {
+		int len = snprintf(_this->tag, sizeof(_this->tag) - 1, "%s", value_str);
 	}
 }
 
@@ -191,13 +204,225 @@ static void create_vstreamer(void *user_data, VSTREAMER_T **output_streamer) {
 	if (output_streamer) {
 		*output_streamer = streamer;
 	}
+
+	if (lg_image_recorder_count < MAX_IMAGE_RECORDERS) { //fail safe
+		lg_image_recorders[lg_image_recorder_count] = _private;
+		lg_image_recorder_count++;
+	}
 }
 
 static int command_handler(void *user_data, const char *_buff) {
+	int opt;
+	int ret = 0;
+	char buff[256];
+	strncpy(buff, _buff, sizeof(buff));
+	char *cmd = strtok(buff, " \n");
+	if (strncmp(cmd, "stop", sizeof(buff)) == 0) {
+		for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
+			image_recorder_private *streamer = lg_image_recorders[i];
+			if (stream == NULL) {
+				continue;
+			}
+			streamer->super.set_param(&streamer->super, "mode", "IDLE");
+		}
+	} else if (strncmp(cmd, "record", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
+				image_recorder_private *streamer = lg_image_recorders[i];
+				if (streamer == NULL) {
+					continue;
+				}
+
+				char path[257];
+				snprintf(path, sizeof(path) - 1, "%s/%s", param, stream->tag);
+				streamer->super.set_param(&streamer->super, "base_path", path);
+				streamer->super.set_param(&streamer->super, "mode", "RECORD");
+			}
+		}
+	} else if (strncmp(cmd, "play", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, "\n");
+		if (param != NULL) {
+			struct dirent *d;
+			DIR *dir;
+
+			dir = opendir(param);
+			if (dir == NULL) {
+				return 0;
+			}
+			while ((d = readdir(dir)) != 0) {
+				if (d->d_name[0] == L'.') {
+					continue;
+				}
+				for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
+					image_recorder_private *streamer = lg_image_recorders[i];
+					if (streamer == NULL) {
+						continue;
+					}
+					if (strcmp(d->d_name, stream->tag) == 0) {
+						char path[257];
+						snprintf(path, sizeof(path) - 1, "%s/%s", param,
+								streamer->tag);
+						streamer->super.set_param(&streamer->super, "base_path", path);
+						streamer->super.set_param(&streamer->super, "mode", "PLAY");
+					}
+				}
+			}
+		}
+	}
 	return 0;
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
+}
+
+static void record_menu_record_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		break;
+	case MENU_EVENT_SELECTED:
+		menu->selected = false;
+		if (lg_recorder_mode == RECORDER_MODE_RECORD) { //stop record
+			lg_recorder_mode = RECORDER_MODE_IDLE;
+
+			char cmd[512];
+			sprintf(cmd, PLUGIN_NAME ".stop");
+			lg_plugin_host->send_command(cmd);
+
+			menu->marked = false;
+			menu->selected = false;
+			printf("stop loading\n");
+		} else if (lg_recorder_mode == RECORDER_MODE_IDLE) { //start record
+			lg_recorder_mode = RECORDER_MODE_RECORD;
+
+			time_t t;
+			time(&t);
+			const tm *lt = localtime(&t);
+			char name[128] = { };
+			snprintf(name, sizeof(name) - 1, "%d-%d-%d_%d:%d:%d",
+					lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday,
+					lt->tm_hour, lt->tm_min, lt->tm_sec);
+
+			char filepath[256];
+			sprintf(filepath, "%s/%s", lg_record_path, name);
+
+			char cmd[512];
+			sprintf(cmd, PLUGIN_NAME ".record %s", filepath);
+			lg_plugin_host->send_command(cmd);
+
+			printf("start recording %s\n", filepath);
+
+			menu->marked = true;
+			menu->selected = false;
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
+}
+
+static void record_menu_load_node_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED:
+		break;
+	case MENU_EVENT_DEACTIVATED:
+		break;
+	case MENU_EVENT_SELECTED:
+		if (menu->marked) {
+			lg_recorder_mode = RECORDER_MODE_IDLE;
+
+			char cmd[512];
+			sprintf(cmd, PLUGIN_NAME ".stop");
+			lg_plugin_host->send_command(cmd);
+			printf("stop loading\n");
+
+			menu->marked = false;
+			menu->selected = false;
+		} else if (lg_recorder_mode == RECORDER_MODE_IDLE) {
+			lg_recorder_mode = RECORDER_MODE_PLAY;
+
+			char filepath[256];
+			sprintf(filepath, "%s/%s", lg_record_path, (char*) menu->user_data);
+			char cmd[512];
+			sprintf(cmd, PLUGIN_NAME ".play %s", filepath);
+			lg_plugin_host->send_command(cmd);
+			printf("start loading %s\n", filepath);
+
+			menu->marked = true;
+			menu->selected = false;
+		}
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		if (menu->user_data) {
+			free(menu->user_data);
+		}
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
+}
+
+static void record_menu_load_callback(struct _MENU_T *menu,
+		enum MENU_EVENT event) {
+	switch (event) {
+	case MENU_EVENT_ACTIVATED: {
+		struct dirent *d;
+		DIR *dir;
+
+		dir = opendir(lg_record_path);
+		if (dir != NULL) {
+			while ((d = readdir(dir)) != 0) {
+				if (d->d_name[0] != L'.') {
+					char *name = malloc(256);
+					strncpy(name, d->d_name, 256);
+					MENU_T *node_menu = menu_new(name,
+							record_menu_load_node_callback, name);
+					menu_add_submenu(menu, node_menu, INT_MAX);
+				}
+			}
+		}
+		break;
+	}
+	case MENU_EVENT_DEACTIVATED: {
+		for (int idx = 0; menu->submenu[idx]; idx++) {
+			menu_delete(&menu->submenu[idx]);
+		}
+		break;
+	}
+	case MENU_EVENT_SELECTED:
+		break;
+	case MENU_EVENT_DESELECTED:
+		break;
+	case MENU_EVENT_BEFORE_DELETE:
+		break;
+	case MENU_EVENT_NONE:
+	default:
+		break;
+	}
+}
+
+static void init_menu() {
+	MENU_T *menu = lg_plugin_host->get_menu();
+	{
+		MENU_T *sub_menu = menu_add_submenu(menu,
+				menu_new("ImageRecorder", NULL, NULL), INT_MAX);
+		menu_add_submenu(sub_menu,
+				menu_new("Record", record_menu_record_callback, NULL), INT_MAX);
+		menu_add_submenu(sub_menu,
+				menu_new("Play", record_menu_load_callback, NULL), INT_MAX);
+	}
 }
 
 static void init_options(void *user_data, json_t *_options) {
@@ -206,11 +431,25 @@ static void init_options(void *user_data, json_t *_options) {
 	if (options == NULL) {
 		return;
 	}
+	{
+		json_t *obj = json_object_get(options, "record_path");
+		if (obj) {
+			strncpy(lg_record_path, json_string_value(obj),
+					sizeof(lg_record_path) - 1);
+
+			init_menu();
+		}
+	}
 }
 
 static void save_options(void *user_data, json_t *_options) {
 	json_t *options = json_object();
 	json_object_set_new(_options, PLUGIN_NAME, options);
+
+	if (lg_record_path[0] != '\0') {
+		json_object_set_new(options, "record_path",
+				json_string(lg_record_path));
+	}
 }
 
 void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
