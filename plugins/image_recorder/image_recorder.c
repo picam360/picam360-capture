@@ -3,16 +3,15 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
 #include <limits.h>
-#include <sys/time.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <assert.h>
-#include <time.h>
 
 #include "image_recorder.h"
 #include "mrevent.h"
@@ -220,7 +219,7 @@ static int command_handler(void *user_data, const char *_buff) {
 	if (strncmp(cmd, "stop", sizeof(buff)) == 0) {
 		for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
 			image_recorder_private *streamer = lg_image_recorders[i];
-			if (stream == NULL) {
+			if (streamer == NULL) {
 				continue;
 			}
 			streamer->super.set_param(&streamer->super, "mode", "IDLE");
@@ -235,7 +234,7 @@ static int command_handler(void *user_data, const char *_buff) {
 				}
 
 				char path[257];
-				snprintf(path, sizeof(path) - 1, "%s/%s", param, stream->tag);
+				snprintf(path, sizeof(path) - 1, "%s/%s", param, streamer->tag);
 				streamer->super.set_param(&streamer->super, "base_path", path);
 				streamer->super.set_param(&streamer->super, "mode", "RECORD");
 			}
@@ -259,7 +258,7 @@ static int command_handler(void *user_data, const char *_buff) {
 					if (streamer == NULL) {
 						continue;
 					}
-					if (strcmp(d->d_name, stream->tag) == 0) {
+					if (strcmp(d->d_name, streamer->tag) == 0) {
 						char path[257];
 						snprintf(path, sizeof(path) - 1, "%s/%s", param,
 								streamer->tag);
@@ -300,7 +299,7 @@ static void record_menu_record_callback(struct _MENU_T *menu,
 
 			time_t t;
 			time(&t);
-			const tm *lt = localtime(&t);
+			struct tm *lt = localtime(&t);
 			char name[128] = { };
 			snprintf(name, sizeof(name) - 1, "%d-%d-%d_%d:%d:%d",
 					lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday,

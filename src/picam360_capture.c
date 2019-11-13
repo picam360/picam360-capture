@@ -338,7 +338,7 @@ static void init_vistreams(PICAM360CAPTURE_T *state) {
 
 		state->vistreams[i] = create_vstream(state, buff);
 		if (state->vistreams[i]) {
-			{//connect mixer input
+			{ //connect mixer input
 				VSTREAMER_T *pre = NULL;
 				VSTREAMER_T **tail_p = &state->vistreams[i];
 				for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
@@ -349,19 +349,25 @@ static void init_vistreams(PICAM360CAPTURE_T *state) {
 				stream_mixer_create_input(tail_p);
 				(*tail_p)->pre_streamer = pre;
 			}
-			{//cam_num
+			{ //cam_num
 				char value[256];
 				sprintf(value, "%d", i);
 				for (VSTREAMER_T *stream = state->vistreams[i]; stream != NULL;
 						stream = stream->next_streamer) {
+					if (stream->set_param == NULL) {
+						continue;
+					}
 					stream->set_param(stream, "cam_num", value);
 				}
 			}
-			{//tag
+			{ //tag
 				char value[256];
 				sprintf(value, "vistream.%d", i);
 				for (VSTREAMER_T *stream = state->vistreams[i]; stream != NULL;
 						stream = stream->next_streamer) {
+					if (stream->set_param == NULL) {
+						continue;
+					}
 					stream->set_param(stream, "tag", value);
 				}
 			}
