@@ -366,9 +366,8 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 			unsigned short len = sizeof(header) + sizeof(struct RTPHeader) + data_len;
 			header[0] = 0xFF;
 			header[1] = 0xE1;
-			for (int i = 0; i < 2; i++) {
-				header[2 + i] = (len >> (8 * i)) & 0xFF;
-			}
+			header[2] = (len >> 8) & 0xFF;//network(big) endian
+			header[3] = (len >> 0) & 0xFF;//network(big) endian
 			header[4] = (unsigned char) 'r';
 			header[5] = (unsigned char) 't';
 			header[6] = (unsigned char) 'p';
@@ -551,10 +550,10 @@ static void *receive_thread_func(void* arg) {
 		for (int i = 0; i < data_len; i++) {
 			if (xmp) {
 				if (xmp_pos == 2) {
-					xmp_len = buff[i];
+					xmp_len = buff[i] << 8;//network(big) endian
 					xmp_pos++;
 				} else if (xmp_pos == 3) {
-					xmp_len += buff[i] << 8;
+					xmp_len += buff[i] << 0;//network(big) endian
 					xmp_pos++;
 				} else if (xmp_pos == 4) {
 					if (buff[i] == 'r') {
@@ -700,9 +699,8 @@ static void *record_thread_func(void* arg) {
 		header[0] = 0xFF;
 		header[1] = 0xE1;
 		unsigned short len = pack->GetPacketLength() + sizeof(header);
-		for (int i = 0; i < 2; i++) {
-			header[2 + i] = (len >> (8 * i)) & 0xFF;
-		}
+		header[2] = (len >> 8) & 0xFF;//network(big) endian
+		header[3] = (len >> 0) & 0xFF;//network(big) endian
 		header[4] = (unsigned char) 'r';
 		header[5] = (unsigned char) 't';
 		header[6] = (unsigned char) 'p';
