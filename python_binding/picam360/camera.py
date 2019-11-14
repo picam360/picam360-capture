@@ -52,8 +52,9 @@ class Camera(SingletonConfigurable):
         atexit.register(self.stop)
 
     def _send_comand(self, _cmd):
-        cmd = f'<picam360:command id="{self.cmd_id}" value="{_cmd}" />'
-        print(cmd)
+        cmd = '<picam360:command id="%d" value="%s" />'
+        cmd = cmd % (self.cmd_id, _cmd)
+        #print(cmd)
         self._send_packet(cmd.encode())
         self.cmd_id += 1
     
@@ -64,10 +65,10 @@ class Camera(SingletonConfigurable):
         buff[1] = 0xE1
         buff[2] = (length >> 8) & 0xff
         buff[3] = (length >> 0) & 0xff
-        buff[4] = b'r'[0]
-        buff[5] = b't'[0]
-        buff[6] = b'p'[0]
-        buff[7] = 0
+        buff[4] = 0x72 # r
+        buff[5] = 0x74 # t
+        buff[6] = 0x70 # p
+        buff[7] = 0x00 # \0
         pack = struct.pack('!BBHII', 0, PT_CMD, self.seq_id, 0, 0)
         buff.extend(pack)
         buff.extend(data)
@@ -77,7 +78,7 @@ class Camera(SingletonConfigurable):
         
     def _parse_image(self, data):
         if self.active_frame == None:
-            if data[0] == b'P'[0] and data[1] == b'I'[0]:
+            if data[0] == 0x50 and data[1] == 0x49: # 'P' 'I'
                 length = (data[2] << 8) + (data[3] << 0)
                 pif_header = data[4:4+length].decode()
                 map = {}
@@ -139,9 +140,8 @@ class Camera(SingletonConfigurable):
         pack = None
         
         while self.thread_run:
-            buff, address = self.recv_sock.recvfrom(65536)
-            #print(f"len: {len(buff)} from: {address} xmp_pos: {xmp_pos}")
-            data_len = len(buff)
+            buff = bytearray(65536)
+            data_len, address = self.recv_sock.recvfrom_into(buff)
             i = 0
             while i < data_len:
                 if xmp:
@@ -152,22 +152,22 @@ class Camera(SingletonConfigurable):
                         xmp_len += buff[i] << 0 #network(big) endian
                         xmp_pos += 1
                     elif xmp_pos == 4:
-                        if buff[i] == b'r'[0]:
+                        if buff[i] == 0x72: # r
                             xmp_pos += 1
                         else:
                             xmp = False
                     elif xmp_pos == 5:
-                        if buff[i] == b't'[0]:
+                        if buff[i] == 0x74: # t
                             xmp_pos += 1
                         else:
                             xmp = False;
                     elif xmp_pos == 6:
-                        if buff[i] == b'p'[0]:
+                        if buff[i] == 0x70: # p
                             xmp_pos += 1
                         else:
                             xmp = False
                     elif xmp_pos == 7: # rtp header
-                        if buff[i] == b'\0'[0]:
+                        if buff[i] == 0x00: # \0
                             xmp_pos += 1
                         else:
                             xmp = False
@@ -204,7 +204,7 @@ class Camera(SingletonConfigurable):
         print("recv thread finished")
                 
     def _create_vostream_cmd(self):
-        cmd = "create_vostream PICAM360MAP width=%d height=%d|%s|rtp port=%d" 
+        cmd = 'create_vostream PICAM360MAP width=%d height=%d|%s|rtp port=%d'
         return cmd % (self.width, self.height, "dmem_tegra_converter", RECV_PORT)
                 
     def _delete_vostream_cmd(self):
