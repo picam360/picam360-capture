@@ -123,7 +123,10 @@ class Camera(SingletonConfigurable):
                 #print("new image!")
                 w = int(self.active_frame['width'][2])
                 h = int(self.active_frame['height'][2])
-                self.value = np.frombuffer(self.active_frame['pixels'][0:w*h], dtype=np.uint8).reshape(h, w, 1)
+                if self.active_frame['img_type'][2] == "RGBA":
+                	self.value = np.frombuffer(self.active_frame['pixels'][0:w*h*4], dtype=np.uint8).reshape(h, w, 4)
+                else:
+                	self.value = np.frombuffer(self.active_frame['pixels'][0:w*h], dtype=np.uint8).reshape(h, w, 1)
                 self.active_frame = None
 
     def _parse_packet(self, pack):
@@ -204,7 +207,7 @@ class Camera(SingletonConfigurable):
         print("recv thread finished")
                 
     def _create_vostream_cmd(self):
-        cmd = 'create_vostream PICAM360MAP width=%d height=%d|%s|rtp port=%d'
+        cmd = 'create_vostream WINDOW img_type=RGBA width=%d height=%d|%s|rtp port=%d'
         return cmd % (self.width, self.height, "dmem_tegra_converter", RECV_PORT)
                 
     def _delete_vostream_cmd(self):
