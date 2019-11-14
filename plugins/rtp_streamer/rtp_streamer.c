@@ -52,6 +52,7 @@ static size_t _write(void *user_data, void *data, size_t data_len) {
 			len = data_len - j;
 		}
 		rtp_sendpacket(rtp, data + j, len, PT_CAM_BASE);
+		rtp_flush(rtp);
 		j += len;
 	}
 	return data_len;
@@ -103,7 +104,6 @@ static void* streaming_thread_fnc(void *obj) {
 		}
 
 		send_image(rtp, image);
-		rtp_flush(rtp);
 
 		if (image->ref) {
 			image->ref->release(image->ref);
@@ -167,7 +167,7 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	if (strcmp(param, "port") == 0) {
 		int value = 0;
 		sscanf(value_str, "%d", &value);
-		if (9100 <= value && value < 9200) {
+		if (9100 <= value && value < 10000) {
 			_this->port = value;
 		} else {
 			printf("error: port=%d is out of range\n", value);
