@@ -133,6 +133,7 @@ public:
 		ssrc = ntohl(rtpheader_p->ssrc);
 	}
 	void StoreHeader() {
+		memset(packet, 0, packetlength);
 		struct RTPHeader *rtpheader_p = (struct RTPHeader*) packet;
 		rtpheader_p->sequencenumber = htons(seqnr);
 		rtpheader_p->payloadtype = payloadtype;

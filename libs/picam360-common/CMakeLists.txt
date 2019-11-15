@@ -37,6 +37,7 @@ add_library(picam360-common STATIC
 	src/gl_program.cc
 	src/jpeg_loader.c
 	src/png_loader.c
+	src/tools.c
 )
 
 include_directories(

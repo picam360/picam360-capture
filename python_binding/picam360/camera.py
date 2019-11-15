@@ -5,26 +5,32 @@ import cv2
 import threading
 import numpy as np
 from socket import socket, AF_INET, SOCK_DGRAM
-import time
 import binascii
 import struct
 import re
+import time
+from .rtp import Rtp
+import binascii
 
-HOST = ''
-SEND_PORT = 9005
-RECV_PORT = 9200
-ADDRESS = "127.0.0.1"
 PT_STATUS = 100
 PT_CMD = 101
 PT_CAM_BASE = 110
+STATUS_PORT = 9004
+SEND_PORT = 9005
+IMAGE_PORT = 9200
 
 class Camera(SingletonConfigurable):
     
     thread_run = False
+    last_frame_id = 0
     cmd_id = 0
-    seq_id = 0
+    vos_id = 0;
     active_frame = None
     value = traitlets.Any()
+    
+    send_sock = None
+    rtp = Rtp()
+    image_rtp = Rtp()
     
     # config
     width = traitlets.Integer(default_value=512).tag(config=True)
@@ -33,48 +39,50 @@ class Camera(SingletonConfigurable):
     def __init__(self, *args, **kwargs):
         self.value = np.empty((self.height, self.width, 3), dtype=np.uint8)
         super(Camera, self).__init__(*args, **kwargs)
-
-        try:
-            self.send_sock = socket(AF_INET, SOCK_DGRAM)
-            self.recv_sock = socket(AF_INET, SOCK_DGRAM)
-            self.recv_sock .bind((HOST, RECV_PORT))
         
-            self._send_comand(self._delete_vostream_cmd())
-            self._send_comand(self._create_vostream_cmd())
-
-            self.value = None
-            self.start()
-        except:
-            self.stop()
-            raise RuntimeError(
-                'Could not initialize camera.  Please see error trace.')
+        self.send_sock = socket(AF_INET, SOCK_DGRAM)
+        self._send_comand(self._delete_vostream_cmd())
+        self._send_comand(self._create_vostream_cmd())
+        self.start()
+        time.sleep(1)
+        self.vos_id = self.last_frame_id
+        print("vos_id=%d" % (self.vos_id))
 
         atexit.register(self.stop)
 
+    def set_view_quat(self, quat):
+        if self.vos_id == 0:
+            return
+        cmd = self._set_vostream_param_cmd("view_quat=%f,%f,%f,%f" % (quat.x, quat.y, quat.z, quat.w))
+        self._send_comand(cmd)
+
+    def set_fov(self, fov):
+        if self.vos_id == 0:
+            return
+        cmd = self._set_vostream_param_cmd("fov=%d" % (fov))
+        self._send_comand(cmd)
+        
     def _send_comand(self, _cmd):
         cmd = '<picam360:command id="%d" value="%s" />'
         cmd = cmd % (self.cmd_id, _cmd)
         #print(cmd)
-        self._send_packet(cmd.encode())
+        self.rtp.send_packet(self.send_sock, SEND_PORT, PT_CMD, cmd.encode())
         self.cmd_id += 1
-    
-    def _send_packet(self, data):
-        length = 8+12+len(data)
-        buff = bytearray(8)
-        buff[0] = 0xFF
-        buff[1] = 0xE1
-        buff[2] = (length >> 8) & 0xff
-        buff[3] = (length >> 0) & 0xff
-        buff[4] = 0x72 # r
-        buff[5] = 0x74 # t
-        buff[6] = 0x70 # p
-        buff[7] = 0x00 # \0
-        pack = struct.pack('!BBHII', 0, PT_CMD, self.seq_id, 0, 0)
-        buff.extend(pack)
-        buff.extend(data)
-        #print(binascii.hexlify(buff))
-        self.send_sock.sendto(buff, (ADDRESS, SEND_PORT))
-        self.seq_id += 1
+        
+    def _parse_status_value(self, name, value):
+        if name == 'last_frame_id':
+            self.last_frame_id = int(value)
+            
+    def _parse_status(self, data):
+        split = data.decode().split(' ')
+        i = 0
+        while i < len(split):
+            if split[i].startswith('name='):
+                name = re.split('[=,\"]', split[i])
+                value = re.split('[=,\"]', split[i+1])
+                self._parse_status_value(name[2], value[2])
+                i += 1
+            i += 1
         
     def _parse_image(self, data):
         if self.active_frame == None:
@@ -131,99 +139,31 @@ class Camera(SingletonConfigurable):
 
     def _parse_packet(self, pack):
         b1, payloadtype, seq_id, i1, i2 = struct.unpack('!BBHII', pack[0:12])
+        payloadtype = payloadtype & 0x7F
+        if payloadtype == PT_STATUS:
+            self._parse_status(pack[12:])
         if payloadtype == PT_CAM_BASE:
             self._parse_image(pack[12:])
-
-    def _capture_frames(self):
-        print("recv thread started")
-        xmp = False
-        xmp_pos = 0
-        xmp_len = 0
-        marker = 0
-        pack = None
-        
-        while self.thread_run:
-            buff = bytearray(65536)
-            data_len, address = self.recv_sock.recvfrom_into(buff)
-            i = 0
-            while i < data_len:
-                if xmp:
-                    if xmp_pos == 2:
-                        xmp_len = buff[i] << 8 #network(big) endian
-                        xmp_pos += 1
-                    elif xmp_pos == 3:
-                        xmp_len += buff[i] << 0 #network(big) endian
-                        xmp_pos += 1
-                    elif xmp_pos == 4:
-                        if buff[i] == 0x72: # r
-                            xmp_pos += 1
-                        else:
-                            xmp = False
-                    elif xmp_pos == 5:
-                        if buff[i] == 0x74: # t
-                            xmp_pos += 1
-                        else:
-                            xmp = False;
-                    elif xmp_pos == 6:
-                        if buff[i] == 0x70: # p
-                            xmp_pos += 1
-                        else:
-                            xmp = False
-                    elif xmp_pos == 7: # rtp header
-                        if buff[i] == 0x00: # \0
-                            xmp_pos += 1
-                        else:
-                            xmp = False
-                    else:
-                        if xmp_pos == 8:
-                            pack = bytearray(xmp_len - 8)
-                        if i + (xmp_len - xmp_pos) <= data_len:
-                            pack[xmp_pos - 8:] = buff[i:i + (xmp_len - xmp_pos)]
-                            i += xmp_len - xmp_pos - 1
-                            xmp_pos = xmp_len
-                            
-                            self._parse_packet(pack)
-                            
-                            pack = None
-                            xmp = False
-                            #print("packet")
-                        else:
-                            rest_in_buff = data_len - i
-                            pack[xmp_pos - 8:] = buff[i:]
-                            i = data_len - 1
-                            xmp_pos += rest_in_buff
-                            print("split")
-                else:
-                    if marker:
-                        marker = 0
-                        if buff[i] == 0xE1: #xmp
-                            xmp = True
-                            xmp_pos = 2
-                            xmp_len = 0
-                    elif buff[i] == 0xFF:
-                        marker = 1
-                i += 1
-                        
-        print("recv thread finished")
                 
     def _create_vostream_cmd(self):
         cmd = 'create_vostream WINDOW img_type=RGBA width=%d height=%d|%s|rtp port=%d'
-        return cmd % (self.width, self.height, "dmem_tegra_converter", RECV_PORT)
+        return cmd % (self.width, self.height, "dmem_tegra_converter", IMAGE_PORT)
                 
     def _delete_vostream_cmd(self):
         cmd = "delete_vostream -i *"
         return cmd
+                
+    def _set_vostream_param_cmd(self, value):
+        cmd = "set_vostream_param id=%d %s"
+        return cmd % (self.vos_id, value)
     
     def start(self):
-        if not hasattr(self, 'thread') or not self.thread.isAlive():
-            self.thread_run = True
-            self.thread = threading.Thread(target=self._capture_frames)
-            self.thread.start()
+        self.rtp.start(STATUS_PORT, self._parse_packet)
+        self.image_rtp.start(IMAGE_PORT, self._parse_packet)
 
     def stop(self):
-        if hasattr(self, 'thread'):
-            self.thread_run = False
-            self.thread.join()
+        self.rtp.stop()
+        self.image_rtp.stop()
             
     def restart(self):
         self.stop()

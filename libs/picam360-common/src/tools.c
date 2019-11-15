@@ -72,3 +72,17 @@ int mkdir_path(const char *filepath, mode_t mode) {
 	free(buf);
 	return (0);
 }
+
+void strchg(char *buf, const char *str1, const char *str2)
+{
+  char tmp[1024 + 1];
+  char *p;
+
+  while ((p = strstr(buf, str1)) != NULL) {
+    *p = '\0';
+    p += strlen(str1);
+    strcpy(tmp, p);
+    strcat(buf, str2);
+    strcat(buf, tmp);
+  }
+}

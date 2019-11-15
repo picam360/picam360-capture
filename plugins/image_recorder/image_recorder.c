@@ -15,6 +15,7 @@
 
 #include "image_recorder.h"
 #include "mrevent.h"
+#include "tools.h"
 
 #define PLUGIN_NAME "image_recorder"
 #define STREAMER_NAME "image_recorder"
@@ -97,6 +98,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		char path[512];
 		sprintf(path, "%s/%d.pif", _this->base_path,
 				_this->framecount - _this->framecount_offset);
+		strchg(path, "${tag}", _this->tag);
 
 		int ret = load_picam360_image_from_file(path, image_p, num_p);
 		if (ret == 0) {
