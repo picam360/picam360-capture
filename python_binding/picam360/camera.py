@@ -30,7 +30,6 @@ class Camera(SingletonConfigurable):
     
     send_sock = None
     rtp = Rtp()
-    image_rtp = Rtp()
     
     # config
     width = traitlets.Integer(default_value=512).tag(config=True)
@@ -44,9 +43,6 @@ class Camera(SingletonConfigurable):
         self._send_comand(self._delete_vostream_cmd())
         self._send_comand(self._create_vostream_cmd())
         self.start()
-        time.sleep(1)
-        self.vos_id = self.last_frame_id
-        print("vos_id=%d" % (self.vos_id))
 
         atexit.register(self.stop)
 
@@ -64,8 +60,7 @@ class Camera(SingletonConfigurable):
         self.cmd_id += 1
         
     def _parse_status_value(self, name, value):
-        if name == 'last_frame_id':
-            self.last_frame_id = int(value)
+        pass
             
     def _parse_status(self, data):
         split = data.decode().split(' ')
@@ -109,6 +104,12 @@ class Camera(SingletonConfigurable):
                 self.active_frame['meta'] = ""
             else:
                 self.active_frame['meta'] = data[0:meta_size].decode()
+                map = {}
+                split = self.active_frame['meta'].split(' ')
+                for i in range(len(split)):
+                    _split = re.split('[=,\"]', split[i])
+                    map[_split[0]] = _split
+                self.vos_id = int(map['frame_id'][2])
             self.active_frame['pixels_cur'] = 0
             
             data = data[meta_size:]
@@ -148,12 +149,10 @@ class Camera(SingletonConfigurable):
         return cmd
     
     def start(self):
-        self.rtp.start(STATUS_PORT, self._parse_packet)
-        self.image_rtp.start(IMAGE_PORT, self._parse_packet)
+        self.rtp.start(IMAGE_PORT, self._parse_packet)
 
     def stop(self):
         self.rtp.stop()
-        self.image_rtp.stop()
             
     def restart(self):
         self.stop()
