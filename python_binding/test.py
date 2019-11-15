@@ -22,7 +22,7 @@ while True:
     qx = Quaternion(axis=[1, 0, 0], angle=M_PI*ang_x/180)
     qy = Quaternion(axis=[0, 1, 0], angle=M_PI*ang_y/180)
     qz = Quaternion(axis=[0, 0, 1], angle=M_PI*ang_z/180)
-    quat = qx*qy*qz
+    quat = qy*qx*qz
     cmd = "view_quat=%f,%f,%f,%f fov=%f" % (quat.x, quat.y, quat.z, quat.w, fov)
     cam.set_vostream_param(cmd)
     
@@ -36,10 +36,10 @@ while True:
         ang_x += step
     elif key == CV_WAITKEY_CURSORKEY_BOTTOM:
         ang_x -= step
-    elif key == CV_WAITKEY_CURSORKEY_RIGHT:
-        ang_z += step
     elif key == CV_WAITKEY_CURSORKEY_LEFT:
-        ang_z -= step
+        ang_y += step
+    elif key == CV_WAITKEY_CURSORKEY_RIGHT:
+        ang_y -= step
     elif key == CV_WAITKEY_CURSORKEY_MINUS:
         fov += step
     elif key == CV_WAITKEY_CURSORKEY_PLUS:
