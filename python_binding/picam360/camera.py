@@ -50,16 +50,10 @@ class Camera(SingletonConfigurable):
 
         atexit.register(self.stop)
 
-    def set_view_quat(self, quat):
+    def set_vostream_param(self, value):
         if self.vos_id == 0:
             return
-        cmd = self._set_vostream_param_cmd("view_quat=%f,%f,%f,%f" % (quat.x, quat.y, quat.z, quat.w))
-        self._send_comand(cmd)
-
-    def set_fov(self, fov):
-        if self.vos_id == 0:
-            return
-        cmd = self._set_vostream_param_cmd("fov=%d" % (fov))
+        cmd = "set_vostream_param id=%d %s" % (self.vos_id, value)
         self._send_comand(cmd)
         
     def _send_comand(self, _cmd):
@@ -152,10 +146,6 @@ class Camera(SingletonConfigurable):
     def _delete_vostream_cmd(self):
         cmd = "delete_vostream -i *"
         return cmd
-                
-    def _set_vostream_param_cmd(self, value):
-        cmd = "set_vostream_param id=%d %s"
-        return cmd % (self.vos_id, value)
     
     def start(self):
         self.rtp.start(STATUS_PORT, self._parse_packet)
