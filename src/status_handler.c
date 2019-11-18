@@ -31,7 +31,6 @@ static PICAM360CAPTURE_T *state = NULL;
                                                (plugin_host)->add_watch(WATCH_VAR(name));
 //status to downstream
 static STATUS_T *STATUS_VAR(ack_command_id);
-static STATUS_T *STATUS_VAR(last_frame_id);
 static STATUS_T *STATUS_VAR(quaternion);
 static STATUS_T *STATUS_VAR(north);
 static STATUS_T *STATUS_VAR(info);
@@ -78,8 +77,6 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
 	if (status == STATUS_VAR(ack_command_id)) {
 		snprintf(buff, buff_len, "%d", state->ack_command_id_downstream);
-	} else if (status == STATUS_VAR(last_frame_id)) {
-		snprintf(buff, buff_len, "%d", state->last_vostream_id);
 	} else if (status == STATUS_VAR(quaternion)) {
 		VECTOR4D_T quat = state->mpu->get_quaternion(state->mpu);
 		snprintf(buff, buff_len, "%f,%f,%f,%f", quat.x, quat.y, quat.z, quat.w);
@@ -124,7 +121,6 @@ static STATUS_T *new_status(const char *name) {
 void init_status_handler(PICAM360CAPTURE_T *_state) {
 	state = _state;
 	STATUS_INIT(&state->plugin_host, "", ack_command_id);
-	STATUS_INIT(&state->plugin_host, "", last_frame_id);
 	STATUS_INIT(&state->plugin_host, "", quaternion);
 	STATUS_INIT(&state->plugin_host, "", north);
 	STATUS_INIT(&state->plugin_host, "", info);

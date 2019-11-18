@@ -55,6 +55,7 @@ typedef struct _MPU_FACTORY_T {
 } MPU_FACTORY_T;
 
 typedef struct _VSTREAMER_T {
+	uuid_t uuid;
 	char name[64];
 	void (*release)(void *user_data);
 

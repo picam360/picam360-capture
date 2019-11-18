@@ -203,8 +203,7 @@ typedef struct _PICAM360CAPTURE_T {
 	VSTREAMER_T *vistreams[MAX_CAM_NUM];
 	VSTREAMER_T *aistream;
 
-	unsigned int last_vostream_id;
-	VOSTREAM_T *vostreams[MAX_OSTREAM_NUM];
+	VSTREAMER_T *vostreams[MAX_OSTREAM_NUM];
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;

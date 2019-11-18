@@ -277,10 +277,10 @@ VSTREAMER_T* create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	const int kMaxArgs = 32;
 	int argc = 0;
 	char *argv[kMaxArgs];
-	char *p = strtok(buff, "|");
+	char *p = strtok(buff, "!");
 	while (p && argc < kMaxArgs - 1) {
 		argv[argc++] = p;
-		p = strtok(0, "|");
+		p = strtok(0, "!");
 	}
 	VSTREAMER_T *streamer = NULL;
 	VSTREAMER_T *pre_streamer = NULL;
@@ -680,16 +680,22 @@ int _command_handler(int argc, char *argv[]) {
 		//TODO
 	} else if (strcmp(cmd, "create_vostream") == 0) {
 		char *o_str = NULL;
+		char uuid_str[37] = { };
+		uuid_t uuid = { };
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "u:i:o:")) != -1) {
+		while ((opt = getopt(argc, argv, "u:o:")) != -1) {
 			switch (opt) {
+			case 'u':
+				sscanf(optarg, "%36s", uuid_str);
+				uuid_parse(uuid_str, uuid);
+				break;
 			case 'o':
 				o_str = optarg;
 				break;
 			}
 		}
-		if (o_str != NULL) {
-			VOSTREAM_T **vostream_p = NULL;
+		if (o_str != NULL && uuid[0] != 0) {
+			VSTREAMER_T **vostream_p = NULL;
 			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
 				if (state->vostreams[i] == NULL) {
 					vostream_p = &state->vostreams[i];
@@ -701,95 +707,100 @@ int _command_handler(int argc, char *argv[]) {
 				printf("over MAX_OSTREAM_NUM\n");
 			} else {
 				VSTREAMER_T *mixer_output = NULL;
-				int id = stream_mixer_create_output(&mixer_output);
+				stream_mixer_create_output(&mixer_output);
+				memcpy(mixer_output->uuid, uuid, 16);
 				VSTREAMER_T *vstreamer = create_vstream(state, o_str);
 				mixer_output->next_streamer = vstreamer;
 				vstreamer->pre_streamer = mixer_output;
 
-				state->last_vostream_id = id;
-				(*vostream_p) = (VOSTREAM_T*) malloc(sizeof(VOSTREAM_T));
-				(*vostream_p)->vstreamer = mixer_output;
-				(*vostream_p)->id = id;
+				(*vostream_p) = mixer_output;
 
-				char value[256];
-				sprintf(value, "%d", id);
-				vstreamer->set_param(vstreamer, "id", value);
+				vstreamer->set_param(vstreamer, "uuid", uuid_str);
 
 				mixer_output->start(mixer_output);
 
-				printf("%s : complete id=%d\n", cmd, state->last_vostream_id);
+				printf("%s : complete uuid=%s\n", cmd, uuid_str);
 			}
 		}
 	} else if (strcmp(cmd, "delete_vostream") == 0) {
 		bool delete_all = false;
-		int id = -1;
+		char uuid_str[37] = { };
+		uuid_t uuid = { };
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:p:")) != -1) {
+		while ((opt = getopt(argc, argv, "au:")) != -1) {
 			switch (opt) {
-			case 'i':
-				if (optarg[0] == '*') {
-					delete_all = true;
-				} else {
-					sscanf(optarg, "%d", &id);
-				}
+			case 'a':
+				delete_all = true;
+				break;
+			case 'u':
+				sscanf(optarg, "%36s", uuid_str);
+				uuid_parse(uuid_str, uuid);
 				break;
 			}
 		}
 		if (delete_all) {
-			int id;
 			VSTREAMER_T *streamer = NULL;
-			while (id = stream_mixer_get_output(-1, &streamer) > 0) {
-				if (streamer) {
-					streamer->stop(streamer);
-					delete_vstream(streamer);
-
-					for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-						if (state->vostreams[i] != NULL
-								&& state->vostreams[i]->id == id) {
-							state->vostreams[i] = NULL;
-							break;
-						}
-					}
-					printf("%s : complete %d\n", cmd, id);
+			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+				if (state->vostreams[i] != NULL) {
+					state->vostreams[i]->release(state->vostreams[i]);
+					state->vostreams[i] = NULL;
 				}
 			}
-		} else if (id >= 0) {
+			printf("%s all : complete\n", cmd);
+		} else if (uuid[0] != 0) {
 			VSTREAMER_T *streamer = NULL;
-			stream_mixer_get_output(id, &streamer);
-			if (streamer) {
-				streamer->stop(streamer);
-				delete_vstream(streamer);
-
-				for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-					if (state->vostreams[i] != NULL
-							&& state->vostreams[i]->id == id) {
-						state->vostreams[i] = NULL;
-						break;
-					}
+			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+				if (state->vostreams[i] != NULL
+						&& uuid_compare(state->vostreams[i]->uuid, uuid) == 0) {
+					state->vostreams[i]->release(state->vostreams[i]);
+					state->vostreams[i] = NULL;
 				}
-				printf("%s : complete %d\n", cmd, id);
 			}
+			printf("%s : complete %s\n", cmd, uuid_str);
 		} else {
-			printf("not existing id=%d\n", id);
+			printf("not specified uuid\n");
 		}
 	} else if (strcmp(cmd, "set_vostream_param") == 0) {
 		VSTREAMER_T *streamer = NULL;
-		int id = -1;
+		char uuid_str[37] = { };
+		uuid_t uuid = { };
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:p:")) != -1) {
+		while ((opt = getopt(argc, argv, "u:p:")) != -1) {
 			switch (opt) {
-			case 'i':
-				sscanf(optarg, "%d", &id);
-				stream_mixer_get_output(id, &streamer);
-				if (streamer == NULL) {
-					printf("not existing id=%d\n", id);
-				}
+			case 'u':
+				sscanf(optarg, "%36s", uuid_str);
+				uuid_parse(uuid_str, uuid);
 				break;
+			}
+		}
+		if (uuid_str[0] != 0) {
+			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+				if (state->vostreams[i] != NULL
+						&& uuid_compare(state->vostreams[i]->uuid, uuid) == 0) {
+					streamer = state->vostreams[i];
+					break;
+				}
+			}
+		}
+		if (streamer == NULL) {
+			printf("not existing uuid=%s\n", uuid_str);
+		}
+		optind = 1; // reset getopt
+		while ((opt = getopt(argc, argv, "u:p:")) != -1) {
+			switch (opt) {
 			case 'p':
 				if (streamer) {
-					char *name = strtok(optarg, "=");
-					char *value = strtok(NULL, "\n");
-					streamer->set_param(streamer, name, value);
+					int len = strlen(optarg);
+					char name[64] = { };
+					char value[512] = { };
+					for (int i = 0; optarg[i] != '\0'; i++) {
+						if (optarg[i] == '=' && i < sizeof(name) && len - (i + 1) < sizeof(value)) {
+							memcpy(name, optarg, i);
+							memcpy(value, optarg + (i + 1), len - (i + 1));
+							streamer->next_streamer->set_param(streamer->next_streamer, name, value);
+							break;
+						}
+					}
 				}
 				break;
 			}
@@ -1749,11 +1760,42 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len,
 	last_seq_num = seq_num;
 
 	if (pt == PT_CMD) {
+		int num = 0;
 		int id;
-		char value[256];
-		int num = sscanf((char*) data,
-				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
-				value);
+		char name[512];
+		char value[512];
+		int name_s = -1;
+		int value_s = -1;
+		for (int i = 0; i < data_len; i++) {
+			if (value_s < 0 && data[i] == ' ') {
+				name_s = i + 1;
+			} else if (name_s > 0) {
+				if (data[i] == '=') {
+					name[i - name_s] = '\0';
+					name_s = -1;
+				} else {
+					name[i - name_s] = data[i];
+				}
+			}
+
+			if (data[i] == '"' && data[i - 1] == '=') {
+				value_s = i + 1;
+			} else if (value_s > 0) {
+				if (data[i] == '"' && data[i - 1] != '\\') {
+					value[i - value_s] = '\0';
+					value_s = -1;
+					if (strcmp(name, "id") == 0) {
+						num += sscanf(value, "%d", &id);
+					} else if (strcmp(name, "value") == 0) {
+						strchg(value, "\\\"", "\"");
+						num++;
+						break;
+					}
+				} else {
+					value[i - value_s] = data[i];
+				}
+			}
+		}
 		if (num == 2 && id != state->ack_command_id_downstream) {
 			state->ack_command_id_downstream = id;
 			state->plugin_host.send_command(value);
