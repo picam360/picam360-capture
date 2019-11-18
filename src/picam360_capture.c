@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <uuid/uuid.h>
 #include <limits.h>
+#include <wordexp.h>
 
 #include "tools.h"
 #include "picam360_capture.h"
@@ -655,20 +656,17 @@ static void exit_func(void) {
 
 //==============================================================================
 
-int _command_handler(const char *_buff) {
+int _command_handler(int argc, char *argv[]) {
 	int opt;
 	int ret = 0;
-	char buff[256];
-	strncpy(buff, _buff, sizeof(buff));
-	char *cmd = strtok(buff, " \n");
+	char *cmd = argv[0];
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0
-			|| strncmp(cmd, "q", sizeof(buff)) == 0
-			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "exit") == 0 || strcmp(cmd, "q") == 0
+			|| strcmp(cmd, "quit") == 0) {
 		printf("exit\n");
 		exit(0);
-	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "save") == 0) {
 		save_options(state);
 		{ //send upstream
 			char cmd[256];
@@ -678,11 +676,19 @@ int _command_handler(const char *_buff) {
 		printf("save config done\n");
 	} else if (cmd[1] == '\0' && cmd[0] >= '0' && cmd[0] <= '9') {
 		state->active_cam = cmd[0] - '0';
-	} else if (strncmp(cmd, "snap", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "snap") == 0) {
 		//TODO
-	} else if (strncmp(cmd, "create_vostream", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "create_vostream") == 0) {
+		char *o_str = NULL;
+		optind = 1; // reset getopt
+		while ((opt = getopt(argc, argv, "u:i:o:")) != -1) {
+			switch (opt) {
+			case 'o':
+				o_str = optarg;
+				break;
+			}
+		}
+		if (o_str != NULL) {
 			VOSTREAM_T **vostream_p = NULL;
 			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
 				if (state->vostreams[i] == NULL) {
@@ -696,7 +702,7 @@ int _command_handler(const char *_buff) {
 			} else {
 				VSTREAMER_T *mixer_output = NULL;
 				int id = stream_mixer_create_output(&mixer_output);
-				VSTREAMER_T *vstreamer = create_vstream(state, param);
+				VSTREAMER_T *vstreamer = create_vstream(state, o_str);
 				mixer_output->next_streamer = vstreamer;
 				vstreamer->pre_streamer = mixer_output;
 
@@ -711,58 +717,28 @@ int _command_handler(const char *_buff) {
 
 				mixer_output->start(mixer_output);
 
-				printf("complete id=%d : %s\n", state->last_vostream_id, _buff);
+				printf("%s : complete id=%d\n", cmd, state->last_vostream_id);
 			}
 		}
-	} else if (strncmp(cmd, "delete_vostream", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
-			bool delete_all = false;
-			int id = -1;
-			const int kMaxArgs = 32;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
-			}
-			argv[0] = cmd;
-			argv[argc] = 0;
-			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "i:")) != -1) {
-				switch (opt) {
-				case 'i':
-					if (optarg[0] == '*') {
-						delete_all = true;
-					} else {
-						sscanf(optarg, "%d", &id);
-					}
-					break;
+	} else if (strcmp(cmd, "delete_vostream") == 0) {
+		bool delete_all = false;
+		int id = -1;
+		optind = 1; // reset getopt
+		while ((opt = getopt(argc, argv, "i:p:")) != -1) {
+			switch (opt) {
+			case 'i':
+				if (optarg[0] == '*') {
+					delete_all = true;
+				} else {
+					sscanf(optarg, "%d", &id);
 				}
+				break;
 			}
-
-			if (delete_all) {
-				int id;
-				VSTREAMER_T *streamer = NULL;
-				while (id = stream_mixer_get_output(-1, &streamer) > 0) {
-					if (streamer) {
-						streamer->stop(streamer);
-						delete_vstream(streamer);
-
-						for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-							if (state->vostreams[i] != NULL
-									&& state->vostreams[i]->id == id) {
-								state->vostreams[i] = NULL;
-								break;
-							}
-						}
-						printf("complete %d : %s\n", id, _buff);
-					}
-				}
-			} else {
-				VSTREAMER_T *streamer = NULL;
-				stream_mixer_get_output(id, &streamer);
+		}
+		if (delete_all) {
+			int id;
+			VSTREAMER_T *streamer = NULL;
+			while (id = stream_mixer_get_output(-1, &streamer) > 0) {
 				if (streamer) {
 					streamer->stop(streamer);
 					delete_vstream(streamer);
@@ -774,101 +750,73 @@ int _command_handler(const char *_buff) {
 							break;
 						}
 					}
-					printf("complete %d : %s\n", id, _buff);
+					printf("%s : complete %d\n", cmd, id);
 				}
+			}
+		} else if (id >= 0) {
+			VSTREAMER_T *streamer = NULL;
+			stream_mixer_get_output(id, &streamer);
+			if (streamer) {
+				streamer->stop(streamer);
+				delete_vstream(streamer);
+
+				for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
+					if (state->vostreams[i] != NULL
+							&& state->vostreams[i]->id == id) {
+						state->vostreams[i] = NULL;
+						break;
+					}
+				}
+				printf("%s : complete %d\n", cmd, id);
+			}
+		} else {
+			printf("not existing id=%d\n", id);
+		}
+	} else if (strcmp(cmd, "set_vostream_param") == 0) {
+		VSTREAMER_T *streamer = NULL;
+		int id = -1;
+		optind = 1; // reset getopt
+		while ((opt = getopt(argc, argv, "i:p:")) != -1) {
+			switch (opt) {
+			case 'i':
+				sscanf(optarg, "%d", &id);
+				stream_mixer_get_output(id, &streamer);
+				if (streamer == NULL) {
+					printf("not existing id=%d\n", id);
+				}
+				break;
+			case 'p':
+				if (streamer) {
+					char *name = strtok(optarg, "=");
+					char *value = strtok(NULL, "\n");
+					streamer->set_param(streamer, name, value);
+				}
+				break;
 			}
 		}
-	} else if (strncmp(cmd, "set_fps", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, "\n");
-		if (param != NULL) {
-			int id = -1;
-			float value = 5;
-			const int kMaxArgs = 32;
-			int argc = 1;
-			char *argv[kMaxArgs];
-			char *p2 = strtok(param, " ");
-			while (p2 && argc < kMaxArgs - 1) {
-				argv[argc++] = p2;
-				p2 = strtok(0, " ");
-			}
-			argv[0] = cmd;
-			argv[argc] = 0;
-			optind = 1; // reset getopt
-			while ((opt = getopt(argc, argv, "f:i:")) != -1) {
-				switch (opt) {
-				case 'i':
-					sscanf(optarg, "%d", &id);
-					break;
-				case 'f':
-					sscanf(optarg, "%f", &value);
-					break;
-				}
-			}
-			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-				if (state->vostreams[i] != NULL
-						&& state->vostreams[i]->id == id) {
-					//TODO:set fps
-					break;
-				}
-			}
-		}
-	} else if (strncmp(cmd, "set_camera_orientation", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "set_camera_orientation") == 0) {
+		if (argv[1] != NULL) {
 			float pitch;
 			float yaw;
 			float roll;
-			sscanf(param, "%f,%f,%f", &pitch, &yaw, &roll);
+			sscanf(argv[1], "%f,%f,%f", &pitch, &yaw, &roll);
 			state->camera_pitch = pitch * M_PI / 180.0;
 			state->camera_yaw = yaw * M_PI / 180.0;
 			state->camera_roll = roll * M_PI / 180.0;
 			printf("set_camera_orientation\n");
 		}
-	} else if (strncmp(cmd, "set_vostream_param", sizeof(buff)) == 0) {
-		int id = -1;
-		const int kMaxArgs = 32;
-		int argc = 0;
-		char *argv[kMaxArgs];
-		char *p = strtok(NULL, " \n");
-		while (p && argc < kMaxArgs - 1) {
-			if (strncmp(p, "id=", 3) == 0) {
-				sscanf(p, "id=%d", &id);
-			} else {
-				argv[argc++] = p;
-			}
-			p = strtok(NULL, " \n");
+	} else if (strcmp(cmd, "set_conf_sync") == 0) {
+		if (argv[1] != NULL) {
+			state->conf_sync = (argv[1][0] == '1');
+			printf("set_conf_sync %s\n", argv[1]);
 		}
-
-		VSTREAMER_T *streamer = NULL;
-		stream_mixer_get_output(id, &streamer);
-
-		if (streamer) {
-			streamer = streamer->next_streamer;
-		} else {
-			printf("not existing id=%d\n", id);
+	} else if (strcmp(cmd, "set_preview") == 0) {
+		if (argv[1] != NULL) {
+			state->preview = (argv[1][0] == '1');
+			printf("set_preview %s\n", argv[1]);
 		}
-		if (streamer) {
-			for (int p = 0; p < argc; p++) {
-				char *name = strtok(argv[p], "=");
-				char *value = strtok(NULL, "=");
-				streamer->set_param(streamer, name, value);
-			}
-		}
-	} else if (strncmp(cmd, "set_conf_sync", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			state->conf_sync = (param[0] == '1');
-			printf("set_conf_sync %s\n", param);
-		}
-	} else if (strncmp(cmd, "set_preview", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			state->preview = (param[0] == '1');
-			printf("set_preview %s\n", param);
-		}
-	} else if (strncmp(cmd, "add_camera_horizon_r", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "add_camera_horizon_r") == 0) {
+		if (argv[1] != NULL) {
 			float *cam_horizon_r =
 					(state->options.config_ex_enabled) ?
 							state->options.cam_horizon_r_ex :
@@ -876,13 +824,13 @@ int _command_handler(const char *_buff) {
 
 			int cam_num = 0;
 			float value = 0;
-			if (param[0] == '*') {
-				sscanf(param, "*=%f", &value);
+			if (argv[1][0] == '*') {
+				sscanf(argv[1], "*=%f", &value);
 				for (int i = 0; i < state->num_of_cam; i++) {
 					cam_horizon_r[i] += value;
 				}
 			} else {
-				sscanf(param, "%d=%f", &cam_num, &value);
+				sscanf(argv[1], "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					cam_horizon_r[cam_num] += value;
 				}
@@ -892,15 +840,14 @@ int _command_handler(const char *_buff) {
 				save_options_ex(state);
 			} else { //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_horizon_r %s", param);
+				sprintf(cmd, "upstream.add_camera_horizon_r %s", argv[1]);
 				state->plugin_host.send_command(cmd);
 			}
 
 			printf("add_camera_horizon_r : completed\n");
 		}
-	} else if (strncmp(cmd, "add_camera_offset_x", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "add_camera_offset_x") == 0) {
+		if (argv[1] != NULL) {
 			float *cam_offset_x =
 					(state->options.config_ex_enabled) ?
 							state->options.cam_offset_x_ex :
@@ -908,13 +855,13 @@ int _command_handler(const char *_buff) {
 
 			int cam_num = 0;
 			float value = 0;
-			if (param[0] == '*') {
-				sscanf(param, "*=%f", &value);
+			if (argv[1][0] == '*') {
+				sscanf(argv[1], "*=%f", &value);
 				for (int i = 0; i < state->num_of_cam; i++) {
 					cam_offset_x[i] += value;
 				}
 			} else {
-				sscanf(param, "%d=%f", &cam_num, &value);
+				sscanf(argv[1], "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					cam_offset_x[cam_num] += value;
 				}
@@ -924,15 +871,14 @@ int _command_handler(const char *_buff) {
 				save_options_ex(state);
 			} else { //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_offset_x %s", param);
+				sprintf(cmd, "upstream.add_camera_offset_x %s", argv[1]);
 				state->plugin_host.send_command(cmd);
 			}
 
 			printf("add_camera_offset_x : completed\n");
 		}
-	} else if (strncmp(cmd, "add_camera_offset_y", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "add_camera_offset_y") == 0) {
+		if (argv[1] != NULL) {
 			float *cam_offset_y =
 					(state->options.config_ex_enabled) ?
 							state->options.cam_offset_y_ex :
@@ -940,13 +886,13 @@ int _command_handler(const char *_buff) {
 
 			int cam_num = 0;
 			float value = 0;
-			if (param[0] == '*') {
-				sscanf(param, "*=%f", &value);
+			if (argv[1][0] == '*') {
+				sscanf(argv[1], "*=%f", &value);
 				for (int i = 0; i < state->num_of_cam; i++) {
 					cam_offset_y[i] += value;
 				}
 			} else {
-				sscanf(param, "%d=%f", &cam_num, &value);
+				sscanf(argv[1], "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					cam_offset_y[cam_num] += value;
 				}
@@ -956,109 +902,103 @@ int _command_handler(const char *_buff) {
 				save_options_ex(state);
 			} else { //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_offset_y %s", param);
+				sprintf(cmd, "upstream.add_camera_offset_y %s", argv[1]);
 				state->plugin_host.send_command(cmd);
 			}
 
 			printf("add_camera_offset_y : completed\n");
 		}
-	} else if (strncmp(cmd, "add_camera_offset_yaw", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "add_camera_offset_yaw") == 0) {
+		if (argv[1] != NULL) {
 			int cam_num = 0;
 			float value = 0;
-			if (param[0] == '*') {
-				sscanf(param, "*=%f", &value);
+			if (argv[1][0] == '*') {
+				sscanf(argv[1], "*=%f", &value);
 				for (int i = 0; i < state->num_of_cam; i++) {
 					state->options.cam_offset_yaw[i] += value;
 				}
 			} else {
-				sscanf(param, "%d=%f", &cam_num, &value);
+				sscanf(argv[1], "%d=%f", &cam_num, &value);
 				if (cam_num >= 0 && cam_num < state->num_of_cam) {
 					state->options.cam_offset_yaw[cam_num] += value;
 				}
 			}
 			{ //send upstream
 				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_offset_yaw %s", param);
+				sprintf(cmd, "upstream.add_camera_offset_yaw %s", argv[1]);
 				state->plugin_host.send_command(cmd);
 			}
 
 			printf("add_camera_offset_yaw : completed\n");
 		}
-	} else if (strncmp(cmd, "set_camera_horizon_r_bias", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "set_camera_horizon_r_bias") == 0) {
+		if (argv[1] != NULL) {
 			float value = 0;
-			sscanf(param, "%f", &value);
+			sscanf(argv[1], "%f", &value);
 			state->camera_horizon_r_bias = value;
 			printf("set_camera_horizon_r_bias : completed\n");
 		}
-	} else if (strncmp(cmd, "set_play_speed", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "set_play_speed") == 0) {
+		if (argv[1] != NULL) {
 			float value = 0;
-			sscanf(param, "%f", &value);
+			sscanf(argv[1], "%f", &value);
 			state->rtp_play_speed = value;
 			rtp_set_play_speed(state->rtp, value);
 			printf("set_play_speed : completed\n");
 		}
-	} else if (strncmp(cmd, "add_color_offset", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
+	} else if (strcmp(cmd, "add_color_offset") == 0) {
+		if (argv[1] != NULL) {
 			float value = 0;
-			sscanf(param, "%f", &value);
+			sscanf(argv[1], "%f", &value);
 			state->options.color_offset += value;
 			printf("add_color_offset : completed\n");
 		}
-	} else if (strncmp(cmd, "set_frame_sync", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			state->frame_sync = (param[0] == '1');
-			printf("set_frame_sync %s\n", param);
+	} else if (strcmp(cmd, "set_frame_sync") == 0) {
+		if (argv[1] != NULL) {
+			state->frame_sync = (argv[1][0] == '1');
+			printf("set_frame_sync %s\n", argv[1]);
 		}
-	} else if (strncmp(cmd, "set_menu_visible", sizeof(buff)) == 0) {
-		char *param = strtok(NULL, " \n");
-		if (param != NULL) {
-			state->menu_visible = (param[0] == '1');
-			printf("set_menu_visible %s\n", param);
+	} else if (strcmp(cmd, "set_menu_visible") == 0) {
+		if (argv[1] != NULL) {
+			state->menu_visible = (argv[1][0] == '1');
+			printf("set_menu_visible %s\n", argv[1]);
 		}
-	} else if (strncmp(cmd, "select_active_menu", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "select_active_menu") == 0) {
 		menu_operate(state->menu, MENU_OPERATE_SELECT);
-	} else if (strncmp(cmd, "deselect_active_menu", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "deselect_active_menu") == 0) {
 		menu_operate(state->menu, MENU_OPERATE_DESELECT);
-	} else if (strncmp(cmd, "go2next_menu", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "go2next_menu") == 0) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_NEXT);
-	} else if (strncmp(cmd, "back2previouse_menu", sizeof(buff)) == 0) {
+	} else if (strcmp(cmd, "back2previouse_menu") == 0) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_BACK);
 //	} else if (state->frame != NULL && strcasecmp(state->frame->renderer->name, "CALIBRATION") == 0) {
 //		static double calib_step = 0.01;
-//		if (strncmp(cmd, "step", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "step") == 0) {
 //			char *param = strtok(NULL, " \n");
 //			if (param != NULL) {
 //				sscanf(param, "%lf", &calib_step);
 //			}
 //		}
-//		if (strncmp(cmd, "u", sizeof(buff)) == 0 || strncmp(cmd, "t", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "u") == 0 || strcmp(cmd, "t") == 0) {
 //			state->options.cam_offset_y[state->active_cam] += calib_step;
 //		}
-//		if (strncmp(cmd, "d", sizeof(buff)) == 0 || strncmp(cmd, "b", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "d") == 0 || strcmp(cmd, "b") == 0) {
 //			state->options.cam_offset_y[state->active_cam] -= calib_step;
 //		}
-//		if (strncmp(cmd, "l", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "l") == 0) {
 //			state->options.cam_offset_x[state->active_cam] += calib_step;
 //		}
-//		if (strncmp(cmd, "r", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "r") == 0) {
 //			state->options.cam_offset_x[state->active_cam] -= calib_step;
 //		}
-//		if (strncmp(cmd, "s", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "s") == 0) {
 //			state->options.sharpness_gain += calib_step;
 //		}
-//		if (strncmp(cmd, "w", sizeof(buff)) == 0) {
+//		if (strcmp(cmd, "w") == 0) {
 //			state->options.sharpness_gain -= calib_step;
 //		}
 	} else {
-		printf("unknown command : %s\n", buff);
+		printf("unknown command : %s\n", cmd);
 	}
 	return ret;
 }
@@ -1093,7 +1033,13 @@ int command_handler() {
 				}
 			}
 			if (!handled) {
-				ret = _command_handler(buff);
+				wordexp_t p;
+				ret = wordexp(buff, &p, 0);
+				if (ret != 0) {
+					printf("command parse error : %s", buff);
+				} else {
+					ret = _command_handler(p.we_wordc, p.we_wordv);
+				}
 			}
 			free(buff);
 		} else {
