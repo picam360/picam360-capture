@@ -270,7 +270,82 @@ static void get_rendering_params(VECTOR4D_T view_quat,
 	}
 }
 
-VSTREAMER_T* create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
+static bool destroy_vstream(VSTREAMER_T *_stream) {
+	for (VSTREAMER_T *stream = _stream; stream != NULL;) {
+		VSTREAMER_T *tmp = stream;
+		stream = stream->next_streamer;
+		tmp->release(tmp);
+	}
+	return true;
+}
+
+static int mixer_event_callback(void *user_data, enum STREAM_MIXER_EVENT event) {
+	STREAM_MIXER_T *mixer = (STREAM_MIXER_T*)user_data;
+	if(event == STREAM_MIXER_EVENT_ALL_OUTPUT_RELEASED){
+		VSTREAMER_T *streamer = NULL;
+		while(mixer->get_input(mixer, 0, &streamer) > 0) {
+			for (; streamer->pre_streamer != NULL; streamer = streamer->pre_streamer) {
+				//do nothing
+			}
+			destroy_vstream(streamer);
+		}
+		LIST_T **pp;
+		LIST_FOR_START(pp, STREAM_MIXER_T, _mixer, state->stream_mixer_list)
+			if (_mixer == mixer) {
+				mixer->release(mixer);
+				LIST_DELETE(pp);
+				break;
+			}
+		}
+	}
+}
+
+static VSTREAMER_T* build_vstream(PICAM360CAPTURE_T *state, const char *_buff);
+static STREAM_MIXER_T* build_mixer(PICAM360CAPTURE_T *state, const char *name) {
+	STREAM_MIXER_DEF_T *mixer_def = NULL;
+	LIST_T **pp;
+	LIST_FOR_START(pp, STREAM_MIXER_DEF_T, _mixer_def, state->stream_mixer_def_list)
+		if (strcmp(_mixer_def->name, name) == 0) {
+			mixer_def = _mixer_def;
+			break;
+		}
+	}
+	if(mixer_def == NULL){
+		return NULL;
+	}
+
+	STREAM_MIXER_T *mixer = NULL;
+	create_stream_mixer(&mixer);
+	strcpy(mixer->name, name);
+	mixer->event_callback = mixer_event_callback;
+
+	for (int i = 0; mixer_def->vistreams[i]; i++) {
+		char buff[256];
+		strncpy(buff, mixer_def->vistreams[i], sizeof(buff));
+
+		VSTREAMER_T *vistream = build_vstream(state, buff);
+		if (vistream == NULL) {
+			printf("build stream failed : %s\n", buff);
+			continue;
+		}
+		//connect mixer input
+		VSTREAMER_T *pre = NULL;
+		VSTREAMER_T **tail_p = &vistream;
+		for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
+			if ((*tail_p)->next_streamer == NULL) {
+				pre = (*tail_p);
+			}
+		}
+		mixer->create_input(mixer, tail_p);
+		(*tail_p)->pre_streamer = pre;
+
+		vistream->start(vistream);
+	}
+
+	return mixer;
+}
+
+static VSTREAMER_T* build_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 
@@ -293,91 +368,81 @@ VSTREAMER_T* create_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 			argv2[argc2++] = p2;
 			p2 = strtok(0, " ");
 		}
-		bool supported = false;
-		for (int j = 0; state->vstreamer_factories[j] != NULL; j++) {
-			if (strncmp(state->vstreamer_factories[j]->name, argv2[0],
-					sizeof(state->vstreamer_factories[j]->name)) == 0) {
-				state->vstreamer_factories[j]->create_vstreamer(
-						state->vstreamer_factories[j], streamer_p);
-				if ((*streamer_p) == NULL) {
+		if (strcmp(argv2[0], "mixer") == 0) {
+			char mixer_name[64] = { };
+			for (int p = 1; p < argc2; p++) {
+				char name[64] = { };
+				char value[512] = { };
+				int len = strlen(argv2[p]);
+				for (int i = 0; argv2[p][i] != '\0'; i++) {
+					if (argv2[p][i] == '=' && i < sizeof(name)
+							&& len - (i + 1) < sizeof(value)) {
+						memcpy(name, argv2[p], i);
+						memcpy(value, argv2[p] + (i + 1), len - (i + 1));
+						if (strcmp(name, "name") == 0) {
+							p = argc2;
+							strcpy(mixer_name, value);
+						}
+						break;
+					}
+				}
+			}
+			if (mixer_name[0] == '\0') {
+				strcpy(mixer_name, "default");
+			}
+			STREAM_MIXER_T *mixer = NULL;
+			LIST_T **pp;
+			LIST_FOR_START(pp, STREAM_MIXER_T, _mixer, state->stream_mixer_list)
+				if (strcmp(_mixer->name, mixer_name) == 0) {
+					mixer = _mixer;
 					break;
 				}
-				for (int p = 1; p < argc2; p++) {
-					char *name = strtok(argv2[p], "=");
-					char *value = strtok(NULL, "=");
-					(*streamer_p)->set_param((*streamer_p), name, value);
-				}
-				(*streamer_p)->pre_streamer = pre_streamer;
-				pre_streamer = (*streamer_p);
-				streamer_p = &(*streamer_p)->next_streamer;
-
-				supported = true;
-				break;
 			}
-		}
-		if (supported == false) {
-			printf("%s : not supported\n", argv2[0]);
+			if (mixer == NULL) {
+				mixer = build_mixer(state, mixer_name);
+				if (mixer == NULL){
+					printf("build mixer failed : %s\n", mixer_name);
+					return NULL;
+				}
+				LIST_T **pp;
+				LIST_TAIL(pp, state->stream_mixer_list);
+				LIST_NEW(pp, mixer);
+			}
+			mixer->create_output(mixer, streamer_p);
+			(*streamer_p)->pre_streamer = pre_streamer;
+			pre_streamer = (*streamer_p);
+			streamer_p = &(*streamer_p)->next_streamer;
+		} else {
+			bool supported = false;
+			for (int j = 0; state->vstreamer_factories[j] != NULL; j++) {
+				if (strncmp(state->vstreamer_factories[j]->name, argv2[0],
+						sizeof(state->vstreamer_factories[j]->name)) == 0) {
+					state->vstreamer_factories[j]->create_vstreamer(
+							state->vstreamer_factories[j], streamer_p);
+					if ((*streamer_p) == NULL) {
+						break;
+					}
+					for (int p = 1; p < argc2; p++) {
+						char *name = strtok(argv2[p], "=");
+						char *value = strtok(NULL, "=");
+						(*streamer_p)->set_param((*streamer_p), name, value);
+					}
+					(*streamer_p)->pre_streamer = pre_streamer;
+					pre_streamer = (*streamer_p);
+					streamer_p = &(*streamer_p)->next_streamer;
+
+					supported = true;
+					break;
+				}
+			}
+			if (supported == false) {
+				printf("%s : not supported\n", argv2[0]);
+			}
 		}
 	}
 
 	return streamer;
 }
-
-bool delete_vstream(VSTREAMER_T *_stream) {
-	for (VSTREAMER_T *stream = _stream; stream != NULL;) {
-		VSTREAMER_T *tmp = stream;
-		stream = stream->next_streamer;
-		tmp->release(tmp);
-	}
-	return true;
-}
-
-static void init_vistreams(PICAM360CAPTURE_T *state) {
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		strncpy(buff, state->vistream_def, sizeof(buff));
-
-		state->vistreams[i] = create_vstream(state, buff);
-		if (state->vistreams[i]) {
-			{ //connect mixer input
-				VSTREAMER_T *pre = NULL;
-				VSTREAMER_T **tail_p = &state->vistreams[i];
-				for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next_streamer) {
-					if ((*tail_p)->next_streamer == NULL) {
-						pre = (*tail_p);
-					}
-				}
-				stream_mixer_create_input(tail_p);
-				(*tail_p)->pre_streamer = pre;
-			}
-			{ //cam_num
-				char value[256];
-				sprintf(value, "%d", i);
-				for (VSTREAMER_T *stream = state->vistreams[i]; stream != NULL;
-						stream = stream->next_streamer) {
-					if (stream->set_param == NULL) {
-						continue;
-					}
-					stream->set_param(stream, "cam_num", value);
-				}
-			}
-			{ //tag
-				char value[256];
-				sprintf(value, "vistream.%d", i);
-				for (VSTREAMER_T *stream = state->vistreams[i]; stream != NULL;
-						stream = stream->next_streamer) {
-					if (stream->set_param == NULL) {
-						continue;
-					}
-					stream->set_param(stream, "tag", value);
-				}
-			}
-
-			state->vistreams[i]->start(state->vistreams[i]);
-		}
-	}
-}
-//------------------------------------------------------------------------------
 
 /***********************************************************
  * Name: init_options
@@ -398,6 +463,53 @@ static void init_options(PICAM360CAPTURE_T *state) {
 		fputs(error.text, stderr);
 		exit(1);
 	}
+	{ //stream_mixer_defs
+		json_t *obj = json_object_get(options, "stream_mixer_defs");
+		if (obj && json_is_array(obj)) {
+			for (int i = 0; i < json_array_size(obj); i++) {
+				STREAM_MIXER_DEF_T *mixer_def = (STREAM_MIXER_DEF_T*) malloc(
+						sizeof(STREAM_MIXER_DEF_T));
+				memset(mixer_def, 0, sizeof(STREAM_MIXER_DEF_T));
+				json_t *i_obj = json_array_get(obj, i);
+
+				if (i == 0) {
+					mixer_def->name = "default";
+				} else {
+					json_t *name_obj = json_object_get(i_obj, "name");
+					if (name_obj) {
+						int len = json_string_length(name_obj);
+						mixer_def->name = (char*) malloc(
+								sizeof(char) * (len + 1));
+						memset(mixer_def->name, 0, sizeof(char) * (len + 1));
+						strncpy(mixer_def->name, json_string_value(name_obj),
+								len);
+					}
+				}
+				json_t *vistreams_obj = json_object_get(i_obj, "vistreams");
+				if (vistreams_obj && json_is_array(vistreams_obj)) {
+					mixer_def->vistreams = (char**) malloc(
+							sizeof(char**)
+									* (json_array_size(vistreams_obj) + 1));
+					memset(mixer_def->vistreams, 0,
+							sizeof(char**)
+									* (json_array_size(vistreams_obj) + 1));
+					for (int j = 0; j < json_array_size(vistreams_obj); j++) {
+						json_t *j_obj = json_array_get(vistreams_obj, j);
+						int len = json_string_length(j_obj);
+						mixer_def->vistreams[j] = (char*) malloc(
+								sizeof(char) * (len + 1));
+						memset(mixer_def->vistreams[j], 0,
+								sizeof(char) * (len + 1));
+						strncpy(mixer_def->vistreams[j],
+								json_string_value(j_obj), len);
+					}
+				}
+				LIST_T **pp;
+				LIST_TAIL(pp, state->stream_mixer_def_list);
+				LIST_NEW(pp, mixer_def);
+			}
+		}
+	}
 	state->num_of_cam = json_number_value(
 			json_object_get(options, "num_of_cam"));
 	state->num_of_cam = MAX(0, MIN(state->num_of_cam, MAX_CAM_NUM));
@@ -406,20 +518,6 @@ static void init_options(PICAM360CAPTURE_T *state) {
 		if (value) {
 			strncpy(state->mpu_name, json_string_value(value),
 					sizeof(state->mpu_name) - 1);
-		}
-	}
-	{
-		json_t *value = json_object_get(options, "vistream_def");
-		if (value) {
-			strncpy(state->vistream_def, json_string_value(value),
-					sizeof(state->vistream_def) - 1);
-		}
-	}
-	{
-		json_t *value = json_object_get(options, "aistream_def");
-		if (value) {
-			strncpy(state->aistream_def, json_string_value(value),
-					sizeof(state->aistream_def) - 1);
 		}
 	}
 	state->options.sharpness_gain = json_number_value(
@@ -516,12 +614,24 @@ static void init_options(PICAM360CAPTURE_T *state) {
 static void save_options(PICAM360CAPTURE_T *state) {
 	json_t *options = json_object();
 
+	{ //stream_mixer_defs
+		json_t *obj = json_array();
+		LIST_T **pp;
+		LIST_FOR_START(pp, STREAM_MIXER_DEF_T, mixer_def, state->stream_mixer_def_list)
+			json_t *i_obj = json_object();
+			json_object_set_new(i_obj, "name", json_string(mixer_def->name));
+			json_t *j_obj = json_array();
+			for (int j = 0; mixer_def->vistreams[j]; j++) {
+				json_array_append_new(j_obj,
+						json_string(mixer_def->vistreams[j]));
+			}
+			json_object_set_new(i_obj, "vistreams", j_obj);
+			json_array_append_new(obj, i_obj);
+		}
+		json_object_set_new(options, "stream_mixer_defs", obj);
+	}
 	json_object_set_new(options, "num_of_cam", json_integer(state->num_of_cam));
 	json_object_set_new(options, "mpu_name", json_string(state->mpu_name));
-	json_object_set_new(options, "vistream_def",
-			json_string(state->vistream_def));
-	json_object_set_new(options, "aistream_def",
-			json_string(state->aistream_def));
 	json_object_set_new(options, "sharpness_gain",
 			json_real(state->options.sharpness_gain));
 	json_object_set_new(options, "color_offset",
@@ -695,32 +805,16 @@ int _command_handler(int argc, char *argv[]) {
 			}
 		}
 		if (o_str != NULL && uuid[0] != 0) {
-			VSTREAMER_T **vostream_p = NULL;
-			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-				if (state->vostreams[i] == NULL) {
-					vostream_p = &state->vostreams[i];
-					break;
-				}
-			}
+			VSTREAMER_T *vstreamer = build_vstream(state, o_str);
+			memcpy(vstreamer->uuid, uuid, sizeof(uuid_t));
 
-			if (vostream_p == NULL) {
-				printf("over MAX_OSTREAM_NUM\n");
-			} else {
-				VSTREAMER_T *mixer_output = NULL;
-				stream_mixer_create_output(&mixer_output);
-				memcpy(mixer_output->uuid, uuid, 16);
-				VSTREAMER_T *vstreamer = create_vstream(state, o_str);
-				mixer_output->next_streamer = vstreamer;
-				vstreamer->pre_streamer = mixer_output;
+			vstreamer->start(vstreamer);
 
-				(*vostream_p) = mixer_output;
+			LIST_T **pp;
+			LIST_TAIL(pp, state->vostream_list);
+			LIST_NEW(pp, vstreamer);
 
-				vstreamer->set_param(vstreamer, "uuid", uuid_str);
-
-				mixer_output->start(mixer_output);
-
-				printf("%s : complete uuid=%s\n", cmd, uuid_str);
-			}
+			printf("%s : complete uuid=%s\n", cmd, uuid_str);
 		}
 	} else if (strcmp(cmd, "delete_vostream") == 0) {
 		bool delete_all = false;
@@ -739,21 +833,20 @@ int _command_handler(int argc, char *argv[]) {
 			}
 		}
 		if (delete_all) {
-			VSTREAMER_T *streamer = NULL;
-			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-				if (state->vostreams[i] != NULL) {
-					state->vostreams[i]->release(state->vostreams[i]);
-					state->vostreams[i] = NULL;
-				}
+			LIST_T **pp = &state->vostream_list;
+			while (*pp) {
+				VSTREAMER_T *streamer = (VSTREAMER_T*) (*pp)->value;
+				destroy_vstream(streamer);
+				LIST_DELETE(pp);
 			}
 			printf("%s all : complete\n", cmd);
 		} else if (uuid[0] != 0) {
-			VSTREAMER_T *streamer = NULL;
-			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-				if (state->vostreams[i] != NULL
-						&& uuid_compare(state->vostreams[i]->uuid, uuid) == 0) {
-					state->vostreams[i]->release(state->vostreams[i]);
-					state->vostreams[i] = NULL;
+			LIST_T **pp;
+			LIST_FOR_START(pp, VSTREAMER_T, streamer, state->vostream_list)
+				if (uuid_compare(streamer->uuid, uuid) == 0) {
+					destroy_vstream(streamer);
+					LIST_DELETE(pp);
+					break;
 				}
 			}
 			printf("%s : complete %s\n", cmd, uuid_str);
@@ -774,10 +867,10 @@ int _command_handler(int argc, char *argv[]) {
 			}
 		}
 		if (uuid_str[0] != 0) {
-			for (int i = 0; i < MAX_OSTREAM_NUM; i++) {
-				if (state->vostreams[i] != NULL
-						&& uuid_compare(state->vostreams[i]->uuid, uuid) == 0) {
-					streamer = state->vostreams[i];
+			LIST_T **pp;
+			LIST_FOR_START(pp, VSTREAMER_T, _streamer, state->vostream_list)
+				if (uuid_compare(_streamer->uuid, uuid) == 0) {
+					streamer = _streamer;
 					break;
 				}
 			}
@@ -794,10 +887,12 @@ int _command_handler(int argc, char *argv[]) {
 					char name[64] = { };
 					char value[512] = { };
 					for (int i = 0; optarg[i] != '\0'; i++) {
-						if (optarg[i] == '=' && i < sizeof(name) && len - (i + 1) < sizeof(value)) {
+						if (optarg[i] == '=' && i < sizeof(name)
+								&& len - (i + 1) < sizeof(value)) {
 							memcpy(name, optarg, i);
 							memcpy(value, optarg + (i + 1), len - (i + 1));
-							streamer->next_streamer->set_param(streamer->next_streamer, name, value);
+							streamer->next_streamer->set_param(
+									streamer->next_streamer, name, value);
 							break;
 						}
 					}
@@ -1835,8 +1930,6 @@ int main(int argc, char *argv[]) {
 	state->num_of_cam = 1;
 	state->preview = false;
 	strncpy(state->mpu_name, "manual", sizeof(state->mpu_name));
-	strncpy(state->vistream_def, "ffmpeg", sizeof(state->vistream_def));
-	strncpy(state->aistream_def, "none", sizeof(state->aistream_def));
 	state->video_direct = false;
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
@@ -1981,9 +2074,6 @@ int main(int argc, char *argv[]) {
 	if (state->mpu == NULL) {
 		printf("something wrong with %s\n", state->mpu_name);
 	}
-
-	//start vistreams
-	init_vistreams(state);
 
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);

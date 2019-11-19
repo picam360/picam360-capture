@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include "mrevent.h"
 #include "rtp.h"
+#include "list.h"
 #include "egl_handler.h"
 
 #include "picam360_capture_plugin.h"
@@ -76,11 +77,6 @@ typedef struct _OPTIONS_T {
 	bool is_samplerExternalOES;
 } OPTIONS_T;
 
-typedef struct _LIST_T {
-	void *value;
-	struct _LIST_T *next;
-} LIST_T;
-
 typedef struct _FRAME_INFO_T {
 	VECTOR4D_T view_quat;
 	float fov;
@@ -90,6 +86,11 @@ typedef struct _FRAME_INFO_T {
 	struct timeval after_redraw_render_texture;
 	struct timeval after_encoded;
 } FRAME_INFO_T;
+
+typedef struct _STREAM_MIXER_DEF_T {
+	char *name;
+	char **vistreams;
+} STREAM_MIXER_DEF_T;
 
 typedef struct _VOSTREAM_T {
 	int id;
@@ -142,8 +143,6 @@ typedef struct _PICAM360CAPTURE_T {
 	bool preview;
 	bool conf_sync;
 	bool video_direct;
-	char vistream_def[256];
-	char aistream_def[256];
 	int32_t screen_width;
 	int32_t screen_height;
 	uint32_t cam_width;
@@ -200,10 +199,9 @@ typedef struct _PICAM360CAPTURE_T {
 	pthread_mutex_t texture_mutex;
 	pthread_mutex_t texture_size_mutex;
 
-	VSTREAMER_T *vistreams[MAX_CAM_NUM];
-	VSTREAMER_T *aistream;
-
-	VSTREAMER_T *vostreams[MAX_OSTREAM_NUM];
+	LIST_T *stream_mixer_def_list;
+	LIST_T *stream_mixer_list;
+	LIST_T *vostream_list;
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;

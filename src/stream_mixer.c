@@ -23,10 +23,10 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define BUFFER_NUM 4
-struct _stream_mixer;
+struct _stream_mixer_private;
 typedef struct _stream_mixer_input {
 	VSTREAMER_T super;
-	struct _stream_mixer *mixer;
+	struct _stream_mixer_private *mixer;
 
 	int id;
 	bool run;
@@ -40,7 +40,7 @@ typedef struct _stream_mixer_input {
 
 typedef struct _stream_mixer_output {
 	VSTREAMER_T super;
-	struct _stream_mixer *mixer;
+	struct _stream_mixer_private *mixer;
 
 	int id;
 	MREVENT_T frame_ready;
@@ -48,14 +48,15 @@ typedef struct _stream_mixer_output {
 	struct _stream_mixer_output *next;
 } stream_mixer_output;
 
-typedef struct _stream_mixer {
+typedef struct _stream_mixer_private {
+	STREAM_MIXER_T super;
+
 	pthread_mutex_t mutex;
 	int input_stream_last_id;
 	int output_stream_last_id;
 	stream_mixer_input *input_head;
 	stream_mixer_output *output_head;
-} stream_mixer;
-static stream_mixer lg_mixer = { };
+} stream_mixer_private;
 
 static void* input_streaming_thread_func(void *obj) {
 	stream_mixer_input *_this = (stream_mixer_input*) obj;
@@ -150,6 +151,10 @@ static void input_release(void *obj) {
 	}
 	pthread_mutex_unlock(&_this->mixer->mutex);
 
+	if(_this->mixer->input_head == NULL && _this->mixer->super.event_callback) {
+		_this->mixer->super.event_callback(_this->mixer, STREAM_MIXER_EVENT_ALL_INPUT_RELEASED);
+	}
+
 	free(obj);
 }
 
@@ -189,6 +194,10 @@ static void output_release(void *obj) {
 		*container_p = (*container_p)->next;
 	}
 	pthread_mutex_unlock(&_this->mixer->mutex);
+
+	if(_this->mixer->output_head == NULL && _this->mixer->super.event_callback) {
+		_this->mixer->super.event_callback(_this->mixer, STREAM_MIXER_EVENT_ALL_OUTPUT_RELEASED);
+	}
 
 	free(obj);
 }
@@ -235,11 +244,8 @@ static int output_get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 	return 0;
 }
 
-void stream_mixer_init() {
-	pthread_mutex_init(&lg_mixer.mutex, NULL);
-}
-
-int stream_mixer_create_input(VSTREAMER_T **out_streamer) {
+static int create_input(void *obj, VSTREAMER_T **out_streamer) {
+	stream_mixer_private *mixer = (stream_mixer_private*) obj;
 	VSTREAMER_T *streamer = (VSTREAMER_T*) malloc(sizeof(stream_mixer_input));
 	memset(streamer, 0, sizeof(stream_mixer_input));
 	strcpy(streamer->name, "MIXER_INPUT");
@@ -250,7 +256,7 @@ int stream_mixer_create_input(VSTREAMER_T **out_streamer) {
 	streamer->user_data = streamer;
 
 	stream_mixer_input *_private = (stream_mixer_input*) streamer;
-	_private->mixer = &lg_mixer;
+	_private->mixer = mixer;
 	_private->id = ++_private->mixer->input_stream_last_id;//id should start from 1
 
 	pthread_mutex_lock(&_private->mixer->mutex);
@@ -269,7 +275,8 @@ int stream_mixer_create_input(VSTREAMER_T **out_streamer) {
 	return _private->id;
 }
 
-int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
+static int create_output(void *obj, VSTREAMER_T **out_streamer) {
+	stream_mixer_private *mixer = (stream_mixer_private*) obj;
 	VSTREAMER_T *streamer = (VSTREAMER_T*) malloc(sizeof(stream_mixer_output));
 	memset(streamer, 0, sizeof(stream_mixer_output));
 	strcpy(streamer->name, "MIXER_OUTPUT");
@@ -280,7 +287,7 @@ int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	streamer->user_data = streamer;
 
 	stream_mixer_output *_private = (stream_mixer_output*) streamer;
-	_private->mixer = &lg_mixer;
+	_private->mixer = mixer;
 	_private->id = ++_private->mixer->output_stream_last_id;//id should start from 1
 	mrevent_init(&_private->frame_ready);
 
@@ -300,44 +307,68 @@ int stream_mixer_create_output(VSTREAMER_T **out_streamer) {
 	return _private->id;
 }
 
-int stream_mixer_get_input(int id, VSTREAMER_T **streamer) {
+static int get_input(void *obj, int id, VSTREAMER_T **streamer) {
+	stream_mixer_private *mixer = (stream_mixer_private*) obj;
 	*streamer = NULL;
-	if(id < 0){
-		stream_mixer_input *node = lg_mixer.input_head;
+	if(id <= 0){
+		stream_mixer_input *node = mixer->input_head;
 		if(node == NULL){
-			return -1;
+			return 0;
 		}else{
 			*streamer = &node->super;
 			return node->id;
 		}
 	}
-	for (stream_mixer_input *node = lg_mixer.input_head; node != NULL;
+	for (stream_mixer_input *node = mixer->input_head; node != NULL;
 			node = node->next) {
 		if(node->id == id) {
 			*streamer = &node->super;
 			return node->id;
 		}
 	}
-	return -1;
+	return 0;
 }
 
-int stream_mixer_get_output(int id, VSTREAMER_T **streamer) {
+static int get_output(void *obj, int id, VSTREAMER_T **streamer) {
+	stream_mixer_private *mixer = (stream_mixer_private*) obj;
 	*streamer = NULL;
-	if(id < 0){
-		stream_mixer_output *node = lg_mixer.output_head;
+	if(id <= 0){
+		stream_mixer_output *node = mixer->output_head;
 		if(node == NULL){
-			return -1;
+			return 0;
 		}else{
 			*streamer = &node->super;
 			return node->id;
 		}
 	}
-	for (stream_mixer_output *node = lg_mixer.output_head; node != NULL;
+	for (stream_mixer_output *node = mixer->output_head; node != NULL;
 			node = node->next) {
 		if(node->id == id) {
 			*streamer = &node->super;
 			return node->id;
 		}
 	}
-	return -1;
+	return 0;
+}
+
+static void mixer_release(void *obj) {
+	stream_mixer_private *_this = (stream_mixer_private*) obj;
+
+	free(obj);
+}
+
+void create_stream_mixer(STREAM_MIXER_T **p) {
+	STREAM_MIXER_T *obj = (STREAM_MIXER_T*) malloc(sizeof(stream_mixer_private));
+	memset(obj, 0, sizeof(stream_mixer_private));
+	obj->release = mixer_release;
+	obj->create_input = create_input;
+	obj->create_output = create_output;
+	obj->get_input = get_input;
+	obj->get_output = get_output;
+	obj->user_data = obj;
+
+	stream_mixer_private *private = (stream_mixer_private*)obj;
+	pthread_mutex_init(&private->mutex, NULL);
+
+	*p = obj;
 }
