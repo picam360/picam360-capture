@@ -25,14 +25,6 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 #define BUFFER_NUM 4
 
-typedef struct _RTP_LIST_T {
-	int port;
-	RTP_T *rtp;
-
-	struct _RTP_LIST_T *next;
-} RTP_LIST_T;
-static RTP_LIST_T *lg_rpt_list = NULL;
-
 typedef struct _rtp_streamer_private {
 	VSTREAMER_T super;
 
@@ -66,23 +58,11 @@ static void* streaming_thread_fnc(void *obj) {
 	rtp_streamer_private *_this = (rtp_streamer_private*) obj;
 
 	RTP_T *rtp = NULL;
-	if (_this->port == 0) {
-		rtp = lg_plugin_host->get_rtp();
+	if (_this->port != 0) {
+		rtp = create_rtp(0, 0, "127.0.0.1", _this->port, RTP_SOCKET_TYPE_UDP,
+				0);
 	} else {
-		RTP_LIST_T **tail_p = &lg_rpt_list;
-		for (; (*tail_p) != NULL; tail_p = &(*tail_p)->next) {
-			if ((*tail_p)->port == _this->port) {
-				break;
-			}
-		}
-		if ((*tail_p) == NULL) {
-			RTP_LIST_T *list = (RTP_LIST_T*) malloc(sizeof(RTP_LIST_T));
-			list->port = _this->port;
-			list->rtp = create_rtp(0, 0, "127.0.0.1", _this->port,
-					RTP_SOCKET_TYPE_UDP, 0);
-			*tail_p = list;
-		}
-		rtp = (*tail_p)->rtp;
+		rtp = lg_plugin_host->get_rtp();
 	}
 
 	while (_this->run) {
@@ -125,6 +105,10 @@ static void* streaming_thread_fnc(void *obj) {
 			}
 			count++;
 		}
+	}
+
+	if (_this->port != 0) {
+		delete_rtp(&rtp);
 	}
 
 	return NULL;

@@ -19,6 +19,7 @@
 //0x00** is reserved by system
 #define PICAM360_HOST_NODE_ID 0x0000
 #define PICAM360_CONTROLLER_NODE_ID 0x0001
+#define PICAM360_RECORDER_NODE_ID 0x0002
 
 #define ENDPOINT_DOMAIN "endpoint."
 #define ENDPOINT_DOMAIN_SIZE (sizeof(ENDPOINT_DOMAIN) - 1)
@@ -26,14 +27,29 @@
 #define UPSTREAM_DOMAIN_SIZE (sizeof(UPSTREAM_DOMAIN) - 1)
 
 enum PICAM360_CAPTURE_EVENT {
-	PICAM360_CAPTURE_EVENT_AFTER_FRAME, PICAM360_CAPTURE_EVENT_AFTER_SNAP, PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED, PICAM360_CAPTURE_EVENT_TEXTURE1_UPDATED,
+	PICAM360_CAPTURE_EVENT_AFTER_FRAME,
+	PICAM360_CAPTURE_EVENT_AFTER_SNAP,
+	PICAM360_CAPTURE_EVENT_TEXTURE0_UPDATED,
+	PICAM360_CAPTURE_EVENT_TEXTURE1_UPDATED,
 };
 enum RENDERING_MODE {
-	RENDERING_MODE_WINDOW, RENDERING_MODE_EQUIRECTANGULAR, RENDERING_MODE_FISHEYE,
+	RENDERING_MODE_WINDOW,
+	RENDERING_MODE_EQUIRECTANGULAR,
+	RENDERING_MODE_FISHEYE,
 };
 
 enum PICAM360_CONTROLLER_EVENT {
-	PICAM360_CONTROLLER_EVENT_NONE, PICAM360_CONTROLLER_EVENT_NEXT, PICAM360_CONTROLLER_EVENT_BACK,
+	PICAM360_CONTROLLER_EVENT_NONE,
+	PICAM360_CONTROLLER_EVENT_NEXT,
+	PICAM360_CONTROLLER_EVENT_BACK,
+};
+
+enum PICAM360_RECORDER_NODE_EVENT {
+	PICAM360_RECORDER_NODE_EVENT_NONE,
+	PICAM360_RECORDER_NODE_EVENT_RECORD_STARTED,
+	PICAM360_RECORDER_NODE_EVENT_RECORD_FINISHED,
+	PICAM360_RECORDER_NODE_EVENT_PLAY_STARTED,
+	PICAM360_RECORDER_NODE_EVENT_PLAY_FINISHED,
 };
 
 typedef struct _MPU_T {
@@ -65,7 +81,8 @@ typedef struct _VSTREAMER_T {
 	void (*stop)(void *user_data);
 	int (*set_param)(void *user_data, const char *param, const char *value);
 	int (*get_param)(void *user_data, const char *param, char *value, int size);
-	int (*get_image)(void *user_data, PICAM360_IMAGE_T **image_p, int *num_p, int wait_usec);
+	int (*get_image)(void *user_data, PICAM360_IMAGE_T **image_p, int *num_p,
+			int wait_usec);
 	void *user_data;
 } VSTREAMER_T;
 
@@ -88,7 +105,7 @@ typedef struct _RENDERING_PARAMS_T {
 	float cam_offset_y[MAX_CAM_NUM];
 	float cam_horizon_r[MAX_CAM_NUM];
 	float cam_aov[MAX_CAM_NUM];
-}RENDERING_PARAMS_T;
+} RENDERING_PARAMS_T;
 
 typedef struct _STATUS_T {
 	char name[64];
@@ -106,7 +123,7 @@ typedef struct _PLUGIN_T {
 	void (*event_handler)(void *user_data, uint32_t node_id, uint32_t event_id);
 	void (*init_options)(void *user_data, json_t *options);
 	void (*save_options)(void *user_data, json_t *options);
-	char *(*get_info)(void *user_data);
+	char* (*get_info)(void *user_data);
 	void *user_data;
 	uint32_t node_id;
 } PLUGIN_T;
@@ -130,7 +147,7 @@ typedef struct _PLUGIN_HOST_T {
 	void (*set_camera_north)(float value);
 
 	//gl related
-	void *(*get_display)();
+	void* (*get_display)();
 	void (*decode_video)(int cam_num, unsigned char *data, int data_len);
 	void (*lock_texture)();
 	void (*unlock_texture)();
@@ -139,18 +156,19 @@ typedef struct _PLUGIN_HOST_T {
 	void (*set_texture_size)(uint32_t width, uint32_t height);
 	int (*load_texture)(const char *filename, uint32_t *tex_out);
 	void (*get_logo_image)(PICAM360_IMAGE_T *img);
-	void (*get_rendering_params)(VECTOR4D_T view_quat, RENDERING_PARAMS_T *params);
+	void (*get_rendering_params)(VECTOR4D_T view_quat,
+			RENDERING_PARAMS_T *params);
 
-	MENU_T *(*get_menu)();
+	MENU_T* (*get_menu)();
 	bool (*get_menu_visible)();
 	void (*set_menu_visible)(bool value);
 
 	float (*get_fov)();
 	void (*set_fov)(float value);
 
-	MPU_T *(*get_mpu)();
-	RTP_T *(*get_rtp)();
-	RTP_T *(*get_rtcp)();
+	MPU_T* (*get_mpu)();
+	RTP_T* (*get_rtp)();
+	RTP_T* (*get_rtcp)();
 	int (*xmp)(char *buff, int buff_len, int cam_num);
 
 	void (*send_command)(const char *cmd);
@@ -161,7 +179,8 @@ typedef struct _PLUGIN_HOST_T {
 	void (*add_watch)(STATUS_T *status);
 	void (*add_plugin)(PLUGIN_T *plugin);
 
-	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode, const char *path);
+	void (*snap)(uint32_t width, uint32_t height, enum RENDERING_MODE mode,
+			const char *path);
 } PLUGIN_HOST_T;
 
 typedef void (*CREATE_PLUGIN)(PLUGIN_HOST_T *plugin_host, PLUGIN_T **plugin);
