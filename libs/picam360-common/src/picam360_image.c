@@ -13,6 +13,7 @@
 #include <assert.h>
 
 #include "picam360_image.h"
+#include "tools.h"
 
 static int release(void *user_data) {
 	PICAM360_IMAGE_T *image = (PICAM360_IMAGE_T*) user_data;
@@ -76,9 +77,20 @@ static size_t _write(void *user_data, void *data, size_t data_len) {
 
 int save_picam360_image_from_file(char *path, PICAM360_IMAGE_T **images,
 		int num) {
-	PICAM360_IMAGE_T *image = images[0];
+
+	int ret;
+	ret = mkdir_path(path, 0775);
+	if (ret < 0) {
+		printf("can not make directory : %s\n", path);
+		return -1;
+	}
+
 	int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC,
 			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+	if (fd < 0) {
+		printf("can not make file : %s\n", path);
+		return -1;
+	}
 
 	save_picam360_image(images, num, _write, (void*) (intptr_t) fd);
 
@@ -97,7 +109,7 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 		char buff[4 * 1024];
 		int cur = 0;
 		cur += _read(user_data, buff, 4);
-		if(cur != 4 || buff[0] != 'P' || buff[1] != 'I'){
+		if (cur != 4 || buff[0] != 'P' || buff[1] != 'I') {
 			num = i;
 			break;
 		}

@@ -29,15 +29,26 @@ enum RECORDER_MODE {
 	RECORDER_MODE_IDLE, RECORDER_MODE_RECORD, RECORDER_MODE_PLAY
 };
 
+#define BUFFER_NUM 4
 typedef struct _image_recorder_private {
 	VSTREAMER_T super;
+
+	bool run;
+	pthread_t streaming_thread;
+
+	int framecount;
+	PICAM360_IMAGE_T *frame_buffers[BUFFER_NUM][MAX_CAM_NUM + 1];
+	MREVENT_T frame_ready;
 
 	char tag[128];
 	char base_path[257];
 	enum RECORDER_MODE mode;
-	int framecount;
-	int framecount_offset;
+	bool repeat;
 	int fps;
+
+	bool eof;
+	int play_framecount;
+	int play_framecount_offset;
 	struct timeval last_timestamp;
 	struct timeval base_timestamp;
 } image_recorder_private;
@@ -49,105 +60,157 @@ static image_recorder_private *lg_image_recorders[MAX_IMAGE_RECORDERS] = { };
 static char lg_record_path[512];
 static enum RECORDER_MODE lg_recorder_mode = RECORDER_MODE_IDLE;
 
+static void* streaming_thread_func(void *obj) {
+	image_recorder_private *_this = (image_recorder_private*) obj;
+
+	while (_this->run) {
+		if (_this->super.pre_streamer == NULL) {
+			usleep(100 * 1000);
+			continue;
+		}
+		int ret;
+		int num = MAX_CAM_NUM;
+		PICAM360_IMAGE_T *images[MAX_CAM_NUM];
+		ret = _this->super.pre_streamer->get_image(_this->super.pre_streamer,
+				images, &num, 100 * 1000);
+		if (ret != 0) {
+			continue;
+		}
+		bool new_frame = true;
+		int cur = _this->framecount % BUFFER_NUM;
+		for (int i = 0; i < num; i++) {
+			if (_this->frame_buffers[cur][i] != NULL
+					&& _this->frame_buffers[cur][i]->ref) {
+				_this->frame_buffers[cur][i]->ref->release(
+						_this->frame_buffers[cur][i]->ref);
+				_this->frame_buffers[cur][i] = NULL;
+			}
+			_this->frame_buffers[cur][i] = images[i];
+		}
+		_this->frame_buffers[cur][num] = NULL;
+		_this->framecount++;
+		mrevent_trigger(&_this->frame_ready);
+
+		if (_this->mode == RECORDER_MODE_RECORD) {
+			char path[512];
+			snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
+					_this->framecount);
+
+			ret = save_picam360_image_from_file(path, images, num);
+		}
+	}
+
+	return NULL;
+}
+
 static void start(void *user_data) {
 	image_recorder_private *_this = (image_recorder_private*) user_data;
 
 	if (_this->super.next_streamer) {
 		_this->super.next_streamer->start(_this->super.next_streamer);
 	}
+
+	_this->run = true;
+	pthread_create(&_this->streaming_thread, NULL, streaming_thread_func,
+			(void*) _this);
 }
 
 static void stop(void *user_data) {
 	image_recorder_private *_this = (image_recorder_private*) user_data;
+
+	if (_this->run) {
+		_this->run = false;
+		pthread_join(_this->streaming_thread, NULL);
+	}
 
 	if (_this->super.next_streamer) {
 		_this->super.next_streamer->stop(_this->super.next_streamer);
 	}
 }
 
-static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
+static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 		int wait_usec) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
 
-	switch (_this->mode) {
-	case RECORDER_MODE_RECORD: {
-		if (_this->super.pre_streamer == NULL) {
-			usleep(wait_usec);
-			break;
-		}
-		int ret;
-		int num = MAX_CAM_NUM;
-		PICAM360_IMAGE_T *images[MAX_CAM_NUM];
-		ret = _this->super.pre_streamer->get_image(_this->super.pre_streamer,
-				images, &num, wait_usec);
-		if (ret != 0) {
-			break;
-		}
-		char path[512];
-		snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
-				_this->framecount);
-
-		ret = save_picam360_image_from_file(path, images, num);
-		if (ret == 0) {
-			_this->framecount++;
-			return 0;
-		}
-		break;
-	}
-	case RECORDER_MODE_PLAY: {
+	if (_this->mode == RECORDER_MODE_PLAY) {
 		char path[512];
 		sprintf(path, "%s/%d.pif", _this->base_path,
-				_this->framecount - _this->framecount_offset);
+				_this->play_framecount - _this->play_framecount_offset + 1);
 		strchg(path, "${tag}", _this->tag);
 
-		int ret = load_picam360_image_from_file(path, image_p, num_p);
-		if (ret == 0) {
-			struct timeval diff;
-			float elapsed_sec;
+		int ret = load_picam360_image_from_file(path, images_p, num_p);
+		if (ret != 0) {
+			if (_this->play_framecount == 0) {
+				usleep(wait_usec);
+			} else if(_this->repeat){
+				printf("repeat\n");
+				_this->play_framecount_offset = _this->play_framecount;
+			}else{
+				printf("eof\n");
+				_this->eof = true;
+				_this->mode = RECORDER_MODE_IDLE;
+			}
+			return -1;
+		} else {
+			_this->play_framecount++;
+		}
+		struct timeval diff;
+		float elapsed_sec;
 
-			struct timeval now;
-			gettimeofday(&now, NULL);
-			if (_this->fps <= 0) {
-				if (_this->framecount >= 1) {
-					timersub(&image_p[0]->timestamp, &_this->last_timestamp,
-							&diff);
-					elapsed_sec = (float) diff.tv_sec
-							+ (float) diff.tv_usec / 1000000;
-					_this->fps = (int) (1.0 / elapsed_sec + 0.5);
-				}
-			} else {
-				float elapsed_sec_target = (float) _this->framecount
-						/ _this->fps;
-
-				timersub(&now, &_this->base_timestamp, &diff);
+		if (_this->fps <= 0) {
+			if (_this->play_framecount >= 2) {
+				timersub(&images_p[0]->timestamp, &_this->last_timestamp, &diff);
 				elapsed_sec = (float) diff.tv_sec
 						+ (float) diff.tv_usec / 1000000;
-				elapsed_sec_target -= elapsed_sec;
-				if (elapsed_sec_target > 10) {
-					elapsed_sec_target = 10;
-					printf("something wrong : %s\n", __FILE__);
-				}
-				if (elapsed_sec_target > 0) {
-					usleep(elapsed_sec_target * 1000000);
-				}
+				_this->fps = (int) (1.0 / elapsed_sec + 0.5);
 			}
-			_this->last_timestamp = image_p[0]->timestamp;
-			gettimeofday(&image_p[0]->timestamp, NULL);
-			_this->framecount++;
-			return 0;
+		} else {
+			struct timeval now;
+			gettimeofday(&now, NULL);
+
+			float elapsed_sec_target = (float) _this->play_framecount / _this->fps;
+
+			timersub(&now, &_this->base_timestamp, &diff);
+			elapsed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			elapsed_sec_target -= elapsed_sec;
+			if (elapsed_sec_target > 10) {
+				elapsed_sec_target = 10;
+				printf("something wrong : %s\n", __FILE__);
+			}
+			if (elapsed_sec_target > 0) {
+				usleep(elapsed_sec_target * 1000000);
+			}
 		}
-		_this->framecount_offset = _this->framecount;
+		_this->last_timestamp = images_p[0]->timestamp;
+		gettimeofday(&images_p[0]->timestamp, NULL);
+		return 0;
+	} else if (_this->super.pre_streamer == NULL) {
 		usleep(wait_usec);
-		break;
-	}
-	case RECORDER_MODE_IDLE:
-	default:
-		if (_this->super.pre_streamer == NULL) {
-			usleep(wait_usec);
-			break;
+		return -1;
+	} else {
+		int res = mrevent_wait(&_this->frame_ready, wait_usec);
+		if (res != 0) {
+			return -1;
+		} else {
+			mrevent_reset(&_this->frame_ready);
 		}
-		return _this->super.pre_streamer->get_image(_this->super.pre_streamer,
-				image_p, num_p, wait_usec);
+		int cur = (_this->framecount - 1) % BUFFER_NUM;
+
+		int num = 0;
+		for (int i = 0; num < *num_p && i < MAX_CAM_NUM; i++) {
+			PICAM360_IMAGE_T *image = _this->frame_buffers[cur][i];
+			if (image == NULL) {
+				break;
+			}
+			if (image->ref) {
+				image->ref->addref(image->ref);
+			}
+			images_p[num] = image;
+
+			num++;
+		}
+		*num_p = num;
+		return 0;
 	}
 	return -1;
 }
@@ -156,8 +219,9 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
 	if (strcmp(param, "mode") == 0) {
 		_this->mode = RECORDER_MODE_IDLE;
-		_this->framecount = 0;
-		_this->framecount_offset = 0;
+		_this->play_framecount = 0;
+		_this->play_framecount_offset = 0;
+		_this->eof = false;
 		gettimeofday(&_this->base_timestamp, NULL);
 		if (strcmp(value_str, "IDLE") == 0) {
 			//do nothing
@@ -175,6 +239,10 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 		}
 	} else if (strcmp(param, "tag") == 0) {
 		int len = snprintf(_this->tag, sizeof(_this->tag) - 1, "%s", value_str);
+	} else if (strcmp(param, "repeat") == 0) {
+		_this->repeat = (value_str[0] == '1' || value_str[0] == 't' || value_str[0] == 'T');
+	} else if (strcmp(param, "fps") == 0) {
+		sscanf(value_str, "%d", &_this->fps);
 	}
 }
 
@@ -183,6 +251,10 @@ static int get_param(void *obj, const char *param, char *value, int size) {
 
 static void release(void *obj) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
+
+	if (_this->run) {
+		_this->super.stop(&_this->super);
+	}
 
 	free(obj);
 }
@@ -201,6 +273,7 @@ static void create_vstreamer(void *user_data, VSTREAMER_T **output_streamer) {
 	streamer->user_data = streamer;
 
 	image_recorder_private *_private = (image_recorder_private*) streamer;
+	mrevent_init(&_private->frame_ready);
 
 	if (output_streamer) {
 		*output_streamer = streamer;
@@ -264,8 +337,10 @@ static int command_handler(void *user_data, const char *_buff) {
 						char path[257];
 						snprintf(path, sizeof(path) - 1, "%s/%s", param,
 								streamer->tag);
-						streamer->super.set_param(&streamer->super, "base_path", path);
-						streamer->super.set_param(&streamer->super, "mode", "PLAY");
+						streamer->super.set_param(&streamer->super, "base_path",
+								path);
+						streamer->super.set_param(&streamer->super, "mode",
+								"PLAY");
 					}
 				}
 			}

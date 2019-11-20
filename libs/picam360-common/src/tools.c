@@ -47,17 +47,12 @@ int mkdir_path(const char *filepath, mode_t mode) {
 	int rc = 0;
 	int len = strlen(filepath);
 
-	buf = (char*) malloc(len + 2);
+	buf = (char*) malloc(len + 1);
 	if (buf == NULL) {
 		printf("Error: malloc(%d) %s\n", errno, strerror(errno));
 		return (-1);
 	}
 	strcpy(buf, filepath);
-	if(buf[len - 1] != '/'){
-		buf[len] = '/';
-		len++;
-		buf[len] = '\0';
-	}
 
 	for (p = strchr(buf + 1, '/'); p; p = strchr(p + 1, '/')) {
 		*p = '\0';
