@@ -141,11 +141,12 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 		int ret = load_picam360_image_from_file(path, images_p, num_p);
 		if (ret != 0) {
 			if (_this->play_framecount == 0) {
-				usleep(wait_usec);
-			} else if(_this->repeat){
+				printf("not found %s\n", path);
+				sleep(1);
+			} else if (_this->repeat) {
 				printf("repeat\n");
 				_this->play_framecount_offset = _this->play_framecount;
-			}else{
+			} else {
 				printf("eof\n");
 				_this->eof = true;
 				_this->mode = RECORDER_MODE_IDLE;
@@ -159,7 +160,8 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 
 		if (_this->fps <= 0) {
 			if (_this->play_framecount >= 2) {
-				timersub(&images_p[0]->timestamp, &_this->last_timestamp, &diff);
+				timersub(&images_p[0]->timestamp, &_this->last_timestamp,
+						&diff);
 				elapsed_sec = (float) diff.tv_sec
 						+ (float) diff.tv_usec / 1000000;
 				_this->fps = (int) (1.0 / elapsed_sec + 0.5);
@@ -168,7 +170,8 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 			struct timeval now;
 			gettimeofday(&now, NULL);
 
-			float elapsed_sec_target = (float) _this->play_framecount / _this->fps;
+			float elapsed_sec_target = (float) _this->play_framecount
+					/ _this->fps;
 
 			timersub(&now, &_this->base_timestamp, &diff);
 			elapsed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
@@ -230,6 +233,7 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 		} else if (strcmp(value_str, "PLAY") == 0) {
 			_this->mode = RECORDER_MODE_PLAY;
 		}
+		return 0;
 	} else if (strcmp(param, "base_path") == 0) {
 		int len = snprintf(_this->base_path, sizeof(_this->base_path) - 1, "%s",
 				value_str);
@@ -237,16 +241,28 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 			_this->base_path[len - 1] = '\0';
 			len--;
 		}
+		return 0;
 	} else if (strcmp(param, "tag") == 0) {
 		int len = snprintf(_this->tag, sizeof(_this->tag) - 1, "%s", value_str);
+		return 0;
 	} else if (strcmp(param, "repeat") == 0) {
-		_this->repeat = (value_str[0] == '1' || value_str[0] == 't' || value_str[0] == 'T');
+		_this->repeat = (value_str[0] == '1' || value_str[0] == 't'
+				|| value_str[0] == 'T');
+		return 0;
 	} else if (strcmp(param, "fps") == 0) {
 		sscanf(value_str, "%d", &_this->fps);
+		return 0;
 	}
+	return -1;
 }
 
 static int get_param(void *obj, const char *param, char *value, int size) {
+	image_recorder_private *_this = (image_recorder_private*) obj;
+	if (strcmp(param, "eof") == 0) {
+		snprintf(value, size, "%s", _this->eof ? "true" : "false");
+		return 0;
+	}
+	return -1;
 }
 
 static void release(void *obj) {
@@ -254,6 +270,17 @@ static void release(void *obj) {
 
 	if (_this->run) {
 		_this->super.stop(&_this->super);
+	}
+	for (int cur = 0; cur < BUFFER_NUM; cur++) {
+		for (int i = 0; i < MAX_CAM_NUM; i++) {
+			if (_this->frame_buffers[cur][i] != NULL
+					&& _this->frame_buffers[cur][i]->ref) {
+				_this->frame_buffers[cur][i]->ref->release(
+						_this->frame_buffers[cur][i]->ref);
+				_this->frame_buffers[cur][i] = NULL;
+			}
+			_this->frame_buffers[cur][i] = NULL;
+		}
 	}
 
 	free(obj);

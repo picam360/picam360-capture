@@ -270,7 +270,7 @@ static void get_rendering_params(VECTOR4D_T view_quat,
 	}
 }
 
-static bool destroy_vstream(VSTREAMER_T *_stream) {
+static bool _destroy_vstream(VSTREAMER_T *_stream) {
 	for (VSTREAMER_T *stream = _stream; stream != NULL;) {
 		VSTREAMER_T *tmp = stream;
 		stream = stream->next_streamer;
@@ -280,14 +280,15 @@ static bool destroy_vstream(VSTREAMER_T *_stream) {
 }
 
 static int mixer_event_callback(void *user_data, enum STREAM_MIXER_EVENT event) {
-	STREAM_MIXER_T *mixer = (STREAM_MIXER_T*)user_data;
-	if(event == STREAM_MIXER_EVENT_ALL_OUTPUT_RELEASED){
+	STREAM_MIXER_T *mixer = (STREAM_MIXER_T*) user_data;
+	if (event == STREAM_MIXER_EVENT_ALL_OUTPUT_RELEASED) {
 		VSTREAMER_T *streamer = NULL;
-		while(mixer->get_input(mixer, 0, &streamer) > 0) {
-			for (; streamer->pre_streamer != NULL; streamer = streamer->pre_streamer) {
+		while (mixer->get_input(mixer, 0, &streamer) > 0) {
+			for (; streamer->pre_streamer != NULL;
+					streamer = streamer->pre_streamer) {
 				//do nothing
 			}
-			destroy_vstream(streamer);
+			_destroy_vstream(streamer);
 		}
 		LIST_T **pp;
 		LIST_FOR_START(pp, STREAM_MIXER_T, _mixer, state->stream_mixer_list)
@@ -300,8 +301,8 @@ static int mixer_event_callback(void *user_data, enum STREAM_MIXER_EVENT event) 
 	}
 }
 
-static VSTREAMER_T* build_vstream(PICAM360CAPTURE_T *state, const char *_buff);
-static STREAM_MIXER_T* build_mixer(PICAM360CAPTURE_T *state, const char *name) {
+static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, const char *_buff);
+static STREAM_MIXER_T* _build_mixer(PICAM360CAPTURE_T *state, const char *name) {
 	STREAM_MIXER_DEF_T *mixer_def = NULL;
 	LIST_T **pp;
 	LIST_FOR_START(pp, STREAM_MIXER_DEF_T, _mixer_def, state->stream_mixer_def_list)
@@ -310,7 +311,7 @@ static STREAM_MIXER_T* build_mixer(PICAM360CAPTURE_T *state, const char *name) {
 			break;
 		}
 	}
-	if(mixer_def == NULL){
+	if (mixer_def == NULL) {
 		return NULL;
 	}
 
@@ -323,7 +324,7 @@ static STREAM_MIXER_T* build_mixer(PICAM360CAPTURE_T *state, const char *name) {
 		char buff[256];
 		strncpy(buff, mixer_def->vistreams[i], sizeof(buff));
 
-		VSTREAMER_T *vistream = build_vstream(state, buff);
+		VSTREAMER_T *vistream = _build_vstream(state, buff);
 		if (vistream == NULL) {
 			printf("build stream failed : %s\n", buff);
 			continue;
@@ -345,7 +346,7 @@ static STREAM_MIXER_T* build_mixer(PICAM360CAPTURE_T *state, const char *name) {
 	return mixer;
 }
 
-static VSTREAMER_T* build_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
+static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 
@@ -399,8 +400,8 @@ static VSTREAMER_T* build_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 				}
 			}
 			if (mixer == NULL) {
-				mixer = build_mixer(state, mixer_name);
-				if (mixer == NULL){
+				mixer = _build_mixer(state, mixer_name);
+				if (mixer == NULL) {
 					printf("build mixer failed : %s\n", mixer_name);
 					return NULL;
 				}
@@ -442,6 +443,29 @@ static VSTREAMER_T* build_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
 	}
 
 	return streamer;
+}
+
+static VSTREAMER_T* build_vstream(uuid_t uuid, const char *buff) {
+	VSTREAMER_T *vstreamer = _build_vstream(state, buff);
+	memcpy(vstreamer->uuid, uuid, sizeof(uuid_t));
+
+	LIST_T **pp;
+	LIST_TAIL(pp, state->vostream_list);
+	LIST_NEW(pp, vstreamer);
+
+	return vstreamer;
+}
+
+static bool destroy_vstream(uuid_t uuid) {
+	LIST_T **pp;
+	LIST_FOR_START(pp, VSTREAMER_T, streamer, state->vostream_list)
+		if (uuid_compare(streamer->uuid, uuid) == 0) {
+			_destroy_vstream(streamer);
+			LIST_DELETE(pp);
+			return true;
+		}
+	}
+	return false;
 }
 
 /***********************************************************
@@ -766,7 +790,7 @@ static void exit_func(void) {
 
 //==============================================================================
 
-int _command_handler(int argc, char *argv[]) {
+static int _command_handler(int argc, char *argv[]) {
 	int opt;
 	int ret = 0;
 	char *cmd = argv[0];
@@ -788,35 +812,34 @@ int _command_handler(int argc, char *argv[]) {
 		state->active_cam = cmd[0] - '0';
 	} else if (strcmp(cmd, "snap") == 0) {
 		//TODO
-	} else if (strcmp(cmd, "create_vostream") == 0) {
-		char *o_str = NULL;
+	} else if (strcmp(cmd, "build_vstream") == 0) {
+		char *s_str = NULL;
 		char uuid_str[37] = { };
 		uuid_t uuid = { };
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "u:o:")) != -1) {
+		while ((opt = getopt(argc, argv, "u:s:")) != -1) {
 			switch (opt) {
 			case 'u':
 				sscanf(optarg, "%36s", uuid_str);
 				uuid_parse(uuid_str, uuid);
 				break;
-			case 'o':
-				o_str = optarg;
+			case 's':
+				s_str = optarg;
 				break;
 			}
 		}
-		if (o_str != NULL && uuid[0] != 0) {
-			VSTREAMER_T *vstreamer = build_vstream(state, o_str);
-			memcpy(vstreamer->uuid, uuid, sizeof(uuid_t));
+		if (s_str != NULL && uuid[0] != 0) {
+			VSTREAMER_T *vstreamer = state->plugin_host.build_vstream(uuid,
+					s_str);
+			if (vstreamer) {
+				vstreamer->start(vstreamer);
+				printf("%s : complete uuid=%s\n", cmd, uuid_str);
+			} else {
+				printf("%s : failed uuid=%s\n", cmd, uuid_str);
+			}
 
-			vstreamer->start(vstreamer);
-
-			LIST_T **pp;
-			LIST_TAIL(pp, state->vostream_list);
-			LIST_NEW(pp, vstreamer);
-
-			printf("%s : complete uuid=%s\n", cmd, uuid_str);
 		}
-	} else if (strcmp(cmd, "delete_vostream") == 0) {
+	} else if (strcmp(cmd, "destroy_vstream") == 0) {
 		bool delete_all = false;
 		char uuid_str[37] = { };
 		uuid_t uuid = { };
@@ -833,23 +856,19 @@ int _command_handler(int argc, char *argv[]) {
 			}
 		}
 		if (delete_all) {
-			LIST_T **pp = &state->vostream_list;
-			while (*pp) {
-				VSTREAMER_T *streamer = (VSTREAMER_T*) (*pp)->value;
-				destroy_vstream(streamer);
-				LIST_DELETE(pp);
+			while (state->vostream_list) {
+				VSTREAMER_T *streamer =
+						(VSTREAMER_T*) state->vostream_list->value;
+				uuid_unparse(streamer->uuid, uuid_str);
+				bool ret = state->plugin_host.destroy_vstream(streamer->uuid);
+				printf("%s : complete %s : %s\n", cmd, uuid_str,
+						ret ? "true" : "false");
 			}
 			printf("%s all : complete\n", cmd);
 		} else if (uuid[0] != 0) {
-			LIST_T **pp;
-			LIST_FOR_START(pp, VSTREAMER_T, streamer, state->vostream_list)
-				if (uuid_compare(streamer->uuid, uuid) == 0) {
-					destroy_vstream(streamer);
-					LIST_DELETE(pp);
-					break;
-				}
-			}
-			printf("%s : complete %s\n", cmd, uuid_str);
+			bool ret = state->plugin_host.destroy_vstream(uuid);
+			printf("%s : complete %s : %s\n", cmd, uuid_str,
+					ret ? "true" : "false");
 		} else {
 			printf("not specified uuid\n");
 		}
@@ -1109,7 +1128,7 @@ int _command_handler(int argc, char *argv[]) {
 	return ret;
 }
 
-int command_handler() {
+static int command_handler() {
 	int ret = 0;
 
 	for (int i = 0; i < 10; i++) {
@@ -1146,6 +1165,7 @@ int command_handler() {
 				} else {
 					ret = _command_handler(p.we_wordc, p.we_wordv);
 				}
+				wordfree(&p);
 			}
 			free(buff);
 		} else {
@@ -1667,6 +1687,9 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_rtcp = get_rtcp;
 		state->plugin_host.xmp = xmp;
 
+		state->plugin_host.build_vstream = build_vstream;
+		state->plugin_host.destroy_vstream = destroy_vstream;
+
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
 		state->plugin_host.add_mpu_factory = add_mpu_factory;
@@ -2061,7 +2084,7 @@ int main(int argc, char *argv[]) {
 	//frame id=0
 	if (frame_param[0]) {
 		char cmd[256];
-		sprintf(cmd, "create_vostream %s", frame_param);
+		sprintf(cmd, "build_vstream %s", frame_param);
 		state->plugin_host.send_command(cmd);
 	}
 	//set mpu

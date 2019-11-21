@@ -33,6 +33,7 @@ option(USE_ROV_DRIVER "Use ROV driver" OFF)
 #common
 add_subdirectory(rtp_streamer)
 add_subdirectory(image_recorder)
+add_subdirectory(view_point_multiplexor)
 #add_subdirectory(video_transmitter)
 #add_subdirectory(video_reciever)
 #add_subdirectory(window_renderer)

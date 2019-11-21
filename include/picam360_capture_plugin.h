@@ -171,6 +171,9 @@ typedef struct _PLUGIN_HOST_T {
 	RTP_T* (*get_rtcp)();
 	int (*xmp)(char *buff, int buff_len, int cam_num);
 
+	VSTREAMER_T* (*build_vstream)(uuid_t uuid, const char *_buff);
+	bool (*destroy_vstream)(uuid_t uuid);
+
 	void (*send_command)(const char *cmd);
 	void (*send_event)(uint32_t node_id, uint32_t event_id);
 	void (*add_mpu_factory)(MPU_FACTORY_T *factory);
