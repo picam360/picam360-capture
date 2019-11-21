@@ -43,7 +43,7 @@ static int _command_handler(int argc, char *argv[]) {
 		char *r_str = NULL; //rendering
 		char *e_str = NULL; //encode
 		char *o_str = NULL; //output file
-		int split = 9;
+		int n = 9;
 		optind = 1; // reset getopt
 		while ((opt = getopt(argc, argv, "i:r:e:o:n:")) != -1) {
 			switch (opt) {
@@ -60,7 +60,7 @@ static int _command_handler(int argc, char *argv[]) {
 				o_str = optarg;
 				break;
 			case 'n':
-				sscanf(optarg, "%d", &split);
+				sscanf(optarg, "%d", &n);
 				break;
 			}
 		}
@@ -68,16 +68,23 @@ static int _command_handler(int argc, char *argv[]) {
 				|| o_str == NULL) {
 			return -1;
 		}
-		for (int p = -split; p <= split; p++) {
-			int pitch = 90 * p / split;
-			int split_p = abs(p) == split ? 1 : 4 * (split - abs(p));
-			for (int y = 0; y < split_p; y++) {
-				int yaw = 360 * y / split_p;
+		int roll = 0;
+		int split_p = n * 2;
+		for (int p = 0; p <= split_p; p++) {
+			int pitch = 180 * p / split_p;
+			int split_y;
+			int _p = (p <= n) ? p : n * 2 - p;
+			split_y = (_p == 0) ? 1 : 4 * _p;
+			for (int y = 0; y < split_y; y++) {
+				int yaw = 360 * y / split_y;
 
 				VECTOR4D_T vq = quaternion_init();
-				vq = quaternion_multiply(vq, quaternion_get_from_z(0));
-				vq = quaternion_multiply(vq, quaternion_get_from_x(pitch));
-				vq = quaternion_multiply(vq, quaternion_get_from_y(yaw));
+				vq = quaternion_multiply(vq,
+						quaternion_get_from_y(yaw * M_PI / 180));
+				vq = quaternion_multiply(vq,
+						quaternion_get_from_x(pitch * M_PI / 180));
+				vq = quaternion_multiply(vq,
+						quaternion_get_from_z(roll * M_PI / 180));
 
 				char def[512];
 				int len = 0;
@@ -86,10 +93,9 @@ static int _command_handler(int argc, char *argv[]) {
 						"!%s view_quat=%.3f,%.3f,%.3f,%.3f fov=%d", r_str, vq.x,
 						vq.y, vq.z, vq.w, fov);
 				len += snprintf(def + len, sizeof(def) - len, "!%s", e_str);
-				len +=
-						snprintf(def + len, sizeof(def) - len,
-								"!image_recorder base_path=%s/%d_0_%d mode=RECORD",
-								o_str, pitch, yaw);
+				len += snprintf(def + len, sizeof(def) - len,
+						"!image_recorder base_path=%s/%d_%d_%d mode=RECORD",
+						o_str, pitch, yaw, roll); //x_y_z
 
 				uuid_t uuid;
 				uuid_generate(uuid);
