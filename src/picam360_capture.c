@@ -872,7 +872,7 @@ static int _command_handler(int argc, char *argv[]) {
 		} else {
 			printf("not specified uuid\n");
 		}
-	} else if (strcmp(cmd, "set_vostream_param") == 0) {
+	} else if (strcmp(cmd, "set_vstream_param") == 0) {
 		VSTREAMER_T *streamer = NULL;
 		char uuid_str[37] = { };
 		uuid_t uuid = { };
