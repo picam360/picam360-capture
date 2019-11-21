@@ -84,7 +84,7 @@ static int _command_handler(int argc, char *argv[]) {
 				vq = quaternion_multiply(vq,
 						quaternion_get_from_x(pitch * M_PI / 180));
 				vq = quaternion_multiply(vq,
-						quaternion_get_from_z(roll * M_PI / 180));
+						quaternion_get_from_y(45 * M_PI / 180));//horizon_opt
 
 				char def[512];
 				int len = 0;
@@ -94,8 +94,8 @@ static int _command_handler(int argc, char *argv[]) {
 						vq.y, vq.z, vq.w, fov);
 				len += snprintf(def + len, sizeof(def) - len, "!%s", e_str);
 				len += snprintf(def + len, sizeof(def) - len,
-						"!image_recorder base_path=%s/%d_%d_%d mode=RECORD",
-						o_str, pitch, yaw, roll); //x_y_z
+						"!image_recorder base_path=%s/%d_%d mode=RECORD",
+						o_str, pitch, yaw); //x_y
 
 				uuid_t uuid;
 				uuid_generate(uuid);
