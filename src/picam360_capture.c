@@ -18,6 +18,7 @@
 #include <uuid/uuid.h>
 #include <limits.h>
 #include <wordexp.h>
+#include <getopt.h>
 
 #include "tools.h"
 #include "picam360_capture.h"
@@ -322,7 +323,7 @@ static STREAM_MIXER_T* _build_mixer(PICAM360CAPTURE_T *state, const char *name) 
 
 	for (int i = 0; mixer_def->vistreams[i]; i++) {
 		int len = strlen(mixer_def->vistreams[i]);
-		char *buff = (char*)malloc(len + 1);
+		char *buff = (char*) malloc(len + 1);
 		strcpy(buff, mixer_def->vistreams[i]);
 
 		VSTREAMER_T *vistream = _build_vstream(state, buff);
@@ -446,7 +447,7 @@ static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, char *buff) {
 
 static VSTREAMER_T* build_vstream(uuid_t uuid, const char *_buff) {
 	int len = strlen(_buff);
-	char *buff = (char*)malloc(len + 1);
+	char *buff = (char*) malloc(len + 1);
 	strcpy(buff, _buff);
 
 	VSTREAMER_T *vstreamer = _build_vstream(state, buff);
@@ -821,8 +822,13 @@ static int _command_handler(int argc, char *argv[]) {
 		char *s_str = NULL;
 		char uuid_str[37] = { };
 		uuid_t uuid = { };
-		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "u:s:")) != -1) {
+		int longindex = 0;
+		struct option longopts[] = { //
+				{ 0, 0, 0, 0 }, //
+				};
+		optind = 0;//hard reset
+		while ((opt = getopt_long(argc, argv, "u:s:", longopts, &longindex))
+				!= -1) {
 			switch (opt) {
 			case 'u':
 				sscanf(optarg, "%36s", uuid_str);
@@ -848,8 +854,13 @@ static int _command_handler(int argc, char *argv[]) {
 		bool delete_all = false;
 		char uuid_str[37] = { };
 		uuid_t uuid = { };
-		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "au:")) != -1) {
+		int longindex = 0;
+		struct option longopts[] = { //
+				{ 0, 0, 0, 0 }, //
+				};
+		optind = 0;//hard reset
+		while ((opt = getopt_long(argc, argv, "au:", longopts, &longindex))
+				!= -1) {
 			switch (opt) {
 			case 'a':
 				delete_all = true;
@@ -881,13 +892,20 @@ static int _command_handler(int argc, char *argv[]) {
 		VSTREAMER_T *streamer = NULL;
 		char uuid_str[37] = { };
 		uuid_t uuid = { };
-		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "u:p:")) != -1) {
-			switch (opt) {
-			case 'u':
-				sscanf(optarg, "%36s", uuid_str);
-				uuid_parse(uuid_str, uuid);
-				break;
+		{
+			int longindex = 0;
+			struct option longopts[] = { //
+					{ 0, 0, 0, 0 }, //
+					};
+			optind = 0;//hard reset
+			while ((opt = getopt_long(argc, argv, "u:p:", longopts, &longindex))
+					!= -1) {
+				switch (opt) {
+				case 'u':
+					sscanf(optarg, "%36s", uuid_str);
+					uuid_parse(uuid_str, uuid);
+					break;
+				}
 			}
 		}
 		if (uuid_str[0] != 0) {
@@ -902,26 +920,33 @@ static int _command_handler(int argc, char *argv[]) {
 		if (streamer == NULL) {
 			printf("not existing uuid=%s\n", uuid_str);
 		}
-		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "u:p:")) != -1) {
-			switch (opt) {
-			case 'p':
-				if (streamer) {
-					int len = strlen(optarg);
-					char name[64] = { };
-					char value[512] = { };
-					for (int i = 0; optarg[i] != '\0'; i++) {
-						if (optarg[i] == '=' && i < sizeof(name)
-								&& len - (i + 1) < sizeof(value)) {
-							memcpy(name, optarg, i);
-							memcpy(value, optarg + (i + 1), len - (i + 1));
-							streamer->next_streamer->set_param(
-									streamer->next_streamer, name, value);
-							break;
+		{
+			int longindex = 0;
+			struct option longopts[] = { //
+					{ 0, 0, 0, 0 }, //
+					};
+			optind = 0;//hard reset
+			while ((opt = getopt_long(argc, argv, "u:p:", longopts, &longindex))
+					!= -1) {
+				switch (opt) {
+				case 'p':
+					if (streamer) {
+						int len = strlen(optarg);
+						char name[64] = { };
+						char value[512] = { };
+						for (int i = 0; optarg[i] != '\0'; i++) {
+							if (optarg[i] == '=' && i < sizeof(name)
+									&& len - (i + 1) < sizeof(value)) {
+								memcpy(name, optarg, i);
+								memcpy(value, optarg + (i + 1), len - (i + 1));
+								streamer->next_streamer->set_param(
+										streamer->next_streamer, name, value);
+								break;
+							}
 						}
 					}
+					break;
 				}
-				break;
 			}
 		}
 	} else if (strcmp(cmd, "set_camera_orientation") == 0) {
@@ -1487,7 +1512,7 @@ static void send_command(const char *_cmd) {
 		;
 	*cur = malloc(sizeof(LIST_T));
 	memset(*cur, 0, sizeof(LIST_T));
-	int slr_len = MIN(strlen(cmd), 256);
+	int slr_len = MIN(strlen(cmd), 64 * 1024); //fail safe
 	char *cmd_clone = malloc(slr_len + 1);
 	strncpy(cmd_clone, cmd, slr_len);
 	cmd_clone[slr_len] = '\0';
@@ -2000,40 +2025,47 @@ int main(int argc, char *argv[]) {
 
 	umask(0000);
 
-	optind = 1; // reset getopt
-	while ((opt = getopt(argc, argv, "c:psi:r:F:v:")) != -1) {
-		switch (opt) {
-		case 'c':
-			strncpy(state->config_filepath, optarg,
-					sizeof(state->config_filepath));
-			break;
-		case 'p':
-			state->preview = true;
-			break;
-		case 'r':
-			state->output_raw = true;
-			strncpy(state->output_raw_filepath, optarg,
-					sizeof(state->output_raw_filepath));
-			break;
-		case 'i':
-			strncpy(state->input_filepath, optarg,
-					sizeof(state->input_filepath));
-			state->input_mode = INPUT_MODE_FILE;
-			state->input_file_cur = -1;
-			state->input_file_size = 0;
-			state->frame_sync = true;
-			input_file_mode = true;
-			break;
-		case 'F':
-			strncpy(frame_param, optarg, 256);
-			break;
-		case 'v':
-			strncpy(state->default_view_coordinate_mode, optarg, 64);
-			break;
-		default:
-			/* '?' */
-			printf("Usage: %s [-c conf_filepath] [-p] [-s]\n", argv[0]);
-			return -1;
+	{
+		int longindex = 0;
+		struct option longopts[] = { //
+				{ 0, 0, 0, 0 }, //
+				};
+		optind = 0;//hard reset
+		while ((opt = getopt_long(argc, argv, "c:psi:r:F:v:", longopts,
+				&longindex)) != -1) {
+			switch (opt) {
+			case 'c':
+				strncpy(state->config_filepath, optarg,
+						sizeof(state->config_filepath));
+				break;
+			case 'p':
+				state->preview = true;
+				break;
+			case 'r':
+				state->output_raw = true;
+				strncpy(state->output_raw_filepath, optarg,
+						sizeof(state->output_raw_filepath));
+				break;
+			case 'i':
+				strncpy(state->input_filepath, optarg,
+						sizeof(state->input_filepath));
+				state->input_mode = INPUT_MODE_FILE;
+				state->input_file_cur = -1;
+				state->input_file_size = 0;
+				state->frame_sync = true;
+				input_file_mode = true;
+				break;
+			case 'F':
+				strncpy(frame_param, optarg, 256);
+				break;
+			case 'v':
+				strncpy(state->default_view_coordinate_mode, optarg, 64);
+				break;
+			default:
+				/* '?' */
+				printf("Usage: %s [-c conf_filepath] [-p] [-s]\n", argv[0]);
+				return -1;
+			}
 		}
 	}
 

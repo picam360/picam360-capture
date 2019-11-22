@@ -84,18 +84,24 @@ static int _command_handler(int argc, char *argv[]) {
 				vq = quaternion_multiply(vq,
 						quaternion_get_from_x(pitch * M_PI / 180));
 				vq = quaternion_multiply(vq,
-						quaternion_get_from_y(45 * M_PI / 180));//horizon_opt
+						quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
 
-				char def[512];
+				int buff_size = 1024;
+				buff_size += strlen(i_str);
+				buff_size += strlen(r_str);
+				buff_size += strlen(e_str);
+				buff_size += strlen(o_str);
+				char *def = (char*) malloc(buff_size);
+
 				int len = 0;
-				len += snprintf(def + len, sizeof(def) - len, "%s", i_str);
-				len += snprintf(def + len, sizeof(def) - len,
+				len += snprintf(def + len, buff_size - len, "%s", i_str);
+				len += snprintf(def + len, buff_size - len,
 						"!%s view_quat=%.3f,%.3f,%.3f,%.3f fov=%d", r_str, vq.x,
 						vq.y, vq.z, vq.w, fov);
-				len += snprintf(def + len, sizeof(def) - len, "!%s", e_str);
-				len += snprintf(def + len, sizeof(def) - len,
-						"!image_recorder base_path=%s/%d_%d mode=RECORD",
-						o_str, pitch, yaw); //x_y
+				len += snprintf(def + len, buff_size - len, "!%s", e_str);
+				len += snprintf(def + len, buff_size - len,
+						"!image_recorder base_path=%s/%d_%d mode=RECORD", o_str,
+						pitch, yaw); //x_y
 
 				uuid_t uuid;
 				uuid_generate(uuid);
@@ -104,6 +110,7 @@ static int _command_handler(int argc, char *argv[]) {
 						def);
 				vstreamer->start(vstreamer);
 				printf("started : %s\n", def);
+				free(def);
 
 				while (1) {
 					char eof_str[8];
@@ -111,7 +118,6 @@ static int _command_handler(int argc, char *argv[]) {
 							sizeof(eof_str));
 					if (eof_str[0] == '1' || eof_str[0] == 't'
 							|| eof_str[0] == 'T') {
-						printf("finished : %s\n", def);
 						break;
 					}
 					usleep(100 * 1000);
