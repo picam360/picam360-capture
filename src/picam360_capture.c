@@ -301,7 +301,7 @@ static int mixer_event_callback(void *user_data, enum STREAM_MIXER_EVENT event) 
 	}
 }
 
-static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, const char *_buff);
+static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, char *_buff);
 static STREAM_MIXER_T* _build_mixer(PICAM360CAPTURE_T *state, const char *name) {
 	STREAM_MIXER_DEF_T *mixer_def = NULL;
 	LIST_T **pp;
@@ -321,10 +321,12 @@ static STREAM_MIXER_T* _build_mixer(PICAM360CAPTURE_T *state, const char *name) 
 	mixer->event_callback = mixer_event_callback;
 
 	for (int i = 0; mixer_def->vistreams[i]; i++) {
-		char buff[256];
-		strncpy(buff, mixer_def->vistreams[i], sizeof(buff));
+		int len = strlen(mixer_def->vistreams[i]);
+		char *buff = (char*)malloc(len + 1);
+		strcpy(buff, mixer_def->vistreams[i]);
 
 		VSTREAMER_T *vistream = _build_vstream(state, buff);
+		free(buff);
 		if (vistream == NULL) {
 			printf("build stream failed : %s\n", buff);
 			continue;
@@ -346,10 +348,7 @@ static STREAM_MIXER_T* _build_mixer(PICAM360CAPTURE_T *state, const char *name) 
 	return mixer;
 }
 
-static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, const char *_buff) {
-	char buff[256];
-	strncpy(buff, _buff, sizeof(buff));
-
+static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, char *buff) {
 	const int kMaxArgs = 32;
 	int argc = 0;
 	char *argv[kMaxArgs];
@@ -445,8 +444,14 @@ static VSTREAMER_T* _build_vstream(PICAM360CAPTURE_T *state, const char *_buff) 
 	return streamer;
 }
 
-static VSTREAMER_T* build_vstream(uuid_t uuid, const char *buff) {
+static VSTREAMER_T* build_vstream(uuid_t uuid, const char *_buff) {
+	int len = strlen(_buff);
+	char *buff = (char*)malloc(len + 1);
+	strcpy(buff, _buff);
+
 	VSTREAMER_T *vstreamer = _build_vstream(state, buff);
+	free(buff);
+
 	memcpy(vstreamer->uuid, uuid, sizeof(uuid_t));
 
 	LIST_T **pp;
