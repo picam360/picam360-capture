@@ -38,14 +38,16 @@ static int _command_handler(int argc, char *argv[]) {
 	if (cmd == NULL) {
 		//do nothing
 	} else if (strcmp(cmd, "generate") == 0) {
+		int keyframe_interval = 1;
+		int fps = 10;
 		int fov = 120;
 		char *i_str = NULL; //input
 		char *r_str = NULL; //rendering
 		char *e_str = NULL; //encode
 		char *o_str = NULL; //output file
-		int n = 9;
+		int n = 3;
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:r:e:o:n:")) != -1) {
+		while ((opt = getopt(argc, argv, "i:r:e:o:n:f:k:")) != -1) {
 			switch (opt) {
 			case 'i':
 				i_str = optarg;
@@ -62,11 +64,32 @@ static int _command_handler(int argc, char *argv[]) {
 			case 'n':
 				sscanf(optarg, "%d", &n);
 				break;
+			case 'f':
+				sscanf(optarg, "%d", &fps);
+				break;
+			case 'k':
+				sscanf(optarg, "%d", &keyframe_interval);
+				break;
 			}
 		}
 		if (i_str == NULL || r_str == NULL || e_str == NULL || e_str == NULL
 				|| o_str == NULL) {
 			return -1;
+		}
+		{ //config
+			char path[512];
+			sprintf(path, "%s/config.json", o_str);
+			ret = mkdir_path(path, 0775);
+
+			json_t *options = json_object();
+			json_object_set_new(options, "num_per_quarter", json_integer(n));
+			json_object_set_new(options, "fps", json_integer(fps));
+			json_object_set_new(options, "keyframe_interval", json_integer(keyframe_interval));
+			json_object_set_new(options, "keyframe_offset", json_object());
+			json_dump_file(options, path,
+					JSON_PRESERVE_ORDER | JSON_INDENT(4)
+							| JSON_REAL_PRECISION(9));
+			json_decref(options);
 		}
 		int roll = 0;
 		int split_p = n * 2;
