@@ -343,6 +343,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			if (streamer != NULL) {
 				streamer->super.set_param(&streamer->super, "base_path", path);
 				streamer->super.set_param(&streamer->super, "mode", "PLAY");
+				streamer->super.set_param(&streamer->super, "fps", "0");
 			}
 		}
 	}
@@ -372,6 +373,10 @@ static void record_menu_record_callback(struct _MENU_T *menu,
 			menu->selected = false;
 			printf("stop recording\n");
 		} else if (lg_recorder_mode == RECORDER_MODE_IDLE) { //start record
+			if(lg_menu_image_recorder == NULL || lg_menu_image_recorder->super.pre_streamer == NULL){
+				menu->selected = false;
+				break;
+			}
 			lg_recorder_mode = RECORDER_MODE_RECORD;
 
 			time_t t;
@@ -460,7 +465,7 @@ static void record_menu_load_callback(struct _MENU_T *menu,
 		dir = opendir(lg_record_path);
 		if (dir != NULL) {
 			while ((d = readdir(dir)) != 0) {
-				if (d->d_name[0] != L'.') {
+				if (d->d_name[0] != L'.' && d->d_type == DT_DIR) {
 					char *name = malloc(256);
 					strncpy(name, d->d_name, 256);
 					MENU_T *node_menu = menu_new(name,
