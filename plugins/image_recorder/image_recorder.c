@@ -47,15 +47,14 @@ typedef struct _image_recorder_private {
 	int fps;
 
 	bool eof;
+	int record_framecount;
 	int play_framecount;
 	int play_framecount_offset;
 	struct timeval last_timestamp;
 	struct timeval base_timestamp;
 } image_recorder_private;
 
-#define MAX_IMAGE_RECORDERS 16
-static int lg_image_recorder_count = 0;
-static image_recorder_private *lg_image_recorders[MAX_IMAGE_RECORDERS] = { };
+static image_recorder_private *lg_menu_image_recorder = NULL;
 
 static char lg_record_path[512];
 static enum RECORDER_MODE lg_recorder_mode = RECORDER_MODE_IDLE;
@@ -93,8 +92,9 @@ static void* streaming_thread_func(void *obj) {
 
 		if (_this->mode == RECORDER_MODE_RECORD) {
 			char path[512];
+			++_this->record_framecount;//start from 1
 			snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
-					_this->framecount);
+					_this->record_framecount);
 
 			ret = save_picam360_image_from_file(path, images, num);
 		}
@@ -222,6 +222,7 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
 	if (strcmp(param, "mode") == 0) {
 		_this->mode = RECORDER_MODE_IDLE;
+		_this->record_framecount = 0;
 		_this->play_framecount = 0;
 		_this->play_framecount_offset = 0;
 		_this->eof = false;
@@ -244,6 +245,9 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 		return 0;
 	} else if (strcmp(param, "tag") == 0) {
 		int len = snprintf(_this->tag, sizeof(_this->tag) - 1, "%s", value_str);
+		if (strcmp(value_str, "menu") == 0) {
+			lg_menu_image_recorder = _this;
+		}
 		return 0;
 	} else if (strcmp(param, "repeat") == 0) {
 		_this->repeat = (value_str[0] == '1' || value_str[0] == 't'
@@ -268,6 +272,9 @@ static int get_param(void *obj, const char *param, char *value, int size) {
 static void release(void *obj) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
 
+	if (_this == lg_menu_image_recorder) {
+		lg_menu_image_recorder = NULL;
+	}
 	if (_this->run) {
 		_this->super.stop(&_this->super);
 	}
@@ -305,11 +312,6 @@ static void create_vstreamer(void *user_data, VSTREAMER_T **output_streamer) {
 	if (output_streamer) {
 		*output_streamer = streamer;
 	}
-
-	if (lg_image_recorder_count < MAX_IMAGE_RECORDERS) { //fail safe
-		lg_image_recorders[lg_image_recorder_count] = _private;
-		lg_image_recorder_count++;
-	}
 }
 
 static int command_handler(void *user_data, const char *_buff) {
@@ -319,24 +321,16 @@ static int command_handler(void *user_data, const char *_buff) {
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd = strtok(buff, " \n");
 	if (strncmp(cmd, "stop", sizeof(buff)) == 0) {
-		for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
-			image_recorder_private *streamer = lg_image_recorders[i];
-			if (streamer == NULL) {
-				continue;
-			}
+		image_recorder_private *streamer = lg_menu_image_recorder;
+		if (streamer != NULL) {
 			streamer->super.set_param(&streamer->super, "mode", "IDLE");
 		}
 	} else if (strncmp(cmd, "record", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
-				image_recorder_private *streamer = lg_image_recorders[i];
-				if (streamer == NULL) {
-					continue;
-				}
-
-				char path[257];
-				snprintf(path, sizeof(path) - 1, "%s/%s", param, streamer->tag);
+			char *path = param;
+			image_recorder_private *streamer = lg_menu_image_recorder;
+			if (streamer != NULL) {
 				streamer->super.set_param(&streamer->super, "base_path", path);
 				streamer->super.set_param(&streamer->super, "mode", "RECORD");
 			}
@@ -344,32 +338,11 @@ static int command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, "play", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, "\n");
 		if (param != NULL) {
-			struct dirent *d;
-			DIR *dir;
-
-			dir = opendir(param);
-			if (dir == NULL) {
-				return 0;
-			}
-			while ((d = readdir(dir)) != 0) {
-				if (d->d_name[0] == L'.') {
-					continue;
-				}
-				for (int i = 0; i < MAX_IMAGE_RECORDERS; i++) {
-					image_recorder_private *streamer = lg_image_recorders[i];
-					if (streamer == NULL) {
-						continue;
-					}
-					if (strcmp(d->d_name, streamer->tag) == 0) {
-						char path[257];
-						snprintf(path, sizeof(path) - 1, "%s/%s", param,
-								streamer->tag);
-						streamer->super.set_param(&streamer->super, "base_path",
-								path);
-						streamer->super.set_param(&streamer->super, "mode",
-								"PLAY");
-					}
-				}
+			char *path = param;
+			image_recorder_private *streamer = lg_menu_image_recorder;
+			if (streamer != NULL) {
+				streamer->super.set_param(&streamer->super, "base_path", path);
+				streamer->super.set_param(&streamer->super, "mode", "PLAY");
 			}
 		}
 	}
@@ -397,7 +370,7 @@ static void record_menu_record_callback(struct _MENU_T *menu,
 
 			menu->marked = false;
 			menu->selected = false;
-			printf("stop loading\n");
+			printf("stop recording\n");
 		} else if (lg_recorder_mode == RECORDER_MODE_IDLE) { //start record
 			lg_recorder_mode = RECORDER_MODE_RECORD;
 
@@ -405,7 +378,7 @@ static void record_menu_record_callback(struct _MENU_T *menu,
 			time(&t);
 			struct tm *lt = localtime(&t);
 			char name[128] = { };
-			snprintf(name, sizeof(name) - 1, "%d-%d-%d_%d:%d:%d",
+			snprintf(name, sizeof(name) - 1, "%4d%2d%2d_%2d%2d%2d",
 					lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday,
 					lt->tm_hour, lt->tm_min, lt->tm_sec);
 
