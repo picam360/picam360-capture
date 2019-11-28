@@ -48,6 +48,7 @@ typedef struct _image_recorder_private {
 
 	bool eof;
 	int record_framecount;
+	int skipframe;
 	int play_framecount;
 	int play_framecount_offset;
 	struct timeval last_timestamp;
@@ -90,7 +91,7 @@ static void* streaming_thread_func(void *obj) {
 		_this->framecount++;
 		mrevent_trigger(&_this->frame_ready);
 
-		if (_this->mode == RECORDER_MODE_RECORD) {
+		if (_this->mode == RECORDER_MODE_RECORD && _this->framecount % (_this->skipframe + 1) == 0) {
 			char path[512];
 			++_this->record_framecount;//start from 1
 			snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
@@ -256,7 +257,11 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	} else if (strcmp(param, "fps") == 0) {
 		sscanf(value_str, "%d", &_this->fps);
 		return 0;
+	} else if (strcmp(param, "skipframe") == 0) {
+		sscanf(value_str, "%d", &_this->skipframe);
+		return 0;
 	}
+
 	return -1;
 }
 
