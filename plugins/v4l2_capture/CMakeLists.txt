@@ -6,8 +6,8 @@ project(v4l2_capture)
 find_package(PkgConfig REQUIRED)
 
 add_library(v4l2_capture MODULE
-	v4l2_capture.cc
-	v4l2_handler.c
+	v4l2_capture.cpp
+	v4l2_handler.cpp
 )
 set_target_properties(v4l2_capture PROPERTIES
     C_STANDARD 11

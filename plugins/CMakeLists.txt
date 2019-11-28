@@ -9,7 +9,7 @@ find_file(TEGRA tegra_drm.h /usr/include/drm)
 
 if(BCM_HOST)
 	message("RASPI")
-#	add_subdirectory(v4l2_capture)
+	add_subdirectory(v4l2_capture)
 #	add_subdirectory(mjpeg_omx_decoder)
 #	add_subdirectory(omx_encoder)
 	add_subdirectory(mpu9250)

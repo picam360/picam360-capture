@@ -22,12 +22,16 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <time.h>
 
 #include <linux/videodev2.h>
 
 #include "v4l2_handler.h"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
+
+static struct timeval lg_init_time = {};
+static struct timeval lg_start_time = {};
 
 struct buffer {
 	void *start;
@@ -43,6 +47,7 @@ typedef struct _PARAMS_T {
 	struct buffer *buffers;
 	unsigned int n_buffers;
 	int run;
+	int num_of_frames;
 
 	PROCESS_IMAGE_CALLBACK process_image;
 	void *user_data;
@@ -64,6 +69,7 @@ static int xioctl(int fh, int request, void *arg) {
 }
 
 static int read_frame(PARAMS_T *params) {
+
 	struct v4l2_buffer buf;
 
 	CLEAR(buf);
@@ -86,9 +92,23 @@ static int read_frame(PARAMS_T *params) {
 		}
 	}
 
+	struct timeval diff;
+	struct timeval now;
+	struct timeval timestamp;
+
+    struct timespec  vsTime;
+    clock_gettime(CLOCK_MONOTONIC, &vsTime);
+    now.tv_sec = vsTime.tv_sec;
+    now.tv_usec = vsTime.tv_nsec/1000.0;
+	timersub(&now, &buf.timestamp, &diff);
+
+	gettimeofday(&now, NULL);
+	timersub(&now, &diff, &timestamp);
+
 	assert(buf.index < params->n_buffers);
 
-	params->run = params->process_image(params->buffers[buf.index].start, buf.bytesused, params->user_data);
+	params->run = params->process_image(params->buffers[buf.index].start, buf.bytesused, timestamp, params->user_data);
+	params->num_of_frames++;
 
 	if (-1 == xioctl(params->fd, VIDIOC_QBUF, &buf))
 		errno_exit("VIDIOC_QBUF");
@@ -120,7 +140,8 @@ static void mainloop(PARAMS_T *params) {
 
 			if (0 == r) {
 				fprintf(stderr, "select timeout\n");
-				exit(EXIT_FAILURE);
+				usleep(1000);
+				continue;
 			}
 
 			if (read_frame(params))
@@ -142,6 +163,10 @@ static void start_capturing(PARAMS_T *params) {
 	unsigned int i;
 	enum v4l2_buf_type type;
 
+	if(lg_init_time.tv_sec == 0){
+		gettimeofday(&lg_init_time, NULL);
+	}
+
 	for (i = 0; i < params->n_buffers; ++i) {
 		struct v4l2_buffer buf;
 
@@ -154,8 +179,28 @@ static void start_capturing(PARAMS_T *params) {
 			errno_exit("VIDIOC_QBUF");
 	}
 	type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+	int wait = 0;
+	struct timeval st;
+	gettimeofday(&st, NULL);
+	if(lg_start_time.tv_sec != 0){
+		int span = (1000000 / params->fps);
+		struct timeval diff;
+		timersub(&st, &lg_init_time, &diff);
+		wait = span - ((1000000 + diff.tv_usec) % span);
+		usleep(wait);
+		gettimeofday(&st, NULL);
+	}
 	if (-1 == xioctl(params->fd, VIDIOC_STREAMON, &type))
 		errno_exit("VIDIOC_STREAMON");
+
+	{
+		struct timeval diff;
+		timersub(&st, &lg_init_time, &diff);
+		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+		printf("started time : %f : %d\n", diff_sec, wait);
+	}
+	lg_start_time = st;
 }
 
 static void uninit_device(PARAMS_T *params) {
@@ -173,7 +218,7 @@ static void init_mmap(PARAMS_T *params) {
 
 	CLEAR(req);
 
-	req.count = 4;
+	req.count = params->n_buffers;
 	req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	req.memory = V4L2_MEMORY_MMAP;
 
@@ -192,7 +237,7 @@ static void init_mmap(PARAMS_T *params) {
 		exit(EXIT_FAILURE);
 	}
 
-	params->buffers = calloc(req.count, sizeof(*params->buffers));
+	params->buffers = (struct buffer*)calloc(req.count, sizeof(*params->buffers));
 
 	if (!params->buffers) {
 		fprintf(stderr, "Out of memory\n");
@@ -234,6 +279,7 @@ static void init_device(PARAMS_T *params) {
 			errno_exit("VIDIOC_QUERYCAP");
 		}
 	}
+	printf("bus_info (%s): %s\n", params->dev_name, cap.bus_info);
 
 	if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
 		fprintf(stderr, "%s is no video capture device\n", params->dev_name);
@@ -331,7 +377,7 @@ static int open_device(PARAMS_T *params) {
 	return 0;
 }
 
-int handle_v4l2(const char *devicefile, int width, int height, int fps, PROCESS_IMAGE_CALLBACK _process_image, void *_user_data) {
+int handle_v4l2(const char *devicefile, int n_buffers, int width, int height, int fps, PROCESS_IMAGE_CALLBACK _process_image, void *_user_data) {
 	PARAMS_T params = { };
 	params.fd = -1;
 	params.run = 1;
@@ -341,6 +387,7 @@ int handle_v4l2(const char *devicefile, int width, int height, int fps, PROCESS_
 	params.width = width;
 	params.height = height;
 	params.fps = fps;
+	params.n_buffers = n_buffers;
 
 	if (open_device(&params) < 0) {
 		return -1;

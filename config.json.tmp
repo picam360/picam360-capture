@@ -1,8 +1,20 @@
 {
+    "stream_mixer_defs": [
+        {
+            "name": "default",
+            "vistreams": [
+                "mixer name=cam!image_recorder tag=menu"
+            ]
+        },
+        {
+            "name": "cam",
+            "vistreams": [
+                "v4l2_capture cam_num=0"
+            ]
+        }
+    ],
     "num_of_cam": 1,
     "mpu_name": "manual",
-    "capture_name": "v4l2_capture",
-    "decoder_name": "mjpeg_omx_decoder",
     "sharpness_gain": 0.0,
     "color_offset": 0.0,
     "overlap": 0.0,
@@ -24,13 +36,18 @@
     "rtcp_tx_port": 9003,
     "rtcp_tx_type": "udp",
     "plugin_paths": [
-        "plugins/v4l2_capture.so",
-        "plugins/mjpeg_omx_decoder.so",
-        "plugins/omx_encoder.so",
-        "plugins/h265_encoder.so",
-        "plugins/window_renderer.so"
+        "plugins/rtp_streamer.so",
+        "plugins/image_recorder.so",
+        "plugins/v4l2_capture.so"
+#        "plugins/mjpeg_omx_decoder.so",
+#        "plugins/omx_encoder.so",
+#        "plugins/h265_encoder.so",
+#        "plugins/window_renderer.so"
     ],
     "v4l2_capture.cam0_devicefile": "/dev/video0",
+    "v4l2_capture.width": 640.0,
+    "v4l2_capture.height": 480.0,
+    "v4l2_capture.fps": 15.0,
     "v4l2_capture.v4l2_ctls": {
         "white_balance_temperature": 2800.0,
         "brightness": -60.0,
@@ -41,6 +58,8 @@
         "gamma": 120.0,
         "sharpness": 1.0,
         "contrast": 40.0
+    },
+    "image_recorder": {
+        "record_path": "/home/picam360/video"
     }
 }
-
