@@ -11,6 +11,7 @@ import re
 import time
 from .rtp import Rtp
 import binascii
+import uuid
 
 PT_STATUS = 100
 PT_CMD = 101
@@ -24,9 +25,9 @@ class Camera(SingletonConfigurable):
     thread_run = False
     last_frame_id = 0
     cmd_id = 0
-    vos_id = 0;
     active_frame = None
     value = traitlets.Any()
+    m_uuid = str(uuid.uuid4())
     
     send_sock = None
     rtp = Rtp()
@@ -40,16 +41,14 @@ class Camera(SingletonConfigurable):
         super(Camera, self).__init__(*args, **kwargs)
         
         self.send_sock = socket(AF_INET, SOCK_DGRAM)
-        self._send_comand(self._delete_vostream_cmd())
-        self._send_comand(self._create_vostream_cmd())
+        self._send_comand(self._destroy_vstream_cmd())
+        self._send_comand(self._build_vstream_cmd())
         self.start()
 
         atexit.register(self.stop)
 
-    def set_vostream_param(self, value):
-        if self.vos_id == 0:
-            return
-        cmd = "set_vostream_param id=%d %s" % (self.vos_id, value)
+    def set_vstream_param(self, value):
+        cmd = "set_vstream_param -u %s -p %s" % (self.m_uuid, value)
         self._send_comand(cmd)
         
     def _send_comand(self, _cmd):
@@ -109,7 +108,6 @@ class Camera(SingletonConfigurable):
                 for i in range(len(split)):
                     _split = re.split('[=,\"]', split[i])
                     map[_split[0]] = _split
-                self.vos_id = int(map['frame_id'][2])
             self.active_frame['pixels_cur'] = 0
             
             data = data[meta_size:]
@@ -140,12 +138,13 @@ class Camera(SingletonConfigurable):
         if payloadtype == PT_CAM_BASE:
             self._parse_image(pack[12:])
                 
-    def _create_vostream_cmd(self):
-        cmd = 'create_vostream WINDOW img_type=RGBA width=%d height=%d|%s|rtp port=%d'
-        return cmd % (self.width, self.height, "dmem_tegra_converter", IMAGE_PORT)
+    def _build_vstream_cmd(self):
+#        cmd = 'build_vstream -u %s -s \\"mixer!WINDOW img_type=RGBA width=%d height=%d!%s!rtp port=%d\\"'
+        cmd = 'build_vstream -u %s -s \\"mixer!WINDOW width=%d height=%d!%s!rtp port=%d\\"'
+        return cmd % (self.m_uuid, self.width, self.height, "dmem_tegra_converter", IMAGE_PORT)
                 
-    def _delete_vostream_cmd(self):
-        cmd = "delete_vostream -i *"
+    def _destroy_vstream_cmd(self):
+        cmd = "destroy_vostream -a"
         return cmd
     
     def start(self):

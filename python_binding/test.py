@@ -7,7 +7,7 @@ CV_WAITKEY_CURSORKEY_TOP    = 82
 CV_WAITKEY_CURSORKEY_RIGHT  = 83 
 CV_WAITKEY_CURSORKEY_BOTTOM = 84
 CV_WAITKEY_CURSORKEY_PLUS   = 171
-CV_WAITKEY_CURSORKEY_MINUS  = 141
+CV_WAITKEY_CURSORKEY_MINUS  = 173
   
 M_PI = 3.1415926535
 
@@ -23,8 +23,10 @@ while True:
     qy = Quaternion(axis=[0, 1, 0], angle=M_PI*ang_y/180)
     qz = Quaternion(axis=[0, 0, 1], angle=M_PI*ang_z/180)
     quat = qy*qx*qz
-    cmd = "view_quat=%f,%f,%f,%f fov=%f" % (quat.x, quat.y, quat.z, quat.w, fov)
-    cam.set_vostream_param(cmd)
+    cmd = "view_quat=%f,%f,%f,%f" % (quat.x, quat.y, quat.z, quat.w)
+    cam.set_vstream_param(cmd)
+    cmd = "fov=%f" % (fov)
+    cam.set_vstream_param(cmd)
     
     if cam.value is not None:
         cv2.imshow('image', cam.value)
