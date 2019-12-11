@@ -139,8 +139,7 @@ class Camera(SingletonConfigurable):
             self._parse_image(pack[12:])
                 
     def _build_vstream_cmd(self):
-#        cmd = 'build_vstream -u %s -s \\"mixer!WINDOW img_type=RGBA width=%d height=%d!%s!rtp port=%d\\"'
-        cmd = 'build_vstream -u %s -s \\"mixer!WINDOW width=%d height=%d!%s!rtp port=%d\\"'
+        cmd = 'build_vstream -u %s -s \\"mixer!WINDOW img_type=RGBA width=%d height=%d!%s!rtp port=%d\\"'
         return cmd % (self.m_uuid, self.width, self.height, "dmem_tegra_converter", IMAGE_PORT)
                 
     def _destroy_vstream_cmd(self):
