@@ -41,7 +41,7 @@ class Camera(SingletonConfigurable):
         super(Camera, self).__init__(*args, **kwargs)
         
         self.send_sock = socket(AF_INET, SOCK_DGRAM)
-        self._send_comand(self._destroy_vstream_cmd())
+        self._send_comand("destroy_vstream -a")
         self._send_comand(self._build_vstream_cmd())
         self.start()
 
@@ -143,14 +143,15 @@ class Camera(SingletonConfigurable):
         return cmd % (self.m_uuid, self.width, self.height, "dmem_tegra_converter", IMAGE_PORT)
                 
     def _destroy_vstream_cmd(self):
-        cmd = "destroy_vostream -a"
+        cmd = "destroy_vstream -u %s" % (self.m_uuid)
         return cmd
     
     def start(self):
         self.rtp.start(IMAGE_PORT, self._parse_packet)
 
-    def stop(self):
+    def stop(self):        
         self.rtp.stop()
+        self._send_comand(self._destroy_vstream_cmd())
             
     def restart(self):
         self.stop()

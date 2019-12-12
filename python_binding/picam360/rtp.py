@@ -40,6 +40,7 @@ class Rtp():
         print("recv thread started : %d" % self.recv_port)
         sock = socket(AF_INET, SOCK_DGRAM)
         sock.bind((HOST, self.recv_port))
+        sock.settimeout(1)
             
         xmp = False
         xmp_pos = 0
@@ -48,8 +49,13 @@ class Rtp():
         pack = None
         
         while self.thread_run:
-            buff = bytearray(65536)
-            data_len, address = sock.recvfrom_into(buff)
+            buff = None
+            data_len = 0
+            try:
+                buff = sock.recv(65536)
+                data_len = len(buff)
+            except:
+                continue
             i = 0
             while i < data_len:
                 if xmp:
@@ -109,7 +115,8 @@ class Rtp():
                     elif buff[i] == 0xFF:
                         marker = 1
                 i += 1
-                        
+                
+        sock.close()          
         print("recv thread finished : %d" % self.recv_port)
     
     def start(self, port, callback):
