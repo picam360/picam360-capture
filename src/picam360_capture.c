@@ -826,7 +826,7 @@ static int _command_handler(int argc, char *argv[]) {
 		struct option longopts[] = { //
 				{ 0, 0, 0, 0 }, //
 				};
-		optind = 0;//hard reset
+		optind = 0; //hard reset
 		while ((opt = getopt_long(argc, argv, "u:s:", longopts, &longindex))
 				!= -1) {
 			switch (opt) {
@@ -858,7 +858,7 @@ static int _command_handler(int argc, char *argv[]) {
 		struct option longopts[] = { //
 				{ 0, 0, 0, 0 }, //
 				};
-		optind = 0;//hard reset
+		optind = 0; //hard reset
 		while ((opt = getopt_long(argc, argv, "au:", longopts, &longindex))
 				!= -1) {
 			switch (opt) {
@@ -897,7 +897,7 @@ static int _command_handler(int argc, char *argv[]) {
 			struct option longopts[] = { //
 					{ 0, 0, 0, 0 }, //
 					};
-			optind = 0;//hard reset
+			optind = 0; //hard reset
 			while ((opt = getopt_long(argc, argv, "u:p:", longopts, &longindex))
 					!= -1) {
 				switch (opt) {
@@ -911,9 +911,12 @@ static int _command_handler(int argc, char *argv[]) {
 		if (uuid_str[0] != 0) {
 			LIST_T **pp;
 			LIST_FOR_START(pp, VSTREAMER_T, _streamer, state->vostream_list)
-				if (uuid_compare(_streamer->uuid, uuid) == 0) {
-					streamer = _streamer;
-					break;
+				for (VSTREAMER_T *s = _streamer; s != NULL; s =
+						s->next_streamer) {
+					if (uuid_compare(s->uuid, uuid) == 0) {
+						streamer = s;
+						break;
+					}
 				}
 			}
 		}
@@ -925,7 +928,7 @@ static int _command_handler(int argc, char *argv[]) {
 			struct option longopts[] = { //
 					{ 0, 0, 0, 0 }, //
 					};
-			optind = 0;//hard reset
+			optind = 0; //hard reset
 			while ((opt = getopt_long(argc, argv, "u:p:", longopts, &longindex))
 					!= -1) {
 				switch (opt) {
@@ -939,8 +942,7 @@ static int _command_handler(int argc, char *argv[]) {
 									&& len - (i + 1) < sizeof(value)) {
 								memcpy(name, optarg, i);
 								memcpy(value, optarg + (i + 1), len - (i + 1));
-								streamer->next_streamer->set_param(
-										streamer->next_streamer, name, value);
+								streamer->set_param(streamer, name, value);
 								break;
 							}
 						}
@@ -2030,7 +2032,7 @@ int main(int argc, char *argv[]) {
 		struct option longopts[] = { //
 				{ 0, 0, 0, 0 }, //
 				};
-		optind = 0;//hard reset
+		optind = 0; //hard reset
 		while ((opt = getopt_long(argc, argv, "c:psi:r:F:v:", longopts,
 				&longindex)) != -1) {
 			switch (opt) {

@@ -34,7 +34,8 @@ typedef struct _rtp_streamer_private {
 	pthread_t streaming_thread;
 } rtp_streamer_private;
 
-static size_t _write(void *user_data, void *data, size_t data_len) {
+static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
+		int plane_num, char *img_type) {
 	RTP_T *rtp = (RTP_T*) user_data;
 	for (int j = 0; j < data_len;) {
 		int len;

@@ -34,10 +34,10 @@ typedef struct _PICAM360_IMAGE_T {
 } PICAM360_IMAGE_T;
 
 int save_picam360_image(PICAM360_IMAGE_T **images, int num,
-		size_t (*_write)(void*, void*, size_t), void *user_data);
-int save_picam360_image_from_file(char *path, PICAM360_IMAGE_T **images,
-		int num);
+		size_t (*_write)(void*, void*, size_t, int, int, char *), void *user_data);
+int save_picam360_image_to_file(char *path, PICAM360_IMAGE_T **images,
+		int num, bool pif_split);
 int load_picam360_image(PICAM360_IMAGE_T **image_p, int *num_p,
-		size_t (*_read)(void*, void*, size_t), void *user_data);
+		size_t (*_read)(void*, void*, size_t, int, int, char *), void *user_data);
 int load_picam360_image_from_file(char *path, PICAM360_IMAGE_T **image_p,
 		int *num_p);

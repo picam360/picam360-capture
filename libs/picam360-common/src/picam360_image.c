@@ -30,9 +30,14 @@ static int release(void *user_data) {
 }
 
 int save_picam360_image(PICAM360_IMAGE_T **images, int num,
-		size_t (*_write)(void*, void*, size_t), void *user_data) {
+		size_t (*_write)(void*, void*, size_t, int, int, char*),
+		void *user_data) {
 	for (int i = 0; i < num; i++) {
 		PICAM360_IMAGE_T *image = images[i];
+
+		char img_type[5] = { };
+		memcpy(img_type, image->img_type, 4);
+
 		char uuid_str[37]; //UUID_STR_LEN
 		uuid_unparse_upper(image->uuid, uuid_str);
 
@@ -59,24 +64,51 @@ int save_picam360_image(PICAM360_IMAGE_T **images, int num,
 		buff[2] = ((len - 4) & 0xff00) >> 8;
 		buff[3] = ((len - 4) & 0x00ff) >> 0;
 		int cur = 0;
-		cur += _write(user_data, buff, len);
-		cur += _write(user_data, image->meta, image->meta_size);
-		for (int i = 0; i < 3; i++) {
-			int size = image->stride[i] * image->height[i];
+		cur += _write(user_data, buff, len, i, 0, NULL);
+		cur += _write(user_data, image->meta, image->meta_size, i, 0, NULL);
+		for (int j = 0; j < 3; j++) {
+			int size = image->stride[j] * image->height[j];
 			if (size == 0) {
 				continue;
 			}
-			cur += _write(user_data, image->pixels[i], size);
+			cur += _write(user_data, image->pixels[i], size, i, j, img_type);
 		}
 	}
 }
 
-static size_t _write(void *user_data, void *data, size_t data_len) {
-	return write((intptr_t) user_data, data, data_len);
+static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
+		int plane_num, char *img_type) {
+	void **params = user_data;
+	if (img_type == NULL || params[1] == NULL) {
+		return write((intptr_t) params[0], data, data_len);
+	} else {
+		char path[512] = { };
+		strncpy(path, params[1], sizeof(path));
+		snprintf(path, sizeof(path) - 1, "%s.%d.%d.%s", (char*) params[1],
+				img_num, plane_num, img_type);
+
+		int ret;
+		ret = mkdir_path(path, 0775);
+		if (ret < 0) {
+			printf("can not make directory : %s\n", path);
+			return -1;
+		}
+
+		int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC,
+				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+		if (fd < 0) {
+			printf("can not make file : %s\n", path);
+			return -1;
+		}
+		write(fd, data, data_len);
+		close(fd);
+
+		return 0;
+	}
 }
 
-int save_picam360_image_from_file(char *path, PICAM360_IMAGE_T **images,
-		int num) {
+int save_picam360_image_to_file(char *path, PICAM360_IMAGE_T **images, int num,
+		bool pif_split) {
 
 	int ret;
 	ret = mkdir_path(path, 0775);
@@ -85,20 +117,26 @@ int save_picam360_image_from_file(char *path, PICAM360_IMAGE_T **images,
 		return -1;
 	}
 
+	void *params[2] = { };
+
 	int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC,
 			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
 	if (fd < 0) {
 		printf("can not make file : %s\n", path);
 		return -1;
 	}
+	params[0] = (void*) (intptr_t) fd;
+	if (pif_split) {
+		params[1] = (void*) path;
+	}
 
-	save_picam360_image(images, num, _write, (void*) (intptr_t) fd);
+	save_picam360_image(images, num, _write, params);
 
 	close(fd);
 }
 
 int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
-		size_t (*_read)(void*, void*, size_t), void *user_data) {
+		size_t (*_read)(void*, void*, size_t, int, int, char*), void *user_data) {
 	int num = *num_p;
 	for (int i = 0; i < num; i++) {
 		PICAM360_IMAGE_T *image = (PICAM360_IMAGE_T*) malloc(
@@ -108,7 +146,7 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 
 		char buff[4 * 1024];
 		int cur = 0;
-		cur += _read(user_data, buff, 4);
+		cur += _read(user_data, buff, 4, i, 0, NULL);
 		if (cur != 4 || buff[0] != 'P' || buff[1] != 'I') {
 			num = i;
 			break;
@@ -116,7 +154,7 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 		int len = 0;
 		len += (int) buff[2] << 8;
 		len += (int) buff[3] << 0;
-		cur += _read(user_data, buff + cur, len);
+		cur += _read(user_data, buff + cur, len, i, 0, NULL);
 		buff[cur] = '\0';
 
 		const int kMaxArgs = 32;
@@ -127,6 +165,7 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 			argv[argc++] = p;
 			p = strtok(NULL, " \n");
 		}
+		char img_type[5] = { };
 		for (int p = 0; p < argc; p++) {
 			char *name = strtok(argv[p], "=");
 			char *value = strtok(NULL, "=");
@@ -138,7 +177,6 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 				sscanf(value, "\"%ld,%ld\"", &image->timestamp.tv_sec,
 						&image->timestamp.tv_usec);
 			} else if (strcmp(name, "img_type") == 0) {
-				char img_type[5] = { };
 				sscanf(value, "\"%4s\"", img_type);
 				memcpy(image->img_type, img_type, 4);
 			} else if (strcmp(name, "meta_size") == 0) {
@@ -158,15 +196,15 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 		}
 		if (image->meta_size > 0) {
 			image->meta = (unsigned char*) malloc(image->meta_size + 1);
-			cur += _read(user_data, image->meta, image->meta_size);
+			cur += _read(user_data, image->meta, image->meta_size, i, 0, NULL);
 		}
-		for (int i = 0; i < 3; i++) {
-			int size = image->stride[i] * image->height[i];
+		for (int j = 0; j < 3; j++) {
+			int size = image->stride[j] * image->height[j];
 			if (size == 0) {
 				continue;
 			}
-			image->pixels[i] = (unsigned char*) malloc(size);
-			cur += _read(user_data, image->pixels[i], size);
+			image->pixels[j] = (unsigned char*) malloc(size);
+			cur += _read(user_data, image->pixels[j], size, i, j, img_type);
 		}
 
 		images_p[i] = image;
@@ -177,18 +215,41 @@ int load_picam360_image(PICAM360_IMAGE_T **images_p, int *num_p,
 	return 0;
 }
 
-static size_t _read(void *user_data, void *data, size_t data_len) {
-	return read((intptr_t) user_data, data, data_len);
+static size_t _read(void *user_data, void *data, size_t data_len, int img_num,
+		int plane_num, char *img_type) {
+	void **params = user_data;
+	if (img_type == NULL) {
+		return read((intptr_t) params[0], data, data_len);
+	} else {
+		char path[512] = { };
+		strncpy(path, params[1], sizeof(path));
+		snprintf(path, sizeof(path) - 1, "%s.%d.%d.%s", (char*) params[1],
+				img_num, plane_num, img_type);
+
+		int fd = open(path, O_RDONLY);
+		if (fd < 0) {
+			return read((intptr_t) params[0], data, data_len);
+		} else {
+			int n = read(fd, data, data_len);
+			close(fd);
+			return n;
+		}
+	}
 }
 
 int load_picam360_image_from_file(char *path, PICAM360_IMAGE_T **image_p,
 		int *num_p) {
+	void *params[2] = { };
+
 	int fd = open(path, O_RDONLY);
 	if (fd < 0) {
+		printf("can not read file : %s\n", path);
 		return -1;
 	}
+	params[0] = (void*) (intptr_t) fd;
+	params[1] = (void*) path;
 
-	load_picam360_image(image_p, num_p, _read, (void*) (intptr_t) fd);
+	load_picam360_image(image_p, num_p, _read, params);
 
 	close(fd);
 

@@ -47,7 +47,9 @@ typedef struct _image_recorder_private {
 	int fps;
 
 	bool eof;
+	bool pif_split; //split pif
 	int record_framecount;
+	int limit_record_framecount;
 	int skipframe;
 	int play_framecount;
 	int play_framecount_offset;
@@ -57,7 +59,7 @@ typedef struct _image_recorder_private {
 
 static image_recorder_private *lg_menu_image_recorder = NULL;
 
-static char lg_record_path[512];
+static char lg_record_path[512] = "Videos";
 static enum RECORDER_MODE lg_recorder_mode = RECORDER_MODE_IDLE;
 
 static void* streaming_thread_func(void *obj) {
@@ -91,13 +93,17 @@ static void* streaming_thread_func(void *obj) {
 		_this->framecount++;
 		mrevent_trigger(&_this->frame_ready);
 
-		if (_this->mode == RECORDER_MODE_RECORD && _this->framecount % (_this->skipframe + 1) == 0) {
+		if (_this->mode == RECORDER_MODE_RECORD
+				&& _this->framecount % (_this->skipframe + 1) == 0) {
 			char path[512];
-			++_this->record_framecount;//start from 1
+			++_this->record_framecount; //start from 1
 			snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
 					_this->record_framecount);
-
-			ret = save_picam360_image_from_file(path, images, num);
+			ret = save_picam360_image_to_file(path, images, num,
+					_this->pif_split);
+			if (_this->record_framecount == _this->limit_record_framecount) {
+				_this->mode = RECORDER_MODE_IDLE;
+			}
 		}
 	}
 
@@ -147,6 +153,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 			} else if (_this->repeat) {
 				printf("repeat\n");
 				_this->play_framecount_offset = _this->play_framecount;
+				sleep(1);//wait 1sec
 			} else {
 				printf("eof\n");
 				_this->eof = true;
@@ -221,7 +228,16 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 
 static int set_param(void *obj, const char *param, const char *value_str) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
-	if (strcmp(param, "mode") == 0) {
+	if (strcmp(param, "uuid") == 0) {
+		char uuid_str[37] = { };
+		sscanf(value_str, "%36s", uuid_str);
+		uuid_parse(uuid_str, _this->super.uuid);
+		return 0;
+	} else if (strcmp(param, "pif_split") == 0) {
+		_this->pif_split = (value_str[0] == '1' || value_str[0] == 't'
+				|| value_str[0] == 'T');
+		return 0;
+	} else if (strcmp(param, "mode") == 0) {
 		_this->mode = RECORDER_MODE_IDLE;
 		_this->record_framecount = 0;
 		_this->play_framecount = 0;
@@ -259,6 +275,9 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 		return 0;
 	} else if (strcmp(param, "skipframe") == 0) {
 		sscanf(value_str, "%d", &_this->skipframe);
+		return 0;
+	} else if (strcmp(param, "limit_record_framecount") == 0) {
+		sscanf(value_str, "%d", &_this->limit_record_framecount);
 		return 0;
 	}
 
@@ -378,7 +397,8 @@ static void record_menu_record_callback(struct _MENU_T *menu,
 			menu->selected = false;
 			printf("stop recording\n");
 		} else if (lg_recorder_mode == RECORDER_MODE_IDLE) { //start record
-			if(lg_menu_image_recorder == NULL || lg_menu_image_recorder->super.pre_streamer == NULL){
+			if (lg_menu_image_recorder == NULL
+					|| lg_menu_image_recorder->super.pre_streamer == NULL) {
 				menu->selected = false;
 				break;
 			}

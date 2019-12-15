@@ -47,7 +47,7 @@ typedef struct _v4l2_capture {
 	int cam_width;
 	int cam_height;
 	int cam_fps;
-	int skip_frame;
+	int skipframe;
 	unsigned int framecount;
 	unsigned int recieved_framecount;
 	float fps;
@@ -63,7 +63,7 @@ static v4l2_capture *lg_v4l2_capture_ary[MAX_CAM_NUM] = { };
 static int lg_width = 2048;
 static int lg_height = 1536;
 static int lg_fps = 15;
-static int lg_skip_frame = 0;
+static int lg_skipframe = 0;
 static int lg_mjpeg_kbps = 0;
 static char lg_devicefiles[MAX_CAM_NUM][256] = { };
 static pthread_mutex_t lg_frame_mlock = PTHREAD_MUTEX_INITIALIZER;
@@ -232,7 +232,7 @@ static void start(void *obj) {
 	_this->cam_width = lg_width;
 	_this->cam_height = lg_height;
 	_this->cam_fps = lg_fps;
-	_this->skip_frame = lg_skip_frame;
+	_this->skipframe = lg_skipframe;
 
 	_this->run = true;
 
@@ -294,6 +294,10 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		return -1;
 	} else {
 		mrevent_reset(&_this->frame_ready);
+	}
+
+	if(((_this->framecount - 1) % (_this->skipframe + 1)) != 0){
+		return -1;
 	}
 
 	int cur = (_this->framecount - 1) % BUFFER_NUM;
@@ -407,9 +411,9 @@ static void init_options(void *user_data, json_t *options) {
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME ".skip_frame");
+		json_t *value = json_object_get(options, PLUGIN_NAME ".skipframe");
 		if (value) {
-			lg_skip_frame = json_number_value(value);
+			lg_skipframe = json_number_value(value);
 		}
 	}
 	{
@@ -445,9 +449,9 @@ static void save_options(void *user_data, json_t *options) {
 				json_real(lg_height));
 		json_object_set_new(options, PLUGIN_NAME ".fps", json_real(lg_fps));
 	}
-	if (lg_skip_frame) {
-		json_object_set_new(options, PLUGIN_NAME ".skip_frame",
-				json_real(lg_skip_frame));
+	if (lg_skipframe) {
+		json_object_set_new(options, PLUGIN_NAME ".skipframe",
+				json_real(lg_skipframe));
 	}
 	if (lg_mjpeg_kbps) {
 		json_object_set_new(options, PLUGIN_NAME ".mjpeg_kbps",
