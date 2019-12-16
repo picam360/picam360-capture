@@ -1,5 +1,6 @@
-#include <unistd.h>
+#define _GNU_SOURCE //for pthread_setname_np
 #include <pthread.h>
+#include <unistd.h>
 #include <stdbool.h>
 #include <limits.h>
 #include <math.h>

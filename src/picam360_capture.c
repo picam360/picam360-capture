@@ -71,6 +71,10 @@
 // POSIX
 #endif
 
+#ifdef BCM_HOST
+#include "bcm_host.h"
+#endif
+
 #define PATH "./"
 #define PICAM360_HISTORY_FILE ".picam360_history"
 #define PLUGIN_NAME "picam360"
@@ -272,9 +276,16 @@ static void get_rendering_params(VECTOR4D_T view_quat,
 }
 
 static bool _destroy_vstream(VSTREAMER_T *_stream) {
-	for (VSTREAMER_T *stream = _stream; stream != NULL;) {
+	VSTREAMER_T *tail = NULL;
+	for (tail = _stream; tail->next_streamer != NULL;tail = tail->next_streamer) {
+		//do nothing
+	}
+	for (VSTREAMER_T *stream = tail; stream != NULL;) {
 		VSTREAMER_T *tmp = stream;
-		stream = stream->next_streamer;
+		stream = stream->pre_streamer;
+		if(stream != NULL) {
+			stream->next_streamer = NULL;
+		}
 		tmp->release(tmp);
 	}
 	return true;

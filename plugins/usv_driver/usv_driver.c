@@ -1,3 +1,5 @@
+#define _GNU_SOURCE //for pthread_setname_np
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -9,11 +11,9 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <math.h>
-#include <pthread.h>
 #include <wchar.h>
 #include <limits.h>
 #include <dirent.h>
-#include <pthread.h>
 
 #include "usv_driver.h"
 

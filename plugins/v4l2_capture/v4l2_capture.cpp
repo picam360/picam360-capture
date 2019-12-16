@@ -278,11 +278,12 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 		sscanf(value_str, "%d", &value);
 		_this->cam_num = MAX(0, MIN(value, MAX_CAM_NUM));
 	}
+	return 0;
 }
 
 static int get_param(void *obj, const char *param, char *value,
 		int size) {
-
+	return 0;
 }
 
 static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
