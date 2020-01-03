@@ -170,6 +170,21 @@ static int input_get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 	return -1;
 }
 
+static int input_set_param(void *obj, const char *param, const char *value_str) {
+	stream_mixer_input *_this = (stream_mixer_input*) obj;
+	if (_this->super.pre_streamer) {
+		_this->super.pre_streamer->set_param(_this->super.pre_streamer, param, value_str);
+	}
+}
+
+static int input_get_param(void *obj, const char *param, char *value_str,
+		int size) {
+	stream_mixer_input *_this = (stream_mixer_input*) obj;
+	if (_this->super.pre_streamer) {
+		_this->super.pre_streamer->get_param(_this->super.pre_streamer, param, value_str, size);
+	}
+}
+
 static void output_start(void *user_data) {
 	stream_mixer_output *_this = (stream_mixer_output*) user_data;
 
@@ -253,6 +268,21 @@ static int output_get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 	return 0;
 }
 
+static int output_set_param(void *obj, const char *param, const char *value_str) {
+	stream_mixer_output *_this = (stream_mixer_output*) obj;
+	if (_this->super.next_streamer) {
+		_this->super.next_streamer->set_param(_this->super.next_streamer, param, value_str);
+	}
+}
+
+static int output_get_param(void *obj, const char *param, char *value_str,
+		int size) {
+	stream_mixer_output *_this = (stream_mixer_output*) obj;
+	if (_this->super.next_streamer) {
+		_this->super.next_streamer->get_param(_this->super.next_streamer, param, value_str, size);
+	}
+}
+
 static int create_input(void *obj, VSTREAMER_T **out_streamer) {
 	stream_mixer_private *mixer = (stream_mixer_private*) obj;
 	VSTREAMER_T *streamer = (VSTREAMER_T*) malloc(sizeof(stream_mixer_input));
@@ -262,6 +292,8 @@ static int create_input(void *obj, VSTREAMER_T **out_streamer) {
 	streamer->start = input_start;
 	streamer->stop = input_stop;
 	streamer->get_image = input_get_image;
+	streamer->set_param = input_set_param;
+	streamer->get_param = input_get_param;
 	streamer->user_data = streamer;
 
 	stream_mixer_input *_private = (stream_mixer_input*) streamer;
@@ -293,6 +325,8 @@ static int create_output(void *obj, VSTREAMER_T **out_streamer) {
 	streamer->start = output_start;
 	streamer->stop = output_stop;
 	streamer->get_image = output_get_image;
+	streamer->set_param = output_set_param;
+	streamer->get_param = output_get_param;
 	streamer->user_data = streamer;
 
 	stream_mixer_output *_private = (stream_mixer_output*) streamer;
