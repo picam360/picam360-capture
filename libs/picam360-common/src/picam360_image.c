@@ -71,7 +71,7 @@ int save_picam360_image(PICAM360_IMAGE_T **images, int num,
 			if (size == 0) {
 				continue;
 			}
-			cur += _write(user_data, image->pixels[i], size, i, j, img_type);
+			cur += _write(user_data, image->pixels[j], size, i, j, img_type);
 		}
 	}
 }
@@ -100,10 +100,10 @@ static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
 			printf("can not make file : %s\n", path);
 			return -1;
 		}
-		write(fd, data, data_len);
+		ret = write(fd, data, data_len);
 		close(fd);
 
-		return 0;
+		return ret;
 	}
 }
 
