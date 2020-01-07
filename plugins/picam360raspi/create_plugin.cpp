@@ -25,6 +25,7 @@
 #include "window_gl_renderer.h"
 #include "picam360map_gl_renderer.h"
 #include "equirectangular_gl_renderer.h"
+#include "omx_encoder.h"
 
 #define PLUGIN_NAME "picam360gl"
 
@@ -100,6 +101,11 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		PLUGIN_T **sub_plugins = ((picam360gl_plugin*) plugin)->sub_plugins;
 		int idx = 0;
 		{
+			create_mjpeg_decoder_plugin(plugin_host, &sub_plugins[idx]);
+			sub_plugins[idx]->parent = plugin;
+			idx++;
+		}
+		{
 			create_window_plugin(plugin_host, &sub_plugins[idx]);
 			sub_plugins[idx]->parent = plugin;
 			idx++;
@@ -115,7 +121,7 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			idx++;
 		}
 		{
-			create_mjpeg_decoder_plugin(plugin_host, &sub_plugins[idx]);
+			create_omx_encoder_plugin(plugin_host, &sub_plugins[idx]);
 			sub_plugins[idx]->parent = plugin;
 			idx++;
 		}

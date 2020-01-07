@@ -26,10 +26,16 @@ set(GLSL_HEADERS
 
 add_library(picam360raspi MODULE
 	create_plugin.cpp
+	
 	window_gl_renderer.c
-	picam360_gl_renderer.c
-	equirectangular_renderer.c
-	mjpeg_omx_decoder.cpp
+#	picam360map_gl_renderer.c
+#	equirectangular_gl_renderer.c
+	
+#	mjpeg_omx_decoder.cpp
+	
+#	omx_encoder.cpp
+#	omxcv_jpeg.cpp
+#	omxcv.cpp
 
 	${GLSL_HEADERS}
 )
