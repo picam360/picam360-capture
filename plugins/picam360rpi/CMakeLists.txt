@@ -4,7 +4,7 @@ message("picam360rpi generating Makefile")
 project(picam360rpi)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(OPENCV opencv REQUIRED)
+#pkg_check_modules(OPENCV opencv REQUIRED)
 
 find_file(BCM_HOST bcm_host.h /opt/vc/include)
 if(BCM_HOST)
@@ -66,17 +66,17 @@ include_directories(
 	./include
 	../../include
 	../../libs/picam360-common/include
-	${OPENCV_INCLUDE_DIRS}
+#	${OPENCV_INCLUDE_DIRS}
 )
 
-link_directories(
-	${OPENCV_LIBRARY_DIRS}
-)
+#link_directories(
+#	${OPENCV_LIBRARY_DIRS}
+#)
 
 target_link_libraries(picam360rpi
 	pthread
 	dl
-	${OPENCV_LIBRARIES}	
+#	${OPENCV_LIBRARIES}	
 )
 
 #packages

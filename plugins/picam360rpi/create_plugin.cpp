@@ -110,21 +110,21 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 			sub_plugins[idx]->parent = plugin;
 			idx++;
 		}
-		{
-			create_picam360map_plugin(plugin_host, &sub_plugins[idx]);
-			sub_plugins[idx]->parent = plugin;
-			idx++;
-		}
-		{
-			create_equirectangular_plugin(plugin_host, &sub_plugins[idx]);
-			sub_plugins[idx]->parent = plugin;
-			idx++;
-		}
-		{
-			create_omx_encoder_plugin(plugin_host, &sub_plugins[idx]);
-			sub_plugins[idx]->parent = plugin;
-			idx++;
-		}
+//		{
+//			create_picam360map_plugin(plugin_host, &sub_plugins[idx]);
+//			sub_plugins[idx]->parent = plugin;
+//			idx++;
+//		}
+//		{
+//			create_equirectangular_plugin(plugin_host, &sub_plugins[idx]);
+//			sub_plugins[idx]->parent = plugin;
+//			idx++;
+//		}
+//		{
+//			create_omx_encoder_plugin(plugin_host, &sub_plugins[idx]);
+//			sub_plugins[idx]->parent = plugin;
+//			idx++;
+//		}
 
 		*_plugin = plugin;
 	}

@@ -68,8 +68,6 @@ set_target_properties(omxjpeg PROPERTIES
 target_link_libraries(omxjpeg
 	pthread
 	dl
-	${LIBJPEG_LIBRARIES}
-	${LIBPNG_LIBRARIES}
 )
 
 target_link_libraries(omxjpeg ${EGL_LIBRARIES})

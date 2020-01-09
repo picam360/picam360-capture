@@ -20,7 +20,7 @@
 #include "omxjpeg.h"
 
 #define PLUGIN_NAME "mjpeg_omx_decoder"
-#define DECODER_NAME "mjpeg_omx_decoder"
+#define DECODER_NAME "mjpeg_decoder"
 
 #define TIMEOUT_MS 2000
 
@@ -77,7 +77,7 @@ static bool init_pfn() {
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
-#define BUFFER_NUM 8
+#define BUFFER_NUM 4
 typedef struct _mjpeg_omx_decoder_private {
 	VSTREAMER_T super;
 
@@ -149,6 +149,7 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 				sizeof(*cinfop));
 		PFN(jpeg_mem_src)(cinfop, in_buf, in_buf_size);
 
+		lg_plugin_host->lock_texture();
 		{
 			glGenTextures(1, (GLuint*) &cinfop->fd);
 
@@ -160,17 +161,18 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+		lg_plugin_host->unlock_texture();
 
-			/* Create EGL Image */
-			cinfop->client_data = (void*) eglCreateImageKHR(
-					lg_plugin_host->get_display(),
-					lg_plugin_host->get_context(), EGL_GL_TEXTURE_2D_KHR,
-					(EGLClientBuffer) cinfop->fd, 0);
+		/* Create EGL Image */
+		cinfop->client_data = (void*) eglCreateImageKHR(
+				lg_plugin_host->get_display(),
+				lg_plugin_host->get_context(), EGL_GL_TEXTURE_2D_KHR,
+				(EGLClientBuffer) cinfop->fd, 0);
 
-			if (cinfop->client_data == EGL_NO_IMAGE_KHR) {
-				printf("eglCreateImageKHR failed.\n");
-				exit(1);
-			}
+		if (cinfop->client_data == EGL_NO_IMAGE_KHR) {
+			printf("eglCreateImageKHR failed.\n");
+			exit(1);
 		}
 	} else {
 		memset(&jerr, 0, sizeof(jerr));

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
-message("video_reciever generating Makefile")
+message("image_recorder generating Makefile")
 project(image_recorder)
 
 find_package(PkgConfig REQUIRED)

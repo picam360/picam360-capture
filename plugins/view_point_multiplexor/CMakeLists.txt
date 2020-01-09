@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
-message("video_reciever generating Makefile")
+message("view_point_multiplexor generating Makefile")
 project(view_point_multiplexor)
 
 find_package(PkgConfig REQUIRED)

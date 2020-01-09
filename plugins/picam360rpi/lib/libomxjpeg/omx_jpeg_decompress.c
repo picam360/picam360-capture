@@ -3,6 +3,7 @@
 #include "ilclient.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
+#include <pthread.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -27,11 +28,18 @@ typedef struct _omx_jpeg_decompress_private {
 	int texture_width;
 	int texture_height;
 	OMX_BUFFERHEADERTYPE *egl_buffer;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	boolean fill_buffer_done;
 } omx_jpeg_decompress_private;
 
 static void my_fill_buffer_done(void *data, COMPONENT_T *comp) {
 	omx_jpeg_decompress_private *_this = (omx_jpeg_decompress_private*) data;
 
+	pthread_mutex_lock(&_this->mutex); // this is for avoiding infinity mrevent_wait
+	pthread_cond_broadcast(&_this->cond);
+	_this->fill_buffer_done = TRUE;
+	pthread_mutex_unlock(&_this->mutex);
 }
 
 OMXJPEG_FN_DEFINE(void, jpeg_CreateDecompress,
@@ -44,6 +52,9 @@ OMXJPEG_FN_DEFINE(void, jpeg_CreateDecompress,
 			sizeof(omx_jpeg_decompress_private));
 	memset(_this, 0, sizeof(omx_jpeg_decompress_private));
 	cinfo->master = (struct jpeg_decomp_master*) _this;
+
+	pthread_mutex_init(&_this->mutex, 0);
+	pthread_cond_init(&_this->cond, 0);
 
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format;
 	int status = 0;
@@ -144,6 +155,12 @@ OMXJPEG_FN_DEFINE(void, jpeg_destroy_decompress, (j_decompress_ptr cinfo)) {
 	OMX_Deinit();
 
 	ilclient_destroy(_this->client);
+
+	if (cinfo->comp_info) {
+		free(cinfo->comp_info);
+	}
+	free(cinfo->src);
+	free(cinfo->master);
 }
 OMXJPEG_FN_DEFINE(void, jpeg_mem_src,
 		(j_decompress_ptr cinfo, unsigned char * inbuffer, unsigned long insize)) {
@@ -155,7 +172,7 @@ OMXJPEG_FN_DEFINE(int, jpeg_read_header,
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
 
-	if(_this->egl_buffer){
+	if (_this->egl_buffer) {
 		//already done
 		return 0;
 	}
@@ -325,6 +342,12 @@ OMXJPEG_FN_DEFINE(boolean, jpeg_start_decompress, (j_decompress_ptr cinfo)) {
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
 
+	_this->fill_buffer_done = FALSE;
+
+	cinfo->comp_info = (jpeg_component_info*) malloc(
+			sizeof(jpeg_component_info));
+	memset(cinfo->comp_info, 0, sizeof(jpeg_component_info));
+
 	uint8_t *data = (uint8_t*) cinfo->src->next_input_byte;
 	int data_len = cinfo->src->bytes_in_buffer;
 
@@ -363,6 +386,11 @@ OMXJPEG_FN_DEFINE(JDIMENSION, jpeg_read_raw_data,
 		printf("OMX_FillThisBuffer failed in callback\n");
 		//exit(1);
 	}
+	pthread_mutex_lock(&_this->mutex);
+	if (_this->fill_buffer_done != TRUE) {
+		pthread_cond_wait(&_this->cond, &_this->mutex);
+	}
+	pthread_mutex_unlock(&_this->mutex);
 
 }
 OMXJPEG_FN_DEFINE(boolean, jpeg_finish_decompress, (j_decompress_ptr cinfo)) {

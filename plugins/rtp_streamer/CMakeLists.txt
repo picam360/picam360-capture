@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.3)
 
-message("video_reciever generating Makefile")
+message("rtp_streamer generating Makefile")
 project(rtp_streamer)
 
 find_package(PkgConfig REQUIRED)
