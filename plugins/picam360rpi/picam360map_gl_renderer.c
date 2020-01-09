@@ -411,7 +411,7 @@ static void init_options(void *user_data, json_t *options) {
 static void save_options(void *user_data, json_t *options) {
 }
 
-void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+void create_picam360map_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	lg_plugin_host = plugin_host;
 
 	{

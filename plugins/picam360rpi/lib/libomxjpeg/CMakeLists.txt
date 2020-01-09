@@ -24,6 +24,7 @@ endif()
 #add_executable 
 #target_link_libraries should be define below here
 add_library(omxjpeg STATIC
+	omxjpeg.c
 	omx_jpeg_decompress.c
 )
 
