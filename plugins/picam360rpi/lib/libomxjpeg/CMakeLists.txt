@@ -12,7 +12,7 @@ if(BCM_HOST)
 	set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/vc/lib/pkgconfig")
 	pkg_check_modules(BCMHOST bcm_host REQUIRED)
 	add_definitions(-DBCM_HOST)
-		add_definitions(-DOMX_SKIP64BIT) # this would be not need in the future
+	add_definitions(-DOMX_SKIP64BIT) # this would be not need in the future
 		
 	include_directories( ${BCMHOST_INCLUDE_DIRS} )
 	link_directories( ${BCMHOST_LIBRARY_DIRS} ) # need to upper of add_executable

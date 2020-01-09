@@ -1385,6 +1385,13 @@ static void* get_display() {
 	return NULL;
 #endif
 }
+static void* get_context() {
+#ifdef USE_GLES
+	return state->egl_handler.context;
+#else
+	return NULL;
+#endif
+}
 static void lock_texture() {
 	pthread_mutex_lock(&state->texture_mutex);
 	eh_activate_context(&state->egl_handler);
@@ -1709,6 +1716,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_camera_north = set_camera_north;
 
 		state->plugin_host.get_display = get_display;
+		state->plugin_host.get_context = get_context;
 		state->plugin_host.lock_texture = lock_texture;
 		state->plugin_host.unlock_texture = unlock_texture;
 		state->plugin_host.set_cam_texture_cur = set_cam_texture_cur;

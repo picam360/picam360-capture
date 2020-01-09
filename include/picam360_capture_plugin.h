@@ -148,6 +148,7 @@ typedef struct _PLUGIN_HOST_T {
 
 	//gl related
 	void* (*get_display)();
+	void* (*get_context)();
 	void (*decode_video)(int cam_num, unsigned char *data, int data_len);
 	void (*lock_texture)();
 	void (*unlock_texture)();

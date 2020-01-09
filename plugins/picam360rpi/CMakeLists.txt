@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1.3)
 
-message("picam360raspi generating Makefile")
-project(picam360raspi)
+message("picam360rpi generating Makefile")
+project(picam360rpi)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(OPENCV opencv REQUIRED)
@@ -13,8 +13,13 @@ if(BCM_HOST)
 	set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/vc/lib/pkgconfig")
 	pkg_check_modules(BCMHOST bcm_host REQUIRED)
 	add_definitions(-DBCM_HOST)
+	add_definitions(-DOMX_SKIP64BIT) # this would be not need in the future
+	
 	include_directories( ${BCMHOST_INCLUDE_DIRS} )
 	link_directories( ${BCMHOST_LIBRARY_DIRS} ) # need to upper of add_executable
+	
+	include_directories( /opt/vc/src/hello_pi/libs/ilclient )
+	link_directories( /opt/vc/src/hello_pi/libs/ilclient ) # need to upper of add_executable
 endif()
 
 set(GLSL_HEADERS
@@ -24,14 +29,14 @@ set(GLSL_HEADERS
   "glsl/window_vsh.h"
 )
 
-add_library(picam360raspi MODULE
+add_library(picam360rpi MODULE
 	create_plugin.cpp
 	
 	window_gl_renderer.c
 #	picam360map_gl_renderer.c
 #	equirectangular_gl_renderer.c
 	
-#	mjpeg_omx_decoder.cpp
+	mjpeg_omx_decoder.cpp
 	
 #	omx_encoder.cpp
 #	omxcv_jpeg.cpp
@@ -40,7 +45,7 @@ add_library(picam360raspi MODULE
 	${GLSL_HEADERS}
 )
 
-set_target_properties(picam360raspi PROPERTIES
+set_target_properties(picam360rpi PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED YES
     C_EXTENSIONS ON # gnu11
@@ -49,6 +54,13 @@ set_target_properties(picam360raspi PROPERTIES
     CXX_EXTENSIONS NO # c++11
     PREFIX ""
 )
+
+#libomxjpeg
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/libomxjpeg)
+add_dependencies(picam360rpi omxjpeg)
+target_include_directories(picam360rpi PUBLIC lib/libomxjpeg)
+target_link_libraries(picam360rpi omxjpeg)
+link_directories (omxjpeg)
 
 include_directories(
 	./include
@@ -61,7 +73,7 @@ link_directories(
 	${OPENCV_LIBRARY_DIRS}
 )
 
-target_link_libraries(picam360raspi
+target_link_libraries(picam360rpi
 	pthread
 	dl
 	${OPENCV_LIBRARIES}	
@@ -108,6 +120,6 @@ add_custom_command(OUTPUT ${GLSL_HEADERS}
 
 
 #post build
-add_custom_command(TARGET picam360raspi POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:picam360raspi> ${CMAKE_CURRENT_SOURCE_DIR}/../
+add_custom_command(TARGET picam360rpi POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:picam360rpi> ${CMAKE_CURRENT_SOURCE_DIR}/../
 )
