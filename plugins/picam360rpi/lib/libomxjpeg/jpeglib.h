@@ -291,7 +291,10 @@ typedef struct jpeg_tegra_mgr * j_tegra_mgr_ptr;
   unsigned char *pVendor_buf; /* pointer to vendor specific buffer */ \
   int global_state;		/* For checking call sequence validity */ \
   int fd; \
-  boolean bMeasure_ImageProcessTime;	/* Measure image process time */
+  boolean bMeasure_ImageProcessTime;	/* Measure image process time */ \
+  /*picam360 extension*/ \
+  void *fill_buffer_done_callback_user_data; \
+  void (*fill_buffer_done_callback)(void*, int);
 #else
 #define jpeg_common_fields \
   struct jpeg_error_mgr * err;	/* Error handler module */\
@@ -300,6 +303,9 @@ typedef struct jpeg_tegra_mgr * j_tegra_mgr_ptr;
   void * client_data;		/* Available for use by application */\
   boolean is_decompressor;	/* So common code can tell which is which */\
   int global_state		/* For checking call sequence validity */
+
+  //picam360 extension
+  void (*fill_buffer_done_callback)(int);
 #endif
 
 /* Routines that are to be used by both halves of the library are declared
