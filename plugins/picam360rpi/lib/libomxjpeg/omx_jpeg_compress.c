@@ -25,12 +25,13 @@ typedef struct _omx_jpeg_compress_private {
 	ILCLIENT_T *client;
 	COMPONENT_T *image_encode;
 
-	OMX_BUFFERHEADERTYPE *egl_buffer;
+	OMX_BUFFERHEADERTYPE *in_buffer;
 	OMX_BUFFERHEADERTYPE *out_buffer;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	int framecount;
 	boolean fill_buffer_done;
+	boolean port_settings_done;
 } omx_jpeg_compress_private;
 
 static void fill_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
@@ -190,9 +191,10 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
-	if (_this->egl_buffer) {
+	if (_this->port_settings_done) {
 		return;
 	}
+	_this->port_settings_done = TRUE;
 
 	int ret = 0;
 	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
@@ -218,9 +220,7 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	def.nBufferSize = def.format.image.nStride * def.format.image.nSliceHeight;
 	//def.nBufferSize = sizeof(OMX_BRCMVEGLIMAGETYPE);
 	def.format.image.bFlagErrorConcealment = OMX_FALSE;
-	def.format.image.eCompressionFormat = OMX_VIDEO_CodingUnused;
-	def.format.image.eColorFormat = OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
-	//def.format.image.eColorFormat = OMX_COLOR_Format24bitBGR888; // OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
+	def.format.image.eColorFormat = OMX_COLOR_Format32bitABGR8888; // OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
 
 	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->image_encode),
 			OMX_IndexParamPortDefinition, &def);
@@ -310,8 +310,8 @@ OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
-	_this->egl_buffer = ilclient_get_output_buffer(_this->image_encode, 340, 1);
-	OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->egl_buffer);
+	_this->in_buffer = ilclient_get_output_buffer(_this->image_encode, 340, 1);
+	OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->in_buffer);
 
 	_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341, 1);
 	OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->out_buffer);

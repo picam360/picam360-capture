@@ -25,6 +25,7 @@
 
 #define TIMEOUT_MS 2000
 
+#include "user-vcsm.h"
 #include "GLES2/gl2.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
@@ -90,6 +91,7 @@ typedef struct _mjpeg_omx_decoder_private {
 	MREVENT_T frame_ready;
 	struct jpeg_decompress_struct cinfo;
 	GLuint textures[BUFFER_NUM];
+	struct egl_image_brcm_vcsm_info vcsm_infos[BUFFER_NUM];
 	EGLImageKHR egl_images[BUFFER_NUM + 1];
 	PICAM360_IMAGE_T frame_buffers[BUFFER_NUM];
 	uint8_t xmp_buffers[BUFFER_NUM][RTP_MAXPAYLOADSIZE];
@@ -143,6 +145,7 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 				&& image_height == cinfop->image_height) {
 			reuse = true;
 		}
+		reuse = true;//test
 	}
 	if (_this->textures[0] > 0 && !reuse) {
 		//release
@@ -175,11 +178,11 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 		printf("allocate egl\n");
 		lg_plugin_host->lock_texture();
 		{
-			glGenTextures(BUFFER_NUM, _this->textures);
 
+#if 0
 			uint32_t image_inner_width = MIN(cinfop->image_width,
 					cinfop->image_height);
-
+			glGenTextures(BUFFER_NUM, _this->textures);
 			for (int i = 0; i < BUFFER_NUM; i++) {
 				glBindTexture(GL_TEXTURE_2D, _this->textures[i]);
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_inner_width,
@@ -205,6 +208,34 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 					exit(1);
 				}
 			}
+#else
+			uint32_t image_inner_width = MIN(cinfop->image_width, cinfop->image_height);
+
+			uint32_t image_width_2n;
+			for (image_width_2n = 64; image_width_2n < 2048; image_width_2n *= 2) {
+				if (image_width_2n >= image_inner_width) {
+					break;
+				}
+			}
+			int rc = vcsm_init();
+			for (int i = 0; i < BUFFER_NUM; i++) {
+				/* Create EGL Image */
+				struct egl_image_brcm_vcsm_info *vcsm_infop =
+						&_this->vcsm_infos[i];
+				vcsm_infop->width = image_width_2n;
+				vcsm_infop->height = image_width_2n;
+				_this->egl_images[i] = eglCreateImageKHR(
+						lg_plugin_host->get_display(), EGL_NO_CONTEXT,
+						EGL_IMAGE_BRCM_VCSM, vcsm_infop, NULL);
+				if (_this->egl_images[i] == EGL_NO_IMAGE_KHR
+						|| vcsm_infop->vcsm_handle == 0) {
+					printf("eglCreateImageKHR failed.\n");
+					exit(1);
+				}
+				_this->textures[i] = 1;
+			}
+			// && _this->vcsm_infos[0].vcsm_handle == 0
+#endif
 			cinfop->client_data = (void*) _this->egl_images;
 		}
 		lg_plugin_host->unlock_texture();
@@ -229,7 +260,7 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 	}
 	_this->frame_buffers[cur].mem_type = PICAM360_MEMORY_TYPE_EGL;
 	memcpy(_this->frame_buffers[cur].img_type, "RGB\0", 4);
-	_this->frame_buffers[cur].id[0] = _this->textures[cur];
+	_this->frame_buffers[cur].id[0] = (int)_this->vcsm_infos[cur].vcsm_handle;
 	_this->frame_buffers[cur].pixels[0] =
 			(unsigned char*) _this->egl_images[cur];
 	_this->frame_buffers[cur].width[0] = MIN(cinfop->image_width,

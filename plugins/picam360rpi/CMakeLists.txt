@@ -20,6 +20,8 @@ if(BCM_HOST)
 	
 	include_directories( /opt/vc/src/hello_pi/libs/ilclient )
 	link_directories( /opt/vc/src/hello_pi/libs/ilclient ) # need to upper of add_executable
+	
+	include_directories( /opt/vc/include/interface/vcsm )
 endif()
 
 set(GLSL_HEADERS
@@ -77,6 +79,7 @@ include_directories(
 target_link_libraries(picam360rpi
 	pthread
 	dl
+	vcsm
 #	${OPENCV_LIBRARIES}	
 )
 

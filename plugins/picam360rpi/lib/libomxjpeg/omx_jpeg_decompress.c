@@ -25,8 +25,6 @@ typedef struct _omx_jpeg_decompress_private {
 	COMPONENT_T *list[4];
 	TUNNEL_T tunnel[3];
 
-	int texture_width;
-	int texture_height;
 	int egl_buffer_num;
 	OMX_BUFFERHEADERTYPE **egl_buffers;
 	pthread_mutex_t mutex;
@@ -94,9 +92,6 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
 	uint32_t image_inner_width = MIN(image_width, image_height);
 
-	_this->texture_width = image_inner_width;
-	_this->texture_height = image_inner_width;
-
 	// tell resizer input what the decoder output will be providing
 	portdef.nPortIndex = 60;
 	OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
@@ -133,8 +128,8 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	// change output color format and dimensions to match input
 	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
 	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
-	portdef.format.image.nFrameWidth = _this->texture_width;
-	portdef.format.image.nFrameHeight = _this->texture_height;
+	portdef.format.image.nFrameWidth = cinfo->image_width;
+	portdef.format.image.nFrameHeight = cinfo->image_height;
 	portdef.format.image.nStride = 0;
 	//portdef.format.image.nSliceHeight = 16;
 	portdef.format.image.nSliceHeight = 0;
@@ -377,7 +372,6 @@ OMXJPEG_FN_DEFINE(int, jpeg_read_header,
 
 	int image_width = 0;
 	int image_height = 0;
-	int image_inner_width = 0;
 
 	uint8_t *data = (uint8_t*) cinfo->src->next_input_byte;
 	int data_len = cinfo->src->bytes_in_buffer;
@@ -391,8 +385,17 @@ OMXJPEG_FN_DEFINE(int, jpeg_read_header,
 			break;
 		}
 	}
-	cinfo->image_width = image_width;
-	cinfo->image_height = image_height;
+
+	uint32_t image_inner_width = MIN(image_width, image_height);
+
+	uint32_t image_width_2n;
+	for (image_width_2n = 64; image_width_2n < 2048; image_width_2n *= 2) {
+		if (image_width_2n >= image_inner_width) {
+			break;
+		}
+	}
+	cinfo->image_width = image_width_2n;
+	cinfo->image_height = image_width_2n;
 
 	return 0;
 }
