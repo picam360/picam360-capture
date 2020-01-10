@@ -10,6 +10,8 @@
 
 #define CHECKED(c, v) if (c) {printf(v); exit(-1);}
 
+#define IMAGE_ENCODE
+
 #define OMX_INIT_STRUCTURE(a) \
     memset(&(a), 0, sizeof(a)); \
     (a).nSize = sizeof(a); \
@@ -95,23 +97,22 @@ OMXJPEG_FN_DEFINE(void, jpeg_CreateCompress,
 	ilclient_set_port_settings_callback(_this->client, port_settings_fnc,
 			(void*) cinfo);
 
-#if 0
+#ifdef IMAGE_ENCODE
 	// create image_encode
 	ret = ilclient_create_component(_this->client, &_this->image_encode,
 			(char*) "image_encode",
 			(ILCLIENT_CREATE_FLAGS_T)(
-					//ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS
-					ILCLIENT_DISABLE_ALL_PORTS
+					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS
 							| ILCLIENT_ENABLE_OUTPUT_BUFFERS));
 	CHECKED(ret != 0, "ILCient image_encode component creation failed.");
 #else
 	ret = ilclient_create_component(_this->client, &_this->image_encode,
 			(char*) "video_encode",
 			(ILCLIENT_CREATE_FLAGS_T)(
-			//ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS
-					ILCLIENT_DISABLE_ALL_PORTS
+					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS
 							| ILCLIENT_ENABLE_OUTPUT_BUFFERS));
-	CHECKED(ret != 0, "ILCient image_encode component creation failed.");
+	CHECKED(ret != 0, "ILCient video_encode component creation failed.");
+
 #endif
 
 }
@@ -156,7 +157,7 @@ OMXJPEG_FN_DEFINE(void, jpeg_set_quality,
 		(j_compress_ptr cinfo, int quality, boolean force_baseline)) {
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
-#if 0
+#ifdef IMAGE_ENCODE
 	int ret = 0;
 
 	//Set the encoder quality
@@ -196,7 +197,7 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	int ret = 0;
 	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
-#if 0
+#ifdef IMAGE_ENCODE
 	//Set input definition to the encoder
 	OMX_PARAM_PORTDEFINITIONTYPE def = { 0 };
 	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
@@ -217,32 +218,14 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	def.nBufferSize = def.format.image.nStride * def.format.image.nSliceHeight;
 	//def.nBufferSize = sizeof(OMX_BRCMVEGLIMAGETYPE);
 	def.format.image.bFlagErrorConcealment = OMX_FALSE;
-	//def.format.image.eCompressionFormat = OMX_VIDEO_CodingUnused;
-	def.format.image.eColorFormat =OMX_COLOR_Format24bitBGR888;// OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
+	def.format.image.eCompressionFormat = OMX_VIDEO_CodingUnused;
+	def.format.image.eColorFormat = OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
+	//def.format.image.eColorFormat = OMX_COLOR_Format24bitBGR888; // OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
 
 	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->image_encode),
 			OMX_IndexParamPortDefinition, &def);
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for input format definition.");
-
-	EGLImageKHR egl_image = (EGLImageKHR) cinfo->client_data;
-	{
-		OMX_STATETYPE state;
-		OMX_GetState(ILC_GET_HANDLE(_this->image_encode), &state);
-		if (state != OMX_StateIdle) {
-			if (state != OMX_StateLoaded) {
-				ilclient_change_component_state(_this->image_encode,
-						OMX_StateLoaded);
-			}
-			ilclient_change_component_state(_this->image_encode, OMX_StateIdle);
-		}
-		omx_err = OMX_UseEGLImage(ILC_GET_HANDLE(_this->image_encode),
-				&_this->egl_buffer, 340, (void*) 0, egl_image);
-		if (omx_err != OMX_ErrorNone) {
-			printf("OMX_UseEGLImage failed. 0x%x\n", omx_err);
-			exit(1);
-		}
-	}
 
 	//Set the output format of the encoder
 	OMX_IMAGE_PARAM_PORTFORMATTYPE format = { 0 };
@@ -255,6 +238,18 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 			OMX_IndexParamImagePortFormat, &format);
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for setting encoder output format.");
+
+	ret = ilclient_change_component_state(_this->image_encode, OMX_StateIdle);
+	CHECKED(ret != 0, "ILClient failed to change encoder to idle state.");
+	ret = ilclient_enable_port_buffers(_this->image_encode, 340, NULL, NULL,
+			NULL);
+	CHECKED(ret != 0, "ILClient failed to enable input buffers.");
+	ret = ilclient_enable_port_buffers(_this->image_encode, 341, NULL, NULL,
+			NULL);
+	CHECKED(ret != 0, "ILClient failed to enable output buffers.");
+	ret = ilclient_change_component_state(_this->image_encode,
+			OMX_StateExecuting);
+	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
 #else
 	//Set input definition to the encoder
 	OMX_PARAM_PORTDEFINITIONTYPE def = { };
@@ -274,6 +269,8 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	//Must be a multiple of 32
 	def.format.video.nStride = ((cinfo->image_height + 31) & ~31) * 4;
 	def.format.video.eColorFormat = OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
+	//def.format.video.eCompressionFormat = OMX_VIDEO_CodingUnused;
+	//def.format.video.eColorFormat = OMX_COLOR_FormatBRCMEGL;//OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
 	//Must be manually defined to ensure sufficient size if stride needs to be rounded up to multiple of 32.
 	def.nBufferSize = def.format.video.nStride * def.format.video.nSliceHeight;
 	//We allocate 1 input buffers.
@@ -284,54 +281,36 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for input format definition.");
 
-	EGLImageKHR egl_image = (EGLImageKHR) cinfo->client_data;
-	{
-		OMX_STATETYPE state;
-		OMX_GetState(ILC_GET_HANDLE(_this->image_encode), &state);
-		if (state != OMX_StateIdle) {
-			if (state != OMX_StateLoaded) {
-				ilclient_change_component_state(_this->image_encode,
-						OMX_StateLoaded);
-			}
-			ilclient_change_component_state(_this->image_encode, OMX_StateIdle);
-		}
-		omx_err = OMX_UseEGLImage(ILC_GET_HANDLE(_this->image_encode),
-				&_this->egl_buffer, 200, (void*) 0, egl_image);
-		if (omx_err != OMX_ErrorNone) {
-			printf("OMX_UseEGLImage failed. 0x%x\n", omx_err);
-			exit(1);
-		}
-	}
-
 	//Set the output format of the encoder
 	OMX_VIDEO_PARAM_PORTFORMATTYPE format = { };
 	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
 	format.nVersion.nVersion = OMX_VERSION;
 	format.nPortIndex = 201;
-	format.eCompressionFormat = OMX_VIDEO_CodingMJPEG;
+	format.eCompressionFormat = OMX_VIDEO_CodingAVC;
 
 	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->image_encode),
 			OMX_IndexParamVideoPortFormat, &format);
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for setting encoder output format.");
-#endif
 
 	ret = ilclient_change_component_state(_this->image_encode, OMX_StateIdle);
 	CHECKED(ret != 0, "ILClient failed to change encoder to idle state.");
-	ret = ilclient_enable_port_buffers(_this->image_encode, 340, NULL, NULL,
+	ret = ilclient_enable_port_buffers(_this->image_encode, 200, NULL, NULL,
 			NULL);
 	CHECKED(ret != 0, "ILClient failed to enable input buffers.");
-	ret = ilclient_enable_port_buffers(_this->image_encode, 341, NULL, NULL,
+	ret = ilclient_enable_port_buffers(_this->image_encode, 201, NULL, NULL,
 			NULL);
 	CHECKED(ret != 0, "ILClient failed to enable output buffers.");
 	ret = ilclient_change_component_state(_this->image_encode,
 			OMX_StateExecuting);
 	CHECKED(ret != 0, "ILClient failed to change encoder to executing stage.");
+#endif
 }
 OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
+	_this->egl_buffer = ilclient_get_output_buffer(_this->image_encode, 340, 1);
 	OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->egl_buffer);
 
 	_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341, 1);
