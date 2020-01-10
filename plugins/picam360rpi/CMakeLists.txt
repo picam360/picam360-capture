@@ -37,6 +37,7 @@ add_library(picam360rpi MODULE
 #	equirectangular_gl_renderer.c
 	
 	mjpeg_omx_decoder.cpp
+	mjpeg_omx_encoder.cpp
 	
 #	omx_encoder.cpp
 #	omxcv_jpeg.cpp

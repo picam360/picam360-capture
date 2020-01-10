@@ -61,7 +61,7 @@ static void fill_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
 		//exit(1);
 	}
 }
-void empty_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
+static void empty_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
 	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;

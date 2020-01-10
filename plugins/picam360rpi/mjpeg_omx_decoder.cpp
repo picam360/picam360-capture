@@ -227,6 +227,17 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 					image->meta_size);
 		}
 	}
+	_this->frame_buffers[cur].mem_type = PICAM360_MEMORY_TYPE_EGL;
+	memcpy(_this->frame_buffers[cur].img_type, "RGB\0", 4);
+	_this->frame_buffers[cur].id[0] = _this->textures[cur];
+	_this->frame_buffers[cur].pixels[0] =
+			(unsigned char*) _this->egl_images[cur];
+	_this->frame_buffers[cur].width[0] = MIN(cinfop->image_width,
+			cinfop->image_height);
+	_this->frame_buffers[cur].height[0] = MIN(cinfop->image_width,
+			cinfop->image_height);
+	;
+
 	_this->framecount++;
 }
 

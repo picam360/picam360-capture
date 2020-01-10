@@ -26,6 +26,7 @@ endif()
 add_library(omxjpeg STATIC
 	omxjpeg.c
 	omx_jpeg_decompress.c
+	omx_jpeg_compress.c
 )
 
 include_directories(

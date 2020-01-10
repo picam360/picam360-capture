@@ -22,6 +22,7 @@
 
 #include "create_plugin.h"
 #include "mjpeg_omx_decoder.h"
+#include "mjpeg_omx_encoder.h"
 #include "window_gl_renderer.h"
 #include "picam360map_gl_renderer.h"
 #include "equirectangular_gl_renderer.h"
@@ -102,6 +103,11 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		int idx = 0;
 		{
 			create_mjpeg_decoder_plugin(plugin_host, &sub_plugins[idx]);
+			sub_plugins[idx]->parent = plugin;
+			idx++;
+		}
+		{
+			create_mjpeg_encoder_plugin(plugin_host, &sub_plugins[idx]);
 			sub_plugins[idx]->parent = plugin;
 			idx++;
 		}
