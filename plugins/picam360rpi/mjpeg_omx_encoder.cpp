@@ -22,9 +22,9 @@
 #define PLUGIN_NAME "mjpeg_omx_encoder"
 #define ENCODER_NAME "mjpeg_encoder"
 
-
 #define TIMEOUT_MS 2000
 
+#include "user-vcsm.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 
@@ -98,15 +98,19 @@ typedef struct _mjpeg_omx_encoder_private {
 	MREVENT_T frame_ready;
 	struct jpeg_compress_struct cinfos[BUFFER_NUM];
 	PICAM360_IMAGE_T frame_buffers[BUFFER_NUM];
+	unsigned char *outbuffers[BUFFER_NUM];
+	unsigned long outsizes[BUFFER_NUM];
 	pthread_t streaming_thread;
 } mjpeg_omx_encoder_private;
 
-static void encode(mjpeg_omx_encoder_private *_this,
-		PICAM360_IMAGE_T *image) {
+static void encode(mjpeg_omx_encoder_private *_this, PICAM360_IMAGE_T *image) {
 	int cur = _this->framecount % BUFFER_NUM;
 	struct jpeg_compress_struct &cinfo = _this->cinfos[cur];
 
-	unsigned long out_buf_size = image->width[0] * image->height[0] * 3 / 2;
+	unsigned char *&outbuffer = _this->outbuffers[cur];
+	unsigned long &outsize = _this->outsizes[cur];
+	outsize = image->width[0] * image->height[0] * 3 / 2;
+
 	PICAM360_IMAGE_T *frame = &_this->frame_buffers[cur];
 	frame->timestamp = image->timestamp;
 	frame->meta = image->meta;
@@ -123,13 +127,12 @@ static void encode(mjpeg_omx_encoder_private *_this,
 		PFN(jpeg_CreateCompress)(&cinfo, JPEG_LIB_VERSION, sizeof(cinfo));
 		PFN(jpeg_suppress_tables)(&cinfo, TRUE);
 
-		frame->pixels[0] = (uint8_t*) malloc(out_buf_size);
+		outbuffer = (uint8_t*) malloc(outsize);
 
 		int quality = lg_quality;
-		PFN(jpeg_mem_dest)(&cinfo, &frame->pixels[0], &out_buf_size);
+		PFN(jpeg_mem_dest)(&cinfo, &outbuffer, &outsize);
 
 		cinfo.fd = image->id[0];
-		cinfo.client_data = image->pixels[0];
 		cinfo.IsVendorbuf = TRUE;
 
 		cinfo.raw_data_in = TRUE;
@@ -139,13 +142,20 @@ static void encode(mjpeg_omx_encoder_private *_this,
 		PFN(jpeg_set_defaults)(&cinfo);
 		PFN(jpeg_set_quality)(&cinfo, quality, TRUE);
 		PFN(jpeg_set_hardware_acceleration_parameters_enc)(&cinfo, TRUE,
-				out_buf_size, 0, 0);
+				outsize, 0, 0);
 	} else {
 		memset(&jerr, 0, sizeof(jerr));
 		cinfo.err = PFN(jpeg_std_error)(&jerr); //local address
-		cinfo.dest->next_output_byte = frame->pixels[0];
-		cinfo.dest->free_in_buffer = out_buf_size;
+		cinfo.dest->next_output_byte = outbuffer;
+		cinfo.dest->free_in_buffer = outsize;
 	}
+
+	struct egl_image_brcm_vcsm_info *vcsm_infop =
+			(struct egl_image_brcm_vcsm_info*) image->pixels[0];
+	VCSM_CACHE_TYPE_T cache_type;
+	unsigned char *buffer = (unsigned char*) vcsm_lock_cache(
+			vcsm_infop->vcsm_handle, VCSM_CACHE_TYPE_HOST, &cache_type);
+	cinfo.client_data = buffer;
 
 	PFN(jpeg_start_compress)(&cinfo, 0);
 
@@ -153,14 +163,19 @@ static void encode(mjpeg_omx_encoder_private *_this,
 		char err_string[256];
 		cinfo.err->format_message((j_common_ptr) &cinfo, err_string);
 		printf("%s", err_string);
+
+		vcsm_unlock_ptr(buffer);
 		return;
 	}
 
 	PFN(jpeg_write_raw_data)(&cinfo, NULL, 0);
 	PFN(jpeg_finish_compress)(&cinfo);
 
-	frame->width[0] = out_buf_size;
-	frame->stride[0] = out_buf_size;
+	vcsm_unlock_ptr(buffer);
+
+	frame->pixels[0] = outbuffer;
+	frame->width[0] = outsize;
+	frame->stride[0] = outsize;
 	frame->height[0] = 1;
 
 	_this->framecount++;
@@ -217,8 +232,7 @@ static void* streaming_thread_fnc(void *obj) {
 }
 
 static void start(void *user_data) {
-	mjpeg_omx_encoder_private *_this =
-			(mjpeg_omx_encoder_private*) user_data;
+	mjpeg_omx_encoder_private *_this = (mjpeg_omx_encoder_private*) user_data;
 
 	if (_this->super.next_streamer) {
 		_this->super.next_streamer->start(_this->super.next_streamer);
@@ -232,7 +246,7 @@ static void start(void *user_data) {
 static void stop(void *user_data) {
 	mjpeg_omx_encoder_private *_this = (mjpeg_omx_encoder_private*) user_data;
 
-	if(_this->run){
+	if (_this->run) {
 		_this->run = false;
 		pthread_join(_this->streaming_thread, NULL);
 	}
@@ -264,7 +278,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 static void release(void *obj) {
 	mjpeg_omx_encoder_private *_this = (mjpeg_omx_encoder_private*) obj;
 
-	if(_this->run){
+	if (_this->run) {
 		_this->super.stop(&_this->super);
 	}
 
@@ -273,7 +287,7 @@ static void release(void *obj) {
 		if (_this->cinfos[i].fd > 0) {
 			_this->cinfos[i].fd = 0;
 			PFN(jpeg_destroy_compress)(&_this->cinfos[i]);
-			free(_this->frame_buffers[i].pixels[0]);
+			free(_this->outbuffers[i]);
 		}
 	}
 
@@ -285,8 +299,7 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	return 0;
 }
 
-static int get_param(void *obj, const char *param, char *value_str,
-		int size) {
+static int get_param(void *obj, const char *param, char *value_str, int size) {
 	mjpeg_omx_encoder_private *_this = (mjpeg_omx_encoder_private*) obj;
 	if (strcmp(param, "alignment") == 0) {
 		sprintf(value_str, "%d", 256);
@@ -308,8 +321,7 @@ static void create_encoder_mjpeg(void *user_data,
 	encoder->get_image = get_image;
 	encoder->user_data = encoder;
 
-	mjpeg_omx_encoder_private *_private =
-			(mjpeg_omx_encoder_private*) encoder;
+	mjpeg_omx_encoder_private *_private = (mjpeg_omx_encoder_private*) encoder;
 	mrevent_init(&_private->frame_ready);
 
 	if (output_encoder) {

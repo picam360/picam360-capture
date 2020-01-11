@@ -27,6 +27,8 @@ typedef struct _omx_jpeg_compress_private {
 
 	OMX_BUFFERHEADERTYPE *in_buffer;
 	OMX_BUFFERHEADERTYPE *out_buffer;
+	unsigned char ** outbuffer;
+	unsigned long * outsize;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	int framecount;
@@ -37,26 +39,26 @@ typedef struct _omx_jpeg_compress_private {
 static void fill_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
 	printf("fill_buffer_done_fnc\n");
 
-	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
+	j_compress_ptr cinfo = (j_compress_ptr) userdata;
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
-	pthread_mutex_lock(&_this->mutex); // this is for avoiding infinity mrevent_wait
-	pthread_cond_broadcast(&_this->cond);
-	_this->fill_buffer_done = TRUE;
-	pthread_mutex_unlock(&_this->mutex);
+//	pthread_mutex_lock(&_this->mutex); // this is for avoiding infinity mrevent_wait
+//	pthread_cond_broadcast(&_this->cond);
+//	_this->fill_buffer_done = TRUE;
+//	pthread_mutex_unlock(&_this->mutex);
 
 	_this->framecount++;
 }
 static void empty_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
-	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
+	j_compress_ptr cinfo = (j_compress_ptr) userdata;
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 	printf("empty_buffer_done_fnc\n");
 }
 static void port_settings_fnc(void *userdata, struct _COMPONENT_T *comp,
 		OMX_U32 data) {
-	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
+	j_compress_ptr cinfo = (j_compress_ptr) userdata;
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 	printf("port_settings_fnc\n");
@@ -145,9 +147,11 @@ OMXJPEG_FN_DEFINE(void, jpeg_mem_dest,
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
+	_this->outbuffer = outbuffer;
+	_this->outsize = outsize;
+
 	cinfo->dest->next_output_byte = *outbuffer;
 	cinfo->dest->free_in_buffer = *outsize;
-
 }
 OMXJPEG_FN_DEFINE(void, jpeg_set_defaults, (j_compress_ptr cinfo)) {
 	omx_jpeg_compress_private *_this =
@@ -310,17 +314,29 @@ OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
-	_this->in_buffer = ilclient_get_output_buffer(_this->image_encode, 340, 1);
+	_this->in_buffer = ilclient_get_input_buffer(_this->image_encode, 340, 1);
+	memcpy(_this->in_buffer->pBuffer, cinfo->client_data,
+			cinfo->image_width * 4 * cinfo->image_height);
+	_this->in_buffer->nFilledLen = _this->in_buffer->nAllocLen;
 	OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->in_buffer);
 
+	*_this->outsize = 0;
 	_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341, 1);
+	do {
+		OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode),
+				_this->out_buffer);
+        memcpy(cinfo->dest->next_output_byte, _this->out_buffer->pBuffer, _this->out_buffer->nFilledLen);
+        cinfo->dest->next_output_byte += _this->out_buffer->nFilledLen;
+        cinfo->dest->free_in_buffer -= _this->out_buffer->nFilledLen;
+        *_this->outsize += _this->out_buffer->nFilledLen;
+
+		_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341,
+				1);
+	} while (!(_this->out_buffer->nFlags & OMX_BUFFERFLAG_ENDOFFRAME));
+
+	//Needed because we call ilclient_get_output_buffer last.
+	//Otherwise ilclient waits forever for the buffer to be filled.
 	OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->out_buffer);
 
-	pthread_mutex_lock(&_this->mutex);
-	if (_this->fill_buffer_done != TRUE) {
-		pthread_cond_wait(&_this->cond, &_this->mutex);
-		_this->fill_buffer_done = FALSE;
-	}
-	pthread_mutex_unlock(&_this->mutex);
 	return;
 }

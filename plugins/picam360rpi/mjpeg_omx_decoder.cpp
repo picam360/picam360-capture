@@ -145,7 +145,7 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 				&& image_height == cinfop->image_height) {
 			reuse = true;
 		}
-		reuse = true;//test
+		reuse = true; //test
 	}
 	if (_this->textures[0] > 0 && !reuse) {
 		//release
@@ -209,10 +209,12 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 				}
 			}
 #else
-			uint32_t image_inner_width = MIN(cinfop->image_width, cinfop->image_height);
+			uint32_t image_inner_width = MIN(cinfop->image_width,
+					cinfop->image_height);
 
 			uint32_t image_width_2n;
-			for (image_width_2n = 64; image_width_2n < 2048; image_width_2n *= 2) {
+			for (image_width_2n = 64; image_width_2n < 2048; image_width_2n *=
+					2) {
 				if (image_width_2n >= image_inner_width) {
 					break;
 				}
@@ -260,14 +262,14 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 	}
 	_this->frame_buffers[cur].mem_type = PICAM360_MEMORY_TYPE_EGL;
 	memcpy(_this->frame_buffers[cur].img_type, "RGB\0", 4);
-	_this->frame_buffers[cur].id[0] = (int)_this->vcsm_infos[cur].vcsm_handle;
 	_this->frame_buffers[cur].pixels[0] =
+			(unsigned char*) &_this->vcsm_infos[cur];
+	_this->frame_buffers[cur].pixels[1] =
 			(unsigned char*) _this->egl_images[cur];
 	_this->frame_buffers[cur].width[0] = MIN(cinfop->image_width,
 			cinfop->image_height);
 	_this->frame_buffers[cur].height[0] = MIN(cinfop->image_width,
 			cinfop->image_height);
-	;
 
 	_this->framecount++;
 }
