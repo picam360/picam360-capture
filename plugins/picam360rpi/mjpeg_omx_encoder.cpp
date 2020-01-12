@@ -150,12 +150,13 @@ static void encode(mjpeg_omx_encoder_private *_this, PICAM360_IMAGE_T *image) {
 		cinfo.dest->free_in_buffer = outsize;
 	}
 
-    int rc = vcsm_init();
 	struct egl_image_brcm_vcsm_info *vcsm_infop =
 			(struct egl_image_brcm_vcsm_info*) image->pixels[0];
-	VCSM_CACHE_TYPE_T cache_type;
-	unsigned char *buffer = (unsigned char*) vcsm_lock_cache(
-			vcsm_infop->vcsm_handle, VCSM_CACHE_TYPE_HOST, &cache_type);
+	//VCSM_CACHE_TYPE_T cache_type;
+	//unsigned char *buffer = (unsigned char*) vcsm_lock_cache(
+	//		vcsm_infop->vcsm_handle, VCSM_CACHE_TYPE_HOST, &cache_type);
+	unsigned char *buffer = (unsigned char*) vcsm_lock(
+			vcsm_infop->vcsm_handle);
 	if (!buffer) {
 		printf("Failed to lock VCSM buffer for handle %d\n",
 				vcsm_infop->vcsm_handle);
