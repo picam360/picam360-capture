@@ -150,6 +150,7 @@ static void encode(mjpeg_omx_encoder_private *_this, PICAM360_IMAGE_T *image) {
 		cinfo.dest->free_in_buffer = outsize;
 	}
 
+    int rc = vcsm_init();
 	struct egl_image_brcm_vcsm_info *vcsm_infop =
 			(struct egl_image_brcm_vcsm_info*) image->pixels[0];
 	VCSM_CACHE_TYPE_T cache_type;
