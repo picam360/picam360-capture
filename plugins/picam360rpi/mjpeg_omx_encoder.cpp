@@ -155,6 +155,11 @@ static void encode(mjpeg_omx_encoder_private *_this, PICAM360_IMAGE_T *image) {
 	VCSM_CACHE_TYPE_T cache_type;
 	unsigned char *buffer = (unsigned char*) vcsm_lock_cache(
 			vcsm_infop->vcsm_handle, VCSM_CACHE_TYPE_HOST, &cache_type);
+	if (!buffer) {
+		printf("Failed to lock VCSM buffer for handle %d\n",
+				vcsm_infop->vcsm_handle);
+		return;
+	}
 	cinfo.client_data = buffer;
 
 	PFN(jpeg_start_compress)(&cinfo, 0);
@@ -287,7 +292,10 @@ static void release(void *obj) {
 		if (_this->cinfos[i].fd > 0) {
 			_this->cinfos[i].fd = 0;
 			PFN(jpeg_destroy_compress)(&_this->cinfos[i]);
+		}
+		if (_this->outbuffers[i]) {
 			free(_this->outbuffers[i]);
+			_this->outbuffers[i] = NULL;
 		}
 	}
 

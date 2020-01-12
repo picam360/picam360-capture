@@ -231,17 +231,34 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for input format definition.");
 
-	//Set the output format of the encoder
-	OMX_IMAGE_PARAM_PORTFORMATTYPE format = { 0 };
-	format.nSize = sizeof(OMX_IMAGE_PARAM_PORTFORMATTYPE);
-	format.nVersion.nVersion = OMX_VERSION;
-	format.nPortIndex = 341;
-	format.eCompressionFormat = OMX_IMAGE_CodingJPEG;
+//	//Set the output format of the encoder
+//	OMX_IMAGE_PARAM_PORTFORMATTYPE format = { 0 };
+//	format.nSize = sizeof(OMX_IMAGE_PARAM_PORTFORMATTYPE);
+//	format.nVersion.nVersion = OMX_VERSION;
+//	format.nPortIndex = 341;
+//	format.eCompressionFormat = OMX_IMAGE_CodingJPEG;
+//
+//	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->image_encode),
+//			OMX_IndexParamImagePortFormat, &format);
+//	CHECKED(ret != OMX_ErrorNone,
+//			"OMX_SetParameter failed for setting encoder output format.");
+
+	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	def.nVersion.nVersion = OMX_VERSION;
+	def.nPortIndex = 341;
+	ret = OMX_GetParameter(ILC_GET_HANDLE(_this->image_encode),
+			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone,
+			"OMX_GetParameter failed for encode port out.");
+
+	def.nBufferSize = cinfo->image_width * cinfo->image_height;
+	def.format.image.eCompressionFormat = OMX_IMAGE_CodingJPEG;
+	def.format.image.eColorFormat = OMX_COLOR_FormatUnused;
 
 	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->image_encode),
-			OMX_IndexParamImagePortFormat, &format);
+			OMX_IndexParamPortDefinition, &def);
 	CHECKED(ret != OMX_ErrorNone,
-			"OMX_SetParameter failed for setting encoder output format.");
+			"OMX_SetParameter failed for input format definition.");
 
 	ret = ilclient_change_component_state(_this->image_encode, OMX_StateIdle);
 	CHECKED(ret != 0, "ILClient failed to change encoder to idle state.");
@@ -321,30 +338,30 @@ OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 	OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->in_buffer);
 
 	*_this->outsize = 0;
-	_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341, 1);
 	do {
+		_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341,
+				1);
+		_this->fill_buffer_done = FALSE;
+		_this->out_buffer->nFilledLen = 0;
 		OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode),
 				_this->out_buffer);
+
 		pthread_mutex_lock(&_this->mutex);
 		if (_this->fill_buffer_done != TRUE) {
 			pthread_cond_wait(&_this->cond, &_this->mutex);
-			_this->fill_buffer_done = FALSE;
 		}
 		pthread_mutex_unlock(&_this->mutex);
-		memcpy(cinfo->dest->next_output_byte, _this->out_buffer->pBuffer,
-				_this->out_buffer->nFilledLen);
-		cinfo->dest->next_output_byte += _this->out_buffer->nFilledLen;
-		cinfo->dest->free_in_buffer -= _this->out_buffer->nFilledLen;
-		*_this->outsize += _this->out_buffer->nFilledLen;
 
-		_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341,
-				1);
-
+		int size = MIN(_this->out_buffer->nFilledLen,
+				cinfo->dest->free_in_buffer);
+		if (size) {
+			memcpy(cinfo->dest->next_output_byte, _this->out_buffer->pBuffer,
+					_this->out_buffer->nFilledLen);
+			cinfo->dest->next_output_byte += _this->out_buffer->nFilledLen;
+			cinfo->dest->free_in_buffer -= _this->out_buffer->nFilledLen;
+			*_this->outsize += _this->out_buffer->nFilledLen;
+		}
 	} while (!(_this->out_buffer->nFlags & OMX_BUFFERFLAG_ENDOFFRAME));
-
-	//Needed because we call ilclient_get_output_buffer last.
-	//Otherwise ilclient waits forever for the buffer to be filled.
-	OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->out_buffer);
 
 	printf("jpeg_finish_compress done %d\n", *_this->outsize);
 	return;
