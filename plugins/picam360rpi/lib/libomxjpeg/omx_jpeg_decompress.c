@@ -8,6 +8,8 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define CHECKED(c, v) if (c) {printf(v); exit(-1);}
+
 #define OMX_INIT_STRUCTURE(a) \
     memset(&(a), 0, sizeof(a)); \
     (a).nSize = sizeof(a); \
@@ -25,44 +27,51 @@ typedef struct _omx_jpeg_decompress_private {
 	COMPONENT_T *list[4];
 	TUNNEL_T tunnel[3];
 
+	uint32_t image_width; //jpeg original image_width
+	uint32_t image_height; //jpeg original image_height
+
 	int egl_buffer_num;
-	OMX_BUFFERHEADERTYPE **egl_buffers;
+	OMX_BUFFERHEADERTYPE *egl_buffer;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
-	int chunkcount;
 	int framecount;
 	boolean fill_buffer_done;
-	boolean port_settings;
+	boolean port_settings_done;
 } omx_jpeg_decompress_private;
 
-static void fill_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
-	//printf("fill_buffer_done_fnc\n");
+#if 1
+#define DECODER_NAME "image_decode"
+#define DECODER_INPUT_PORT 320
+#define DECODER_OUTPUT_PORT 321
+#else
+#define DECODER_NAME "video_decode"
+#define DECODER_INPUT_PORT 130
+#define DECODER_OUTPUT_PORT 131
+#endif
 
+static void fill_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
 	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
+
+	//dead lock caution : don't wait ilhost thread in here
+
+	//printf("fill_buffer_done_fnc\n");
 
 	pthread_mutex_lock(&_this->mutex); // this is for avoiding infinity mrevent_wait
 	pthread_cond_broadcast(&_this->cond);
 	_this->fill_buffer_done = TRUE;
 	pthread_mutex_unlock(&_this->mutex);
 
-	if (cinfo->fill_buffer_done_callback) {
-		cinfo->fill_buffer_done_callback(
-				cinfo->fill_buffer_done_callback_user_data, _this->framecount);
-	}
 	_this->framecount++;
-	if (OMX_FillThisBuffer(ilclient_get_handle(_this->egl_render),
-			_this->egl_buffers[_this->framecount % _this->egl_buffer_num])
-			!= OMX_ErrorNone) {
-		printf("OMX_FillThisBuffer failed in callback\n");
-		//exit(1);
-	}
 }
 static void empty_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
 	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
+
+	//dead lock caution : don't wait ilhost thread in here
+
 	//printf("empty_buffer_done_fnc\n");
 }
 static void port_settings_fnc(void *userdata, struct _COMPONENT_T *comp,
@@ -70,32 +79,34 @@ static void port_settings_fnc(void *userdata, struct _COMPONENT_T *comp,
 	j_decompress_ptr cinfo = (j_decompress_ptr) userdata;
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
-	//printf("port_settings_fnc\n");
+
 	//dead lock caution : don't wait ilhost thread in here
+
+	//printf("port_settings_fnc\n");
 }
 static void change_port_settings(j_decompress_ptr cinfo) {
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
 	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
-	OMX_PARAM_PORTDEFINITIONTYPE portdef;
+	OMX_PARAM_PORTDEFINITIONTYPE def;
 
 	// need to setup the input for the resizer with the output of the
 	// decoder
-	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
-	portdef.nVersion.nVersion = OMX_VERSION;
-	portdef.nPortIndex = 131;
+	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	def.nVersion.nVersion = OMX_VERSION;
+	def.nPortIndex = DECODER_OUTPUT_PORT;
 	OMX_GetParameter(ILC_GET_HANDLE(_this->video_decode),
-			OMX_IndexParamPortDefinition, &portdef);
+			OMX_IndexParamPortDefinition, &def);
 
-	uint32_t image_width = (unsigned int) portdef.format.image.nFrameWidth;
-	uint32_t image_height = (unsigned int) portdef.format.image.nFrameHeight;
+	uint32_t image_width = (unsigned int) def.format.image.nFrameWidth;
+	uint32_t image_height = (unsigned int) def.format.image.nFrameHeight;
 	uint32_t image_inner_width = MIN(image_width, image_height);
 
 	// tell resizer input what the decoder output will be providing
-	portdef.nPortIndex = 60;
+	def.nPortIndex = 60;
 	OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
-			OMX_IndexParamPortDefinition, &portdef);
+			OMX_IndexParamPortDefinition, &def);
 
 	if (ilclient_setup_tunnel(_this->tunnel, 0, 0) != 0) {
 		printf("fail tunnel 0\n");
@@ -119,39 +130,39 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	//		omx_crop_req.nWidth, omx_crop_req.nHeight);
 
 	// query output buffer requirements for resizer
-	portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
-	portdef.nVersion.nVersion = OMX_VERSION;
-	portdef.nPortIndex = 61;
+	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	def.nVersion.nVersion = OMX_VERSION;
+	def.nPortIndex = 61;
 	OMX_GetParameter(ILC_GET_HANDLE(_this->resize),
-			OMX_IndexParamPortDefinition, &portdef);
+			OMX_IndexParamPortDefinition, &def);
 
 	// change output color format and dimensions to match input
-	portdef.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
-	portdef.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
-	portdef.format.image.nFrameWidth = cinfo->image_width;
-	portdef.format.image.nFrameHeight = cinfo->image_height;
-	portdef.format.image.nStride = 0;
-	//portdef.format.image.nSliceHeight = 16;
-	portdef.format.image.nSliceHeight = 0;
-	portdef.format.image.bFlagErrorConcealment = OMX_FALSE;
+	def.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
+	def.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
+	def.format.image.nFrameWidth = cinfo->image_width;
+	def.format.image.nFrameHeight = cinfo->image_height;
+	def.format.image.nStride = 0;
+	//def.format.image.nSliceHeight = 16;
+	def.format.image.nSliceHeight = 0;
+	def.format.image.bFlagErrorConcealment = OMX_FALSE;
 
 	OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
-			OMX_IndexParamPortDefinition, &portdef);
+			OMX_IndexParamPortDefinition, &def);
 
 	// grab output requirements again to get actual buffer size
 	// requirement (and buffer count requirement!)
 	OMX_GetParameter(ILC_GET_HANDLE(_this->resize),
-			OMX_IndexParamPortDefinition, &portdef);
+			OMX_IndexParamPortDefinition, &def);
 
 	// move resizer into executing state
 	ilclient_change_component_state(_this->resize, OMX_StateExecuting);
 
 	// show some logging so user knows it's working
 	printf("Width: %u Height: %u Output Color Format: 0x%x Buffer Size: %u\n",
-			(unsigned int) portdef.format.image.nFrameWidth,
-			(unsigned int) portdef.format.image.nFrameHeight,
-			(unsigned int) portdef.format.image.eColorFormat,
-			(unsigned int) portdef.nBufferSize);
+			(unsigned int) def.format.image.nFrameWidth,
+			(unsigned int) def.format.image.nFrameHeight,
+			(unsigned int) def.format.image.eColorFormat,
+			(unsigned int) def.nBufferSize);
 	fflush(stdout);
 
 	//resize -> egl_render
@@ -178,14 +189,9 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 		exit(1);
 	}
 
-	EGLImageKHR *egl_images = (EGLImageKHR*) cinfo->client_data;
-	for (int i = 0; egl_images[i] != NULL; i++) {
-		_this->egl_buffer_num = i;
-	}
-	_this->egl_buffers = (OMX_BUFFERHEADERTYPE**) malloc(
-			sizeof(OMX_BUFFERHEADERTYPE*) * _this->egl_buffer_num);
+	EGLImageKHR egl_image = (EGLImageKHR) cinfo->client_data;
 
-	port_format.nBufferCountActual = _this->egl_buffer_num;
+	port_format.nBufferCountActual = 1;
 	omx_err = OMX_SetParameter(ILC_GET_HANDLE(_this->egl_render),
 			OMX_IndexParamPortDefinition, &port_format);
 	if (omx_err != OMX_ErrorNone) {
@@ -203,7 +209,8 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 		exit(1);
 	}
 
-	for (int i = 0; i < _this->egl_buffer_num; i++) {
+	//for (int i = 0; i < _this->egl_buffer_num; i++)
+	{
 		OMX_STATETYPE state;
 		OMX_GetState(ILC_GET_HANDLE(_this->egl_render), &state);
 		if (state != OMX_StateIdle) {
@@ -214,7 +221,7 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 			ilclient_change_component_state(_this->egl_render, OMX_StateIdle);
 		}
 		omx_err = OMX_UseEGLImage(ILC_GET_HANDLE(_this->egl_render),
-				&_this->egl_buffers[i], 221, (void*) i, egl_images[i]);
+				&_this->egl_buffer, 221, (void*) 0, egl_image);
 		if (omx_err != OMX_ErrorNone) {
 			printf("OMX_UseEGLImage failed. 0x%x\n", omx_err);
 			exit(1);
@@ -223,15 +230,6 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 
 	// Set lg_egl_render to executing
 	ilclient_change_component_state(_this->egl_render, OMX_StateExecuting);
-
-	// Request lg_egl_render to write data to the texture buffer
-	if (OMX_FillThisBuffer(ILC_GET_HANDLE(_this->egl_render),
-			_this->egl_buffers[0]) != OMX_ErrorNone) {
-		printf("OMX_FillThisBuffer failed.\n");
-		exit(1);
-	}
-
-	printf("start fill buffer\n");
 }
 
 OMXJPEG_FN_DEFINE(void, jpeg_CreateDecompress,
@@ -252,18 +250,14 @@ OMXJPEG_FN_DEFINE(void, jpeg_CreateDecompress,
 	pthread_mutex_init(&_this->mutex, 0);
 	pthread_cond_init(&_this->cond, 0);
 
-	OMX_VIDEO_PARAM_PORTFORMATTYPE format;
-	int status = 0;
+	int ret = 0;
 	unsigned int data_len = 0;
 
-	if ((_this->client = ilclient_init()) == NULL) {
-		return;
-	}
+	_this->client = ilclient_init();
+	CHECKED(_this->client == NULL, "ilclient_init failed.");
 
-	if (OMX_Init() != OMX_ErrorNone) {
-		ilclient_destroy(_this->client);
-		return;
-	}
+	ret = OMX_Init();
+	CHECKED(ret != OMX_ErrorNone, "OMX_Init failed.");
 
 	// callback
 	ilclient_set_fill_buffer_done_callback(_this->client, fill_buffer_done_fnc,
@@ -274,54 +268,62 @@ OMXJPEG_FN_DEFINE(void, jpeg_CreateDecompress,
 			(void*) cinfo);
 
 	// create video_decode
-	if (ilclient_create_component(_this->client, &_this->video_decode,
-			(char*) "video_decode",
+	ret = ilclient_create_component(_this->client, &_this->video_decode,
+			(char*) DECODER_NAME,
 			(ILCLIENT_CREATE_FLAGS_T)(
-					ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS))
-			!= 0)
-		status = -14;
+					ILCLIENT_DISABLE_ALL_PORTS
+							| ILCLIENT_ENABLE_INPUT_BUFFERS));
+	CHECKED(ret != 0, "ilclient_create_component failed\n");
+
 	_this->list[0] = _this->video_decode;
 
 	// create resize
-	if (status == 0
-			&& ilclient_create_component(_this->client, &_this->resize,
-					(char*) "resize",
-					(ILCLIENT_CREATE_FLAGS_T)(ILCLIENT_DISABLE_ALL_PORTS)) != 0)
-		status = -14;
+	ret = ilclient_create_component(_this->client, &_this->resize,
+			(char*) "resize",
+			(ILCLIENT_CREATE_FLAGS_T)(ILCLIENT_DISABLE_ALL_PORTS));
+	CHECKED(ret != 0, "ilclient_create_component failed\n");
+
 	_this->list[1] = _this->resize;
 
 	// create lg_egl_render
-	if (status == 0
-			&& ilclient_create_component(_this->client, &_this->egl_render,
-					(char*) "egl_render",
-					(ILCLIENT_CREATE_FLAGS_T)(
-							ILCLIENT_DISABLE_ALL_PORTS
-									| ILCLIENT_ENABLE_OUTPUT_BUFFERS)) != 0)
-		status = -14;
+	ret = ilclient_create_component(_this->client, &_this->egl_render,
+			(char*) "egl_render",
+			(ILCLIENT_CREATE_FLAGS_T)(
+					ILCLIENT_DISABLE_ALL_PORTS
+							| ILCLIENT_ENABLE_OUTPUT_BUFFERS));
+	CHECKED(ret != 0, "ilclient_create_component failed\n");
+
 	_this->list[2] = _this->egl_render;
 
-	set_tunnel(_this->tunnel, _this->video_decode, 131, _this->resize, 60);
+	set_tunnel(_this->tunnel, _this->video_decode, DECODER_OUTPUT_PORT,
+			_this->resize, 60);
 	set_tunnel(_this->tunnel + 1, _this->resize, 61, _this->egl_render, 220);
 
-	if (status == 0)
-		ilclient_change_component_state(_this->video_decode, OMX_StateIdle);
+	ret = ilclient_change_component_state(_this->video_decode, OMX_StateIdle);
+	CHECKED(ret != 0, "ilclient_change_component_state failed\n");
 
-	memset(&format, 0, sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE));
-	format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
-	format.nVersion.nVersion = OMX_VERSION;
-	format.nPortIndex = 130;
-	format.eCompressionFormat = OMX_VIDEO_CodingMJPEG;
-	if (status == 0
-			&& OMX_SetParameter(ILC_GET_HANDLE(_this->video_decode),
-					OMX_IndexParamVideoPortFormat, &format) != OMX_ErrorNone) {
-		status = -14;
-	}
-	if (status == 0
-			&& ilclient_enable_port_buffers(_this->video_decode, 130, NULL,
-					NULL, NULL) != 0) {
-		status = -14;
-	}
+	OMX_PARAM_PORTDEFINITIONTYPE def = { 0 };
+	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+	def.nVersion.nVersion = OMX_VERSION;
+	def.nPortIndex = DECODER_INPUT_PORT;
+	ret = OMX_GetParameter(ILC_GET_HANDLE(_this->video_decode),
+			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone,
+			"OMX_GetParameter failed for encode port out.");
 
+	def.format.image.eCompressionFormat = OMX_IMAGE_CodingJPEG;
+	def.format.image.eColorFormat = OMX_COLOR_FormatUnused;
+
+	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->video_decode),
+			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone,
+			"OMX_SetParameter failed for input format definition.");
+
+	ret = ilclient_enable_port_buffers(_this->video_decode, DECODER_INPUT_PORT,
+			NULL, NULL, NULL);
+	CHECKED(ret != 0, "ilclient_enable_port_buffers failed\n");
+
+	// Set video_decode to executing
 	ilclient_change_component_state(_this->video_decode, OMX_StateExecuting);
 }
 OMXJPEG_FN_DEFINE(void, jpeg_destroy_decompress, (j_decompress_ptr cinfo)) {
@@ -333,21 +335,21 @@ OMXJPEG_FN_DEFINE(void, jpeg_destroy_decompress, (j_decompress_ptr cinfo)) {
 	ilclient_set_empty_buffer_done_callback(_this->client, NULL, (void*) cinfo);
 	ilclient_set_port_settings_callback(_this->client, NULL, (void*) cinfo);
 
-	int status = 0;
+	int ret = 0;
 	OMX_BUFFERHEADERTYPE *buf = NULL;
 
-	buf = ilclient_get_input_buffer(_this->video_decode, 130, 1);
+	buf = ilclient_get_input_buffer(_this->video_decode, DECODER_INPUT_PORT, 1);
 	buf->nFilledLen = 0;
 	buf->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN | OMX_BUFFERFLAG_EOS;
 
-	if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->video_decode), buf)
-			!= OMX_ErrorNone)
-		status = -20;
+	ret = OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->video_decode), buf);
+	CHECKED(ret != OMX_ErrorNone, "OMX_EmptyThisBuffer failed\n");
 
 	// need to flush the renderer to allow video_decode to disable its input port
 	ilclient_flush_tunnels(_this->tunnel, 0);
 
-	ilclient_disable_port_buffers(_this->video_decode, 130, NULL, NULL, NULL);
+	ilclient_disable_port_buffers(_this->video_decode, DECODER_INPUT_PORT, NULL,
+			NULL, NULL);
 
 	ilclient_disable_tunnel(_this->tunnel);
 	ilclient_disable_tunnel(_this->tunnel + 1);
@@ -402,63 +404,15 @@ OMXJPEG_FN_DEFINE(int, jpeg_read_header,
 	cinfo->image_width = image_width_2n;
 	cinfo->image_height = image_width_2n;
 
+	_this->image_width = image_width;
+	_this->image_height = image_height;
+
 	return 0;
 }
 
 OMXJPEG_FN_DEFINE(boolean, jpeg_start_decompress, (j_decompress_ptr cinfo)) {
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
-
-	_this->fill_buffer_done = FALSE;
-
-	uint8_t *data = (uint8_t*) cinfo->src->next_input_byte;
-	int data_len = cinfo->src->bytes_in_buffer;
-
-	if (!data_len) {
-		return FALSE;
-	}
-
-	int ret = 0;
-	int status = 0;
-	OMX_BUFFERHEADERTYPE *buf = NULL;
-
-	for (int cur = 0; cur < data_len; cur += buf->nAllocLen) {
-		buf = ilclient_get_input_buffer(_this->video_decode, 130, 1);
-
-		buf->nFilledLen = MIN(data_len - cur, buf->nAllocLen);
-		memcpy(buf->pBuffer, data + cur, buf->nFilledLen);
-
-		buf->nOffset = 0;
-		if (_this->chunkcount == 0) {
-			buf->nFlags = OMX_BUFFERFLAG_STARTTIME;
-		} else {
-			buf->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
-		}
-		if (cur + buf->nFilledLen == data_len) {
-			buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
-			buf->nFlags |= OMX_BUFFERFLAG_SYNCFRAME;
-			//printf("finish\n");
-		}
-
-		ret = OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->video_decode), buf);
-		if (ret != OMX_ErrorNone) {
-			status = -6;
-			printf("OMX_EmptyThisBuffer error\n");
-			return FALSE;
-		}
-		if (!_this->port_settings) {
-			ret = ilclient_wait_for_event(_this->video_decode,
-					OMX_EventPortSettingsChanged, 131, 0, 0, 1, 0, 5);
-			//ret = ilclient_remove_event(_this->video_decode,
-			//		OMX_EventPortSettingsChanged, 131, 0, 0, 1);
-			if (ret == 0) {
-				printf("change port_settings\n");
-				_this->port_settings = TRUE;
-				change_port_settings(cinfo);
-			}
-		}
-		_this->chunkcount++;
-	}
 
 	return TRUE;
 }
@@ -472,13 +426,61 @@ OMXJPEG_FN_DEFINE(boolean, jpeg_finish_decompress, (j_decompress_ptr cinfo)) {
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
 
-	boolean ret = FALSE;
+	_this->fill_buffer_done = FALSE;
+
+	uint8_t *data = (uint8_t*) cinfo->src->next_input_byte;
+	int data_len = cinfo->src->bytes_in_buffer;
+
+	if (!data_len) {
+		return FALSE;
+	}
+
+	int ret = 0;
+	OMX_BUFFERHEADERTYPE *buf = NULL;
+
+	for (int cur = 0; cur < data_len; cur += buf->nAllocLen) {
+		buf = ilclient_get_input_buffer(_this->video_decode, DECODER_INPUT_PORT,
+				1);
+
+		buf->nFilledLen = MIN(data_len - cur, buf->nAllocLen);
+		memcpy(buf->pBuffer, data + cur, buf->nFilledLen);
+
+		buf->nOffset = 0;
+		buf->nFlags = 0;
+		if (cur + buf->nFilledLen == data_len) {
+			buf->nFlags |= OMX_BUFFERFLAG_EOS;
+			//printf("finish\n");
+		}
+
+		ret = OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->video_decode), buf);
+		CHECKED(ret != OMX_ErrorNone, "OMX_FillThisBuffer failed\n");
+	}
+	if (!_this->port_settings_done) {
+		while (1) {
+			ret = ilclient_wait_for_event(_this->video_decode,
+					OMX_EventPortSettingsChanged, DECODER_OUTPUT_PORT, 0, 0, 1,
+					0, 5);
+			//ret = ilclient_remove_event(_this->video_decode,
+			//		OMX_EventPortSettingsChanged, DECODER_OUTPUT_PORT, 0, 0, 1);
+			if (ret == 0) {
+				printf("change port_settings\n");
+				_this->port_settings_done = TRUE;
+				change_port_settings(cinfo);
+				break;
+			}
+		}
+	}
+
+	_this->fill_buffer_done = FALSE;
+	ret = OMX_FillThisBuffer(ilclient_get_handle(_this->egl_render),
+			_this->egl_buffer);
+	CHECKED(ret != OMX_ErrorNone, "OMX_FillThisBuffer failed\n");
+
 	pthread_mutex_lock(&_this->mutex);
-	if (_this->port_settings && _this->fill_buffer_done != TRUE) {
+	if (_this->fill_buffer_done != TRUE) {
 		pthread_cond_wait(&_this->cond, &_this->mutex);
-		_this->fill_buffer_done = FALSE;
-		ret = TRUE;
 	}
 	pthread_mutex_unlock(&_this->mutex);
-	return ret;
+
+	return TRUE;
 }

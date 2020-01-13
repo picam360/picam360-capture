@@ -79,7 +79,7 @@ static bool init_pfn() {
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
-#define BUFFER_NUM 4
+#define BUFFER_NUM 2
 typedef struct _mjpeg_omx_decoder_private {
 	VSTREAMER_T super;
 
@@ -89,7 +89,7 @@ typedef struct _mjpeg_omx_decoder_private {
 	float fps;
 	int frameskip;
 	MREVENT_T frame_ready;
-	struct jpeg_decompress_struct cinfo;
+	struct jpeg_decompress_struct cinfos[BUFFER_NUM];
 	GLuint textures[BUFFER_NUM];
 	struct egl_image_brcm_vcsm_info vcsm_infos[BUFFER_NUM];
 	EGLImageKHR egl_images[BUFFER_NUM + 1];
@@ -98,16 +98,6 @@ typedef struct _mjpeg_omx_decoder_private {
 	pthread_t streaming_thread;
 } mjpeg_omx_decoder_private;
 
-static void fill_buffer_done_fnc(void *userdata, int framecount) {
-	//printf("fill_buffer_done_fnc %d\n", framecount);
-
-	mjpeg_omx_decoder_private *_this = (mjpeg_omx_decoder_private*) userdata;
-	int cur = framecount % BUFFER_NUM;
-
-	if ((framecount % _this->image_unit) == 0) {
-		mrevent_trigger(&_this->frame_ready);
-	}
-}
 static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 	uint8_t *in_buf = image->pixels[0];
 	int in_buf_size = image->stride[0];
@@ -122,10 +112,10 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 
 	int cur = _this->framecount % BUFFER_NUM;
 
-	struct jpeg_decompress_struct *cinfop = &_this->cinfo;
+	struct jpeg_decompress_struct *cinfop = &_this->cinfos[cur];
 	struct jpeg_error_mgr jerr;
 	bool reuse = false;
-	if (_this->textures[0] == 0) {
+	if (_this->textures[cur] == 0) {
 	} else {
 		int image_width = 0;
 		int image_height = 0;
@@ -147,7 +137,7 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 		}
 		reuse = true; //test
 	}
-	if (_this->textures[0] > 0 && !reuse) {
+	if (_this->textures[cur] > 0 && !reuse) {
 		//release
 		printf("release\n");
 		eglDestroyImageKHR(lg_plugin_host->get_display(),
@@ -165,8 +155,6 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 		PFN(jpeg_CreateDecompress)(cinfop, JPEG_LIB_VERSION,
 				sizeof(*cinfop));
 		PFN(jpeg_mem_src)(cinfop, in_buf, in_buf_size);
-		cinfop->fill_buffer_done_callback_user_data = (void*) _this;
-		cinfop->fill_buffer_done_callback = fill_buffer_done_fnc;
 	} else {
 		memset(&jerr, 0, sizeof(jerr));
 		cinfop->err = PFN(jpeg_std_error)(&jerr); //local address
@@ -174,7 +162,7 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 		cinfop->src->bytes_in_buffer = in_buf_size;
 	}
 	PFN(jpeg_read_header)(cinfop, TRUE);
-	if (_this->textures[0] == 0) {
+	if (_this->textures[cur] == 0) {
 		printf("allocate egl\n");
 		lg_plugin_host->lock_texture();
 		{
@@ -220,25 +208,26 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 				}
 			}
 			int rc = vcsm_init();
-			for (int i = 0; i < BUFFER_NUM; i++) {
+			//for (int i = 0; i < BUFFER_NUM; i++)
+			{
 				/* Create EGL Image */
 				struct egl_image_brcm_vcsm_info *vcsm_infop =
-						&_this->vcsm_infos[i];
+						&_this->vcsm_infos[cur];
 				vcsm_infop->width = image_width_2n;
 				vcsm_infop->height = image_width_2n;
-				_this->egl_images[i] = eglCreateImageKHR(
+				_this->egl_images[cur] = eglCreateImageKHR(
 						lg_plugin_host->get_display(), EGL_NO_CONTEXT,
 						EGL_IMAGE_BRCM_VCSM, vcsm_infop, NULL);
-				if (_this->egl_images[i] == EGL_NO_IMAGE_KHR
+				if (_this->egl_images[cur] == EGL_NO_IMAGE_KHR
 						|| vcsm_infop->vcsm_handle == 0) {
 					printf("eglCreateImageKHR failed.\n");
 					exit(1);
 				}
-				_this->textures[i] = 1;
+				_this->textures[cur] = 1;
 			}
 			// && _this->vcsm_infos[0].vcsm_handle == 0
 #endif
-			cinfop->client_data = (void*) _this->egl_images;
+			cinfop->client_data = (void*) _this->egl_images[cur];
 		}
 		lg_plugin_host->unlock_texture();
 	}
@@ -271,6 +260,10 @@ static void decode(mjpeg_omx_decoder_private *_this, PICAM360_IMAGE_T *image) {
 			cinfop->image_height);
 
 	_this->framecount++;
+
+	if ((_this->framecount % _this->image_unit) == 0) {
+		mrevent_trigger(&_this->frame_ready);
+	}
 }
 
 //static void parse_xml(char *xml, _FRAME_T *frame) {
@@ -401,10 +394,10 @@ static void release(void *obj) {
 
 	_this->super.stop(&_this->super);
 
-	struct jpeg_decompress_struct *cinfop = &_this->cinfo;
-	PFN(jpeg_destroy_decompress)(cinfop);
 
 	for (int i = 0; i < BUFFER_NUM; i++) {
+		struct jpeg_decompress_struct *cinfop = &_this->cinfos[i];
+		PFN(jpeg_destroy_decompress)(cinfop);
 		if (_this->egl_images[i]) {
 			eglDestroyImageKHR(lg_plugin_host->get_display(),
 					_this->egl_images[i]);
@@ -414,7 +407,7 @@ static void release(void *obj) {
 			_this->vcsm_infos[i].vcsm_handle = 0;
 		}
 	}
-//	if (_this->textures[0]) {
+//	if (_this->textures[cur]) {
 //		glDeleteTextures(BUFFER_NUM, _this->textures);
 //	}
 

@@ -37,11 +37,13 @@ typedef struct _omx_jpeg_compress_private {
 } omx_jpeg_compress_private;
 
 static void fill_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
-	//printf("fill_buffer_done_fnc\n");
-
 	j_compress_ptr cinfo = (j_compress_ptr) userdata;
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
+
+	//dead lock caution : don't wait ilhost thread in here
+
+	//printf("fill_buffer_done_fnc\n");
 
 	pthread_mutex_lock(&_this->mutex); // this is for avoiding infinity mrevent_wait
 	pthread_cond_broadcast(&_this->cond);
@@ -54,6 +56,9 @@ static void empty_buffer_done_fnc(void *userdata, COMPONENT_T *comp) {
 	j_compress_ptr cinfo = (j_compress_ptr) userdata;
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
+
+	//dead lock caution : don't wait ilhost thread in here
+
 	//printf("empty_buffer_done_fnc\n");
 }
 static void port_settings_fnc(void *userdata, struct _COMPONENT_T *comp,
@@ -61,8 +66,10 @@ static void port_settings_fnc(void *userdata, struct _COMPONENT_T *comp,
 	j_compress_ptr cinfo = (j_compress_ptr) userdata;
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
-	//printf("port_settings_fnc\n");
+
 	//dead lock caution : don't wait ilhost thread in here
+
+	//printf("port_settings_fnc\n");
 }
 
 OMXJPEG_FN_DEFINE(void, jpeg_CreateCompress,
@@ -80,17 +87,13 @@ OMXJPEG_FN_DEFINE(void, jpeg_CreateCompress,
 	pthread_cond_init(&_this->cond, 0);
 
 	int ret = 0;
-	int status = 0;
 	unsigned int data_len = 0;
 
-	if ((_this->client = ilclient_init()) == NULL) {
-		return;
-	}
+	_this->client = ilclient_init();
+	CHECKED(_this->client == NULL, "ilclient_init failed.");
 
-	if (OMX_Init() != OMX_ErrorNone) {
-		ilclient_destroy(_this->client);
-		return;
-	}
+	ret = OMX_Init();
+	CHECKED(ret != OMX_ErrorNone, "OMX_Init failed.");
 
 	// callback
 	ilclient_set_fill_buffer_done_callback(_this->client, fill_buffer_done_fnc,
@@ -230,18 +233,6 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 			OMX_IndexParamPortDefinition, &def);
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_SetParameter failed for input format definition.");
-
-//	//Set the output format of the encoder
-//	OMX_IMAGE_PARAM_PORTFORMATTYPE format = { 0 };
-//	format.nSize = sizeof(OMX_IMAGE_PARAM_PORTFORMATTYPE);
-//	format.nVersion.nVersion = OMX_VERSION;
-//	format.nPortIndex = 341;
-//	format.eCompressionFormat = OMX_IMAGE_CodingJPEG;
-//
-//	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->image_encode),
-//			OMX_IndexParamImagePortFormat, &format);
-//	CHECKED(ret != OMX_ErrorNone,
-//			"OMX_SetParameter failed for setting encoder output format.");
 
 	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
 	def.nVersion.nVersion = OMX_VERSION;
