@@ -402,16 +402,21 @@ static void release(void *obj) {
 	_this->super.stop(&_this->super);
 
 	struct jpeg_decompress_struct *cinfop = &_this->cinfo;
+	PFN(jpeg_destroy_decompress)(cinfop);
+
 	for (int i = 0; i < BUFFER_NUM; i++) {
 		if (_this->egl_images[i]) {
 			eglDestroyImageKHR(lg_plugin_host->get_display(),
 					_this->egl_images[i]);
 		}
+		if (_this->vcsm_infos[i].vcsm_handle) {
+			vcsm_free(_this->vcsm_infos[i].vcsm_handle);
+			_this->vcsm_infos[i].vcsm_handle = 0;
+		}
 	}
-	if (_this->textures[0]) {
-		glDeleteTextures(BUFFER_NUM, _this->textures);
-	}
-	PFN(jpeg_destroy_decompress)(cinfop);
+//	if (_this->textures[0]) {
+//		glDeleteTextures(BUFFER_NUM, _this->textures);
+//	}
 
 	free(obj);
 }

@@ -363,6 +363,6 @@ OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 		}
 	} while (!(_this->out_buffer->nFlags & OMX_BUFFERFLAG_ENDOFFRAME));
 
-	printf("jpeg_finish_compress done %d\n", *_this->outsize);
+	//printf("jpeg_finish_compress done %d\n", *_this->outsize);
 	return;
 }

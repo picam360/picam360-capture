@@ -328,6 +328,11 @@ OMXJPEG_FN_DEFINE(void, jpeg_destroy_decompress, (j_decompress_ptr cinfo)) {
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
 
+	// callback
+	ilclient_set_fill_buffer_done_callback(_this->client, NULL, (void*) cinfo);
+	ilclient_set_empty_buffer_done_callback(_this->client, NULL, (void*) cinfo);
+	ilclient_set_port_settings_callback(_this->client, NULL, (void*) cinfo);
+
 	int status = 0;
 	OMX_BUFFERHEADERTYPE *buf = NULL;
 
@@ -345,10 +350,10 @@ OMXJPEG_FN_DEFINE(void, jpeg_destroy_decompress, (j_decompress_ptr cinfo)) {
 	ilclient_disable_port_buffers(_this->video_decode, 130, NULL, NULL, NULL);
 
 	ilclient_disable_tunnel(_this->tunnel);
+	ilclient_disable_tunnel(_this->tunnel + 1);
 	ilclient_teardown_tunnels(_this->tunnel);
 
 	ilclient_state_transition(_this->list, OMX_StateIdle);
-	ilclient_state_transition(_this->list, OMX_StateLoaded);
 
 	ilclient_cleanup_components(_this->list);
 
