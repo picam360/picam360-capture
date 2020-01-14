@@ -79,7 +79,7 @@ static bool init_pfn() {
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
-#define BUFFER_NUM 2
+#define BUFFER_NUM 3
 typedef struct _mjpeg_omx_decoder_private {
 	VSTREAMER_T super;
 

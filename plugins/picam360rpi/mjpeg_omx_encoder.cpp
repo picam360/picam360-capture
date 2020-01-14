@@ -85,7 +85,7 @@ static bool init_pfn() {
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
-#define BUFFER_NUM 2
+#define BUFFER_NUM 3
 
 static int lg_quality = 85; //google recomended
 

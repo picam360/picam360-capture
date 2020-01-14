@@ -215,7 +215,7 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	CHECKED(ret != OMX_ErrorNone, "OMX_GetParameter failed for encode port in.");
 
 	//We allocate 1 input buffers.
-	def.nBufferCountActual = 1;
+	def.nBufferCountActual = 2;
 	def.format.image.nFrameWidth = cinfo->image_width;
 	def.format.image.nFrameHeight = cinfo->image_height;
 	//16 byte alignment. I don't know if these also hold for image encoding.
@@ -243,7 +243,7 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_GetParameter failed for encode port out.");
 
-	def.nBufferCountActual = 1;
+	def.nBufferCountActual = 2;
 	def.nBufferSize = MIN(cinfo->image_width * cinfo->image_height, 128 * 1024);
 	def.format.image.eCompressionFormat = OMX_IMAGE_CodingJPEG;
 	def.format.image.eColorFormat = OMX_COLOR_FormatUnused;

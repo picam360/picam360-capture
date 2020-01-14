@@ -87,7 +87,7 @@ static void port_settings_fnc(void *userdata, struct _COMPONENT_T *comp,
 static void change_port_settings(j_decompress_ptr cinfo) {
 	omx_jpeg_decompress_private *_this =
 			(omx_jpeg_decompress_private*) cinfo->master;
-	OMX_ERRORTYPE omx_err = OMX_ErrorNone;
+	OMX_ERRORTYPE ret = OMX_ErrorNone;
 
 	OMX_PARAM_PORTDEFINITIONTYPE def;
 
@@ -96,17 +96,26 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
 	def.nVersion.nVersion = OMX_VERSION;
 	def.nPortIndex = DECODER_OUTPUT_PORT;
-	OMX_GetParameter(ILC_GET_HANDLE(_this->video_decode),
+	ret = OMX_GetParameter(ILC_GET_HANDLE(_this->video_decode),
 			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone, "OMX_GetParameter failed.");
 
 	uint32_t image_width = (unsigned int) def.format.image.nFrameWidth;
 	uint32_t image_height = (unsigned int) def.format.image.nFrameHeight;
 	uint32_t image_inner_width = MIN(image_width, image_height);
 
+	def.nBufferCountActual = 2;
+
+	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->video_decode),
+			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone, "OMX_SetParameter failed.");
+
 	// tell resizer input what the decoder output will be providing
 	def.nPortIndex = 60;
-	OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
+
+	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
 			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone, "OMX_SetParameter failed.");
 
 	if (ilclient_setup_tunnel(_this->tunnel, 0, 0) != 0) {
 		printf("fail tunnel 0\n");
@@ -115,7 +124,8 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 
 	// put resizer in idle state (this allows the outport of the decoder
 	// to become enabled)
-	ilclient_change_component_state(_this->resize, OMX_StateIdle);
+	ret = ilclient_change_component_state(_this->resize, OMX_StateIdle);
+	CHECKED(ret != 0, "ilclient_change_component_state failed.");
 
 	OMX_CONFIG_RECTTYPE omx_crop_req;
 	OMX_INIT_STRUCTURE(omx_crop_req);
@@ -124,8 +134,9 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	omx_crop_req.nWidth = image_inner_width;
 	omx_crop_req.nTop = (image_height - image_inner_width) / 2;
 	omx_crop_req.nHeight = image_inner_width;
-	OMX_SetConfig(ILC_GET_HANDLE(_this->resize), OMX_IndexConfigCommonInputCrop,
-			&omx_crop_req);
+	ret = OMX_SetConfig(ILC_GET_HANDLE(_this->resize),
+			OMX_IndexConfigCommonInputCrop, &omx_crop_req);
+	CHECKED(ret != OMX_ErrorNone, "OMX_SetConfig failed.");
 	//printf("crop %d, %d, %d, %d\n", omx_crop_req.nLeft, omx_crop_req.nTop,
 	//		omx_crop_req.nWidth, omx_crop_req.nHeight);
 
@@ -133,9 +144,11 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
 	def.nVersion.nVersion = OMX_VERSION;
 	def.nPortIndex = 61;
-	OMX_GetParameter(ILC_GET_HANDLE(_this->resize),
+	ret = OMX_GetParameter(ILC_GET_HANDLE(_this->resize),
 			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone, "OMX_GetParameter failed.");
 
+	def.nBufferCountActual = 2;
 	// change output color format and dimensions to match input
 	def.format.image.eCompressionFormat = OMX_IMAGE_CodingUnused;
 	def.format.image.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
@@ -146,16 +159,19 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	def.format.image.nSliceHeight = 0;
 	def.format.image.bFlagErrorConcealment = OMX_FALSE;
 
-	OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
+	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->resize),
 			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone, "OMX_SetParameter failed.");
 
 	// grab output requirements again to get actual buffer size
 	// requirement (and buffer count requirement!)
-	OMX_GetParameter(ILC_GET_HANDLE(_this->resize),
+	ret = OMX_GetParameter(ILC_GET_HANDLE(_this->resize),
 			OMX_IndexParamPortDefinition, &def);
+	CHECKED(ret != OMX_ErrorNone, "OMX_GetParameter failed.");
 
 	// move resizer into executing state
-	ilclient_change_component_state(_this->resize, OMX_StateExecuting);
+	ret = ilclient_change_component_state(_this->resize, OMX_StateExecuting);
+	CHECKED(ret != 0, "ilclient_change_component_state failed.");
 
 	// show some logging so user knows it's working
 //	printf("Width: %u Height: %u Output Color Format: 0x%x Buffer Size: %u\n",
@@ -174,40 +190,29 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	}
 
 	// Set lg_egl_render to idle
-	ilclient_change_component_state(_this->egl_render, OMX_StateIdle);
+	ret = ilclient_change_component_state(_this->egl_render, OMX_StateIdle);
+	CHECKED(ret != 0, "ilclient_change_component_state failed.");
 
 	// Obtain the information about the output port.
 	OMX_PARAM_PORTDEFINITIONTYPE port_format;
 	OMX_INIT_STRUCTURE(port_format);
 	port_format.nPortIndex = 221;
-	omx_err = OMX_GetParameter(ILC_GET_HANDLE(_this->egl_render),
+	ret = OMX_GetParameter(ILC_GET_HANDLE(_this->egl_render),
 			OMX_IndexParamPortDefinition, &port_format);
-	if (omx_err != OMX_ErrorNone) {
-		printf(
-				"%s - OMX_GetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
-				__func__, omx_err);
-		exit(1);
-	}
+	CHECKED(ret != OMX_ErrorNone, "OMX_GetParameter failed.");
 
 	EGLImageKHR egl_image = (EGLImageKHR) cinfo->client_data;
 
 	port_format.nBufferCountActual = 1;
-	omx_err = OMX_SetParameter(ILC_GET_HANDLE(_this->egl_render),
+	ret = OMX_SetParameter(ILC_GET_HANDLE(_this->egl_render),
 			OMX_IndexParamPortDefinition, &port_format);
-	if (omx_err != OMX_ErrorNone) {
-		printf(
-				"%s - OMX_SetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)",
-				__func__, omx_err);
-		exit(1);
-	}
+	CHECKED(ret != OMX_ErrorNone, "OMX_SetParameter failed.");
 
 	// Enable the output port and tell lg_egl_render to use the texture as a buffer
 	//ilclient_enable_port(lg_egl_render, 221); THIS BLOCKS SO CAN'T BE USED
-	if (OMX_SendCommand(ILC_GET_HANDLE(_this->egl_render),
-			OMX_CommandPortEnable, 221, NULL) != OMX_ErrorNone) {
-		printf("OMX_CommandPortEnable failed.\n");
-		exit(1);
-	}
+	ret = OMX_SendCommand(ILC_GET_HANDLE(_this->egl_render),
+			OMX_CommandPortEnable, 221, NULL);
+	CHECKED(ret != OMX_ErrorNone, "OMX_SendCommand failed.");
 
 	//for (int i = 0; i < _this->egl_buffer_num; i++)
 	{
@@ -218,18 +223,18 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 				ilclient_change_component_state(_this->egl_render,
 						OMX_StateLoaded);
 			}
-			ilclient_change_component_state(_this->egl_render, OMX_StateIdle);
+			ret = ilclient_change_component_state(_this->egl_render,
+					OMX_StateIdle);
+			CHECKED(ret != 0, "ilclient_change_component_state failed.");
 		}
-		omx_err = OMX_UseEGLImage(ILC_GET_HANDLE(_this->egl_render),
+		ret = OMX_UseEGLImage(ILC_GET_HANDLE(_this->egl_render),
 				&_this->egl_buffer, 221, (void*) 0, egl_image);
-		if (omx_err != OMX_ErrorNone) {
-			printf("OMX_UseEGLImage failed. 0x%x\n", omx_err);
-			exit(1);
-		}
+		CHECKED(ret != OMX_ErrorNone, "OMX_UseEGLImage failed.");
 	}
 
 	// Set lg_egl_render to executing
 	ilclient_change_component_state(_this->egl_render, OMX_StateExecuting);
+	CHECKED(ret != 0, "ilclient_change_component_state failed.");
 }
 
 OMXJPEG_FN_DEFINE(void, jpeg_CreateDecompress,
