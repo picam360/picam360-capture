@@ -130,7 +130,7 @@ static int v4l2_progress_image(const void *p, int size,
 	int cur = _this->recieved_framecount % BUFFER_NUM;
 
 	int xmp_len = lg_plugin_host->xmp((char*) (_this->xmp_buffers[cur]),
-			RTP_MAXPAYLOADSIZE, _this->cam_num);
+	RTP_MAXPAYLOADSIZE, _this->cam_num);
 
 	PICAM360_IMAGE_T *frame = &_this->frame_buffers[cur];
 	memset(frame, 0, sizeof(PICAM360_IMAGE_T));
@@ -261,7 +261,7 @@ static void start(void *obj) {
 static void stop(void *obj) {
 	v4l2_capture *_this = (v4l2_capture*) obj;
 
-	if(_this->run) {
+	if (_this->run) {
 		_this->run = false;
 		pthread_join(_this->streaming_thread, NULL);
 	}
@@ -281,8 +281,7 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 	return 0;
 }
 
-static int get_param(void *obj, const char *param, char *value,
-		int size) {
+static int get_param(void *obj, const char *param, char *value, int size) {
 	return 0;
 }
 
@@ -297,7 +296,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		mrevent_reset(&_this->frame_ready);
 	}
 
-	if(((_this->framecount - 1) % (_this->skipframe + 1)) != 0){
+	if (((_this->framecount - 1) % (_this->skipframe + 1)) != 0) {
 		return -1;
 	}
 
@@ -349,7 +348,7 @@ static int command_handler(void *user_data, const char *_buff) {
 	char buff[256] = { };
 	strncpy(buff, _buff, sizeof(buff) - 1);
 	char *cmd = strtok(buff, " \n");
-	if (strncmp(cmd, PLUGIN_NAME ".add_v4l2_ctl", sizeof(buff)) == 0) {
+	if (strncmp(cmd, "add_v4l2_ctl", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			char *name = param;
@@ -379,9 +378,14 @@ static void event_handler(void *user_data, uint32_t node_id,
 		uint32_t event_id) {
 }
 
-static void init_options(void *user_data, json_t *options) {
+static void init_options(void *user_data, json_t *_options) {
+	PLUGIN_T *plugin = (PLUGIN_T*) user_data;
+	json_t *options = json_object_get(_options, PLUGIN_NAME);
+	if (options == NULL) {
+		return;
+	}
 	{
-		json_t *v4l2_ctls = json_object_get(options, PLUGIN_NAME ".v4l2_ctls");
+		json_t *v4l2_ctls = json_object_get(options, "v4l2_ctls");
 		const char *key;
 		json_t *value;
 
@@ -394,38 +398,38 @@ static void init_options(void *user_data, json_t *options) {
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME ".width");
+		json_t *value = json_object_get(options, "width");
 		if (value) {
 			lg_width = json_number_value(value);
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME ".height");
+		json_t *value = json_object_get(options, "height");
 		if (value) {
 			lg_height = json_number_value(value);
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME ".fps");
+		json_t *value = json_object_get(options, "fps");
 		if (value) {
 			lg_fps = json_number_value(value);
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME ".skipframe");
+		json_t *value = json_object_get(options, "skipframe");
 		if (value) {
 			lg_skipframe = json_number_value(value);
 		}
 	}
 	{
-		json_t *value = json_object_get(options, PLUGIN_NAME ".mjpeg_kbps");
+		json_t *value = json_object_get(options, "mjpeg_kbps");
 		if (value) {
 			lg_mjpeg_kbps = json_number_value(value);
 		}
 	}
 	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
+		sprintf(buff, "cam%d_devicefile", i);
 		json_t *value = json_object_get(options, buff);
 		if (value) {
 			int len = json_string_length(value);
@@ -436,27 +440,27 @@ static void init_options(void *user_data, json_t *options) {
 	}
 }
 
-static void save_options(void *user_data, json_t *options) {
+static void save_options(void *user_data, json_t *_options) {
+	json_t *options = json_object();
+	json_object_set_new(_options, PLUGIN_NAME, options);
+
 	for (int i = 0; i < MAX_CAM_NUM; i++) {
 		char buff[256];
 		if (lg_devicefiles[i][0] != 0) {
-			sprintf(buff, PLUGIN_NAME ".cam%d_devicefile", i);
+			sprintf(buff, "cam%d_devicefile", i);
 			json_object_set_new(options, buff, json_string(lg_devicefiles[i]));
 		}
 	}
 	{
-		json_object_set_new(options, PLUGIN_NAME ".width", json_real(lg_width));
-		json_object_set_new(options, PLUGIN_NAME ".height",
-				json_real(lg_height));
-		json_object_set_new(options, PLUGIN_NAME ".fps", json_real(lg_fps));
+		json_object_set_new(options, "width", json_real(lg_width));
+		json_object_set_new(options, "height", json_real(lg_height));
+		json_object_set_new(options, "fps", json_real(lg_fps));
 	}
 	if (lg_skipframe) {
-		json_object_set_new(options, PLUGIN_NAME ".skipframe",
-				json_real(lg_skipframe));
+		json_object_set_new(options, "skipframe", json_real(lg_skipframe));
 	}
 	if (lg_mjpeg_kbps) {
-		json_object_set_new(options, PLUGIN_NAME ".mjpeg_kbps",
-				json_real(lg_mjpeg_kbps));
+		json_object_set_new(options, "mjpeg_kbps", json_real(lg_mjpeg_kbps));
 	}
 	if (lg_v4l2_ctls) {
 		json_t *v4l2_ctls = json_object();
@@ -464,12 +468,11 @@ static void save_options(void *user_data, json_t *options) {
 			json_object_set(v4l2_ctls, lg_v4l2_ctls[i]->name,
 					json_real(lg_v4l2_ctls[i]->value));
 		}
-		json_object_set_new(options, PLUGIN_NAME ".v4l2_ctls", v4l2_ctls);
+		json_object_set_new(options, "v4l2_ctls", v4l2_ctls);
 	}
 }
 
-void create_plugin(PLUGIN_HOST_T *plugin_host,
-		PLUGIN_T **_plugin) {
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	lg_plugin_host = plugin_host;
 
 	{

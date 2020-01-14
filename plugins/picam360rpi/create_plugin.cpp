@@ -28,21 +28,21 @@
 #include "equirectangular_gl_renderer.h"
 #include "omx_encoder.h"
 
-#define PLUGIN_NAME "picam360gl"
+#define PLUGIN_NAME "picam360rpi"
 
 #define MAX_SUB_PLUGINS 16
-typedef struct _picam360gl_plugin {
+typedef struct _picam360rpi_plugin {
 	PLUGIN_T super;
 
 	PLUGIN_T *sub_plugins[MAX_SUB_PLUGINS] = { };
 
 	void *user_data;
-} picam360gl_plugin;
+} picam360rpi_plugin;
 
 static char lg_license_path[256] = { };
 
 static int command_handler(void *user_data, const char *buff) {
-	picam360gl_plugin *plugin = (picam360gl_plugin*) user_data;
+	picam360rpi_plugin *plugin = (picam360rpi_plugin*) user_data;
 	for (int i = 0; i < MAX_SUB_PLUGINS && plugin->sub_plugins[i] != NULL; i++) {
 		int name_len = strlen(plugin->sub_plugins[i]->name);
 		if (strncmp(buff, plugin->sub_plugins[i]->name, name_len) == 0 && buff[name_len] == '.') {
@@ -53,7 +53,7 @@ static int command_handler(void *user_data, const char *buff) {
 }
 
 static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) {
-	picam360gl_plugin *plugin = (picam360gl_plugin*) user_data;
+	picam360rpi_plugin *plugin = (picam360rpi_plugin*) user_data;
 	for (int i = 0; i < MAX_SUB_PLUGINS && plugin->sub_plugins[i] != NULL; i++) {
 		if (plugin->sub_plugins[i]->event_handler) {
 			plugin->sub_plugins[i]->event_handler(plugin->sub_plugins[i], node_id, event_id);
@@ -62,7 +62,7 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 }
 
 static void init_options(void *user_data, json_t *_options) {
-	picam360gl_plugin *plugin = (picam360gl_plugin*) user_data;
+	picam360rpi_plugin *plugin = (picam360rpi_plugin*) user_data;
 	json_t *options = json_object_get(_options, PLUGIN_NAME);
 	for (int i = 0; i < MAX_SUB_PLUGINS && plugin->sub_plugins[i] != NULL; i++) {
 		if (plugin->sub_plugins[i]->init_options) {
@@ -72,7 +72,7 @@ static void init_options(void *user_data, json_t *_options) {
 }
 
 static void save_options(void *user_data, json_t *_options) {
-	picam360gl_plugin *plugin = (picam360gl_plugin*) user_data;
+	picam360rpi_plugin *plugin = (picam360rpi_plugin*) user_data;
 	json_t *options = json_object();
 	for (int i = 0; i < MAX_SUB_PLUGINS && plugin->sub_plugins[i] != NULL; i++) {
 		if (plugin->sub_plugins[i]->save_options) {
@@ -88,8 +88,8 @@ static void release(void *obj) {
 
 void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	{
-		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(picam360gl_plugin));
-		memset(plugin, 0, sizeof(picam360gl_plugin));
+		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(picam360rpi_plugin));
+		memset(plugin, 0, sizeof(picam360rpi_plugin));
 		strcpy(plugin->name, PLUGIN_NAME);
 		plugin->release = release;
 		plugin->command_handler = command_handler;
@@ -99,7 +99,7 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		plugin->get_info = NULL;
 		plugin->user_data = plugin;
 
-		PLUGIN_T **sub_plugins = ((picam360gl_plugin*) plugin)->sub_plugins;
+		PLUGIN_T **sub_plugins = ((picam360rpi_plugin*) plugin)->sub_plugins;
 		int idx = 0;
 		{
 			create_mjpeg_decoder_plugin(plugin_host, &sub_plugins[idx]);

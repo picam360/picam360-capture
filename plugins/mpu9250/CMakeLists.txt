@@ -51,6 +51,9 @@ target_link_libraries(mpu9250
 	dl
 )
 
+#for pthread_setname_np
+add_definitions(-D_GNU_SOURCE)
+
 #post build
 add_custom_command(TARGET mpu9250 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:mpu9250> ${CMAKE_CURRENT_SOURCE_DIR}/../

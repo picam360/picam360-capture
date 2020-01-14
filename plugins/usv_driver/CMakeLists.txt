@@ -26,6 +26,9 @@ target_link_libraries(usv_driver
 	dl
 )
 
+#for pthread_setname_np
+add_definitions(-D_GNU_SOURCE)
+
 #post build
 add_custom_command(TARGET usv_driver POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:usv_driver> ${CMAKE_CURRENT_SOURCE_DIR}/../

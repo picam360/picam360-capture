@@ -101,19 +101,27 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		return ret;
 	}
 
-	num = MIN(num, *num_p);
-	for (int i = 0; i < num; i++) {
+	*num_p = MIN(num, *num_p);
+	for (int i = 0; i < *num_p; i++) {
 		int cur = _this->framecount % BUFFER_NUM;
+
+		//release
+		if (_this->frame_buffers[cur].ref) {
+			_this->frame_buffers[cur].ref->release(_this->frame_buffers[cur].ref);
+		}
+
 		get_frame_info_str(&lg_plugin->fisheye_params[i],
 				(char*) _this->meta_buffers[cur],
 				(int*) &_this->meta_sizes[cur]);
 		_this->frame_buffers[cur] = *images[i];
+		if (_this->frame_buffers[cur].ref) {
+			_this->frame_buffers[cur].ref->addref(_this->frame_buffers[cur].ref);
+		}
 		_this->frame_buffers[cur].meta = _this->meta_buffers[cur];
 		_this->frame_buffers[cur].meta_size = _this->meta_sizes[cur];
 		image_p[i] = &_this->frame_buffers[cur];
 		_this->framecount++;
 	}
-	*num_p = num;
 
 	return 0;
 }
@@ -124,6 +132,8 @@ static void release(void *obj) {
 
 static int set_param(void *obj, const char *param, const char *value_str) {
 	fisheye_params_private *_this = (fisheye_params_private*) obj;
+
+	return 0;
 }
 
 static int get_param(void *obj, const char *param, char *value_str, int size) {
@@ -132,6 +142,8 @@ static int get_param(void *obj, const char *param, char *value_str, int size) {
 		_this->super.next_streamer->get_param(_this->super.next_streamer, param,
 				value_str, size);
 	}
+
+	return 0;
 }
 
 static void create_vstreamer(void *user_data, VSTREAMER_T **output_encoder) {
@@ -361,6 +373,22 @@ static void save_options(void *user_data, json_t *_options) {
 			}
 		}
 		json_object_set_new(options, "lens_k", ary);
+	}
+	{
+		json_t *ary = json_array();
+		if (json_is_array(ary)) {
+			int size = MAX_CAM_NUM;
+			for (int i = 0; i < size; i++) {
+				json_t *ary2 = json_array();
+				int size2 = 3;
+				for (int j = 0; j < size2; j++) {
+					json_array_append_new(ary2,
+							json_real(lg_plugin->fisheye_params[i].cam_offset[j]));
+				}
+				json_array_append_new(ary, ary2);
+			}
+		}
+		json_object_set_new(options, "cam_offset", ary);
 	}
 }
 

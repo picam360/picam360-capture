@@ -122,6 +122,8 @@ add_custom_command(OUTPUT ${GLSL_HEADERS}
   VERBATIM
 )
 
+#for pthread_setname_np
+add_definitions(-D_GNU_SOURCE)
 
 #post build
 add_custom_command(TARGET picam360rpi POST_BUILD
