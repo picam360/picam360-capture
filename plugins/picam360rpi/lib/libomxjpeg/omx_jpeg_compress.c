@@ -8,7 +8,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define CHECKED(c, v) if (c) {printf(v); exit(-1);}
+#define CHECKED(c, v) if (c) {printf("%s:%d - %s", __FILE__, __LINE__, v); exit(-1);}
 
 #define IMAGE_ENCODE
 
@@ -25,8 +25,6 @@ typedef struct _omx_jpeg_compress_private {
 	ILCLIENT_T *client;
 	COMPONENT_T *image_encode;
 
-	OMX_BUFFERHEADERTYPE *in_buffer;
-	OMX_BUFFERHEADERTYPE *out_buffer;
 	unsigned char **outbuffer;
 	unsigned long *outsize;
 	pthread_mutex_t mutex;
@@ -224,7 +222,10 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	def.format.image.nSliceHeight = (cinfo->image_height + 15) & ~15;
 	//Must be manually defined to ensure sufficient size if stride needs to be rounded up to multiple of 32.
 	def.format.image.nStride = ((cinfo->image_height + 31) & ~31) * 4;
-	def.nBufferSize = def.format.image.nStride * def.format.image.nSliceHeight;
+	//def.nBufferSize = def.format.image.nStride * def.format.image.nSliceHeight;
+	def.nBufferSize = MIN(
+			def.format.image.nStride * def.format.image.nSliceHeight,
+			128 * 1024);
 	//def.nBufferSize = sizeof(OMX_BRCMVEGLIMAGETYPE);
 	def.format.image.bFlagErrorConcealment = OMX_FALSE;
 	def.format.image.eColorFormat = OMX_COLOR_Format32bitABGR8888; // OMX_COLOR_FormatBRCMEGL; //OMX_COLOR_Format24bitBGR888; //OMX_COLOR_Format32bitABGR8888;//OMX_COLOR_FormatYUV420PackedPlanar;
@@ -242,7 +243,8 @@ OMXJPEG_FN_DEFINE(void, jpeg_start_compress,
 	CHECKED(ret != OMX_ErrorNone,
 			"OMX_GetParameter failed for encode port out.");
 
-	def.nBufferSize = cinfo->image_width * cinfo->image_height;
+	def.nBufferCountActual = 1;
+	def.nBufferSize = MIN(cinfo->image_width * cinfo->image_height, 128 * 1024);
 	def.format.image.eCompressionFormat = OMX_IMAGE_CodingJPEG;
 	def.format.image.eColorFormat = OMX_COLOR_FormatUnused;
 
@@ -322,20 +324,35 @@ OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 	omx_jpeg_compress_private *_this =
 			(omx_jpeg_compress_private*) cinfo->master;
 
-	_this->in_buffer = ilclient_get_input_buffer(_this->image_encode, 340, 1);
-	memcpy(_this->in_buffer->pBuffer, cinfo->client_data,
-			cinfo->image_width * 4 * cinfo->image_height);
-	_this->in_buffer->nFilledLen = _this->in_buffer->nAllocLen;
-	OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), _this->in_buffer);
+	int ret = 0;
+	int data_len = cinfo->image_width * 4 * cinfo->image_height;
+	unsigned char *data = cinfo->client_data;
+
+	OMX_BUFFERHEADERTYPE *buf = NULL;
+
+	for (int cur = 0; cur < data_len; cur += buf->nAllocLen) {
+		buf = ilclient_get_input_buffer(_this->image_encode, 340, 1);
+
+		buf->nFilledLen = MIN(data_len - cur, buf->nAllocLen);
+		memcpy(buf->pBuffer, data + cur, buf->nFilledLen);
+
+		buf->nOffset = 0;
+		buf->nFlags = 0;
+		if (cur + buf->nFilledLen == data_len) {
+			buf->nFlags |= OMX_BUFFERFLAG_EOS;
+			//printf("finish\n");
+		}
+
+		ret = OMX_EmptyThisBuffer(ILC_GET_HANDLE(_this->image_encode), buf);
+		CHECKED(ret != OMX_ErrorNone, "OMX_FillThisBuffer failed\n");
+	}
 
 	*_this->outsize = 0;
 	do {
-		_this->out_buffer = ilclient_get_output_buffer(_this->image_encode, 341,
-				1);
+		buf = ilclient_get_output_buffer(_this->image_encode, 341, 1);
 		_this->fill_buffer_done = FALSE;
-		_this->out_buffer->nFilledLen = 0;
-		OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode),
-				_this->out_buffer);
+		buf->nFilledLen = 0;
+		OMX_FillThisBuffer(ILC_GET_HANDLE(_this->image_encode), buf);
 
 		pthread_mutex_lock(&_this->mutex);
 		if (_this->fill_buffer_done != TRUE) {
@@ -343,16 +360,15 @@ OMXJPEG_FN_DEFINE(void, jpeg_finish_compress, (j_compress_ptr cinfo)) {
 		}
 		pthread_mutex_unlock(&_this->mutex);
 
-		int size = MIN(_this->out_buffer->nFilledLen,
-				cinfo->dest->free_in_buffer);
+		int size = MIN(buf->nFilledLen, cinfo->dest->free_in_buffer);
 		if (size) {
-			memcpy(cinfo->dest->next_output_byte, _this->out_buffer->pBuffer,
-					_this->out_buffer->nFilledLen);
-			cinfo->dest->next_output_byte += _this->out_buffer->nFilledLen;
-			cinfo->dest->free_in_buffer -= _this->out_buffer->nFilledLen;
-			*_this->outsize += _this->out_buffer->nFilledLen;
+			memcpy(cinfo->dest->next_output_byte, buf->pBuffer,
+					buf->nFilledLen);
+			cinfo->dest->next_output_byte += buf->nFilledLen;
+			cinfo->dest->free_in_buffer -= buf->nFilledLen;
+			*_this->outsize += buf->nFilledLen;
 		}
-	} while (!(_this->out_buffer->nFlags & OMX_BUFFERFLAG_ENDOFFRAME));
+	} while (!(buf->nFlags & OMX_BUFFERFLAG_ENDOFFRAME));
 
 	//printf("jpeg_finish_compress done %d\n", *_this->outsize);
 	return;

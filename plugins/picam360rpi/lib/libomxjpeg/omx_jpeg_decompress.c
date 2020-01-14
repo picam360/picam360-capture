@@ -8,7 +8,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define CHECKED(c, v) if (c) {printf(v); exit(-1);}
+#define CHECKED(c, v) if (c) {printf("%s:%d - %s", __FILE__, __LINE__, v); exit(-1);}
 
 #define OMX_INIT_STRUCTURE(a) \
     memset(&(a), 0, sizeof(a)); \
@@ -158,12 +158,12 @@ static void change_port_settings(j_decompress_ptr cinfo) {
 	ilclient_change_component_state(_this->resize, OMX_StateExecuting);
 
 	// show some logging so user knows it's working
-	printf("Width: %u Height: %u Output Color Format: 0x%x Buffer Size: %u\n",
-			(unsigned int) def.format.image.nFrameWidth,
-			(unsigned int) def.format.image.nFrameHeight,
-			(unsigned int) def.format.image.eColorFormat,
-			(unsigned int) def.nBufferSize);
-	fflush(stdout);
+//	printf("Width: %u Height: %u Output Color Format: 0x%x Buffer Size: %u\n",
+//			(unsigned int) def.format.image.nFrameWidth,
+//			(unsigned int) def.format.image.nFrameHeight,
+//			(unsigned int) def.format.image.eColorFormat,
+//			(unsigned int) def.nBufferSize);
+//	fflush(stdout);
 
 	//resize -> egl_render
 
@@ -463,7 +463,7 @@ OMXJPEG_FN_DEFINE(boolean, jpeg_finish_decompress, (j_decompress_ptr cinfo)) {
 			//ret = ilclient_remove_event(_this->video_decode,
 			//		OMX_EventPortSettingsChanged, DECODER_OUTPUT_PORT, 0, 0, 1);
 			if (ret == 0) {
-				printf("change port_settings\n");
+				//printf("change port_settings\n");
 				_this->port_settings_done = TRUE;
 				change_port_settings(cinfo);
 				break;

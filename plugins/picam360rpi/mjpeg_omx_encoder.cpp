@@ -190,6 +190,7 @@ static void encode(mjpeg_omx_encoder_private *_this, PICAM360_IMAGE_T *image) {
 }
 
 static void* streaming_thread_fnc(void *obj) {
+	pthread_setname_np(pthread_self(), "mjpeg_encoder");
 	mjpeg_omx_encoder_private *_this = (mjpeg_omx_encoder_private*) obj;
 
 	while (_this->run) {
