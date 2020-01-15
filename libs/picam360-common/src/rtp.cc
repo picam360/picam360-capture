@@ -110,10 +110,10 @@ public:
 	uint32_t GetTimestamp() const {
 		return timestamp;
 	}
-	uint8_t *GetPacketData() const {
+	uint8_t* GetPacketData() const {
 		return packet;
 	}
-	uint8_t *GetPayloadData() const {
+	uint8_t* GetPayloadData() const {
 		return packet + sizeof(struct RTPHeader);
 	}
 	size_t GetPacketLength() const {
@@ -195,24 +195,28 @@ typedef struct _RTP_T {
 	int tx_buffer_size = RTP_MAXPACKETSIZE;
 } RTP_T;
 
-int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_len, bool flush) {
+int send_via_socket(RTP_T *_this, int fd, const unsigned char *data,
+		int data_len, bool flush) {
 	for (int i = 0; i < data_len;) {
 		int buffer_space = _this->tx_buffer_size - _this->tx_buffer_cur;
 		if (buffer_space < (data_len - i)) {
-			memcpy(_this->tx_buffer + _this->tx_buffer_cur, data + i, buffer_space);
+			memcpy(_this->tx_buffer + _this->tx_buffer_cur, data + i,
+					buffer_space);
 			_this->tx_buffer_cur += buffer_space;
 			i += buffer_space;
 
 			int size = _this->tx_buffer_cur;
 			_this->tx_buffer_cur = 0;
 
-			int actsize = sendto(fd, _this->tx_buffer, size, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+			int actsize = sendto(fd, _this->tx_buffer, size, 0,
+					(struct sockaddr*) &_this->tx_addr, sizeof(_this->tx_addr));
 			if (actsize != size) {
 				perror("sendto() failed.");
 				return -1;
 			}
 		} else {
-			memcpy(_this->tx_buffer + _this->tx_buffer_cur, data + i, data_len - i);
+			memcpy(_this->tx_buffer + _this->tx_buffer_cur, data + i,
+					data_len - i);
 			_this->tx_buffer_cur += data_len - i;
 			i = data_len;
 		}
@@ -221,7 +225,8 @@ int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_le
 		int size = _this->tx_buffer_cur;
 		_this->tx_buffer_cur = 0;
 
-		int actsize = sendto(fd, _this->tx_buffer, size, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+		int actsize = sendto(fd, _this->tx_buffer, size, 0,
+				(struct sockaddr*) &_this->tx_addr, sizeof(_this->tx_addr));
 		if (actsize != size) {
 			perror("sendto() failed.");
 			return -1;
@@ -275,7 +280,7 @@ static int connect_timeout(struct sockaddr_in *client, int timeout) {
 	/*** end set socket nonblocking ***/
 
 	/*** connect time out***/
-	retval = connect(sock, (struct sockaddr *) client, sizeof(*client));
+	retval = connect(sock, (struct sockaddr*) client, sizeof(*client));
 	if (retval < 0) {
 		if (errno == EINPROGRESS) {
 			tv.tv_sec = timeout;
@@ -288,7 +293,8 @@ static int connect_timeout(struct sockaddr_in *client, int timeout) {
 				return -1;
 			} else if (retval > 0) {
 				/*connect*/
-				retval = connect(sock, (struct sockaddr *) client, sizeof(*client));
+				retval = connect(sock, (struct sockaddr*) client,
+						sizeof(*client));
 				if (retval < 0) {
 					close(sock);
 					return -1;
@@ -317,7 +323,8 @@ static int connect_timeout(struct sockaddr_in *client, int timeout) {
 	return sock;
 }
 
-int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt) {
+int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len,
+		int pt) {
 	pthread_mutex_lock(&_this->mlock);
 	{
 		int ret;
@@ -364,11 +371,12 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 			pack->StoreHeader();
 
 			unsigned char header[8];
-			unsigned short len = sizeof(header) + sizeof(struct RTPHeader) + data_len;
+			unsigned short len = sizeof(header) + sizeof(struct RTPHeader)
+					+ data_len;
 			header[0] = 0xFF;
 			header[1] = 0xE1;
-			header[2] = (len >> 8) & 0xFF;//network(big) endian
-			header[3] = (len >> 0) & 0xFF;//network(big) endian
+			header[2] = (len >> 8) & 0xFF; //network(big) endian
+			header[3] = (len >> 0) & 0xFF; //network(big) endian
 			header[4] = (unsigned char) 'r';
 			header[5] = (unsigned char) 't';
 			header[6] = (unsigned char) 'p';
@@ -378,11 +386,14 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 			case RTP_SOCKET_TYPE_TCP:
 			case RTP_SOCKET_TYPE_UDP:
 				if (1) {
-					uint8_t *data_ary[3] = { header, pack->GetPacketData(), (uint8_t*) data };
-					int datalen_ary[3] = { sizeof(header), (int) pack->GetPacketLength(), data_len };
+					uint8_t *data_ary[3] = { header, pack->GetPacketData(),
+							(uint8_t*) data };
+					int datalen_ary[3] = { sizeof(header),
+							(int) pack->GetPacketLength(), data_len };
 					bool flush_ary[3] = { false, false, false };
 					for (int i = 0; i < 3; i++) {
-						int size = send_via_socket(_this, _this->tx_fd, data_ary[i], datalen_ary[i], flush_ary[i]);
+						int size = send_via_socket(_this, _this->tx_fd,
+								data_ary[i], datalen_ary[i], flush_ary[i]);
 						if (size < 0) {
 							close(_this->tx_fd);
 							_this->tx_fd = -1;
@@ -393,7 +404,8 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 				break;
 			case RTP_SOCKET_TYPE_FIFO:
 				ret = write(_this->tx_fd, header, sizeof(header));
-				ret = write(_this->tx_fd, pack->GetPacketData(), pack->GetPacketLength());
+				ret = write(_this->tx_fd, pack->GetPacketData(),
+						pack->GetPacketLength());
 				ret = write(_this->tx_fd, data, data_len);
 				break;
 			default:
@@ -407,7 +419,8 @@ int rtp_sendpacket(RTP_T *_this, const unsigned char *data, int data_len, int pt
 			struct timeval diff;
 			timersub(&time2, &time, &diff);
 			int diff_usec = diff.tv_sec * 1000000 + diff.tv_usec;
-			float cal_usec = 8.0f * data_len / (_this->bandwidth_limit / 1000000);
+			float cal_usec = 8.0f * data_len
+					/ (_this->bandwidth_limit / 1000000);
 			if (diff_usec < cal_usec) {
 				int need_to_wait = MIN(cal_usec - diff_usec, 1000000);
 				usleep(need_to_wait);
@@ -426,7 +439,7 @@ void rtp_flush(RTP_T *_this) {
 	pthread_mutex_unlock(&_this->mlock);
 }
 
-static void *buffering_thread_func(void* arg) {
+static void* buffering_thread_func(void *arg) {
 	RTP_T *_this = (RTP_T*) arg;
 	pthread_setname_np(pthread_self(), "RTP BUFFERING");
 
@@ -441,21 +454,25 @@ static void *buffering_thread_func(void* arg) {
 
 				if (srv_fd < 0) {
 					srv_fd = socket(AF_INET, SOCK_STREAM, 0);
-					int status = bind(srv_fd, (struct sockaddr*) &_this->rx_addr, sizeof(_this->rx_addr));
+					int status = bind(srv_fd,
+							(struct sockaddr*) &_this->rx_addr,
+							sizeof(_this->rx_addr));
 					if (status < 0) {
 						perror("bind() failed.");
 					}
 				}
 				listen(srv_fd, 1);
 				printf("Waiting for connection ...\n");
-				rx_fd = accept(srv_fd, (struct sockaddr *) &client_addr, &client_addr_size);
+				rx_fd = accept(srv_fd, (struct sockaddr*) &client_addr,
+						&client_addr_size);
 				printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
 			}
 			break;
 		case RTP_SOCKET_TYPE_UDP:
 			if (1) {
 				rx_fd = socket(AF_INET, SOCK_DGRAM, 0);
-				int status = bind(rx_fd, (struct sockaddr*) &_this->rx_addr, sizeof(_this->rx_addr));
+				int status = bind(rx_fd, (struct sockaddr*) &_this->rx_addr,
+						sizeof(_this->rx_addr));
 				if (status < 0) {
 					perror("bind() failed.");
 				}
@@ -477,13 +494,17 @@ static void *buffering_thread_func(void* arg) {
 			case RTP_SOCKET_TYPE_UDP:
 				if (1) {
 					raw_pack = new RTPPacket(_this->rx_buffer_size);
-					raw_pack->packetlength = recvfrom(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength(), 0, NULL, NULL);
+					raw_pack->packetlength = recvfrom(rx_fd,
+							raw_pack->GetPacketData(),
+							raw_pack->GetPacketLength(), 0, NULL, NULL);
 				}
 				break;
 			case RTP_SOCKET_TYPE_FIFO:
 				if (1) {
 					raw_pack = new RTPPacket(_this->rx_buffer_size);
-					raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
+					raw_pack->packetlength = read(rx_fd,
+							raw_pack->GetPacketData(),
+							raw_pack->GetPacketLength());
 				}
 				break;
 			default:
@@ -515,7 +536,7 @@ static void *buffering_thread_func(void* arg) {
 	return NULL;
 }
 
-static void *receive_thread_func(void* arg) {
+static void* receive_thread_func(void *arg) {
 	RTP_T *_this = (RTP_T*) arg;
 	pthread_setname_np(pthread_self(), "RTP RECEIVE");
 
@@ -551,10 +572,10 @@ static void *receive_thread_func(void* arg) {
 		for (int i = 0; i < data_len; i++) {
 			if (xmp) {
 				if (xmp_pos == 2) {
-					xmp_len = buff[i] << 8;//network(big) endian
+					xmp_len = buff[i] << 8; //network(big) endian
 					xmp_pos++;
 				} else if (xmp_pos == 3) {
-					xmp_len += buff[i] << 0;//network(big) endian
+					xmp_len += buff[i] << 0; //network(big) endian
 					xmp_pos++;
 				} else if (xmp_pos == 4) {
 					if (buff[i] == 'r') {
@@ -585,7 +606,8 @@ static void *receive_thread_func(void* arg) {
 						pack = new RTPPacket(xmp_len - 8);
 					}
 					if (i + (xmp_len - xmp_pos) <= data_len) {
-						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i], xmp_len - xmp_pos);
+						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i],
+								xmp_len - xmp_pos);
 						i += xmp_len - xmp_pos - 1;
 						xmp_pos = xmp_len;
 						pack->LoadHeader();
@@ -599,7 +621,8 @@ static void *receive_thread_func(void* arg) {
 							}
 							int elapsed_usec;
 							if (pack->timestamp < last_timestamp) {
-								elapsed_usec = pack->timestamp + (UINT_MAX - last_timestamp);
+								elapsed_usec = pack->timestamp
+										+ (UINT_MAX - last_timestamp);
 							} else {
 								elapsed_usec = pack->timestamp - last_timestamp;
 							}
@@ -607,11 +630,15 @@ static void *receive_thread_func(void* arg) {
 							if (_this->auto_play) {
 								struct timeval diff;
 								timersub(&time, &last_time, &diff);
-								float diff_usec = diff.tv_sec * 1000000 + (float) diff.tv_usec;
-								float _elapsed_usec = ((float) elapsed_usec / _this->play_speed);
+								float diff_usec = diff.tv_sec * 1000000
+										+ (float) diff.tv_usec;
+								float _elapsed_usec = ((float) elapsed_usec
+										/ _this->play_speed);
 
 								if (diff_usec < _elapsed_usec) {
-									usleep(MIN(_elapsed_usec - diff_usec, 1000000));
+									usleep(
+											MIN(_elapsed_usec - diff_usec,
+													1000000));
 								}
 								last_time = time;
 								_this->play_time = current_play_time;
@@ -628,16 +655,23 @@ static void *receive_thread_func(void* arg) {
 						}
 
 						pthread_mutex_lock(&_this->callbacks_mlock);
-						for (std::list<struct RTP_CALLBACK_PAIR>::iterator it = _this->callbacks.begin(); it != _this->callbacks.end(); it++) {
-							(*it).callback(pack->GetPayloadData(), pack->GetPayloadLength(), pack->GetPayloadType(), pack->GetSequenceNumber(), (*it).user_data);
+						for (std::list<struct RTP_CALLBACK_PAIR>::iterator it =
+								_this->callbacks.begin();
+								it != _this->callbacks.end(); it++) {
+							(*it).callback(pack->GetPayloadData(),
+									pack->GetPayloadLength(),
+									pack->GetPayloadType(),
+									pack->GetSequenceNumber(), (*it).user_data);
 						}
 						pthread_mutex_unlock(&_this->callbacks_mlock);
 
 						if (_this->record_fd > 0) {
-							pthread_mutex_lock(&_this->record_packet_queue_mlock);
+							pthread_mutex_lock(
+									&_this->record_packet_queue_mlock);
 							_this->record_packet_queue.push_back(pack);
 							mrevent_trigger(&_this->record_packet_ready);
-							pthread_mutex_unlock(&_this->record_packet_queue_mlock);
+							pthread_mutex_unlock(
+									&_this->record_packet_queue_mlock);
 						} else {
 							delete pack;
 						}
@@ -645,7 +679,8 @@ static void *receive_thread_func(void* arg) {
 						xmp = false;
 					} else {
 						int rest_in_buff = data_len - i;
-						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i], rest_in_buff);
+						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i],
+								rest_in_buff);
 						i = data_len - 1;
 						xmp_pos += rest_in_buff;
 					}
@@ -668,7 +703,7 @@ static void *receive_thread_func(void* arg) {
 	return NULL;
 }
 
-static void *record_thread_func(void* arg) {
+static void* record_thread_func(void *arg) {
 	RTP_T *_this = (RTP_T*) arg;
 	pthread_setname_np(pthread_self(), "RTP RECORD");
 
@@ -700,8 +735,8 @@ static void *record_thread_func(void* arg) {
 		header[0] = 0xFF;
 		header[1] = 0xE1;
 		unsigned short len = pack->GetPacketLength() + sizeof(header);
-		header[2] = (len >> 8) & 0xFF;//network(big) endian
-		header[3] = (len >> 0) & 0xFF;//network(big) endian
+		header[2] = (len >> 8) & 0xFF; //network(big) endian
+		header[3] = (len >> 0) & 0xFF; //network(big) endian
 		header[4] = (unsigned char) 'r';
 		header[5] = (unsigned char) 't';
 		header[6] = (unsigned char) 'p';
@@ -728,7 +763,7 @@ static void *record_thread_func(void* arg) {
 	return NULL;
 }
 
-static void *load_thread_func(void* arg) {
+static void* load_thread_func(void *arg) {
 	pthread_setname_np(pthread_self(), "RTP LOAD");
 
 	void **args = (void**) arg;
@@ -756,7 +791,8 @@ static void *load_thread_func(void* arg) {
 			}
 		}
 		RTPPacket *raw_pack = new RTPPacket(_this->rx_buffer_size);
-		raw_pack->packetlength = read(_this->load_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
+		raw_pack->packetlength = read(_this->load_fd, raw_pack->GetPacketData(),
+				raw_pack->GetPacketLength());
 
 		if (raw_pack->packetlength <= 0) { //eof
 			if (_this->is_looping) {
@@ -787,7 +823,9 @@ static void *load_thread_func(void* arg) {
 	return NULL;
 }
 
-RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit) {
+RTP_T* create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type,
+		char *destip_str, unsigned short destport,
+		enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit) {
 	RTP_T *_this = new RTP_T;
 
 	rtp_set_buffer_size(_this, _this->rx_buffer_size, _this->tx_buffer_size);
@@ -796,7 +834,7 @@ RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, 
 
 	signal(SIGPIPE, SIG_IGN);
 
-	if(portbase != 0) {
+	if (portbase != 0) {
 		_this->rx_socket_type = rx_socket_type;
 
 		_this->rx_addr.sin_family = AF_INET;
@@ -804,10 +842,11 @@ RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, 
 		_this->rx_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 		_this->receive_run = true;
-		pthread_create(&_this->receive_thread, NULL, receive_thread_func, (void*) _this);
+		pthread_create(&_this->receive_thread, NULL, receive_thread_func,
+				(void*) _this);
 	}
 
-	if(destport != 0){
+	if (destport != 0) {
 		_this->tx_socket_type = tx_socket_type;
 
 		_this->tx_addr.sin_family = AF_INET;
@@ -815,7 +854,8 @@ RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, 
 		_this->tx_addr.sin_addr.s_addr = inet_addr(destip_str);
 
 		_this->buffering_run = true;
-		pthread_create(&_this->buffering_thread, NULL, buffering_thread_func, (void*) _this);
+		pthread_create(&_this->buffering_thread, NULL, buffering_thread_func,
+				(void*) _this);
 		mrevent_init(&_this->buffering_ready);
 	}
 
@@ -839,13 +879,21 @@ int rtp_set_buffer_size(RTP_T *_this, int rx_buffer_size, int tx_buffer_size) {
 int delete_rtp(RTP_T **_this_p) {
 	RTP_T *_this = *_this_p;
 
-	_this->receive_run = false;
-	pthread_join(_this->receive_thread, NULL);
+	rtp_stop_recording(_this);
+	rtp_stop_loading(_this);
+	if (_this->receive_run) {
+		_this->receive_run = false;
+		pthread_join(_this->receive_thread, NULL);
+	}
 	if (_this->tx_fd >= 0) {
 		close(_this->tx_fd);
 		_this->tx_fd = -1;
 	}
-	pthread_join(_this->buffering_thread, NULL);
+	if (_this->buffering_run) {
+		_this->buffering_run = false;
+		pthread_join(_this->buffering_thread, NULL);
+	}
+
 
 	delete _this;
 	*_this_p = NULL;
@@ -856,8 +904,10 @@ int delete_rtp(RTP_T **_this_p) {
 void rtp_start_recording(RTP_T *_this, char *path) {
 	rtp_stop_recording(_this);
 	strcpy(_this->record_path, path);
-	_this->record_fd = open(_this->record_path, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-	pthread_create(&_this->record_thread, NULL, record_thread_func, (void*) _this);
+	_this->record_fd = open(_this->record_path, O_CREAT | O_WRONLY | O_TRUNC,
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+	pthread_create(&_this->record_thread, NULL, record_thread_func,
+			(void*) _this);
 }
 
 void rtp_stop_recording(RTP_T *_this) {
@@ -876,7 +926,8 @@ bool rtp_is_recording(RTP_T *_this, char **path) {
 	return (_this->record_fd > 0);
 }
 
-bool rtp_start_loading(RTP_T *_this, char *path, bool auto_play, bool is_looping, RTP_LOADING_CALLBACK callback, void *user_data) {
+bool rtp_start_loading(RTP_T *_this, char *path, bool auto_play,
+		bool is_looping, RTP_LOADING_CALLBACK callback, void *user_data) {
 	rtp_stop_loading(_this);
 	strcpy(_this->load_path, path);
 	_this->auto_play = auto_play;
@@ -887,7 +938,8 @@ bool rtp_start_loading(RTP_T *_this, char *path, bool auto_play, bool is_looping
 		args[0] = (void*) _this;
 		args[1] = (void*) callback;
 		args[2] = user_data;
-		pthread_create(&_this->load_thread, NULL, load_thread_func, (void*) args);
+		pthread_create(&_this->load_thread, NULL, load_thread_func,
+				(void*) args);
 		return true;
 	} else {
 		printf("failed to open %s\n", _this->load_path);
@@ -920,7 +972,7 @@ bool rtp_is_loading(RTP_T *_this, char **path) {
 	return (_this->load_fd > 0);
 }
 
-const char *rtp_get_rtp_socket_type_str(enum RTP_SOCKET_TYPE type) {
+const char* rtp_get_rtp_socket_type_str(enum RTP_SOCKET_TYPE type) {
 	switch (type) {
 	case RTP_SOCKET_TYPE_TCP:
 		return "tcp";

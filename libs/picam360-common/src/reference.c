@@ -34,6 +34,8 @@ static int release(struct _REFERENCE_H *_this) {
 		ret = --_this->ref_count;
 		if(ret == 0 && _this->callback){
 			_this->callback(_this->user_data);
+			_this->callback = NULL;
+			_this->user_data = NULL;
 		}
 	}
 	pthread_mutex_unlock(&_this->mutex);

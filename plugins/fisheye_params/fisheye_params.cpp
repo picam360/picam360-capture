@@ -46,7 +46,7 @@ typedef struct _fisheye_params_private {
 
 	int cam_num;
 	unsigned int framecount;
-	PICAM360_IMAGE_T frame_buffers[BUFFER_NUM];
+	PICAM360_IMAGE_T *frame_buffers[BUFFER_NUM];
 	uint8_t meta_buffers[BUFFER_NUM][RTP_MAXPAYLOADSIZE];
 	uint32_t meta_sizes[BUFFER_NUM];
 } fisheye_params_private;
@@ -106,20 +106,20 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		int cur = _this->framecount % BUFFER_NUM;
 
 		//release
-		if (_this->frame_buffers[cur].ref) {
-			_this->frame_buffers[cur].ref->release(_this->frame_buffers[cur].ref);
-		}
+//		if (_this->frame_buffers[cur].ref) {
+//			_this->frame_buffers[cur].ref->release(_this->frame_buffers[cur].ref);
+//		}
 
-		get_frame_info_str(&lg_plugin->fisheye_params[i],
-				(char*) _this->meta_buffers[cur],
-				(int*) &_this->meta_sizes[cur]);
-		_this->frame_buffers[cur] = *images[i];
-		if (_this->frame_buffers[cur].ref) {
-			_this->frame_buffers[cur].ref->addref(_this->frame_buffers[cur].ref);
-		}
-		_this->frame_buffers[cur].meta = _this->meta_buffers[cur];
-		_this->frame_buffers[cur].meta_size = _this->meta_sizes[cur];
-		image_p[i] = &_this->frame_buffers[cur];
+//		get_frame_info_str(&lg_plugin->fisheye_params[i],
+//				(char*) _this->meta_buffers[cur],
+//				(int*) &_this->meta_sizes[cur]);
+		_this->frame_buffers[cur] = images[i];
+//		if (_this->frame_buffers[cur].ref) {
+//			_this->frame_buffers[cur].ref->addref(_this->frame_buffers[cur].ref);
+//		}
+//		_this->frame_buffers[cur].meta = _this->meta_buffers[cur];
+//		_this->frame_buffers[cur].meta_size = _this->meta_sizes[cur];
+		image_p[i] = _this->frame_buffers[cur];
 		_this->framecount++;
 	}
 
