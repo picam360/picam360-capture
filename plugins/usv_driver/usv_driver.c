@@ -417,7 +417,7 @@ static int command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v1, v2, v3, v4;
@@ -439,7 +439,7 @@ static int command_handler(void *user_data, const char *_buff) {
 				printf("%s : completed\n", buff);
 			}
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_thruster_mode", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_thruster_mode", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v;
@@ -450,7 +450,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_thruster_mode : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_light_strength", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v;
@@ -461,7 +461,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_light_strength : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_lowlevel_control", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_lowlevel_control", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
@@ -470,7 +470,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			lg_lowlevel_control = (value != 0);
 			printf("set_lowlevel_control : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_emergency_mode", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_emergency_mode", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
@@ -480,7 +480,7 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			printf("set_emergency_mode : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_pid_enabled", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_pid_enabled", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
@@ -494,7 +494,7 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			printf("set_pid_enabled : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_heading_lock", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_heading_lock", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
@@ -504,7 +504,7 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			printf("set_heading_lock : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_light_value", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int id = 0;
@@ -516,7 +516,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%f", &value);
 			printf("set_light_value : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "set_motor_value", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int id = 0;
@@ -546,9 +546,12 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 	}
 }
 
-static void init_options(void *user_data, json_t *options) {
+static void init_options(void *user_data, json_t *_options) {
+	PLUGIN_T *plugin = (PLUGIN_T*) user_data;
+	json_t *options = json_object_get(_options, PLUGIN_NAME);
+
 	{ //pid_gain
-		json_t *ary1 = json_object_get(options, PLUGIN_NAME ".pid_gain");
+		json_t *ary1 = json_object_get(options, "pid_gain");
 		if (json_is_array(ary1)) {
 			int size1 = json_array_size(ary1);
 			for (int i1 = 0; i1 < MIN(size1, PID_NUM); i1++) {
@@ -565,7 +568,7 @@ static void init_options(void *user_data, json_t *options) {
 
 	for (int i = 0; i < LIGHT_NUM; i++) {
 		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".light%d_id", i);
+		sprintf(buff, "light%d_id", i);
 		int id = (int) json_number_value(json_object_get(options, buff));
 		if (id != 0) {
 			lg_light_id[i] = id;
@@ -575,12 +578,12 @@ static void init_options(void *user_data, json_t *options) {
 	for (int i = 0; i < MOTOR_NUM; i++) {
 		char buff[256];
 		int value;
-		sprintf(buff, PLUGIN_NAME ".motor%d_id", i);
+		sprintf(buff, "motor%d_id", i);
 		value = (int) json_number_value(json_object_get(options, buff));
 		if (value != 0) {
 			lg_motor_id[i] = value;
 		}
-		sprintf(buff, PLUGIN_NAME ".motor%d_dir", i);
+		sprintf(buff, "motor%d_dir", i);
 		value = (int) json_number_value(json_object_get(options, buff));
 		if (value != 0) {
 			lg_motor_dir[i] = value;
@@ -588,25 +591,28 @@ static void init_options(void *user_data, json_t *options) {
 	}
 	{
 		float value;
-		value = json_number_value(json_object_get(options, PLUGIN_NAME ".motor_center"));
+		value = json_number_value(json_object_get(options, "motor_center"));
 		if (value != 0) {
 			lg_motor_center = value;
 		}
-		value = json_number_value(json_object_get(options, PLUGIN_NAME ".motor_margin"));
+		value = json_number_value(json_object_get(options, "motor_margin"));
 		if (value != 0) {
 			lg_motor_margin = value;
 		}
-		value = json_number_value(json_object_get(options, PLUGIN_NAME ".motor_range"));
+		value = json_number_value(json_object_get(options, "motor_range"));
 		if (value != 0) {
 			lg_motor_range = value;
 		}
 	}
-	lg_thruster_mode = (int) json_number_value(json_object_get(options, PLUGIN_NAME ".thruster_mode"));
+	lg_thruster_mode = (int) json_number_value(json_object_get(options, "thruster_mode"));
 
 	init_pwm(); //need motor ids
 }
 
-static void save_options(void *user_data, json_t *options) {
+static void save_options(void *user_data, json_t *_options) {
+	json_t *options = json_object();
+	json_object_set_new(_options, PLUGIN_NAME, options);
+
 	{ //pid_gain
 		json_t *ary1 = json_array();
 		for (int i1 = 0; i1 < PID_NUM; i1++) {
@@ -616,29 +622,29 @@ static void save_options(void *user_data, json_t *options) {
 			}
 			json_array_append_new(ary1, ary2);
 		}
-		json_object_set_new(options, PLUGIN_NAME ".pid_gain", ary1);
+		json_object_set_new(options, "pid_gain", ary1);
 	}
 
 	for (int i = 0; i < LIGHT_NUM; i++) {
 		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".light%d_id", i);
+		sprintf(buff, "light%d_id", i);
 		json_object_set_new(options, buff, json_real(lg_light_id[i]));
 	}
 
 	for (int i = 0; i < MOTOR_NUM; i++) {
 		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".motor%d_id", i);
+		sprintf(buff, "motor%d_id", i);
 		json_object_set_new(options, buff, json_real(lg_motor_id[i]));
-		sprintf(buff, PLUGIN_NAME ".motor%d_dir", i);
+		sprintf(buff, "motor%d_dir", i);
 		json_object_set_new(options, buff, json_real(lg_motor_dir[i]));
 	}
 
 	{
-		json_object_set_new(options, PLUGIN_NAME ".motor_center", json_real(lg_motor_center));
-		json_object_set_new(options, PLUGIN_NAME ".motor_margin", json_real(lg_motor_margin));
-		json_object_set_new(options, PLUGIN_NAME ".motor_range", json_real(lg_motor_range));
+		json_object_set_new(options, "motor_center", json_real(lg_motor_center));
+		json_object_set_new(options, "motor_margin", json_real(lg_motor_margin));
+		json_object_set_new(options, "motor_range", json_real(lg_motor_range));
 	}
-	json_object_set_new(options, PLUGIN_NAME ".thruster_mode", json_real(lg_thruster_mode));
+	json_object_set_new(options, "thruster_mode", json_real(lg_thruster_mode));
 }
 
 #define MAX_INFO_LEN 1024
