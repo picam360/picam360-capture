@@ -44,7 +44,7 @@ typedef struct _image_recorder_private {
 	char base_path[257];
 	enum RECORDER_MODE mode;
 	bool repeat;
-	int fps;
+	float fps;
 
 	bool eof;
 	bool pif_split; //split pif
@@ -153,7 +153,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 			} else if (_this->repeat) {
 				printf("repeat\n");
 				_this->play_framecount_offset = _this->play_framecount;
-				sleep(1);//wait 1sec
+				sleep(1); //wait 1sec
 			} else {
 				printf("eof\n");
 				_this->eof = true;
@@ -172,7 +172,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 						&diff);
 				elapsed_sec = (float) diff.tv_sec
 						+ (float) diff.tv_usec / 1000000;
-				_this->fps = (int) (1.0 / elapsed_sec + 0.5);
+				_this->fps = 1.0 / elapsed_sec;
 			}
 		} else {
 			struct timeval now;
@@ -184,8 +184,8 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 			timersub(&now, &_this->base_timestamp, &diff);
 			elapsed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 			elapsed_sec_target -= elapsed_sec;
-			if (elapsed_sec_target > 10) {
-				elapsed_sec_target = 10;
+			if (elapsed_sec_target > 60) {
+				elapsed_sec_target = 60;
 				printf("something wrong : %s\n", __FILE__);
 			}
 			if (elapsed_sec_target > 0) {
@@ -271,7 +271,7 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 				|| value_str[0] == 'T');
 		return 0;
 	} else if (strcmp(param, "fps") == 0) {
-		sscanf(value_str, "%d", &_this->fps);
+		sscanf(value_str, "%f", &_this->fps);
 		return 0;
 	} else if (strcmp(param, "skipframe") == 0) {
 		sscanf(value_str, "%d", &_this->skipframe);
