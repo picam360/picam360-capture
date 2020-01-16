@@ -40,15 +40,14 @@ typedef struct _plugin_private {
 } plugin_private;
 static plugin_private *lg_plugin = NULL;
 
-#define BUFFER_NUM 4
+typedef struct _PICAM360_IMAGE_WRAPPER_T {
+	PICAM360_IMAGE_T super;
+	REFERENCE_H *original_ref;
+} PICAM360_IMAGE_WRAPPER_T;
 typedef struct _fisheye_params_private {
 	VSTREAMER_T super;
 
 	int cam_num;
-	unsigned int framecount;
-	PICAM360_IMAGE_T *frame_buffers[BUFFER_NUM];
-	uint8_t meta_buffers[BUFFER_NUM][RTP_MAXPAYLOADSIZE];
-	uint32_t meta_sizes[BUFFER_NUM];
 } fisheye_params_private;
 
 static void start(void *user_data) {
@@ -89,6 +88,20 @@ static int get_frame_info_str(FISHEYE_PARAMS_T *params, char *buff,
 	return 0;
 }
 
+static int release_PICAM360_IMAGE_WRAPPER_T(void *obj) {
+	PICAM360_IMAGE_WRAPPER_T *image = (PICAM360_IMAGE_WRAPPER_T*) obj;
+
+	if (image->super.meta) {
+		free(image->super.meta);
+	}
+	if (image->original_ref) {
+		image->original_ref->release(image->original_ref);
+	}
+	free(image);
+
+	return 0;
+}
+
 static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 		int wait_usec) {
 	fisheye_params_private *_this = (fisheye_params_private*) obj;
@@ -103,24 +116,17 @@ static int get_image(void *obj, PICAM360_IMAGE_T **image_p, int *num_p,
 
 	*num_p = MIN(num, *num_p);
 	for (int i = 0; i < *num_p; i++) {
-		int cur = _this->framecount % BUFFER_NUM;
+		PICAM360_IMAGE_WRAPPER_T *image = (PICAM360_IMAGE_WRAPPER_T*) malloc(
+				sizeof(PICAM360_IMAGE_WRAPPER_T));
+		image->super = *images[i];
+		image->original_ref = images[i]->ref;
+		image->super.meta = (unsigned char*) malloc(RTP_MAXPAYLOADSIZE);
+		create_reference(&image->super.ref, release_PICAM360_IMAGE_WRAPPER_T,
+				image);
 
-		//release
-//		if (_this->frame_buffers[cur].ref) {
-//			_this->frame_buffers[cur].ref->release(_this->frame_buffers[cur].ref);
-//		}
-
-//		get_frame_info_str(&lg_plugin->fisheye_params[i],
-//				(char*) _this->meta_buffers[cur],
-//				(int*) &_this->meta_sizes[cur]);
-		_this->frame_buffers[cur] = images[i];
-//		if (_this->frame_buffers[cur].ref) {
-//			_this->frame_buffers[cur].ref->addref(_this->frame_buffers[cur].ref);
-//		}
-//		_this->frame_buffers[cur].meta = _this->meta_buffers[cur];
-//		_this->frame_buffers[cur].meta_size = _this->meta_sizes[cur];
-		image_p[i] = _this->frame_buffers[cur];
-		_this->framecount++;
+		get_frame_info_str(&lg_plugin->fisheye_params[i],
+				(char*) image->super.meta, (int*) &image->super.meta_size);
+		image_p[i] = &image->super;
 	}
 
 	return 0;
@@ -383,7 +389,8 @@ static void save_options(void *user_data, json_t *_options) {
 				int size2 = 3;
 				for (int j = 0; j < size2; j++) {
 					json_array_append_new(ary2,
-							json_real(lg_plugin->fisheye_params[i].cam_offset[j]));
+							json_real(
+									lg_plugin->fisheye_params[i].cam_offset[j]));
 				}
 				json_array_append_new(ary, ary2);
 			}
