@@ -340,14 +340,16 @@ static int command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "start_compass_calib", sizeof(buff)) == 0) {
 		lg_is_compass_calib = true;
 		for (int i = 0; i < 3; i++) {
 			lg_compass_min[i] = INT_MAX;
 			lg_compass_max[i] = -INT_MAX;
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff)) == 0) {
+		printf("start_compass_calib!\n");
+	} else if (strncmp(cmd, "stop_compass_calib", sizeof(buff)) == 0) {
 		lg_is_compass_calib = false;
+		printf("stop_compass_calib!\n");
 	}
 	return 0;
 }
@@ -361,41 +363,50 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 	}
 }
 
-static void init_options(void *user_data, json_t *options) {
-	lg_offset_pitch = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_pitch"));
-	lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
-	lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
-	lg_i2c_ch = json_number_value(json_object_get(options, PLUGIN_NAME ".i2c_ch"));
-	lg_debugdump_compass0 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass0"));
-	lg_debugdump_compass1 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass1"));
-	lg_debugdump_compass2 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_compass2"));
-	lg_debugdump_quat0 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat0"));
-	lg_debugdump_quat1 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat1"));
-	lg_debugdump_quat2 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat2"));
-	lg_debugdump_quat3 = json_number_value(json_object_get(options, PLUGIN_NAME ".debugdump_quat3"));
+static void init_options(void *user_data, json_t *_options) {
+	PLUGIN_T *plugin = (PLUGIN_T*) user_data;
+	json_t *options = json_object_get(_options, PLUGIN_NAME);
+	if (options == NULL) {
+		return;
+	}
+
+	lg_offset_pitch = json_number_value(json_object_get(options, "offset_pitch"));
+	lg_offset_yaw = json_number_value(json_object_get(options, "offset_yaw"));
+	lg_offset_roll = json_number_value(json_object_get(options, "offset_roll"));
+	lg_i2c_ch = json_number_value(json_object_get(options, "i2c_ch"));
+	lg_debugdump_compass0 = json_number_value(json_object_get(options, "debugdump_compass0"));
+	lg_debugdump_compass1 = json_number_value(json_object_get(options, "debugdump_compass1"));
+	lg_debugdump_compass2 = json_number_value(json_object_get(options, "debugdump_compass2"));
+	lg_debugdump_quat0 = json_number_value(json_object_get(options, "debugdump_quat0"));
+	lg_debugdump_quat1 = json_number_value(json_object_get(options, "debugdump_quat1"));
+	lg_debugdump_quat2 = json_number_value(json_object_get(options, "debugdump_quat2"));
+	lg_debugdump_quat3 = json_number_value(json_object_get(options, "debugdump_quat3"));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		sprintf(buff, "compass_min_%d", i);
 		lg_compass_min[i] = json_number_value(json_object_get(options, buff));
-		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		sprintf(buff, "compass_max_%d", i);
 		lg_compass_max[i] = json_number_value(json_object_get(options, buff));
 	}
 
 	init();
 }
 
-static void save_options(void *user_data, json_t *options) {
-	json_object_set_new(options, PLUGIN_NAME ".offset_pitch", json_real(lg_offset_pitch));
-	json_object_set_new(options, PLUGIN_NAME ".offset_yaw", json_real(lg_offset_yaw));
-	json_object_set_new(options, PLUGIN_NAME ".offset_roll", json_real(lg_offset_roll));
-	json_object_set_new(options, PLUGIN_NAME ".i2c_ch", json_real(lg_i2c_ch));
+static void save_options(void *user_data, json_t *_options) {
+	json_t *options = json_object();
+	json_object_set_new(_options, PLUGIN_NAME, options);
+
+	json_object_set_new(options, "offset_pitch", json_real(lg_offset_pitch));
+	json_object_set_new(options, "offset_yaw", json_real(lg_offset_yaw));
+	json_object_set_new(options, "offset_roll", json_real(lg_offset_roll));
+	json_object_set_new(options, "i2c_ch", json_real(lg_i2c_ch));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
-		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		sprintf(buff, "compass_min_%d", i);
 		json_object_set_new(options, buff, json_real(lg_compass_min[i]));
-		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		sprintf(buff, "compass_max_%d", i);
 		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
 	}
 }
