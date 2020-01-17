@@ -1,43 +1,43 @@
 Host SSH_PF
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/22_device.key
+  IdentityFile ~/.ssh/%PORT%_device_rsa
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null 
   ServerAliveInterval 60
   ServerAliveCountMax 3
   ExitOnForwardFailure yes
-  RemoteForward 22 localhost:22
+  RemoteForward %PORT% localhost:22
 
 Host WWW_PF     
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/9001_device.key
+  IdentityFile ~/.ssh/%PORT%_device_rsa
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   ServerAliveInterval 60
   ServerAliveCountMax 3
   ExitOnForwardFailure yes
-  RemoteForward 9001 localhost:9001
+  RemoteForward %PORT% localhost:9001
 
 Host NODEDEBUG_PF     
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/9229_device.key
+  IdentityFile ~/.ssh/%PORT%_device_rsa
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   ServerAliveInterval 60
   ServerAliveCountMax 3
   ExitOnForwardFailure yes
-  RemoteForward 9229 localhost:9229
+  RemoteForward %PORT% localhost:9229
 
 Host PYTHONDEBUG_PF     
   HostName pf.picam360.com
-  IdentityFile ~/.ssh/5678_device.key
+  IdentityFile ~/.ssh/%PORT%_device_rsa
   User ssh-gateway
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   ServerAliveInterval 60
   ServerAliveCountMax 3
   ExitOnForwardFailure yes
-  RemoteForward 5678 localhost:5678
+  RemoteForward %PORT% localhost:5678
