@@ -23,9 +23,49 @@
 #include "bcm_host.h"
 #endif
 
+#ifdef USE_GLEW
+#include <GL/glew.h>
+#endif
+
+#ifdef USE_GLFW
+#include <GLFW/glfw3.h>
+#endif
+
+static void glfwErrorCallback(int num, const char *err_str) {
+	printf("GLFW Error: %s\n", err_str);
+}
+
 void init_egl(EGL_HANDLER_T *state) {
 #ifdef USE_GLES
-#ifdef BCM_HOST
+#ifdef USE_GLFW
+	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+	glfwSetErrorCallback(glfwErrorCallback);
+	if (glfwInit() == GL_FALSE) {
+		printf("error on glfwInit\n");
+	}
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	state->screen_width = 640;
+	state->screen_height = 480;
+	state->glfw_window = glfwCreateWindow(state->screen_width, state->screen_height, "picam360", NULL, NULL);
+
+	glfwMakeContextCurrent(state->glfw_window);
+
+#ifdef USE_GLEW
+	glewExperimental = GL_TRUE; //avoid glGenVertexArrays crash with glew-1.13
+	if (glewInit() != GLEW_OK) {
+		printf("error on glewInit\n");
+	}
+#endif
+	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+#elif BCM_HOST
+
+	bcm_host_init();
+	printf("Note: ensure you have sufficient gpu_mem configured\n");
+
 	int32_t success = 0;
 	EGLBoolean result;
 	EGLint num_config;
@@ -156,9 +196,10 @@ void init_egl(EGL_HANDLER_T *state) {
 	eh_activate_context(state);
 }
 
-
-void eh_activate_context(EGL_HANDLER_T *handler){
-#ifdef USE_GLES
+void eh_activate_context(EGL_HANDLER_T *handler) {
+#ifdef USE_GLFW
+	return;
+#elif USE_GLES
 #ifdef CONTEXT_SHARING
 	EGLBoolean result;
 	result = eglMakeCurrent(handler->display, handler->surface, handler->surface, handler->context);
@@ -166,12 +207,28 @@ void eh_activate_context(EGL_HANDLER_T *handler){
 #endif
 #endif
 }
-void eh_deactivate_context(EGL_HANDLER_T *handler){
-#ifdef USE_GLES
+void eh_deactivate_context(EGL_HANDLER_T *handler) {
+#ifdef USE_GLFW
+	return;
+#elif USE_GLES
 #ifdef CONTEXT_SHARING
 	EGLBoolean result;
 	result = eglMakeCurrent(handler->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	assert(EGL_FALSE != result);
 #endif
+#endif
+}
+void* eh_get_context(EGL_HANDLER_T *handler) {
+#ifdef USE_GLFW
+	return NULL;
+#else
+	return handler->context;
+#endif
+}
+void* eh_get_display(EGL_HANDLER_T *handler) {
+#ifdef USE_GLFW
+	return NULL;
+#else
+	return handler->display;
 #endif
 }

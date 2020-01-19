@@ -12,6 +12,9 @@ if(BCM_HOST)
 	set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/vc/lib/pkgconfig")
 	pkg_check_modules(BCMHOST bcm_host REQUIRED)
 	add_definitions(-DBCM_HOST)
+	#set( USE_GLFW ON )
+	#add_definitions(-DUSE_GLFW)
+	#add_definitions(-DGLFW_INCLUDE_ES2)
 	include_directories( ${BCMHOST_INCLUDE_DIRS} )
 	link_directories( ${BCMHOST_LIBRARY_DIRS} ) # need to upper of add_executable
 endif()
@@ -77,6 +80,20 @@ link_directories(
 	${LIBEDIT_LIBRARY_DIRS}
 	${UUID_LIBRARY_DIRS}
 )
+
+#glfw
+if(USE_GLFW)
+	pkg_check_modules(GLFW glfw3 REQUIRED)
+	include_directories( ${GLFW_INCLUDE_DIRS} )
+	link_directories( ${GLFW_LIBRARY_DIRS} )
+endif()
+
+#glew
+if(USE_GLEW)
+	pkg_check_modules(GLEW glew>=2.1 REQUIRED)
+	include_directories( ${GLEW_INCLUDE_DIRS} )
+	link_directories( ${GLEW_LIBRARY_DIRS} )
+endif()
 
 #opengl
 if(USE_GLES)
@@ -171,7 +188,17 @@ if(USE_GLES)
 	target_link_libraries(picam360-capture.bin ${GLES_LIBRARIES} ${EGL_LIBRARIES} ${FREETYPE_LIBRARIES} )
 else()
 	target_link_libraries(picam360-capture.bin ${CMAKE_CURRENT_SOURCE_DIR}/libs/freetype-gl/libfreetype-gl.a )
-	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${GLFW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
+	target_link_libraries(picam360-capture.bin ${OPENGL_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${FREETYPE_LIBRARIES})
+endif()
+
+#glfw
+if(USE_GLFW)
+	target_link_libraries(picam360-capture.bin ${GLFW_STATIC_LIBRARIES})
+endif()
+
+#glew
+if(USE_GLFW)
+	target_link_libraries(picam360-capture.bin ${GLEW_STATIC_LIBRARIES})
 endif()
 
 #install

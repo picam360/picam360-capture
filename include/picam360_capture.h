@@ -5,12 +5,11 @@
 #include "GLES2/gl2.h"
 #include "GLES2/gl2ext.h"
 #else
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
 //#include "GL/gl.h"
 //#include "GL/glut.h"
 //#include "GL/glext.h"
 #endif
+
 #include <pthread.h>
 #include "mrevent.h"
 #include "rtp.h"

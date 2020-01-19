@@ -71,10 +71,6 @@
 // POSIX
 #endif
 
-#ifdef BCM_HOST
-#include "bcm_host.h"
-#endif
-
 #define PATH "./"
 #define PICAM360_HISTORY_FILE ".picam360_history"
 #define PLUGIN_NAME "picam360"
@@ -126,10 +122,6 @@ static int end_width(const char *str, const char *suffix) {
 	if (lensuffix > lenstr)
 		return 0;
 	return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
-}
-
-static void glfwErrorCallback(int num, const char *err_str) {
-	printf("GLFW Error: %s\n", err_str);
 }
 
 static int load_texture(const char *filename, uint32_t *tex_out) {
@@ -1379,18 +1371,10 @@ static void set_camera_north(float value) {
 }
 
 static void* get_display() {
-#ifdef USE_GLES
-	return state->egl_handler.display;
-#else
-	return NULL;
-#endif
+	return eh_get_display(&state->egl_handler);
 }
 static void* get_context() {
-#ifdef USE_GLES
-	return state->egl_handler.context;
-#else
-	return NULL;
-#endif
+	return eh_get_context(&state->egl_handler);
 }
 static void lock_texture() {
 	pthread_mutex_lock(&state->texture_mutex);
@@ -2109,10 +2093,6 @@ int main(int argc, char *argv[]) {
 		//frame mutex init
 		pthread_mutex_init(&state->cmd_list_mutex, 0);
 	}
-#if BCM_HOST
-	bcm_host_init();
-	printf("Note: ensure you have sufficient gpu_mem configured\n");
-#endif
 
 	init_plugin_host(state);
 
