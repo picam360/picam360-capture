@@ -51,8 +51,22 @@ static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
 	return data_len;
 }
 
-static void send_image(RTP_T *rtp, PICAM360_IMAGE_T *image) {
-	save_picam360_image(&image, 1, _write, (void*) rtp);
+static void send_image(RTP_T *rtp, PICAM360_IMAGE_T **image, int num) {
+	if(num > 1)
+	{
+		unsigned char soia[4] = { 'S', 'O', 'I', 'A' }; //start of image array
+		rtp_sendpacket(rtp, soia, 4, PT_CAM_BASE);
+		rtp_flush(rtp);
+	}
+
+	save_picam360_image(images, num, _write, (void*) rtp);
+
+	if(num > 1)
+	{
+		unsigned char eoia[4] = { 'E', 'O', 'I', 'A' }; //end of image array
+		rtp_sendpacket(rtp, eoia, 4, PT_CAM_BASE);
+		rtp_flush(rtp);
+	}
 }
 
 static void* streaming_thread_fnc(void *obj) {
@@ -72,19 +86,19 @@ static void* streaming_thread_fnc(void *obj) {
 			continue;
 		}
 		int ret;
-		int num = 1;
-		PICAM360_IMAGE_T *image;
+		int num = MAX_CAM_NUM;
+		PICAM360_IMAGE_T *images[MAX_CAM_NUM];
 		ret = _this->super.pre_streamer->get_image(_this->super.pre_streamer,
-				&image, &num, 100 * 1000);
+				images, &num, 100 * 1000);
 		if (ret != 0) {
 			continue;
 		}
-		if (num != 1 || image->mem_type != PICAM360_MEMORY_TYPE_PROCESS) {
+		if (image->mem_type != PICAM360_MEMORY_TYPE_PROCESS) {
 			printf("%s : something wrong!\n", __FILE__);
 			continue;
 		}
 
-		send_image(rtp, image);
+		send_image(rtp, images, num);
 
 		if (image->ref) {
 			image->ref->release(image->ref);
