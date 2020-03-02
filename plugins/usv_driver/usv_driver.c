@@ -224,9 +224,10 @@ void *pid_control_single(float t_s, float north) {
 }
 void *pid_control_double(float t_s, float north) {
 	if (!lg_pid_enabled) {
+		float gain = 2.0;
 		float rudder = lg_target_heading / 180;
-		float value_r = lg_thrust + rudder / 2;
-		float value_l = lg_thrust - rudder / 2;
+		float value_r = lg_thrust + gain*rudder / 2;
+		float value_l = lg_thrust - gain*rudder / 2;
 		if (lg_emergency_mode) {
 			lg_motor_value[0] = 0;
 			lg_motor_value[1] = 0;
