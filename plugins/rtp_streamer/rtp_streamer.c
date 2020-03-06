@@ -51,9 +51,8 @@ static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
 	return data_len;
 }
 
-static void send_image(RTP_T *rtp, PICAM360_IMAGE_T **image, int num) {
-	if(num > 1)
-	{
+static void send_image(RTP_T *rtp, PICAM360_IMAGE_T **images, int num) {
+	if (num > 1) {
 		unsigned char soia[4] = { 'S', 'O', 'I', 'A' }; //start of image array
 		rtp_sendpacket(rtp, soia, 4, PT_CAM_BASE);
 		rtp_flush(rtp);
@@ -61,8 +60,7 @@ static void send_image(RTP_T *rtp, PICAM360_IMAGE_T **image, int num) {
 
 	save_picam360_image(images, num, _write, (void*) rtp);
 
-	if(num > 1)
-	{
+	if (num > 1) {
 		unsigned char eoia[4] = { 'E', 'O', 'I', 'A' }; //end of image array
 		rtp_sendpacket(rtp, eoia, 4, PT_CAM_BASE);
 		rtp_flush(rtp);
@@ -93,15 +91,17 @@ static void* streaming_thread_fnc(void *obj) {
 		if (ret != 0) {
 			continue;
 		}
-		if (image->mem_type != PICAM360_MEMORY_TYPE_PROCESS) {
+		if (images[0]->mem_type != PICAM360_MEMORY_TYPE_PROCESS) {
 			printf("%s : something wrong!\n", __FILE__);
 			continue;
 		}
 
 		send_image(rtp, images, num);
 
-		if (image->ref) {
-			image->ref->release(image->ref);
+		for (int i = 0; i < num; i++) {
+			if (images[i]->ref) {
+				images[i]->ref->release(images[i]->ref);
+			}
 		}
 
 		{
@@ -113,7 +113,7 @@ static void* streaming_thread_fnc(void *obj) {
 			struct timeval now;
 			gettimeofday(&now, NULL);
 
-			timersub(&now, &image->timestamp, &diff);
+			timersub(&now, &images[0]->timestamp, &diff);
 			_elapsed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 			if ((count % 200) == 0) {
 				printf("rtp : %f\n", _elapsed_sec);
