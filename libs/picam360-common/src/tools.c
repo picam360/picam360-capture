@@ -68,16 +68,21 @@ int mkdir_path(const char *filepath, mode_t mode) {
 	return (0);
 }
 
-void strchg(char *buf, const char *str1, const char *str2)
-{
-  char tmp[1024 + 1];
-  char *p;
+void strchg(char *buf, const char *str1, const char *str2) {
+	char tmp[1024 + 1];
+	char *p;
 
-  while ((p = strstr(buf, str1)) != NULL) {
-    *p = '\0';
-    p += strlen(str1);
-    strcpy(tmp, p);
-    strcat(buf, str2);
-    strcat(buf, tmp);
-  }
+	while ((p = strstr(buf, str1)) != NULL) {
+		*p = '\0';
+		p += strlen(str1);
+		strcpy(tmp, p);
+		strcat(buf, str2);
+		strcat(buf, tmp);
+	}
+}
+
+int strcasecmpr(const char *str1, const char *str2) {
+	int len1 = strlen(str1);
+	int len2 = strlen(str2);
+	return strcasecmp(str1 + len1 - len2, str2);
 }

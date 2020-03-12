@@ -42,6 +42,7 @@ typedef struct _image_recorder_private {
 
 	char tag[128];
 	char base_path[257];
+	char meta_path[257];
 	enum RECORDER_MODE mode;
 	bool repeat;
 	float fps;
@@ -135,18 +136,88 @@ static void stop(void *user_data) {
 	}
 }
 
+static size_t read_file(const char *file, unsigned char **data) {
+	if (data == NULL) {
+		return 0;
+	}
+
+	FILE *fp = fopen(file, "rb");
+	size_t length = 0;
+
+	if (fp) {
+		fseek(fp, 0, SEEK_END);
+		length = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+
+		*data = (unsigned char*) malloc(length + 1);
+		length = fread(*data, 1, length, fp);
+		(*data)[length] = '\0';
+
+		fclose(fp);
+	}
+
+	return length;
+}
+
+static int image_release(void *user_data) {
+	PICAM360_IMAGE_T *image = (PICAM360_IMAGE_T*) user_data;
+	for (int i = 0; i < 3; i++) {
+		if (image->pixels[i] == NULL) {
+			continue;
+		}
+		free(image->pixels[i]);
+	}
+	if (image->meta != NULL) {
+		free(image->meta);
+	}
+	free(image);
+}
+
 static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 		int wait_usec) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
 
 	if (_this->mode == RECORDER_MODE_PLAY) {
+		bool no_more_frame = false;
 		char path[512];
-		sprintf(path, "%s/%d.pif", _this->base_path,
-				_this->play_framecount - _this->play_framecount_offset + 1);
-		strchg(path, "${tag}", _this->tag);
+		if (strcasecmpr(_this->base_path, ".jpeg") == 0
+				|| strcasecmpr(_this->base_path, ".jpg") == 0) {
+			sprintf(path, _this->base_path,
+					_this->play_framecount - _this->play_framecount_offset + 1);
+			unsigned char *pixels = NULL;
+			int len = read_file(path, &pixels);
+			if (pixels == NULL) {
+				no_more_frame = true;
+			} else {
+				PICAM360_IMAGE_T *frame = (PICAM360_IMAGE_T*) malloc(
+						sizeof(PICAM360_IMAGE_T));
+				memset(frame, 0, sizeof(PICAM360_IMAGE_T));
+				create_reference(&frame->ref, image_release, frame);
+				//frame->timestamp = timestamp;
+				frame->mem_type = PICAM360_MEMORY_TYPE_PROCESS;
+				frame->width[0] = len;
+				frame->stride[0] = len;
+				frame->height[0] = 1;
+				frame->pixels[0] = pixels;
+				frame->num_of_planes = 1;
+				memcpy(frame->img_type, "JPEG", 4);
+				frame->meta_size = read_file(_this->meta_path, &frame->meta);
 
-		int ret = load_picam360_image_from_file(path, images_p, num_p);
-		if (ret != 0) {
+				images_p[0] = frame;
+				*num_p = 1;
+			}
+			if (_this->fps <= 0) {
+				_this->fps = 1;
+			}
+		} else {
+			sprintf(path, "%s/%d.pif", _this->base_path,
+					_this->play_framecount - _this->play_framecount_offset + 1);
+			strchg(path, "${tag}", _this->tag);
+
+			int ret = load_picam360_image_from_file(path, images_p, num_p);
+			no_more_frame = (ret != 0);
+		}
+		if (no_more_frame) {
 			if (_this->play_framecount == 0) {
 				printf("not found %s\n", path);
 				sleep(1);
@@ -259,6 +330,10 @@ static int set_param(void *obj, const char *param, const char *value_str) {
 			_this->base_path[len - 1] = '\0';
 			len--;
 		}
+		return 0;
+	} else if (strcmp(param, "meta_path") == 0) {
+		int len = snprintf(_this->meta_path, sizeof(_this->meta_path) - 1, "%s",
+				value_str);
 		return 0;
 	} else if (strcmp(param, "tag") == 0) {
 		int len = snprintf(_this->tag, sizeof(_this->tag) - 1, "%s", value_str);
