@@ -41,6 +41,7 @@ static int _command_handler(int argc, char *argv[]) {
 		int keyframe_interval = 1;
 		int fps = 10;
 		int fov = 120;
+		char tmp_path[257] = { };
 		char *i_str = NULL; //input
 		char *r_str = NULL; //rendering
 		char *e_str = NULL; //encode
@@ -60,6 +61,7 @@ static int _command_handler(int argc, char *argv[]) {
 				break;
 			case 'o':
 				o_str = optarg;
+				snprintf(tmp_path, sizeof(tmp_path) - 1, "%s.tmp", o_str);
 				break;
 			case 'n':
 				sscanf(optarg, "%d", &n);
@@ -78,13 +80,14 @@ static int _command_handler(int argc, char *argv[]) {
 		}
 		{ //config
 			char path[512];
-			sprintf(path, "%s/config.json", o_str);
+			sprintf(path, "%s/config.json", tmp_path);
 			ret = mkdir_path(path, 0775);
 
 			json_t *options = json_object();
 			json_object_set_new(options, "num_per_quarter", json_integer(n));
 			json_object_set_new(options, "fps", json_integer(fps));
-			json_object_set_new(options, "keyframe_interval", json_integer(keyframe_interval));
+			json_object_set_new(options, "keyframe_interval",
+					json_integer(keyframe_interval));
 			json_object_set_new(options, "keyframe_offset", json_object());
 			json_dump_file(options, path,
 					JSON_PRESERVE_ORDER | JSON_INDENT(4)
@@ -113,7 +116,7 @@ static int _command_handler(int argc, char *argv[]) {
 				buff_size += strlen(i_str);
 				buff_size += strlen(r_str);
 				buff_size += strlen(e_str);
-				buff_size += strlen(o_str);
+				buff_size += strlen(tmp_path);
 				char *def = (char*) malloc(buff_size);
 
 				int len = 0;
@@ -123,8 +126,8 @@ static int _command_handler(int argc, char *argv[]) {
 						vq.y, vq.z, vq.w, fov);
 				len += snprintf(def + len, buff_size - len, "!%s", e_str);
 				len += snprintf(def + len, buff_size - len,
-						"!image_recorder base_path=%s/%d_%d mode=RECORD", o_str,
-						pitch, yaw); //x_y
+						"!image_recorder base_path=%s/%d_%d mode=RECORD",
+						tmp_path, pitch, yaw); //x_y
 
 				uuid_t uuid;
 				uuid_generate(uuid);
@@ -147,6 +150,15 @@ static int _command_handler(int argc, char *argv[]) {
 				}
 				lg_plugin_host->destroy_vstream(uuid);
 			}
+		}
+		{ //pvf archive
+			int ret;
+			char buff[256];
+			snprintf(buff, sizeof(buff), "(cd %s && zip -0r - *) > %s",
+					tmp_path, o_str);
+			ret = system(buff);
+			snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
+			ret = system(buff);
 		}
 		printf("%s : completed\n", cmd);
 	}
