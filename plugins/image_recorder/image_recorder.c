@@ -100,6 +100,9 @@ static void* streaming_thread_func(void *obj) {
 			++_this->record_framecount; //start from 1
 			snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
 					_this->record_framecount);
+
+			printf("save! : %d : %d\n",_this->record_framecount, images[0]->stride[0]);
+
 			ret = save_picam360_image_to_file(path, images, num,
 					_this->pif_split);
 			if (_this->record_framecount == _this->limit_record_framecount) {

@@ -78,16 +78,24 @@ int save_picam360_image(PICAM360_IMAGE_T **images, int num,
 
 static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
 		int plane_num, char *img_type) {
+	int ret;
 	void **params = user_data;
 	if (img_type == NULL || params[1] == NULL) {
-		return write((intptr_t) params[0], data, data_len);
+		for(int cur=0;cur < data_len;) {
+			ret = write((intptr_t) params[0], data + cur, data_len - cur);
+		    int errsv = errno;
+			if(ret < 0){
+				printf("\nerrno!:%d\n\n",errsv);
+				continue;
+			}
+			cur += ret;
+		}
 	} else {
 		char path[512] = { };
 		strncpy(path, params[1], sizeof(path));
 		snprintf(path, sizeof(path) - 1, "%s.%d.%d.%s", (char*) params[1],
 				img_num, plane_num, img_type);
 
-		int ret;
 		ret = mkdir_path(path, 0775);
 		if (ret < 0) {
 			printf("can not make directory : %s\n", path);
@@ -100,11 +108,19 @@ static size_t _write(void *user_data, void *data, size_t data_len, int img_num,
 			printf("can not make file : %s\n", path);
 			return -1;
 		}
-		ret = write(fd, data, data_len);
+		for(int cur=0;cur < data_len;) {
+			ret = write(fd, data + cur, data_len - cur);
+		    int errsv = errno;
+			if(ret < 0){
+				printf("\nerrno!:%d\n\n",errsv);
+				continue;
+			}
+			cur += ret;
+		}
 		close(fd);
-
-		return ret;
 	}
+
+	return ret;
 }
 
 int save_picam360_image_to_file(char *path, PICAM360_IMAGE_T **images, int num,
