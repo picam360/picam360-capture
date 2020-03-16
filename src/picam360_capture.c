@@ -270,7 +270,7 @@ static void get_rendering_params(VECTOR4D_T view_quat,
 static bool _destroy_vstream(VSTREAMER_T *_stream) {
 	VSTREAMER_T *tail = NULL;
 	for (tail = _stream; tail->next_streamer != NULL;tail = tail->next_streamer) {
-		//do nothing
+		_stream->stop(_stream);//tell stop
 	}
 	for (VSTREAMER_T *stream = tail; stream != NULL;) {
 		VSTREAMER_T *tmp = stream;
