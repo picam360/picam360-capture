@@ -27,9 +27,9 @@ enum PICAM360_PIXELMAP_TYPE {
 	PICAM360_PIXELMAP_TYPE_WINDOW,
 	PICAM360_PIXELMAP_TYPE_FISHEYE,
 	PICAM360_PIXELMAP_TYPE_PICAM360MAP,
-	PICAM360_PIXELMAP_TYPE_PICAM360MAP3D,//side_by_side
+	PICAM360_PIXELMAP_TYPE_PICAM360MAP3D, //side_by_side
 	PICAM360_PIXELMAP_TYPE_EQUIRECTANGULAR,
-	PICAM360_PIXELMAP_TYPE_EQUIRECTANGULAR3D,//top_and_botom
+	PICAM360_PIXELMAP_TYPE_EQUIRECTANGULAR3D, //top_and_botom
 	PICAM360_PIXELMAP_TYPE_CUBEMAP,
 };
 
@@ -55,10 +55,16 @@ typedef struct _PICAM360_IMAGE_T {
 } PICAM360_IMAGE_T;
 
 int save_picam360_image(PICAM360_IMAGE_T **images, int num,
-		size_t (*_write)(void*, void*, size_t, int, int, char *), void *user_data);
-int save_picam360_image_to_file(char *path, PICAM360_IMAGE_T **images,
-		int num, bool pif_split);
+		size_t (*_write)(void*, void*, size_t, int, int, char*),
+		void *user_data);
+int save_picam360_image_to_file(char *path, PICAM360_IMAGE_T **images, int num,
+		bool pif_split);
 int load_picam360_image(PICAM360_IMAGE_T **image_p, int *num_p,
-		size_t (*_read)(void*, void*, size_t, int, int, char *), void *user_data);
+		size_t (*_read)(void*, void*, size_t, int, int, char*),
+		void *user_data);
 int load_picam360_image_from_file(char *path, PICAM360_IMAGE_T **image_p,
 		int *num_p);
+
+int clone_picam360_image(
+		PICAM360_IMAGE_T **images_p, int *num_p,
+		PICAM360_IMAGE_T **images, int num);

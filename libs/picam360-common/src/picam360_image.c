@@ -271,3 +271,31 @@ int load_picam360_image_from_file(char *path, PICAM360_IMAGE_T **image_p,
 
 	return 0;
 }
+
+int clone_picam360_image(
+		PICAM360_IMAGE_T **images_p, int *num_p,
+		PICAM360_IMAGE_T **images, int num){
+	for (int i = 0; i < num & i < *num_p; i++) {
+		PICAM360_IMAGE_T *image = (PICAM360_IMAGE_T*) malloc(
+				sizeof(PICAM360_IMAGE_T));
+		memcpy(image, images[i], sizeof(PICAM360_IMAGE_T));
+		create_reference(&image->ref, release, image);
+		if (image->meta_size > 0) {
+			image->meta = (unsigned char*) malloc(image->meta_size + 1);
+			memcpy(image->meta, images[i]->meta, image->meta_size);
+			image->meta[image->meta_size] = '\0';
+		}
+		for (int j = 0; j < 3; j++) {
+			int size = image->stride[j] * image->height[j];
+			if (size == 0) {
+				continue;
+			}
+			image->pixels[j] = (unsigned char*) malloc(size);
+			memcpy(image->pixels[j], images[i]->pixels[j], size);
+		}
+
+		images_p[i] = image;
+	}
+
+	*num_p = num;
+}

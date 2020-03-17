@@ -15,6 +15,7 @@
 
 #include "image_recorder.h"
 #include "mrevent.h"
+#include "list.h"
 #include "tools.h"
 
 #define PLUGIN_NAME "image_recorder"
@@ -29,12 +30,22 @@ enum RECORDER_MODE {
 	RECORDER_MODE_IDLE, RECORDER_MODE_RECORD, RECORDER_MODE_PLAY
 };
 
+typedef struct _record_node {
+	char path[512];
+	int num;
+	PICAM360_IMAGE_T *images[MAX_CAM_NUM];
+} record_node;
+
 #define BUFFER_NUM 4
 typedef struct _image_recorder_private {
 	VSTREAMER_T super;
 
 	bool run;
 	pthread_t streaming_thread;
+
+	pthread_t record_thread;
+	pthread_mutex_t record_queue_mlock;
+	LIST_T *record_queue;
 
 	int framecount;
 	PICAM360_IMAGE_T *frame_buffers[BUFFER_NUM][MAX_CAM_NUM + 1];
@@ -63,6 +74,42 @@ static image_recorder_private *lg_menu_image_recorder = NULL;
 static char lg_record_path[512] = "Videos";
 static enum RECORDER_MODE lg_recorder_mode = RECORDER_MODE_IDLE;
 
+static void* record_thread_func(void *obj) {
+	image_recorder_private *_this = (image_recorder_private*) obj;
+
+	while (1) {
+		record_node *node = NULL;
+
+		pthread_mutex_lock(&_this->record_queue_mlock);
+
+		if (_this->record_queue) {
+			LIST_T *cur = _this->record_queue;
+			node = (record_node*) cur->value;
+			_this->record_queue = cur->next;
+			free(cur);
+		}
+
+		pthread_mutex_unlock(&_this->record_queue_mlock);
+
+		if (node == NULL) {
+			if (_this->run) {
+				usleep(100 * 1000);
+				continue;
+			} else {
+				break;
+			}
+		}
+
+		printf("save! : %s : %d\n", node->path, node->images[0]->stride[0]);
+
+		int ret = save_picam360_image_to_file(node->path, node->images,
+				node->num, _this->pif_split);
+		for (int i = 0; i < node->num; i++) {
+			node->images[i]->ref->release(node->images[i]->ref);
+		}
+		free(node);
+	}
+}
 static void* streaming_thread_func(void *obj) {
 	image_recorder_private *_this = (image_recorder_private*) obj;
 
@@ -96,15 +143,24 @@ static void* streaming_thread_func(void *obj) {
 
 		if (_this->mode == RECORDER_MODE_RECORD
 				&& _this->framecount % (_this->skipframe + 1) == 0) {
-			char path[512];
 			++_this->record_framecount; //start from 1
-			snprintf(path, sizeof(path) - 1, "%s/%d.pif", _this->base_path,
-					_this->record_framecount);
 
-			printf("save! : %d : %d\n",_this->record_framecount, images[0]->stride[0]);
+			record_node *node = (record_node*) malloc(sizeof(record_node));
+			memset(node, 0, sizeof(record_node));
 
-			ret = save_picam360_image_to_file(path, images, num,
-					_this->pif_split);
+			snprintf(node->path, sizeof(node->path) - 1, "%s/%d.pif",
+					_this->base_path, _this->record_framecount);
+			node->num = MAX_CAM_NUM;
+			ret = clone_picam360_image(node->images, &node->num, images, num);
+
+			pthread_mutex_lock(&_this->record_queue_mlock);
+
+			LIST_T **pp;
+			LIST_TAIL(pp, _this->record_queue);
+			LIST_NEW(pp, node);
+
+			pthread_mutex_unlock(&_this->record_queue_mlock);
+
 			if (_this->record_framecount == _this->limit_record_framecount) {
 				_this->mode = RECORDER_MODE_IDLE;
 			}
@@ -124,6 +180,8 @@ static void start(void *user_data) {
 	_this->run = true;
 	pthread_create(&_this->streaming_thread, NULL, streaming_thread_func,
 			(void*) _this);
+	pthread_create(&_this->record_thread, NULL, record_thread_func,
+			(void*) _this);
 }
 
 static void stop(void *user_data) {
@@ -132,6 +190,7 @@ static void stop(void *user_data) {
 	if (_this->run) {
 		_this->run = false;
 		pthread_join(_this->streaming_thread, NULL);
+		pthread_join(_this->record_thread, NULL);
 	}
 
 	if (_this->super.next_streamer) {
@@ -215,7 +274,7 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 		} else {
 			sprintf(path, "%s/%d.pif", _this->base_path,
 					_this->play_framecount - _this->play_framecount_offset + 1);
-			strchg(path, "${tag}", _this->tag);
+			strchg(path, "@tag@", _this->tag);
 
 			int ret = load_picam360_image_from_file(path, images_p, num_p);
 			no_more_frame = (ret != 0);
@@ -410,6 +469,7 @@ static void create_vstreamer(void *user_data, VSTREAMER_T **output_streamer) {
 
 	image_recorder_private *_private = (image_recorder_private*) streamer;
 	mrevent_init(&_private->frame_ready);
+	pthread_mutex_init(&_private->record_queue_mlock, NULL);
 
 	if (output_streamer) {
 		*output_streamer = streamer;
