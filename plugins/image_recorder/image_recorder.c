@@ -100,7 +100,7 @@ static void* record_thread_func(void *obj) {
 			}
 		}
 
-		printf("save! : %s : %d\n", node->path, node->images[0]->stride[0]);
+		//printf("save! : %s : %d\n", node->path, node->images[0]->stride[0]);
 
 		int ret = save_picam360_image_to_file(node->path, node->images,
 				node->num, _this->pif_split);
