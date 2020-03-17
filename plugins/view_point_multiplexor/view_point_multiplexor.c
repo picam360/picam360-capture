@@ -39,6 +39,7 @@ static int _command_handler(int argc, char *argv[]) {
 		//do nothing
 	} else if (strcmp(cmd, "generate") == 0) {
 		int keyframe_interval = 1;
+		int *keyframe_offset_ary;
 		int fps = 10;
 		int fov = 120;
 		char tmp_path[257] = { };
@@ -78,6 +79,18 @@ static int _command_handler(int argc, char *argv[]) {
 				|| o_str == NULL) {
 			return -1;
 		}
+		{ //get num of view angles
+			int i = 0;
+			int split_p = n * 2;
+			for (int p = 0; p <= split_p; p++) {
+				int _p = (p <= n) ? p : n * 2 - p;
+				int split_y = (_p == 0) ? 1 : 4 * _p;
+				for (int y = 0; y < split_y; y++) {
+					i++;
+				}
+			}
+			keyframe_offset_ary = (int*) malloc(sizeof(int) * i);
+		}
 		{ //config
 			char path[512];
 			sprintf(path, "%s/config.json", tmp_path);
@@ -88,67 +101,100 @@ static int _command_handler(int argc, char *argv[]) {
 			json_object_set_new(options, "fps", json_integer(fps));
 			json_object_set_new(options, "keyframe_interval",
 					json_integer(keyframe_interval));
-			json_object_set_new(options, "keyframe_offset", json_object());
+			{
+				json_t *obj = json_object();
+				int i = 0;
+				int split_p = n * 2;
+				for (int p = 0; p <= split_p; p++) {
+					int _p = (p <= n) ? p : n * 2 - p;
+					int split_y = (_p == 0) ? 1 : 4 * _p;
+					for (int y = 0; y < split_y; y++, i++) {
+						int pitch = 180 * p / split_p;
+						int yaw = 360 * y / split_y;
+						char view_angle[32];
+						sprintf(view_angle, "%d_%d", pitch, yaw);
+						keyframe_offset_ary[i] = (int) (rand()
+								% keyframe_interval);
+						json_object_set_new(obj, view_angle,
+								json_integer(keyframe_offset_ary[i]));
+					}
+				}
+				json_object_set_new(options, "keyframe_offset", obj);
+			}
 			json_dump_file(options, path,
 					JSON_PRESERVE_ORDER | JSON_INDENT(4)
 							| JSON_REAL_PRECISION(9));
 			json_decref(options);
 		}
-		int roll = 0;
-		int split_p = n * 2;
-		for (int p = 0; p <= split_p; p++) {
-			int pitch = 180 * p / split_p;
-			int split_y;
-			int _p = (p <= n) ? p : n * 2 - p;
-			split_y = (_p == 0) ? 1 : 4 * _p;
-			for (int y = 0; y < split_y; y++) {
-				int yaw = 360 * y / split_y;
+		{
+			int i = 0;
+			int roll = 0;
+			int split_p = n * 2;
+			for (int p = 0; p <= split_p; p++) {
+				int _p = (p <= n) ? p : n * 2 - p;
+				int split_y = (_p == 0) ? 1 : 4 * _p;
+				for (int y = 0; y < split_y; y++, i++) {
+					int pitch = 180 * p / split_p;
+					int yaw = 360 * y / split_y;
+					char view_angle[32];
+					sprintf(view_angle, "%d_%d", pitch, yaw);
 
-				VECTOR4D_T vq = quaternion_init();
-				vq = quaternion_multiply(vq,
-						quaternion_get_from_y(yaw * M_PI / 180));
-				vq = quaternion_multiply(vq,
-						quaternion_get_from_x(pitch * M_PI / 180));
-				vq = quaternion_multiply(vq,
-						quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
+					VECTOR4D_T vq = quaternion_init();
+					vq = quaternion_multiply(vq,
+							quaternion_get_from_y(yaw * M_PI / 180));
+					vq = quaternion_multiply(vq,
+							quaternion_get_from_x(pitch * M_PI / 180));
+					vq = quaternion_multiply(vq,
+							quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
 
-				int buff_size = 1024;
-				buff_size += strlen(i_str);
-				buff_size += strlen(r_str);
-				buff_size += strlen(e_str);
-				buff_size += strlen(tmp_path);
-				char *def = (char*) malloc(buff_size);
+					int buff_size = 1024;
+					buff_size += strlen(i_str);
+					buff_size += strlen(r_str);
+					buff_size += strlen(e_str);
+					buff_size += strlen(tmp_path);
+					char *def = (char*) malloc(buff_size);
 
-				int len = 0;
-				len += snprintf(def + len, buff_size - len, "%s", i_str);
-				len += snprintf(def + len, buff_size - len,
-						"!%s view_quat=%.3f,%.3f,%.3f,%.3f fov=%d", r_str, vq.x,
-						vq.y, vq.z, vq.w, fov);
-				len += snprintf(def + len, buff_size - len, "!%s", e_str);
-				len += snprintf(def + len, buff_size - len,
-						"!image_recorder base_path=%s/%d_%d mode=RECORD",
-						tmp_path, pitch, yaw); //x_y
-
-				uuid_t uuid;
-				uuid_generate(uuid);
-
-				VSTREAMER_T *vstreamer = lg_plugin_host->build_vstream(uuid,
-						def);
-				vstreamer->start(vstreamer);
-				printf("started : %s\n", def);
-				free(def);
-
-				while (1) {
-					char eof_str[8];
-					vstreamer->get_param(vstreamer, "eof", eof_str,
-							sizeof(eof_str));
-					if (eof_str[0] == '1' || eof_str[0] == 't'
-							|| eof_str[0] == 'T') {
-						break;
+					int len = 0;
+					len += snprintf(def + len, buff_size - len, "%s", i_str);
+					len += snprintf(def + len, buff_size - len,
+							"!%s view_quat=%.3f,%.3f,%.3f,%.3f fov=%d", r_str,
+							vq.x, vq.y, vq.z, vq.w, fov);
+					len += snprintf(def + len, buff_size - len, "!%s", e_str);
+					len += snprintf(def + len, buff_size - len,
+							"!image_recorder base_path=%s/%s mode=RECORD",
+							tmp_path, view_angle); //x_y
+					{
+						char str[32];
+						sprintf(str, "%d", keyframe_interval);
+						strchg(def, "@keyframe_interval@", str);
 					}
-					usleep(100 * 1000);
+					{
+						char str[32];
+						sprintf(str, "%d", keyframe_offset_ary[i]);
+						strchg(def, "@keyframe_offset@", str);
+					}
+
+					uuid_t uuid;
+					uuid_generate(uuid);
+
+					VSTREAMER_T *vstreamer = lg_plugin_host->build_vstream(uuid,
+							def);
+					vstreamer->start(vstreamer);
+					printf("started : %s\n", def);
+					free(def);
+
+					while (1) {
+						char eof_str[8];
+						vstreamer->get_param(vstreamer, "eof", eof_str,
+								sizeof(eof_str));
+						if (eof_str[0] == '1' || eof_str[0] == 't'
+								|| eof_str[0] == 'T') {
+							break;
+						}
+						usleep(100 * 1000);
+					}
+					lg_plugin_host->destroy_vstream(uuid);
 				}
-				lg_plugin_host->destroy_vstream(uuid);
 			}
 		}
 		{ //pvf archive
@@ -159,6 +205,9 @@ static int _command_handler(int argc, char *argv[]) {
 			ret = system(buff);
 			snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
 			ret = system(buff);
+		}
+		{ //finalize
+			free(keyframe_offset_ary);
 		}
 		printf("%s : completed\n", cmd);
 	}
