@@ -48,8 +48,11 @@ static int _command_handler(int argc, char *argv[]) {
 		char *e_str = NULL; //encode
 		char *o_str = NULL; //output file
 		int n = 3;
+		int p_start = 0;
+		int y_start = 0;
+		bool resume = false;
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:r:e:o:n:f:k:")) != -1) {
+		while ((opt = getopt(argc, argv, "i:r:e:o:n:f:k:c")) != -1) {
 			switch (opt) {
 			case 'i':
 				i_str = optarg;
@@ -73,6 +76,9 @@ static int _command_handler(int argc, char *argv[]) {
 			case 'k':
 				sscanf(optarg, "%d", &keyframe_interval);
 				break;
+			case 'c':
+				resume = true;
+				break;
 			}
 		}
 		if (i_str == NULL || r_str == NULL || e_str == NULL || e_str == NULL
@@ -94,46 +100,97 @@ static int _command_handler(int argc, char *argv[]) {
 		{ //config
 			char path[512];
 			sprintf(path, "%s/config.json", tmp_path);
-			ret = mkdir_path(path, 0775);
-
-			json_t *options = json_object();
-			json_object_set_new(options, "num_per_quarter", json_integer(n));
-			json_object_set_new(options, "fps", json_integer(fps));
-			json_object_set_new(options, "keyframe_interval",
-					json_integer(keyframe_interval));
-			{
-				json_t *obj = json_object();
-				int i = 0;
-				int split_p = n * 2;
-				for (int p = 0; p <= split_p; p++) {
-					int _p = (p <= n) ? p : n * 2 - p;
-					int split_y = (_p == 0) ? 1 : 4 * _p;
-					for (int y = 0; y < split_y; y++, i++) {
-						int pitch = 180 * p / split_p;
-						int yaw = 360 * y / split_y;
-						char view_angle[32];
-						sprintf(view_angle, "%d_%d", pitch, yaw);
-						keyframe_offset_ary[i] = (int) (rand()
-								% keyframe_interval);
-						json_object_set_new(obj, view_angle,
-								json_integer(keyframe_offset_ary[i]));
+			json_error_t error;
+			json_t *options = NULL;
+			if (resume) {
+				options = json_load_file(path, 0, &error);
+			}
+			if (options) {
+				n = json_number_value(
+						json_object_get(options, "num_per_quarter"));
+				fps = json_number_value(json_object_get(options, "fps"));
+				keyframe_interval = json_number_value(
+						json_object_get(options, "keyframe_interval"));
+				{
+					json_t *obj = json_object_get(options, "keyframe_offset");
+					if (obj == NULL || json_is_object(obj) == 0) {
+						printf("can not resume\n");
+						exit(-1);
+					}
+					int i = 0;
+					int split_p = n * 2;
+					for (int p = 0; p <= split_p; p++) {
+						int _p = (p <= n) ? p : n * 2 - p;
+						int split_y = (_p == 0) ? 1 : 4 * _p;
+						for (int y = 0; y < split_y; y++, i++) {
+							int pitch = 180 * p / split_p;
+							int yaw = 360 * y / split_y;
+							char view_angle[32];
+							sprintf(view_angle, "%d_%d", pitch, yaw);
+							json_t *obj2 = json_object_get(obj, view_angle);
+							if (obj2 == NULL) {
+								printf("can not resume\n");
+								exit(-1);
+							}
+							keyframe_offset_ary[i] = json_number_value(obj2);
+							{
+								char filename[512];
+								sprintf(filename, "%s/%s", tmp_path,
+										view_angle);
+								struct stat buffer;
+								if (stat(filename, &buffer) == 0) {
+									p_start = p;
+									y_start = y;
+								}
+							}
+						}
 					}
 				}
-				json_object_set_new(options, "keyframe_offset", obj);
+			} else {
+				ret = mkdir_path(path, 0775);
+
+				json_t *options = json_object();
+				json_object_set_new(options, "num_per_quarter",
+						json_integer(n));
+				json_object_set_new(options, "fps", json_integer(fps));
+				json_object_set_new(options, "keyframe_interval",
+						json_integer(keyframe_interval));
+				{
+					json_t *obj = json_object();
+					int i = 0;
+					int split_p = n * 2;
+					for (int p = 0; p <= split_p; p++) {
+						int _p = (p <= n) ? p : n * 2 - p;
+						int split_y = (_p == 0) ? 1 : 4 * _p;
+						for (int y = 0; y < split_y; y++, i++) {
+							int pitch = 180 * p / split_p;
+							int yaw = 360 * y / split_y;
+							char view_angle[32];
+							sprintf(view_angle, "%d_%d", pitch, yaw);
+							keyframe_offset_ary[i] = (int) (rand()
+									% keyframe_interval);
+							json_object_set_new(obj, view_angle,
+									json_integer(keyframe_offset_ary[i]));
+						}
+					}
+					json_object_set_new(options, "keyframe_offset", obj);
+				}
+				json_dump_file(options, path,
+						JSON_PRESERVE_ORDER | JSON_INDENT(4)
+								| JSON_REAL_PRECISION(9));
 			}
-			json_dump_file(options, path,
-					JSON_PRESERVE_ORDER | JSON_INDENT(4)
-							| JSON_REAL_PRECISION(9));
 			json_decref(options);
 		}
 		{
 			int i = 0;
-			int roll = 0;
 			int split_p = n * 2;
 			for (int p = 0; p <= split_p; p++) {
 				int _p = (p <= n) ? p : n * 2 - p;
 				int split_y = (_p == 0) ? 1 : 4 * _p;
 				for (int y = 0; y < split_y; y++, i++) {
+					if (p < p_start || (p == p_start && y < y_start)) {
+						continue;
+					}
 					int pitch = 180 * p / split_p;
 					int yaw = 360 * y / split_y;
 					char view_angle[32];
