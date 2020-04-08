@@ -174,6 +174,10 @@ static int _command_handler(int argc, char *argv[]) {
 							sprintf(view_angle, "%d_%d", pitch, yaw);
 							keyframe_offset_ary[i] = (int) (rand()
 									% keyframe_interval);
+							if (frame_pack_size > 0) { // sync_frame_pack_size
+								keyframe_offset_ary[i] /= frame_pack_size;
+								keyframe_offset_ary[i] *= frame_pack_size;
+							}
 							json_object_set_new(obj, view_angle,
 									json_integer(keyframe_offset_ary[i]));
 						}
