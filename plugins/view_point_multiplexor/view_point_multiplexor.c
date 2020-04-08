@@ -25,6 +25,7 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
+static char lg_frame_packer_path[512];
 
 static void release(void *obj) {
 
@@ -38,6 +39,7 @@ static int _command_handler(int argc, char *argv[]) {
 	if (cmd == NULL) {
 		//do nothing
 	} else if (strcmp(cmd, "generate") == 0) {
+		int frame_pack_size = 0;
 		int keyframe_interval = 1;
 		int *keyframe_offset_ary;
 		int fps = 10;
@@ -52,7 +54,7 @@ static int _command_handler(int argc, char *argv[]) {
 		int y_start = 0;
 		bool resume = false;
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:r:e:o:n:f:k:c")) != -1) {
+		while ((opt = getopt(argc, argv, "i:r:e:o:n:f:k:p:c")) != -1) {
 			switch (opt) {
 			case 'i':
 				i_str = optarg;
@@ -75,6 +77,9 @@ static int _command_handler(int argc, char *argv[]) {
 				break;
 			case 'k':
 				sscanf(optarg, "%d", &keyframe_interval);
+				break;
+			case 'p':
+				sscanf(optarg, "%d", &frame_pack_size);
 				break;
 			case 'c':
 				resume = true;
@@ -254,6 +259,17 @@ static int _command_handler(int argc, char *argv[]) {
 				}
 			}
 		}
+		if (frame_pack_size > 0) { // frame pack
+			int ret;
+			char buff[256];
+			snprintf(buff, sizeof(buff), "mv %s %s_", tmp_path, tmp_path);
+			ret = system(buff);
+			snprintf(buff, sizeof(buff), "node %s %d %s_ %s",
+					lg_frame_packer_path, frame_pack_size, tmp_path, tmp_path);
+			ret = system(buff);
+			snprintf(buff, sizeof(buff), "rm -rf %s_", tmp_path);
+			ret = system(buff);
+		}
 		{ //pvf archive
 			int ret;
 			char buff[256];
@@ -297,12 +313,21 @@ static void init_options(void *user_data, json_t *_options) {
 	if (options == NULL) {
 		return;
 	}
+	json_t *value = json_object_get(options, "frame_packer_path");
+	if (value) {
+		int len = json_string_length(value);
+		if (len < sizeof(lg_frame_packer_path)) {
+			strncpy(lg_frame_packer_path, json_string_value(value), len);
+		}
+	}
 }
 
 static void save_options(void *user_data, json_t *_options) {
 	json_t *options = json_object();
 	json_object_set_new(_options, PLUGIN_NAME, options);
 
+	json_object_set_new(options, "frame_packer_path",
+			json_string(lg_frame_packer_path));
 }
 
 void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {

@@ -2,13 +2,13 @@ const fs = require('fs');
 const BSON = require('bson');
 const Long = BSON.Long;
 
-var block_size = parseInt(process.argv[2]);
+var frame_pack_size = parseInt(process.argv[2]);
 var input_path = process.argv[3];
 var output_path = process.argv[4];
 var config_json;
 
-if(!(block_size > 0)){
-	console.log('error:invalid block size:'+block_size);
+if(!(frame_pack_size > 0)){
+	console.log('error:invalid block size:'+frame_pack_size);
 	return;
 }
 
@@ -17,7 +17,7 @@ if (fs.existsSync(input_path + '/config.json')) {
 	console.log('loading config...');
 	config_json = JSON.parse(fs.readFileSync(input_path + '/config.json', 'utf8'));
 	console.log('config_json:', config_json);
-	config_json.block_size = block_size;
+	config_json.frame_pack_size = frame_pack_size;
 } else {
 	console.log('error:invalid path');
 	return;
@@ -57,11 +57,11 @@ for(var vp in config_json.keyframe_offset) {
 		}
 		ipaths.push(ipath);
 	}
-	const eblock = Math.ceil(ipaths.length/block_size);
+	const eblock = Math.ceil(ipaths.length/frame_pack_size);
 	for(var i=0;i<eblock;i++){
 		const opath = ovp_path + '/' + (i + 1) + '.bson';
-		const sidx = i*block_size;
-		const eidx = (i+1)*block_size;
+		const sidx = i*frame_pack_size;
+		const eidx = (i+1)*frame_pack_size;
 		bson_pack(ipaths.slice(sidx, eidx), opath);
 	}
 	if(ipaths.length > 1){
