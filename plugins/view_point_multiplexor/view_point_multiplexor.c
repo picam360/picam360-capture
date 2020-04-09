@@ -42,8 +42,8 @@ static int _command_handler(int argc, char *argv[]) {
 		int frame_pack_size = 0;
 		int keyframe_interval = 1;
 		int *keyframe_offset_ary;
-		int fps = 10;
 		int fov = 120;
+		int fps = 10;
 		char tmp_path[257] = { };
 		char *i_str = NULL; //input
 		char *r_str = NULL; //rendering
@@ -54,7 +54,7 @@ static int _command_handler(int argc, char *argv[]) {
 		int y_start = 0;
 		bool resume = false;
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:r:e:o:n:f:k:p:c")) != -1) {
+		while ((opt = getopt(argc, argv, "i:r:e:o:n:v:f:k:p:c")) != -1) {
 			switch (opt) {
 			case 'i':
 				i_str = optarg;
@@ -71,6 +71,9 @@ static int _command_handler(int argc, char *argv[]) {
 				break;
 			case 'n':
 				sscanf(optarg, "%d", &n);
+				break;
+			case 'v':
+				sscanf(optarg, "%d", &fov);
 				break;
 			case 'f':
 				sscanf(optarg, "%d", &fps);
