@@ -49,6 +49,8 @@ for(var vp in config_json.keyframe_offset) {
 	const ovp_path = output_path + '/' + vp;
 	fs.mkdirSync(ovp_path);
 	
+	console.log('packing... : ' + ovp_path);
+	
 	var ipaths = [];
 	for(var i=0;;i++){
 		const ipath = ivp_path + '/' + (i + 1) + '.pif';
