@@ -546,7 +546,7 @@ static void record_menu_record_callback(struct _MENU_T *menu,
 			time(&t);
 			struct tm *lt = localtime(&t);
 			char name[128] = { };
-			snprintf(name, sizeof(name) - 1, "%4d%2d%2d_%2d%2d%2d",
+			snprintf(name, sizeof(name) - 1, "%04d%02d%02d_%02d%02d%02d",
 					lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday,
 					lt->tm_hour, lt->tm_min, lt->tm_sec);
 
@@ -628,7 +628,14 @@ static void record_menu_load_callback(struct _MENU_T *menu,
 		dir = opendir(lg_record_path);
 		if (dir != NULL) {
 			while ((d = readdir(dir)) != 0) {
-				if (d->d_name[0] != L'.' && d->d_type == DT_DIR) {
+				if (d->d_name[0] == L'.'){
+					continue;
+				}
+				char filename[512];
+				sprintf(filename, "%s/%s", lg_record_path, d->d_name);
+				struct stat buffer = {};
+				int ret = stat(filename, &buffer);
+				if (ret == 0 && buffer.st_mode & S_IFDIR) {
 					char *name = malloc(256);
 					strncpy(name, d->d_name, 256);
 					MENU_T *node_menu = menu_new(name,
