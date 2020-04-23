@@ -52,9 +52,10 @@ static int _command_handler(int argc, char *argv[]) {
 		int n = 3;
 		int p_start = 0;
 		int y_start = 0;
+		bool horizon_opt = true;
 		bool resume = false;
 		optind = 1; // reset getopt
-		while ((opt = getopt(argc, argv, "i:r:e:o:n:v:f:k:p:c")) != -1) {
+		while ((opt = getopt(argc, argv, "i:r:e:o:n:v:f:k:p:h:c")) != -1) {
 			switch (opt) {
 			case 'i':
 				i_str = optarg;
@@ -83,6 +84,11 @@ static int _command_handler(int argc, char *argv[]) {
 				break;
 			case 'p':
 				sscanf(optarg, "%d", &frame_pack_size);
+				break;
+			case 'h':
+				if (optarg[0] == '0' || optarg[0] == 'f') {
+					horizon_opt = false;
+				}
 				break;
 			case 'c':
 				resume = true;
@@ -213,8 +219,10 @@ static int _command_handler(int argc, char *argv[]) {
 							quaternion_get_from_y(yaw * M_PI / 180));
 					vq = quaternion_multiply(vq,
 							quaternion_get_from_x(pitch * M_PI / 180));
-					vq = quaternion_multiply(vq,
-							quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
+					if (horizon_opt) {
+						vq = quaternion_multiply(vq,
+								quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
+					}
 
 					int buff_size = 1024;
 					buff_size += strlen(i_str);
