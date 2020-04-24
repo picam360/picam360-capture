@@ -277,12 +277,12 @@ static int _command_handler(int argc, char *argv[]) {
 		if (frame_pack_size > 0) { // frame pack
 			int ret;
 			char buff[256];
-			snprintf(buff, sizeof(buff), "mv %s %s_", tmp_path, tmp_path);
-			ret = system(buff);
-			snprintf(buff, sizeof(buff), "node %s %d %s_ %s",
+			snprintf(buff, sizeof(buff), "node %s %d %s %s_",
 					lg_frame_packer_path, frame_pack_size, tmp_path, tmp_path);
 			ret = system(buff);
-			snprintf(buff, sizeof(buff), "rm -rf %s_", tmp_path);
+			snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
+			ret = system(buff);
+			snprintf(buff, sizeof(buff), "mv %s_ %s", tmp_path, tmp_path);
 			ret = system(buff);
 		}
 		{ //pvf archive
