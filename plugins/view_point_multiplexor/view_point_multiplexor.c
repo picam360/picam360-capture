@@ -32,6 +32,17 @@ static void release(void *obj) {
 	free(obj);
 }
 
+static int pvf_archive(const char *tmp_path, const char *o_str) {
+	int ret;
+	char buff[256];
+	snprintf(buff, sizeof(buff), "(cd %s && zip -0r - *) > %s", tmp_path,
+			o_str);
+	ret = system(buff);
+	snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
+	ret = system(buff);
+	return 0;
+}
+
 static int _command_handler(int argc, char *argv[]) {
 	int opt;
 	int ret = 0;
@@ -120,6 +131,17 @@ static int _command_handler(int argc, char *argv[]) {
 				options = json_load_file(path, 0, &error);
 			}
 			if (options) {
+				int _frame_pack_size = json_number_value(
+						json_object_get(options, "frame_pack_size"));
+				if (_frame_pack_size > 0) { // bson pack has already done
+					pvf_archive(tmp_path, o_str);
+					if (keyframe_offset_ary) { //finalize
+						free(keyframe_offset_ary);
+					}
+					printf("%s : completed\n", cmd);
+					return 0;
+				}
+
 				n = json_number_value(
 						json_object_get(options, "num_per_quarter"));
 				fps = json_number_value(json_object_get(options, "fps"));
@@ -133,6 +155,7 @@ static int _command_handler(int argc, char *argv[]) {
 					}
 					int i = 0;
 					int split_p = n * 2;
+					bool start_position_found = false;
 					for (int p = 0; p <= split_p; p++) {
 						int _p = (p <= n) ? p : n * 2 - p;
 						int split_y = (_p == 0) ? 1 : 4 * _p;
@@ -147,14 +170,17 @@ static int _command_handler(int argc, char *argv[]) {
 								exit(-1);
 							}
 							keyframe_offset_ary[i] = json_number_value(obj2);
-							{
+							if (!start_position_found) {
 								char filename[512];
 								sprintf(filename, "%s/%s", tmp_path,
 										view_angle);
 								struct stat buffer;
-								if (stat(filename, &buffer) == 0) {
+								ret = stat(filename, &buffer);
+								if (ret == 0) {
 									p_start = p;
 									y_start = y;
+								} else {
+									start_position_found = true;
 								}
 							}
 						}
@@ -285,16 +311,8 @@ static int _command_handler(int argc, char *argv[]) {
 			snprintf(buff, sizeof(buff), "mv %s_ %s", tmp_path, tmp_path);
 			ret = system(buff);
 		}
-		{ //pvf archive
-			int ret;
-			char buff[256];
-			snprintf(buff, sizeof(buff), "(cd %s && zip -0r - *) > %s",
-					tmp_path, o_str);
-			ret = system(buff);
-			snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
-			ret = system(buff);
-		}
-		{ //finalize
+		pvf_archive(tmp_path, o_str);
+		if (keyframe_offset_ary) { //finalize
 			free(keyframe_offset_ary);
 		}
 		printf("%s : completed\n", cmd);
