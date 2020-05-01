@@ -111,6 +111,8 @@ static json_t* json_load_file_without_comment(const char *path, size_t flags,
 			tmp_conf_filepath);
 	ret = system(buff);
 	options = json_load_file(tmp_conf_filepath, flags, error);
+	snprintf(buff, sizeof(buff), "rm %s", tmp_conf_filepath);
+	ret = system(buff);
 	return options;
 }
 
