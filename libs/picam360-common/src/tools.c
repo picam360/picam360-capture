@@ -86,3 +86,17 @@ int strcasecmpr(const char *str1, const char *str2) {
 	int len2 = strlen(str2);
 	return strcasecmp(str1 + len1 - len2, str2);
 }
+
+void encodeHTML(char *str) {
+	strchg(str, "<", "&lt;");
+	strchg(str, ">", "&gt;");
+	strchg(str, "\"", "&quot;");
+	strchg(str, "'", "&apos;");
+}
+
+void decodeHTML(char *str) {
+	strchg(str, "&lt;", "<");
+	strchg(str, "&gt;", ">");
+	strchg(str, "&quot;", "\"");
+	strchg(str, "&apos;", "'");
+}

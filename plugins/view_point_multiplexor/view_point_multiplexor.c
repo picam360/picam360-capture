@@ -19,10 +19,37 @@
 #include "tools.h"
 
 #define PLUGIN_NAME "view_point_multiplexor"
-#define STREAMER_NAME "view_point_multiplexor"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define STATUS_VAR(name) lg_status_ ## name
+#define STATUS_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_status(STATUS_VAR(name));
+//status to downstream
+static STATUS_T *STATUS_VAR(status);
+static char lg_status_str[256] = {};
+
+static void status_get_value(void *user_data, char *buff, int buff_len) {
+	STATUS_T *status = (STATUS_T*) user_data;
+	if (status == STATUS_VAR(status)) {
+		snprintf(buff, buff_len, "%s", lg_status_str);
+	}
+}
+static void status_set_value(void *user_data, const char *value) {
+}
+static void status_release(void *user_data) {
+	free(user_data);
+}
+static STATUS_T *new_status(const char *name) {
+	STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
+	strcpy(status->name, name);
+	status->get_value = status_get_value;
+	status->set_value = status_set_value;
+	status->release = status_release;
+	status->user_data = status;
+	return status;
+}
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
 static char lg_frame_packer_path[512];
@@ -35,8 +62,10 @@ static void release(void *obj) {
 static int pvf_archive(const char *tmp_path, const char *o_str) {
 	int ret;
 	char buff[256];
-	snprintf(buff, sizeof(buff), "(cd %s && zip -0r - *) > %s", tmp_path,
+	snprintf(buff, sizeof(buff), "(cd %s && zip -0r - *) > %s_", tmp_path,
 			o_str);
+	ret = system(buff);
+	snprintf(buff, sizeof(buff), "mv %s_ > %s", o_str, o_str);
 	ret = system(buff);
 	snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
 	ret = system(buff);
@@ -380,4 +409,6 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 
 		*_plugin = plugin;
 	}
+	strcpy(lg_status_str, "IDLE");
+	STATUS_INIT(plugin_host, PLUGIN_NAME ".", status);
 }

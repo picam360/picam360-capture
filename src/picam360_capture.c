@@ -1201,8 +1201,8 @@ static int command_handler() {
 					printf("command parse error : %s", buff);
 				} else {
 					ret = _command_handler(p.we_wordc, p.we_wordv);
+					wordfree(&p);
 				}
-				wordfree(&p);
 			}
 			free(buff);
 		} else {
@@ -1951,6 +1951,7 @@ static int rtcp_callback(unsigned char *data, unsigned int data_len,
 				}
 			}
 		}
+		decodeHTML(value);
 		if (num == 2 && id != state->ack_command_id_downstream) {
 			state->ack_command_id_downstream = id;
 			state->plugin_host.send_command(value);
