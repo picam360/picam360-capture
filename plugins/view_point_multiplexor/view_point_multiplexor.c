@@ -65,7 +65,7 @@ static int pvf_archive(const char *tmp_path, const char *o_str) {
 	snprintf(buff, sizeof(buff), "(cd %s && zip -0r - *) > %s_", tmp_path,
 			o_str);
 	ret = system(buff);
-	snprintf(buff, sizeof(buff), "mv %s_ > %s", o_str, o_str);
+	snprintf(buff, sizeof(buff), "mv %s_ %s", o_str, o_str);
 	ret = system(buff);
 	snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
 	ret = system(buff);
