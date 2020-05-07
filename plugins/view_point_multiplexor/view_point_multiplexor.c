@@ -28,7 +28,7 @@
                                                (plugin_host)->add_status(STATUS_VAR(name));
 //status to downstream
 static STATUS_T *STATUS_VAR(status);
-static char lg_status_str[256] = {};
+static char lg_status_str[256] = { };
 
 static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
@@ -41,7 +41,7 @@ static void status_set_value(void *user_data, const char *value) {
 static void status_release(void *user_data) {
 	free(user_data);
 }
-static STATUS_T *new_status(const char *name) {
+static STATUS_T* new_status(const char *name) {
 	STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
 	strcpy(status->name, name);
 	status->get_value = status_get_value;
@@ -78,6 +78,10 @@ static int _command_handler(int argc, char *argv[]) {
 	char *cmd = argv[0];
 	if (cmd == NULL) {
 		//do nothing
+	} else if (strcmp(cmd, "reset") == 0) {
+		if (strcmp(lg_status_str, "DONE") == 0) {
+			strcpy(lg_status_str, "IDLE");
+		}
 	} else if (strcmp(cmd, "generate") == 0) {
 		int frame_pack_size = 0;
 		int keyframe_interval = 1;
@@ -89,6 +93,7 @@ static int _command_handler(int argc, char *argv[]) {
 		char *r_str = NULL; //rendering
 		char *e_str = NULL; //encode
 		char *o_str = NULL; //output file
+		int num_of_viewangle = 0;
 		int n = 3;
 		int p_start = 0;
 		int y_start = 0;
@@ -149,7 +154,8 @@ static int _command_handler(int argc, char *argv[]) {
 					i++;
 				}
 			}
-			keyframe_offset_ary = (int*) malloc(sizeof(int) * i);
+			num_of_viewangle = i;
+			keyframe_offset_ary = (int*) malloc(sizeof(int) * num_of_viewangle);
 		}
 		{ //config
 			char path[512];
@@ -254,6 +260,9 @@ static int _command_handler(int argc, char *argv[]) {
 			}
 			json_decref(options);
 		}
+		{ // progress
+			strcpy(lg_status_str, "CONVERT=0");
+		}
 		{
 			int i = 0;
 			int split_p = n * 2;
@@ -326,6 +335,11 @@ static int _command_handler(int argc, char *argv[]) {
 						usleep(100 * 1000);
 					}
 					lg_plugin_host->destroy_vstream(uuid);
+
+					{ // progress
+						int progress = 100 * (i + 1) / num_of_viewangle;
+						sprintf(lg_status_str, "CONVERT=%d", progress);
+					}
 				}
 			}
 		}
@@ -345,6 +359,9 @@ static int _command_handler(int argc, char *argv[]) {
 			free(keyframe_offset_ary);
 		}
 		printf("%s : completed\n", cmd);
+		{ // progress
+			strcpy(lg_status_str, "DONE");
+		}
 	}
 }
 
