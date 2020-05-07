@@ -28,12 +28,37 @@
                                                (plugin_host)->add_status(STATUS_VAR(name));
 //status to downstream
 static STATUS_T *STATUS_VAR(status);
-static char lg_status_str[256] = { };
+
+typedef struct _vpm_plugin_t {
+	PLUGIN_T super;
+
+	char status_str[256];
+
+	bool run;
+	pthread_t streaming_thread;
+
+	//convert
+	struct {
+		int frame_pack_size;
+		int keyframe_interval;
+		int fov;
+		int fps;
+		char i_str[256]; //input
+		char r_str[256]; //rendering
+		char e_str[256]; //encode
+		char o_str[256]; //output file
+		int n;
+		bool horizon_opt;
+		bool resume;
+	} params;
+} vpm_plugin_t;
+
+vpm_plugin_t *lg_plugin;
 
 static void status_get_value(void *user_data, char *buff, int buff_len) {
 	STATUS_T *status = (STATUS_T*) user_data;
 	if (status == STATUS_VAR(status)) {
-		snprintf(buff, buff_len, "%s", lg_status_str);
+		snprintf(buff, buff_len, "%s", lg_plugin->status_str);
 	}
 }
 static void status_set_value(void *user_data, const char *value) {
@@ -71,6 +96,246 @@ static int pvf_archive(const char *tmp_path, const char *o_str) {
 	ret = system(buff);
 	return 0;
 }
+static void* streaming_thread_fnc(void *obj) {
+	int ret = 0;
+
+	int frame_pack_size = lg_plugin->params.frame_pack_size;
+	int keyframe_interval = lg_plugin->params.keyframe_interval;
+	int fov = lg_plugin->params.fov;
+	int fps = lg_plugin->params.fps;
+	char *i_str = lg_plugin->params.i_str; //input
+	char *r_str = lg_plugin->params.r_str; //rendering
+	char *e_str = lg_plugin->params.e_str; //encode
+	char *o_str = lg_plugin->params.o_str; //output file
+	int n = lg_plugin->params.n;
+	bool horizon_opt = lg_plugin->params.horizon_opt;
+	bool resume = lg_plugin->params.resume;
+
+	int num_of_viewangle = 0;
+	int *keyframe_offset_ary;
+	int p_start = 0;
+	int y_start = 0;
+	char tmp_path[257];
+	snprintf(tmp_path, sizeof(tmp_path) - 1, "%s.tmp", o_str);
+
+	{ //get num of view angles
+		int i = 0;
+		int split_p = n * 2;
+		for (int p = 0; p <= split_p; p++) {
+			int _p = (p <= n) ? p : n * 2 - p;
+			int split_y = (_p == 0) ? 1 : 4 * _p;
+			for (int y = 0; y < split_y; y++) {
+				i++;
+			}
+		}
+		num_of_viewangle = i;
+		keyframe_offset_ary = (int*) malloc(sizeof(int) * num_of_viewangle);
+	}
+	{ //config
+		char path[512];
+		sprintf(path, "%s/config.json", tmp_path);
+		json_error_t error;
+		json_t *options = NULL;
+		if (resume) {
+			options = json_load_file(path, 0, &error);
+		}
+		if (options) {
+			int _frame_pack_size = json_number_value(
+					json_object_get(options, "frame_pack_size"));
+			if (_frame_pack_size > 0) { // bson pack has already done
+				pvf_archive(tmp_path, o_str);
+				if (keyframe_offset_ary) { //finalize
+					free(keyframe_offset_ary);
+				}
+				printf("generate : completed\n");
+				return 0;
+			}
+
+			n = json_number_value(json_object_get(options, "num_per_quarter"));
+			fps = json_number_value(json_object_get(options, "fps"));
+			keyframe_interval = json_number_value(
+					json_object_get(options, "keyframe_interval"));
+			{
+				json_t *obj = json_object_get(options, "keyframe_offset");
+				if (obj == NULL || json_is_object(obj) == 0) {
+					printf("can not resume\n");
+					exit(-1);
+				}
+				int i = 0;
+				int split_p = n * 2;
+				bool start_position_found = false;
+				for (int p = 0; p <= split_p; p++) {
+					int _p = (p <= n) ? p : n * 2 - p;
+					int split_y = (_p == 0) ? 1 : 4 * _p;
+					for (int y = 0; y < split_y; y++, i++) {
+						int pitch = 180 * p / split_p;
+						int yaw = 360 * y / split_y;
+						char view_angle[32];
+						sprintf(view_angle, "%d_%d", pitch, yaw);
+						json_t *obj2 = json_object_get(obj, view_angle);
+						if (obj2 == NULL) {
+							printf("can not resume\n");
+							exit(-1);
+						}
+						keyframe_offset_ary[i] = json_number_value(obj2);
+						if (!start_position_found) {
+							char filename[512];
+							sprintf(filename, "%s/%s", tmp_path, view_angle);
+							struct stat buffer;
+							ret = stat(filename, &buffer);
+							if (ret == 0) {
+								p_start = p;
+								y_start = y;
+							} else {
+								start_position_found = true;
+							}
+						}
+					}
+				}
+			}
+		} else {
+			ret = mkdir_path(path, 0775);
+
+			json_t *options = json_object();
+			json_object_set_new(options, "num_per_quarter", json_integer(n));
+			json_object_set_new(options, "fps", json_integer(fps));
+			json_object_set_new(options, "keyframe_interval",
+					json_integer(keyframe_interval));
+			{
+				json_t *obj = json_object();
+				int i = 0;
+				int split_p = n * 2;
+				for (int p = 0; p <= split_p; p++) {
+					int _p = (p <= n) ? p : n * 2 - p;
+					int split_y = (_p == 0) ? 1 : 4 * _p;
+					for (int y = 0; y < split_y; y++, i++) {
+						int pitch = 180 * p / split_p;
+						int yaw = 360 * y / split_y;
+						char view_angle[32];
+						sprintf(view_angle, "%d_%d", pitch, yaw);
+						keyframe_offset_ary[i] = (int) (rand()
+								% keyframe_interval);
+						if (frame_pack_size > 0) { // sync_frame_pack_size
+							keyframe_offset_ary[i] /= frame_pack_size;
+							keyframe_offset_ary[i] *= frame_pack_size;
+						}
+						json_object_set_new(obj, view_angle,
+								json_integer(keyframe_offset_ary[i]));
+					}
+				}
+				json_object_set_new(options, "keyframe_offset", obj);
+			}
+			json_dump_file(options, path,
+					JSON_PRESERVE_ORDER | JSON_INDENT(4)
+							| JSON_REAL_PRECISION(9));
+		}
+		json_decref(options);
+	}
+	{ // progress
+		strcpy(lg_plugin->status_str, "CONVERT=0");
+	}
+	{
+		int i = 0;
+		int split_p = n * 2;
+		for (int p = 0; p <= split_p; p++) {
+			int _p = (p <= n) ? p : n * 2 - p;
+			int split_y = (_p == 0) ? 1 : 4 * _p;
+			for (int y = 0; y < split_y; y++, i++) {
+				if (p < p_start || (p == p_start && y < y_start)) {
+					continue;
+				}
+				int pitch = 180 * p / split_p;
+				int yaw = 360 * y / split_y;
+				char view_angle[32];
+				sprintf(view_angle, "%d_%d", pitch, yaw);
+
+				VECTOR4D_T vq = quaternion_init();
+				vq = quaternion_multiply(vq,
+						quaternion_get_from_y(yaw * M_PI / 180));
+				vq = quaternion_multiply(vq,
+						quaternion_get_from_x(pitch * M_PI / 180));
+				if (horizon_opt) {
+					vq = quaternion_multiply(vq,
+							quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
+				}
+
+				int buff_size = 1024;
+				buff_size += strlen(i_str);
+				buff_size += strlen(r_str);
+				buff_size += strlen(e_str);
+				buff_size += strlen(tmp_path);
+				char *def = (char*) malloc(buff_size);
+
+				int len = 0;
+				len += snprintf(def + len, buff_size - len, "%s", i_str);
+				len += snprintf(def + len, buff_size - len,
+						"!%s view_quat=%.3f,%.3f,%.3f,%.3f fov=%d", r_str, vq.x,
+						vq.y, vq.z, vq.w, fov);
+				len += snprintf(def + len, buff_size - len, "!%s", e_str);
+				len += snprintf(def + len, buff_size - len,
+						"!image_recorder base_path=%s/%s mode=RECORD", tmp_path,
+						view_angle); //x_y
+				{
+					char str[32];
+					sprintf(str, "%d", keyframe_interval);
+					strchg(def, "@keyframe_interval@", str);
+				}
+				{
+					char str[32];
+					sprintf(str, "%d", keyframe_offset_ary[i]);
+					strchg(def, "@keyframe_offset@", str);
+				}
+
+				uuid_t uuid;
+				uuid_generate(uuid);
+
+				VSTREAMER_T *vstreamer = lg_plugin_host->build_vstream(uuid,
+						def);
+				vstreamer->start(vstreamer);
+				printf("started : %s\n", def);
+				free(def);
+
+				while (1) {
+					char eof_str[8];
+					vstreamer->get_param(vstreamer, "eof", eof_str,
+							sizeof(eof_str));
+					if (eof_str[0] == '1' || eof_str[0] == 't'
+							|| eof_str[0] == 'T') {
+						break;
+					}
+					usleep(100 * 1000);
+				}
+				lg_plugin_host->destroy_vstream(uuid);
+
+				{ // progress
+					int progress = 100 * (i + 1) / num_of_viewangle;
+					sprintf(lg_plugin->status_str, "CONVERT=%d", progress);
+				}
+			}
+		}
+	}
+	if (frame_pack_size > 0) { // frame pack
+		int ret;
+		char buff[256];
+		snprintf(buff, sizeof(buff), "node %s %d %s %s_", lg_frame_packer_path,
+				frame_pack_size, tmp_path, tmp_path);
+		ret = system(buff);
+		snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
+		ret = system(buff);
+		snprintf(buff, sizeof(buff), "mv %s_ %s", tmp_path, tmp_path);
+		ret = system(buff);
+	}
+	pvf_archive(tmp_path, o_str);
+	if (keyframe_offset_ary) { //finalize
+		free(keyframe_offset_ary);
+	}
+	printf("generate : completed\n");
+	{ // progress
+		strcpy(lg_plugin->status_str, "DONE");
+	}
+
+	return NULL;
+}
 
 static int _command_handler(int argc, char *argv[]) {
 	int opt;
@@ -79,289 +344,76 @@ static int _command_handler(int argc, char *argv[]) {
 	if (cmd == NULL) {
 		//do nothing
 	} else if (strcmp(cmd, "reset") == 0) {
-		if (strcmp(lg_status_str, "DONE") == 0) {
-			strcpy(lg_status_str, "IDLE");
+		if (strcmp(lg_plugin->status_str, "DONE") == 0) {
+			strcpy(lg_plugin->status_str, "IDLE");
 		}
 	} else if (strcmp(cmd, "generate") == 0) {
-		int frame_pack_size = 0;
-		int keyframe_interval = 1;
-		int *keyframe_offset_ary;
-		int fov = 120;
-		int fps = 10;
-		char tmp_path[257] = { };
-		char *i_str = NULL; //input
-		char *r_str = NULL; //rendering
-		char *e_str = NULL; //encode
-		char *o_str = NULL; //output file
-		int num_of_viewangle = 0;
-		int n = 3;
-		int p_start = 0;
-		int y_start = 0;
-		bool horizon_opt = true;
-		bool resume = false;
+		if (lg_plugin->run == true) {
+			printf("now generating another...\n");
+			return 0;
+		}
+
+		memset(&lg_plugin->params, 0, sizeof(lg_plugin->params));
+		lg_plugin->params.frame_pack_size = 0;
+		lg_plugin->params.keyframe_interval = 1;
+		lg_plugin->params.fov = 120;
+		lg_plugin->params.fps = 10;
+		lg_plugin->params.n = 3;
+		lg_plugin->params.horizon_opt = true;
+		lg_plugin->params.resume = false;
+
 		optind = 1; // reset getopt
 		while ((opt = getopt(argc, argv, "i:r:e:o:n:v:f:k:p:h:c")) != -1) {
 			switch (opt) {
 			case 'i':
-				i_str = optarg;
+				strncpy(lg_plugin->params.i_str, optarg,
+						sizeof(lg_plugin->params.i_str));
 				break;
 			case 'r':
-				r_str = optarg;
+				strncpy(lg_plugin->params.r_str, optarg,
+						sizeof(lg_plugin->params.r_str));
 				break;
 			case 'e':
-				e_str = optarg;
+				strncpy(lg_plugin->params.e_str, optarg,
+						sizeof(lg_plugin->params.e_str));
 				break;
 			case 'o':
-				o_str = optarg;
-				snprintf(tmp_path, sizeof(tmp_path) - 1, "%s.tmp", o_str);
+				strncpy(lg_plugin->params.o_str, optarg,
+						sizeof(lg_plugin->params.o_str));
 				break;
 			case 'n':
-				sscanf(optarg, "%d", &n);
+				sscanf(optarg, "%d", &lg_plugin->params.n);
 				break;
 			case 'v':
-				sscanf(optarg, "%d", &fov);
+				sscanf(optarg, "%d", &lg_plugin->params.fov);
 				break;
 			case 'f':
-				sscanf(optarg, "%d", &fps);
+				sscanf(optarg, "%d", &lg_plugin->params.fps);
 				break;
 			case 'k':
-				sscanf(optarg, "%d", &keyframe_interval);
+				sscanf(optarg, "%d", &lg_plugin->params.keyframe_interval);
 				break;
 			case 'p':
-				sscanf(optarg, "%d", &frame_pack_size);
+				sscanf(optarg, "%d", &lg_plugin->params.frame_pack_size);
 				break;
 			case 'h':
 				if (optarg[0] == '0' || optarg[0] == 'f') {
-					horizon_opt = false;
+					lg_plugin->params.horizon_opt = false;
 				}
 				break;
 			case 'c':
-				resume = true;
+				lg_plugin->params.resume = true;
 				break;
 			}
 		}
-		if (i_str == NULL || r_str == NULL || e_str == NULL || e_str == NULL
-				|| o_str == NULL) {
+		if (lg_plugin->params.i_str == NULL || lg_plugin->params.r_str == NULL
+				|| lg_plugin->params.e_str == NULL
+				|| lg_plugin->params.o_str == NULL) {
 			return -1;
 		}
-		{ //get num of view angles
-			int i = 0;
-			int split_p = n * 2;
-			for (int p = 0; p <= split_p; p++) {
-				int _p = (p <= n) ? p : n * 2 - p;
-				int split_y = (_p == 0) ? 1 : 4 * _p;
-				for (int y = 0; y < split_y; y++) {
-					i++;
-				}
-			}
-			num_of_viewangle = i;
-			keyframe_offset_ary = (int*) malloc(sizeof(int) * num_of_viewangle);
-		}
-		{ //config
-			char path[512];
-			sprintf(path, "%s/config.json", tmp_path);
-			json_error_t error;
-			json_t *options = NULL;
-			if (resume) {
-				options = json_load_file(path, 0, &error);
-			}
-			if (options) {
-				int _frame_pack_size = json_number_value(
-						json_object_get(options, "frame_pack_size"));
-				if (_frame_pack_size > 0) { // bson pack has already done
-					pvf_archive(tmp_path, o_str);
-					if (keyframe_offset_ary) { //finalize
-						free(keyframe_offset_ary);
-					}
-					printf("%s : completed\n", cmd);
-					return 0;
-				}
-
-				n = json_number_value(
-						json_object_get(options, "num_per_quarter"));
-				fps = json_number_value(json_object_get(options, "fps"));
-				keyframe_interval = json_number_value(
-						json_object_get(options, "keyframe_interval"));
-				{
-					json_t *obj = json_object_get(options, "keyframe_offset");
-					if (obj == NULL || json_is_object(obj) == 0) {
-						printf("can not resume\n");
-						exit(-1);
-					}
-					int i = 0;
-					int split_p = n * 2;
-					bool start_position_found = false;
-					for (int p = 0; p <= split_p; p++) {
-						int _p = (p <= n) ? p : n * 2 - p;
-						int split_y = (_p == 0) ? 1 : 4 * _p;
-						for (int y = 0; y < split_y; y++, i++) {
-							int pitch = 180 * p / split_p;
-							int yaw = 360 * y / split_y;
-							char view_angle[32];
-							sprintf(view_angle, "%d_%d", pitch, yaw);
-							json_t *obj2 = json_object_get(obj, view_angle);
-							if (obj2 == NULL) {
-								printf("can not resume\n");
-								exit(-1);
-							}
-							keyframe_offset_ary[i] = json_number_value(obj2);
-							if (!start_position_found) {
-								char filename[512];
-								sprintf(filename, "%s/%s", tmp_path,
-										view_angle);
-								struct stat buffer;
-								ret = stat(filename, &buffer);
-								if (ret == 0) {
-									p_start = p;
-									y_start = y;
-								} else {
-									start_position_found = true;
-								}
-							}
-						}
-					}
-				}
-			} else {
-				ret = mkdir_path(path, 0775);
-
-				json_t *options = json_object();
-				json_object_set_new(options, "num_per_quarter",
-						json_integer(n));
-				json_object_set_new(options, "fps", json_integer(fps));
-				json_object_set_new(options, "keyframe_interval",
-						json_integer(keyframe_interval));
-				{
-					json_t *obj = json_object();
-					int i = 0;
-					int split_p = n * 2;
-					for (int p = 0; p <= split_p; p++) {
-						int _p = (p <= n) ? p : n * 2 - p;
-						int split_y = (_p == 0) ? 1 : 4 * _p;
-						for (int y = 0; y < split_y; y++, i++) {
-							int pitch = 180 * p / split_p;
-							int yaw = 360 * y / split_y;
-							char view_angle[32];
-							sprintf(view_angle, "%d_%d", pitch, yaw);
-							keyframe_offset_ary[i] = (int) (rand()
-									% keyframe_interval);
-							if (frame_pack_size > 0) { // sync_frame_pack_size
-								keyframe_offset_ary[i] /= frame_pack_size;
-								keyframe_offset_ary[i] *= frame_pack_size;
-							}
-							json_object_set_new(obj, view_angle,
-									json_integer(keyframe_offset_ary[i]));
-						}
-					}
-					json_object_set_new(options, "keyframe_offset", obj);
-				}
-				json_dump_file(options, path,
-						JSON_PRESERVE_ORDER | JSON_INDENT(4)
-								| JSON_REAL_PRECISION(9));
-			}
-			json_decref(options);
-		}
-		{ // progress
-			strcpy(lg_status_str, "CONVERT=0");
-		}
-		{
-			int i = 0;
-			int split_p = n * 2;
-			for (int p = 0; p <= split_p; p++) {
-				int _p = (p <= n) ? p : n * 2 - p;
-				int split_y = (_p == 0) ? 1 : 4 * _p;
-				for (int y = 0; y < split_y; y++, i++) {
-					if (p < p_start || (p == p_start && y < y_start)) {
-						continue;
-					}
-					int pitch = 180 * p / split_p;
-					int yaw = 360 * y / split_y;
-					char view_angle[32];
-					sprintf(view_angle, "%d_%d", pitch, yaw);
-
-					VECTOR4D_T vq = quaternion_init();
-					vq = quaternion_multiply(vq,
-							quaternion_get_from_y(yaw * M_PI / 180));
-					vq = quaternion_multiply(vq,
-							quaternion_get_from_x(pitch * M_PI / 180));
-					if (horizon_opt) {
-						vq = quaternion_multiply(vq,
-								quaternion_get_from_y(45 * M_PI / 180)); //horizon_opt
-					}
-
-					int buff_size = 1024;
-					buff_size += strlen(i_str);
-					buff_size += strlen(r_str);
-					buff_size += strlen(e_str);
-					buff_size += strlen(tmp_path);
-					char *def = (char*) malloc(buff_size);
-
-					int len = 0;
-					len += snprintf(def + len, buff_size - len, "%s", i_str);
-					len += snprintf(def + len, buff_size - len,
-							"!%s view_quat=%.3f,%.3f,%.3f,%.3f fov=%d", r_str,
-							vq.x, vq.y, vq.z, vq.w, fov);
-					len += snprintf(def + len, buff_size - len, "!%s", e_str);
-					len += snprintf(def + len, buff_size - len,
-							"!image_recorder base_path=%s/%s mode=RECORD",
-							tmp_path, view_angle); //x_y
-					{
-						char str[32];
-						sprintf(str, "%d", keyframe_interval);
-						strchg(def, "@keyframe_interval@", str);
-					}
-					{
-						char str[32];
-						sprintf(str, "%d", keyframe_offset_ary[i]);
-						strchg(def, "@keyframe_offset@", str);
-					}
-
-					uuid_t uuid;
-					uuid_generate(uuid);
-
-					VSTREAMER_T *vstreamer = lg_plugin_host->build_vstream(uuid,
-							def);
-					vstreamer->start(vstreamer);
-					printf("started : %s\n", def);
-					free(def);
-
-					while (1) {
-						char eof_str[8];
-						vstreamer->get_param(vstreamer, "eof", eof_str,
-								sizeof(eof_str));
-						if (eof_str[0] == '1' || eof_str[0] == 't'
-								|| eof_str[0] == 'T') {
-							break;
-						}
-						usleep(100 * 1000);
-					}
-					lg_plugin_host->destroy_vstream(uuid);
-
-					{ // progress
-						int progress = 100 * (i + 1) / num_of_viewangle;
-						sprintf(lg_status_str, "CONVERT=%d", progress);
-					}
-				}
-			}
-		}
-		if (frame_pack_size > 0) { // frame pack
-			int ret;
-			char buff[256];
-			snprintf(buff, sizeof(buff), "node %s %d %s %s_",
-					lg_frame_packer_path, frame_pack_size, tmp_path, tmp_path);
-			ret = system(buff);
-			snprintf(buff, sizeof(buff), "rm -rf %s", tmp_path);
-			ret = system(buff);
-			snprintf(buff, sizeof(buff), "mv %s_ %s", tmp_path, tmp_path);
-			ret = system(buff);
-		}
-		pvf_archive(tmp_path, o_str);
-		if (keyframe_offset_ary) { //finalize
-			free(keyframe_offset_ary);
-		}
-		printf("%s : completed\n", cmd);
-		{ // progress
-			strcpy(lg_status_str, "DONE");
-		}
+		lg_plugin->run = true;
+		pthread_create(&lg_plugin->streaming_thread, NULL, streaming_thread_fnc,
+				NULL);
 	}
 }
 
@@ -413,8 +465,8 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 	lg_plugin_host = plugin_host;
 
 	{
-		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
-		memset(plugin, 0, sizeof(PLUGIN_T));
+		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(vpm_plugin_t));
+		memset(plugin, 0, sizeof(vpm_plugin_t));
 		strcpy(plugin->name, PLUGIN_NAME);
 		plugin->release = release;
 		plugin->command_handler = command_handler;
@@ -425,7 +477,8 @@ void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
 		plugin->user_data = plugin;
 
 		*_plugin = plugin;
+		lg_plugin = (vpm_plugin_t*) plugin;
 	}
-	strcpy(lg_status_str, "IDLE");
+	strcpy(lg_plugin->status_str, "IDLE");
 	STATUS_INIT(plugin_host, PLUGIN_NAME ".", status);
 }
