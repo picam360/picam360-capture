@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,8 +114,7 @@ static void* streaming_thread_fnc(void *obj) {
 
 	int num_of_viewangle = 0;
 	int *keyframe_offset_ary;
-	int p_start = 0;
-	int y_start = 0;
+	int i_start = 0;
 	char tmp_path[257];
 	snprintf(tmp_path, sizeof(tmp_path) - 1, "%s.tmp", o_str);
 
@@ -183,10 +183,8 @@ static void* streaming_thread_fnc(void *obj) {
 							sprintf(filename, "%s/%s", tmp_path, view_angle);
 							struct stat buffer;
 							ret = stat(filename, &buffer);
-							if (ret == 0) {
-								p_start = p;
-								y_start = y;
-							} else {
+							if (ret != 0) {
+								i_start = MAX(i - 1, 0);
 								start_position_found = true;
 							}
 						}
@@ -232,7 +230,8 @@ static void* streaming_thread_fnc(void *obj) {
 		json_decref(options);
 	}
 	{ // progress
-		strcpy(lg_plugin->status_str, "CONVERT=0");
+		int progress = 100 * i_start / num_of_viewangle;
+		sprintf(lg_plugin->status_str, "CONVERT=%d", progress);
 	}
 	{
 		int i = 0;
@@ -241,7 +240,7 @@ static void* streaming_thread_fnc(void *obj) {
 			int _p = (p <= n) ? p : n * 2 - p;
 			int split_y = (_p == 0) ? 1 : 4 * _p;
 			for (int y = 0; y < split_y; y++, i++) {
-				if (p < p_start || (p == p_start && y < y_start)) {
+				if (i < i_start) {
 					continue;
 				}
 				int pitch = 180 * p / split_p;
@@ -349,10 +348,13 @@ static int _command_handler(int argc, char *argv[]) {
 		}
 	} else if (strcmp(cmd, "generate") == 0) {
 		if (lg_plugin->run == true) {
-			printf("now generating another...\n");
-			return 0;
+			ret = pthread_tryjoin_np(lg_plugin->streaming_thread, NULL);
+			if (ret != 0) {
+				printf("now generating another...\n");
+				return 0;
+			}
+			lg_plugin->run = false;
 		}
-
 		memset(&lg_plugin->params, 0, sizeof(lg_plugin->params));
 		lg_plugin->params.frame_pack_size = 0;
 		lg_plugin->params.keyframe_interval = 1;
