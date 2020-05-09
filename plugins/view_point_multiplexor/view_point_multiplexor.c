@@ -57,9 +57,11 @@ typedef struct _vpm_plugin_t {
 vpm_plugin_t *lg_plugin;
 
 static void status_get_value(void *user_data, char *buff, int buff_len) {
+	vpm_plugin_t *_this = lg_plugin;
+
 	STATUS_T *status = (STATUS_T*) user_data;
 	if (status == STATUS_VAR(status)) {
-		snprintf(buff, buff_len, "%s", lg_plugin->status_str);
+		snprintf(buff, buff_len, "%s", _this->status_str);
 	}
 }
 static void status_set_value(void *user_data, const char *value) {
@@ -98,19 +100,21 @@ static int pvf_archive(const char *tmp_path, const char *o_str) {
 	return 0;
 }
 static void* streaming_thread_fnc(void *obj) {
+	vpm_plugin_t *_this = lg_plugin;
+
 	int ret = 0;
 
-	int frame_pack_size = lg_plugin->params.frame_pack_size;
-	int keyframe_interval = lg_plugin->params.keyframe_interval;
-	int fov = lg_plugin->params.fov;
-	int fps = lg_plugin->params.fps;
-	char *i_str = lg_plugin->params.i_str; //input
-	char *r_str = lg_plugin->params.r_str; //rendering
-	char *e_str = lg_plugin->params.e_str; //encode
-	char *o_str = lg_plugin->params.o_str; //output file
-	int n = lg_plugin->params.n;
-	bool horizon_opt = lg_plugin->params.horizon_opt;
-	bool resume = lg_plugin->params.resume;
+	int frame_pack_size = _this->params.frame_pack_size;
+	int keyframe_interval = _this->params.keyframe_interval;
+	int fov = _this->params.fov;
+	int fps = _this->params.fps;
+	char *i_str = _this->params.i_str; //input
+	char *r_str = _this->params.r_str; //rendering
+	char *e_str = _this->params.e_str; //encode
+	char *o_str = _this->params.o_str; //output file
+	int n = _this->params.n;
+	bool horizon_opt = _this->params.horizon_opt;
+	bool resume = _this->params.resume;
 
 	int num_of_viewangle = 0;
 	int *keyframe_offset_ary;
@@ -179,10 +183,10 @@ static void* streaming_thread_fnc(void *obj) {
 						}
 						keyframe_offset_ary[i] = json_number_value(obj2);
 						if (!start_position_found) {
-							char filename[512];
-							sprintf(filename, "%s/%s", tmp_path, view_angle);
+							char dirname[512];
+							sprintf(dirname, "%s/%s/", tmp_path, view_angle);
 							struct stat buffer;
-							ret = stat(filename, &buffer);
+							ret = stat(dirname, &buffer);
 							if (ret != 0) {
 								i_start = MAX(i - 1, 0);
 								start_position_found = true;
@@ -192,7 +196,7 @@ static void* streaming_thread_fnc(void *obj) {
 				}
 			}
 		} else {
-			ret = mkdir_path(path, 0775);
+			ret = mkdir_path(path, 0777);
 
 			json_t *options = json_object();
 			json_object_set_new(options, "num_per_quarter", json_integer(n));
@@ -231,7 +235,7 @@ static void* streaming_thread_fnc(void *obj) {
 	}
 	{ // progress
 		int progress = 100 * i_start / num_of_viewangle;
-		sprintf(lg_plugin->status_str, "CONVERT=%d", progress);
+		sprintf(_this->status_str, "CONVERT=%d", progress);
 	}
 	{
 		int i = 0;
@@ -247,6 +251,25 @@ static void* streaming_thread_fnc(void *obj) {
 				int yaw = 360 * y / split_y;
 				char view_angle[32];
 				sprintf(view_angle, "%d_%d", pitch, yaw);
+
+				{ // mkdir
+					char dirname[512];
+					sprintf(dirname, "%s/%s/", tmp_path, view_angle);
+					struct stat buffer;
+					ret = stat(dirname, &buffer);
+					if (ret != 0) {
+						ret = mkdir_path(dirname, 0777);
+					}
+				}
+
+				if (!_this->run) { //stop
+					if (keyframe_offset_ary) { //finalize
+						free(keyframe_offset_ary);
+					}
+					printf("generate : stopped\n");
+
+					return NULL;
+				}
 
 				VECTOR4D_T vq = quaternion_init();
 				vq = quaternion_multiply(vq,
@@ -308,7 +331,7 @@ static void* streaming_thread_fnc(void *obj) {
 
 				{ // progress
 					int progress = 100 * (i + 1) / num_of_viewangle;
-					sprintf(lg_plugin->status_str, "CONVERT=%d", progress);
+					sprintf(_this->status_str, "CONVERT=%d", progress);
 				}
 			}
 		}
@@ -330,91 +353,99 @@ static void* streaming_thread_fnc(void *obj) {
 	}
 	printf("generate : completed\n");
 	{ // progress
-		strcpy(lg_plugin->status_str, "DONE");
+		strcpy(_this->status_str, "DONE");
 	}
 
+	_this->run = false;
 	return NULL;
 }
 
 static int _command_handler(int argc, char *argv[]) {
+	vpm_plugin_t *_this = lg_plugin;
+
 	int opt;
 	int ret = 0;
 	char *cmd = argv[0];
 	if (cmd == NULL) {
 		//do nothing
 	} else if (strcmp(cmd, "reset") == 0) {
-		if (strcmp(lg_plugin->status_str, "DONE") == 0) {
-			strcpy(lg_plugin->status_str, "IDLE");
+		if (strcmp(_this->status_str, "DONE") == 0) {
+			strcpy(_this->status_str, "IDLE");
+		}
+	} else if (strcmp(cmd, "stop") == 0) {
+		if (_this->run == true) {
+			_this->run = false;
+			pthread_join(_this->streaming_thread, NULL);
+			strcpy(_this->status_str, "IDLE");
 		}
 	} else if (strcmp(cmd, "generate") == 0) {
-		if (lg_plugin->run == true) {
-			ret = pthread_tryjoin_np(lg_plugin->streaming_thread, NULL);
+		if (_this->run == true) {
+			ret = pthread_tryjoin_np(_this->streaming_thread, NULL);
 			if (ret != 0) {
 				printf("now generating another...\n");
 				return 0;
 			}
-			lg_plugin->run = false;
+			_this->run = false; // fail safe : this should be done in working thread
 		}
-		memset(&lg_plugin->params, 0, sizeof(lg_plugin->params));
-		lg_plugin->params.frame_pack_size = 0;
-		lg_plugin->params.keyframe_interval = 1;
-		lg_plugin->params.fov = 120;
-		lg_plugin->params.fps = 10;
-		lg_plugin->params.n = 3;
-		lg_plugin->params.horizon_opt = true;
-		lg_plugin->params.resume = false;
+		memset(&_this->params, 0, sizeof(_this->params));
+		_this->params.frame_pack_size = 0;
+		_this->params.keyframe_interval = 1;
+		_this->params.fov = 120;
+		_this->params.fps = 10;
+		_this->params.n = 3;
+		_this->params.horizon_opt = true;
+		_this->params.resume = false;
 
 		optind = 1; // reset getopt
 		while ((opt = getopt(argc, argv, "i:r:e:o:n:v:f:k:p:h:c")) != -1) {
 			switch (opt) {
 			case 'i':
-				strncpy(lg_plugin->params.i_str, optarg,
-						sizeof(lg_plugin->params.i_str));
+				strncpy(_this->params.i_str, optarg,
+						sizeof(_this->params.i_str));
 				break;
 			case 'r':
-				strncpy(lg_plugin->params.r_str, optarg,
-						sizeof(lg_plugin->params.r_str));
+				strncpy(_this->params.r_str, optarg,
+						sizeof(_this->params.r_str));
 				break;
 			case 'e':
-				strncpy(lg_plugin->params.e_str, optarg,
-						sizeof(lg_plugin->params.e_str));
+				strncpy(_this->params.e_str, optarg,
+						sizeof(_this->params.e_str));
 				break;
 			case 'o':
-				strncpy(lg_plugin->params.o_str, optarg,
-						sizeof(lg_plugin->params.o_str));
+				strncpy(_this->params.o_str, optarg,
+						sizeof(_this->params.o_str));
 				break;
 			case 'n':
-				sscanf(optarg, "%d", &lg_plugin->params.n);
+				sscanf(optarg, "%d", &_this->params.n);
 				break;
 			case 'v':
-				sscanf(optarg, "%d", &lg_plugin->params.fov);
+				sscanf(optarg, "%d", &_this->params.fov);
 				break;
 			case 'f':
-				sscanf(optarg, "%d", &lg_plugin->params.fps);
+				sscanf(optarg, "%d", &_this->params.fps);
 				break;
 			case 'k':
-				sscanf(optarg, "%d", &lg_plugin->params.keyframe_interval);
+				sscanf(optarg, "%d", &_this->params.keyframe_interval);
 				break;
 			case 'p':
-				sscanf(optarg, "%d", &lg_plugin->params.frame_pack_size);
+				sscanf(optarg, "%d", &_this->params.frame_pack_size);
 				break;
 			case 'h':
 				if (optarg[0] == '0' || optarg[0] == 'f') {
-					lg_plugin->params.horizon_opt = false;
+					_this->params.horizon_opt = false;
 				}
 				break;
 			case 'c':
-				lg_plugin->params.resume = true;
+				_this->params.resume = true;
 				break;
 			}
 		}
-		if (lg_plugin->params.i_str == NULL || lg_plugin->params.r_str == NULL
-				|| lg_plugin->params.e_str == NULL
-				|| lg_plugin->params.o_str == NULL) {
+		if (_this->params.i_str == NULL || _this->params.r_str == NULL
+				|| _this->params.e_str == NULL || _this->params.o_str == NULL) {
 			return -1;
 		}
-		lg_plugin->run = true;
-		pthread_create(&lg_plugin->streaming_thread, NULL, streaming_thread_fnc,
+		_this->run = true;
+		pthread_create(&_this->streaming_thread, NULL, streaming_thread_fnc,
 				NULL);
 	}
 }
