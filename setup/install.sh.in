@@ -26,6 +26,11 @@ if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/" ]; then
 fi
 cp plugins/*.so ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/plugins/
 
+if [ ! -d "${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/framemeta/" ]; then
+	mkdir ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/framemeta/
+fi
+cp framemeta/*.meta ${CMAKE_INSTALL_PREFIX}/lib/picam360-capture/framemeta/
+
 systemctl daemon-reload
 systemctl start picam360-capture.service
 systemctl enable picam360-capture.service
