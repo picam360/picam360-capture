@@ -268,9 +268,6 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 				images_p[0] = frame;
 				*num_p = 1;
 			}
-			if (_this->fps <= 0) {
-				_this->fps = 1;
-			}
 		} else {
 			sprintf(path, "%s/%d.pif", _this->base_path,
 					_this->play_framecount - _this->play_framecount_offset + 1);
@@ -299,7 +296,9 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 		struct timeval diff;
 		float elapsed_sec;
 
-		if (_this->fps <= 0) {
+		if (_this->fps < 0) {
+			//max fps
+		} else if (_this->fps == 0) {
 			if (_this->play_framecount >= 2) {
 				timersub(&images_p[0]->timestamp, &_this->last_timestamp,
 						&diff);
@@ -324,6 +323,16 @@ static int get_image(void *obj, PICAM360_IMAGE_T **images_p, int *num_p,
 			if (elapsed_sec_target > 0) {
 				usleep(elapsed_sec_target * 1000000);
 			}
+		}
+		if ((_this->play_framecount % 200) == 0) {
+			struct timeval now;
+			gettimeofday(&now, NULL);
+
+			timersub(&now, &_this->base_timestamp, &diff);
+			elapsed_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+
+			printf("image recorder : play : fps=%f\n",
+					_this->play_framecount / elapsed_sec);
 		}
 		_this->last_timestamp = images_p[0]->timestamp;
 		gettimeofday(&images_p[0]->timestamp, NULL);
@@ -426,6 +435,21 @@ static int get_param(void *obj, const char *param, char *value, int size) {
 	if (strcmp(param, "eof") == 0) {
 		snprintf(value, size, "%s", _this->eof ? "true" : "false");
 		return 0;
+	} else if (strcmp(param, "frames_in_buffer") == 0) {
+		if (_this->mode == RECORDER_MODE_RECORD) {
+			int num = 0;
+
+			pthread_mutex_lock(&_this->record_queue_mlock);
+
+			for (LIST_T *cur = _this->record_queue; cur != NULL; cur =
+					cur->next) {
+				num++;
+			}
+
+			pthread_mutex_unlock(&_this->record_queue_mlock);
+
+			snprintf(value, size, "%d", num);
+		}
 	}
 	return -1;
 }
@@ -628,12 +652,12 @@ static void record_menu_load_callback(struct _MENU_T *menu,
 		dir = opendir(lg_record_path);
 		if (dir != NULL) {
 			while ((d = readdir(dir)) != 0) {
-				if (d->d_name[0] == L'.'){
+				if (d->d_name[0] == L'.') {
 					continue;
 				}
 				char filename[512];
 				sprintf(filename, "%s/%s", lg_record_path, d->d_name);
-				struct stat buffer = {};
+				struct stat buffer = { };
 				int ret = stat(filename, &buffer);
 				if (ret == 0 && buffer.st_mode & S_IFDIR) {
 					char *name = malloc(256);

@@ -323,7 +323,25 @@ static void* streaming_thread_fnc(void *obj) {
 							sizeof(eof_str));
 					if (eof_str[0] == '1' || eof_str[0] == 't'
 							|| eof_str[0] == 'T') {
-						break;
+						bool is_end = true;
+						for (VSTREAMER_T *stream = vstreamer->next_streamer;
+								stream != NULL; stream =
+										stream->next_streamer) {
+							char frames_in_buffer_str[8] = { };
+							stream->get_param(stream, "frames_in_buffer",
+									frames_in_buffer_str,
+									sizeof(frames_in_buffer_str));
+							if (frames_in_buffer_str[0] == 0
+									|| frames_in_buffer_str[0] == '0') {
+								is_end = true;
+							} else {
+								is_end = false;
+								break;
+							}
+						}
+						if (is_end) {
+							break;
+						}
 					}
 					usleep(100 * 1000);
 				}
