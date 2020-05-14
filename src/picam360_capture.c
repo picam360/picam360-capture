@@ -136,7 +136,7 @@ static int load_texture(const char *filename, uint32_t *tex_out) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width[0], image.height[0], 0,
-	GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
+			GL_RGB, GL_UNSIGNED_BYTE, image.pixels[0]);
 	if ((err = glGetError()) != GL_NO_ERROR) {
 #ifdef USE_GLES
 		printf("glTexImage2D failed. Could not allocate texture buffer.\n");
@@ -269,15 +269,59 @@ static void get_rendering_params(VECTOR4D_T view_quat,
 	}
 }
 
+static void cal_transform_matrix(VECTOR4D_T view_quat, VECTOR4D_T cam_quat,
+		VECTOR4D_T cam_offset,
+		float *unif_matrix) {
+	{ //cam_attitude //depth axis is z, vertical asis is y
+		float view_matrix[16];
+		float cam_matrix[16];
+		float north_matrix[16];
+		float world_matrix[16];
+
+		{ // Rv : view
+			mat4_identity(view_matrix);
+			mat4_fromQuat(view_matrix, view_quat.ary);
+			mat4_invert(view_matrix, view_matrix);
+		}
+
+		{ // Rw : view coodinate to world coodinate and view heading to ground initially
+			mat4_identity(world_matrix);
+			mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
+		}
+		{ // Rc : cam orientation
+			mat4_identity(cam_matrix);
+			mat4_fromQuat(cam_matrix, cam_quat.ary);
+			mat4_invert(cam_matrix, cam_matrix);
+		}
+
+		{ // Rco : cam offset
+			float cam_offset_matrix[16];
+			mat4_identity(cam_offset_matrix);
+			mat4_fromQuat(cam_offset_matrix, cam_offset.ary);
+			mat4_invert(cam_offset_matrix, cam_offset_matrix);
+			mat4_multiply(cam_matrix, cam_matrix, cam_offset_matrix); // Rc'=RcoRc
+		}
+
+		{ //RcRv(Rc^-1)RcRw
+			mat4_identity(unif_matrix);
+			mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
+			mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
+			mat4_multiply(unif_matrix, unif_matrix, cam_matrix); // RcRvRw
+		}
+		mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
+	}
+}
+
 static bool _destroy_vstream(VSTREAMER_T *_stream) {
 	VSTREAMER_T *tail = NULL;
-	for (tail = _stream; tail->next_streamer != NULL;tail = tail->next_streamer) {
-		_stream->stop(_stream);//tell stop
+	for (tail = _stream; tail->next_streamer != NULL; tail =
+			tail->next_streamer) {
+		_stream->stop(_stream); //tell stop
 	}
 	for (VSTREAMER_T *stream = tail; stream != NULL;) {
 		VSTREAMER_T *tmp = stream;
 		stream = stream->pre_streamer;
-		if(stream != NULL) {
+		if (stream != NULL) {
 			stream->next_streamer = NULL;
 		}
 		tmp->release(tmp);
@@ -1711,6 +1755,7 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.load_texture = load_texture;
 		state->plugin_host.get_logo_image = get_logo_image;
 		state->plugin_host.get_rendering_params = get_rendering_params;
+		state->plugin_host.cal_transform_matrix = cal_transform_matrix;
 
 		state->plugin_host.get_menu = get_menu;
 		state->plugin_host.get_menu_visible = get_menu_visible;

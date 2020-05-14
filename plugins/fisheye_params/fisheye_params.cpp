@@ -32,6 +32,7 @@ typedef struct _FISHEYE_PARAMS_T {
 	float lens_k[4];
 
 	float cam_offset[3]; // x,y,z axis rotation
+	float cam_fov;
 } FISHEYE_PARAMS_T;
 
 typedef struct _plugin_private {
@@ -69,19 +70,20 @@ static int get_frame_info_str(FISHEYE_PARAMS_T *params, char *buff,
 		int *buff_sizse) {
 	int len = 0;
 
-	len += sprintf(buff + len, "<picam360:frame ");
-	len += sprintf(buff + len, "mode=\"%s\" ", "FISHEYE");
-	len += sprintf(buff + len, "cam_c=\"%.3f,%.3f\" ", params->cam_c[0],
+	len += sprintf(buff + len, "<picam360:frame");
+	len += sprintf(buff + len, " mode=\"%s\"", "FISHEYE");
+	len += sprintf(buff + len, " cam_c=\"%.6f,%.6f\"", params->cam_c[0],
 			params->cam_c[1]);
-	len += sprintf(buff + len, "cam_f=\"%.3f,%.3f\" ", params->cam_f[0],
+	len += sprintf(buff + len, " cam_f=\"%.6f,%.6f\"", params->cam_f[0],
 			params->cam_f[1]);
-	len += sprintf(buff + len, "lens_k=\"%.3f,%.3f,%.3f,%.3f\" ",
+	len += sprintf(buff + len, " lens_k=\"%.6f,%.6f,%.6f,%.6f\"",
 			params->lens_k[0], params->lens_k[1], params->lens_k[2],
 			params->lens_k[3]);
-	len += sprintf(buff + len, "cam_offset=\"%.3f,%.3f,%.3f\" ",
+	len += sprintf(buff + len, " cam_offset=\"%.6f,%.6f,%.6f\"",
 			params->cam_offset[0], params->cam_offset[1],
 			params->cam_offset[2]);
-	len += sprintf(buff + len, "/>");
+	len += sprintf(buff + len, " cam_fov=\"%.6f\"", params->cam_fov);
+	len += sprintf(buff + len, " />");
 
 	*buff_sizse = len;
 
@@ -327,6 +329,15 @@ static void init_options(void *user_data, json_t *_options) {
 			}
 		}
 	}
+	{
+		json_t *ary = json_object_get(options, "cam_fov");
+		if (json_is_array(ary)) {
+			int size = json_array_size(ary);
+			for (int i = 0; i < size && i < MAX_CAM_NUM; i++) {
+				lg_plugin->fisheye_params[i].cam_fov = json_number_value(json_array_get(ary, i));
+			}
+		}
+	}
 }
 
 static void save_options(void *user_data, json_t *_options) {
@@ -396,6 +407,17 @@ static void save_options(void *user_data, json_t *_options) {
 			}
 		}
 		json_object_set_new(options, "cam_offset", ary);
+	}
+	{
+		json_t *ary = json_array();
+		if (json_is_array(ary)) {
+			int size = MAX_CAM_NUM;
+			for (int i = 0; i < size; i++) {
+				json_array_append_new(ary,
+						json_real(lg_plugin->fisheye_params[i].cam_fov));
+			}
+		}
+		json_object_set_new(options, "cam_fov", ary);
 	}
 }
 

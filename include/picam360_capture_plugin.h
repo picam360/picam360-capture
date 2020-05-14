@@ -159,6 +159,8 @@ typedef struct _PLUGIN_HOST_T {
 	void (*get_logo_image)(PICAM360_IMAGE_T *img);
 	void (*get_rendering_params)(VECTOR4D_T view_quat,
 			RENDERING_PARAMS_T *params);
+	void (*cal_transform_matrix)(VECTOR4D_T view_quat, VECTOR4D_T cam_quat,
+			VECTOR4D_T cam_offset, float *unif_matrix);
 
 	MENU_T* (*get_menu)();
 	bool (*get_menu_visible)();
