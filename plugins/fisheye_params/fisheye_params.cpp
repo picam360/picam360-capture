@@ -38,6 +38,7 @@ typedef struct _FISHEYE_PARAMS_T {
 typedef struct _plugin_private {
 	PLUGIN_T super;
 	FISHEYE_PARAMS_T fisheye_params[MAX_CAM_NUM];
+	FISHEYE_PARAMS_T fisheye_params_backup[MAX_CAM_NUM];
 } plugin_private;
 static plugin_private *lg_plugin = NULL;
 
@@ -178,6 +179,10 @@ static int _command_handler(int argc, char *argv[]) {
 	char *cmd = argv[0];
 	if (cmd == NULL) {
 		//do nothing
+	} else if (strcmp(cmd, "clear") == 0) {
+		for (int i = 0; i < MAX_CAM_NUM; i++) {
+			lg_plugin->fisheye_params[i] = lg_plugin->fisheye_params_backup[i];
+		}
 	} else if (strcmp(cmd, "set_cam_c") == 0) {
 		if (argv[1] == NULL) {
 			return -1;
@@ -334,9 +339,13 @@ static void init_options(void *user_data, json_t *_options) {
 		if (json_is_array(ary)) {
 			int size = json_array_size(ary);
 			for (int i = 0; i < size && i < MAX_CAM_NUM; i++) {
-				lg_plugin->fisheye_params[i].cam_fov = json_number_value(json_array_get(ary, i));
+				lg_plugin->fisheye_params[i].cam_fov = json_number_value(
+						json_array_get(ary, i));
 			}
 		}
+	}
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
+		lg_plugin->fisheye_params_backup[i] = lg_plugin->fisheye_params[i];
 	}
 }
 
@@ -418,6 +427,9 @@ static void save_options(void *user_data, json_t *_options) {
 			}
 		}
 		json_object_set_new(options, "cam_fov", ary);
+	}
+	for (int i = 0; i < MAX_CAM_NUM; i++) {
+		lg_plugin->fisheye_params_backup[i] = lg_plugin->fisheye_params[i];
 	}
 }
 
