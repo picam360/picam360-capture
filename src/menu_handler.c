@@ -188,8 +188,6 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			printf("stop loading\n");
 			menu->marked = false;
 			menu->selected = false;
-
-			state->options.config_ex_enabled = false;
 		} else if (!rtp_is_recording(state->rtp, NULL)
 				&& !rtp_is_loading(state->rtp, NULL)) {
 			char filepath[256];
@@ -200,13 +198,6 @@ static void packet_menu_load_node_callback(struct _MENU_T *menu,
 			printf("start loading %s\n", filepath);
 			menu->marked = true;
 			menu->selected = false;
-
-			//TODO
-//			{ //try loading configuration
-//				snprintf(state->options.config_ex_filepath, 256, "%s.json", filepath);
-//				init_options_ex(state);
-//				state->options.config_ex_enabled = true;
-//			}
 
 			snprintf(lg_convert_base_path, 256, VIDEO_FOLDER_PATH "/%s",
 					(char*) menu->user_data);
@@ -327,55 +318,6 @@ static void stereo_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	}
 }
 
-static void refraction_menu_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
-	switch (event) {
-	case MENU_EVENT_SELECTED:
-		for (int idx = 0; menu->parent->submenu[idx]; idx++) {
-			menu->parent->submenu[idx]->marked = false;
-		}
-		menu->marked = true;
-		menu->selected = false;
-		{
-			float value = 1.0;
-			switch ((intptr_t) menu->user_data) {
-			case 1:
-				value = 1.0;
-				break;
-			case 2:
-				value = 0.98;
-				break;
-			case 3:
-				value = 0.96;
-				break;
-			}
-			char cmd[256];
-			snprintf(cmd, 256, "set_camera_horizon_r_bias %f", value);
-			state->plugin_host.send_command(cmd);
-		}
-		{
-			float value = 1.0;
-			switch ((intptr_t) menu->user_data) {
-			case 1:
-				value = 1.0;
-				break;
-			case 2:
-				value = 1.1;
-				break;
-			case 3:
-				value = 1.3;
-				break;
-			}
-			state->refraction = value;
-		}
-		break;
-	case MENU_EVENT_DESELECTED:
-		break;
-	default:
-		break;
-	}
-}
-
 static void play_speed_menu_callback(struct _MENU_T *menu,
 		enum MENU_EVENT event) {
 	switch (event) {
@@ -441,25 +383,6 @@ static void resolution_menu_callback(struct _MENU_T *menu,
 	}
 }
 
-static void horizonr_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
-	switch (event) {
-	case MENU_EVENT_SELECTED:
-		if (1) {
-			float value = (intptr_t) menu->user_data;
-			value *= 0.01;
-			char cmd[256];
-			snprintf(cmd, 256, "add_camera_horizon_r *=%f", value);
-			state->plugin_host.send_command(cmd);
-		}
-		menu->selected = false;
-		break;
-	case MENU_EVENT_DESELECTED:
-		break;
-	default:
-		break;
-	}
-}
-
 static void fov_menu_callback(struct _MENU_T *menu, enum MENU_EVENT event) {
 	switch (event) {
 	case MENU_EVENT_SELECTED:
@@ -492,15 +415,6 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 				state->plugin_host.send_command(cmd);
 			}
 			break;
-		case CALIBRATION_CMD_IMAGE_CIRCLE:
-//TODO
-//			if (1) {
-//				if (state->frame) {
-//					state->frame->tmp_renderer = state->frame->renderer;
-//					state->frame->renderer = get_renderer("CALIBRATION");
-//				}
-//			}
-			break;
 		case CALIBRATION_CMD_VIEWER_COMPASS:
 			if (1) {
 				char cmd[256];
@@ -523,14 +437,6 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 		break;
 	case MENU_EVENT_DESELECTED:
 		switch ((intptr_t) menu->user_data) {
-		case CALIBRATION_CMD_IMAGE_CIRCLE:
-//TODO
-//			if (1) {
-//				if (state->frame) {
-//					state->frame->renderer = state->frame->tmp_renderer;
-//				}
-//			}
-			break;
 		case CALIBRATION_CMD_VIEWER_COMPASS:
 			if (1) {
 				char cmd[256];
@@ -544,98 +450,6 @@ static void calibration_menu_callback(struct _MENU_T *menu,
 			if (1) {
 				char cmd[256];
 				snprintf(cmd, 256, "upstream.mpu9250.stop_compass_calib");
-				state->plugin_host.send_command(cmd);
-			}
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
-}
-
-static void image_circle_calibration_menu_callback(struct _MENU_T *menu,
-		enum MENU_EVENT event) {
-	const float GAIN = 0.005;
-	switch (event) {
-	case MENU_EVENT_SELECTED:
-		switch ((intptr_t) menu->user_data) {
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-		case 9:
-			if (1) {
-				char name[64];
-				sprintf(name, "%ld", (intptr_t) menu->user_data - 1);
-				state->plugin_host.send_command(name);
-			}
-			menu->selected = false;
-			break;
-		case 10:				//x
-			break;
-		case 11:				//decrement x
-			if (1) {
-				float value = (int) 1;
-				value *= GAIN;
-				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_x %d=%f",
-						state->active_cam, value);
-				state->plugin_host.send_command(cmd);
-			}
-			menu->selected = false;
-			break;
-		case 12:				//increment x
-			if (1) {
-				float value = (int) -1;
-				value *= GAIN;
-				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_x %d=%f",
-						state->active_cam, value);
-				state->plugin_host.send_command(cmd);
-			}
-			menu->selected = false;
-			break;
-		case 20:				//y
-			break;
-		case 21:				//decrement y
-			if (1) {
-				float value = (int) 1;
-				value *= GAIN;
-				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_y %d=%f",
-						state->active_cam, value);
-				state->plugin_host.send_command(cmd);
-			}
-			menu->selected = false;
-			break;
-		case 22:				//increment y
-			if (1) {
-				float value = (int) -1;
-				value *= GAIN;
-				char cmd[256];
-				snprintf(cmd, 256, "add_camera_offset_y %d=%f",
-						state->active_cam, value);
-				state->plugin_host.send_command(cmd);
-			}
-			menu->selected = false;
-			break;
-		default:
-			break;
-		}
-		break;
-	case MENU_EVENT_DESELECTED:
-		switch ((intptr_t) menu->user_data) {
-		case 30:
-			if (1) {
-				char cmd[256];
-				snprintf(cmd, 256, "stop_ac");
 				state->plugin_host.send_command(cmd);
 			}
 			break;
@@ -712,21 +526,6 @@ void init_menu_handler(PICAM360CAPTURE_T *_state) {
 			MENU_T *on_menu = menu_add_submenu(sub_menu,
 					menu_new("On", sync_menu_callback, (void*) true), INT_MAX);
 			on_menu->marked = true;
-		}
-		MENU_T *refraction_menu = menu_add_submenu(sub_menu,
-				menu_new("Refraction", NULL, NULL), INT_MAX);
-		{
-			MENU_T *sub_menu = refraction_menu;
-			menu_add_submenu(sub_menu,
-					menu_new("Air", refraction_menu_callback, (void*) 1),
-					INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new("AcrylicDome", refraction_menu_callback,
-							(void*) 2), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new("UnderWater", refraction_menu_callback, (void*) 3),
-					INT_MAX);
-			refraction_menu->submenu[0]->marked = true;
 		}
 		MENU_T *stereo_menu = menu_add_submenu(sub_menu,
 				menu_new("Stereo", NULL, NULL), INT_MAX);
@@ -820,50 +619,6 @@ void init_menu_handler(PICAM360CAPTURE_T *_state) {
 	{
 		MENU_T *sub_menu = menu_add_submenu(menu,
 				menu_new("Calibration", NULL, NULL), INT_MAX);
-		MENU_T *image_circle_menu = menu_add_submenu(sub_menu,
-				menu_new("ImageCircle", calibration_menu_callback,
-						(void*) CALIBRATION_CMD_IMAGE_CIRCLE), INT_MAX);
-		{
-			MENU_T *sub_menu = image_circle_menu;
-			MENU_T *image_circle_cam_menu = menu_add_submenu(sub_menu,
-					menu_new("cam", image_circle_calibration_menu_callback,
-							(void*) 0), INT_MAX);
-			{
-				MENU_T *sub_menu = image_circle_cam_menu;
-				for (int i = 0; i < state->num_of_cam; i++) {
-					char name[64];
-					sprintf(name, "%d", i);
-					menu_add_submenu(sub_menu,
-							menu_new(name,
-									image_circle_calibration_menu_callback,
-									(void*) (intptr_t)(i + 1)), INT_MAX);
-				}
-			}
-			MENU_T *image_circle_x_menu = menu_add_submenu(sub_menu,
-					menu_new("x", image_circle_calibration_menu_callback,
-							(void*) 10), INT_MAX);
-			{
-				MENU_T *sub_menu = image_circle_x_menu;
-				menu_add_submenu(sub_menu,
-						menu_new("-", image_circle_calibration_menu_callback,
-								(void*) 11), INT_MAX);
-				menu_add_submenu(sub_menu,
-						menu_new("+", image_circle_calibration_menu_callback,
-								(void*) 12), INT_MAX);
-			}
-			MENU_T *image_circle_y_menu = menu_add_submenu(sub_menu,
-					menu_new("y", image_circle_calibration_menu_callback,
-							(void*) 20), INT_MAX);
-			{
-				MENU_T *sub_menu = image_circle_y_menu;
-				menu_add_submenu(sub_menu,
-						menu_new("-", image_circle_calibration_menu_callback,
-								(void*) 21), INT_MAX);
-				menu_add_submenu(sub_menu,
-						menu_new("+", image_circle_calibration_menu_callback,
-								(void*) 22), INT_MAX);
-			}
-		}
 		MENU_T *image_params_menu = menu_add_submenu(sub_menu,
 				menu_new("ImageParams", calibration_menu_callback,
 						(void*) CALIBRATION_CMD_IMAGE_PARAMS), INT_MAX);
@@ -973,15 +728,6 @@ void init_menu_handler(PICAM360CAPTURE_T *_state) {
 		menu_add_submenu(sub_menu,
 				menu_new("VehicleCompass", calibration_menu_callback,
 						(void*) CALIBRATION_CMD_VEHICLE_COMPASS), INT_MAX);
-		MENU_T *horizonr_menu = menu_add_submenu(sub_menu,
-				menu_new("HorizonR", NULL, NULL), 0);
-		{
-			MENU_T *sub_menu = horizonr_menu;
-			menu_add_submenu(sub_menu,
-					menu_new("-", horizonr_menu_callback, (void*) -1), INT_MAX);
-			menu_add_submenu(sub_menu,
-					menu_new("+", horizonr_menu_callback, (void*) 1), INT_MAX);
-		}
 		menu_add_submenu(sub_menu,
 				menu_new("Save", calibration_menu_callback,
 						(void*) CALIBRATION_CMD_SAVE), INT_MAX);

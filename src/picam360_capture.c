@@ -84,8 +84,6 @@
 
 static void init_options(PICAM360CAPTURE_T *state);
 static void save_options(PICAM360CAPTURE_T *state);
-static void init_options_ex(PICAM360CAPTURE_T *state);
-static void save_options_ex(PICAM360CAPTURE_T *state);
 static void exit_func(void);
 
 static void loading_callback(void *user_data, int ret);
@@ -172,100 +170,6 @@ static void get_logo_image(PICAM360_IMAGE_T *img) {
 	}
 	if (img) {
 		*img = state->logo_image;
-	}
-}
-
-static void get_rendering_params(VECTOR4D_T view_quat,
-		RENDERING_PARAMS_T *params) {
-	{
-		//params->stereo = frame->stereo;
-		//params->fov = frame->fov;
-		params->active_cam = state->active_cam;
-		params->num_of_cam = state->num_of_cam;
-	}
-	{ //cam_attitude //depth axis is z, vertical asis is y
-		float view_matrix[16];
-		float north_matrix[16];
-		float world_matrix[16];
-
-		{ // Rv : view
-			mat4_identity(view_matrix);
-			mat4_fromQuat(view_matrix, view_quat.ary);
-			mat4_invert(view_matrix, view_matrix);
-		}
-
-		{ // Rn : north
-			mat4_identity(north_matrix);
-			float north = state->plugin_host.get_view_north();
-			mat4_rotateY(north_matrix, north_matrix, north * M_PI / 180);
-		}
-
-		{ // Rw : view coodinate to world coodinate and view heading to ground initially
-			mat4_identity(world_matrix);
-			mat4_rotateX(world_matrix, world_matrix, -M_PI / 2);
-		}
-
-		for (int i = 0; i < state->num_of_cam; i++) {
-			float *unif_matrix = params->cam_attitude[i];
-			float cam_matrix[16];
-			{ // Rc : cam orientation
-				mat4_identity(cam_matrix);
-				if (state->camera_coordinate_from_device) {
-					mat4_fromQuat(cam_matrix, state->camera_quaternion[i].ary);
-				} else {
-					//euler Y(yaw)X(pitch)Z(roll)
-					mat4_rotateZ(cam_matrix, cam_matrix, state->camera_roll);
-					mat4_rotateX(cam_matrix, cam_matrix, state->camera_pitch);
-					mat4_rotateY(cam_matrix, cam_matrix, state->camera_yaw);
-				}
-			}
-
-			{ // Rco : cam offset  //euler Y(yaw)X(pitch)Z(roll)
-				float *cam_offset_matrix = params->cam_offset_matrix[i];
-				mat4_identity(cam_offset_matrix);
-				mat4_rotateZ(cam_offset_matrix, cam_offset_matrix,
-						state->options.cam_offset_roll[i]);
-				mat4_rotateX(cam_offset_matrix, cam_offset_matrix,
-						state->options.cam_offset_pitch[i]);
-				mat4_rotateY(cam_offset_matrix, cam_offset_matrix,
-						state->options.cam_offset_yaw[i]);
-				mat4_invert(cam_offset_matrix, cam_offset_matrix);
-				mat4_multiply(cam_matrix, cam_matrix, cam_offset_matrix); // Rc'=RcoRc
-			}
-
-			{ //RcRv(Rc^-1)RcRw
-				mat4_identity(unif_matrix);
-				mat4_multiply(unif_matrix, unif_matrix, world_matrix); // Rw
-				mat4_multiply(unif_matrix, unif_matrix, view_matrix); // RvRw
-				//mat4_multiply(unif_matrix, unif_matrix, north_matrix); // RnRvRw
-				mat4_multiply(unif_matrix, unif_matrix, cam_matrix); // RcRnRvRw
-			}
-			mat4_transpose(unif_matrix, unif_matrix); // this mat4 library is row primary, opengl is column primary
-//			{
-//				//normalize det = 1
-//				float det = mat4_determinant(unif_matrix);
-//				float det_4 = pow(det, 0.25);
-//				for (int i = 0; i < 16; i++) {
-//					unif_matrix[i] / det_4;
-//				}
-//				//printf("det=%f, %f, %f\n", det, pow(det, 0.25), mat4_determinant(unif_matrix));
-//			}
-		}
-	}
-	{ //cam_options
-		for (int i = 0; i < state->num_of_cam; i++) {
-			params->cam_offset_x[i] = state->options.cam_offset_x[i];
-			params->cam_offset_y[i] = state->options.cam_offset_y[i];
-			params->cam_horizon_r[i] = state->options.cam_horizon_r[i];
-			params->cam_aov[i] = state->options.cam_aov[i];
-			if (state->options.config_ex_enabled) {
-				params->cam_offset_x[i] += state->options.cam_offset_x_ex[i];
-				params->cam_offset_y[i] += state->options.cam_offset_y_ex[i];
-				params->cam_horizon_r[i] += state->options.cam_horizon_r_ex[i];
-			}
-			params->cam_horizon_r[i] *= state->camera_horizon_r_bias;
-			params->cam_aov[i] /= state->refraction;
-		}
 	}
 }
 
@@ -605,37 +509,6 @@ static void init_options(PICAM360CAPTURE_T *state) {
 			json_object_get(options, "color_offset"));
 	state->options.overlap = json_number_value(
 			json_object_get(options, "overlap"));
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_offset_pitch", i);
-		state->options.cam_offset_pitch[i] = json_number_value(
-				json_object_get(options, buff));
-		sprintf(buff, "cam%d_offset_yaw", i);
-		state->options.cam_offset_yaw[i] = json_number_value(
-				json_object_get(options, buff));
-		sprintf(buff, "cam%d_offset_roll", i);
-		state->options.cam_offset_roll[i] = json_number_value(
-				json_object_get(options, buff));
-		sprintf(buff, "cam%d_offset_x", i);
-		state->options.cam_offset_x[i] = json_number_value(
-				json_object_get(options, buff));
-		sprintf(buff, "cam%d_offset_y", i);
-		state->options.cam_offset_y[i] = json_number_value(
-				json_object_get(options, buff));
-		sprintf(buff, "cam%d_horizon_r", i);
-		state->options.cam_horizon_r[i] = json_number_value(
-				json_object_get(options, buff));
-		sprintf(buff, "cam%d_aov", i);
-		state->options.cam_aov[i] = json_number_value(
-				json_object_get(options, buff));
-
-		if (state->options.cam_horizon_r[i] == 0) {
-			state->options.cam_horizon_r[i] = 0.8;
-		}
-		if (state->options.cam_aov[i] == 0) {
-			state->options.cam_aov[i] = 245;
-		}
-	}
 	{ //rtp
 		state->options.rtp_rx_port = json_number_value(
 				json_object_get(options, "rtp_rx_port"));
@@ -716,30 +589,6 @@ static void save_options(PICAM360CAPTURE_T *state) {
 	json_object_set_new(options, "color_offset",
 			json_real(state->options.color_offset));
 	json_object_set_new(options, "overlap", json_real(state->options.overlap));
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_offset_pitch", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_pitch[i]));
-		sprintf(buff, "cam%d_offset_yaw", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_yaw[i]));
-		sprintf(buff, "cam%d_offset_roll", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_roll[i]));
-		sprintf(buff, "cam%d_offset_x", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_x[i]));
-		sprintf(buff, "cam%d_offset_y", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_y[i]));
-		sprintf(buff, "cam%d_horizon_r", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_horizon_r[i]));
-		sprintf(buff, "cam%d_aov", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_aov[i]));
-	}
 	{ //rtp
 		json_object_set_new(options, "rtp_rx_port",
 				json_integer(state->options.rtp_rx_port));
@@ -796,47 +645,6 @@ static void save_options(PICAM360CAPTURE_T *state) {
 
 	json_decref(options);
 }
-
-static void init_options_ex(PICAM360CAPTURE_T *state) {
-	json_error_t error;
-	json_t *options = json_load_file(state->options.config_ex_filepath, 0,
-			&error);
-	if (options != NULL) {
-		for (int i = 0; i < state->num_of_cam; i++) {
-			char buff[256];
-			sprintf(buff, "cam%d_offset_x", i);
-			state->options.cam_offset_x_ex[i] = json_number_value(
-					json_object_get(options, buff));
-			sprintf(buff, "cam%d_offset_y", i);
-			state->options.cam_offset_y_ex[i] = json_number_value(
-					json_object_get(options, buff));
-			sprintf(buff, "cam%d_horizon_r", i);
-			state->options.cam_horizon_r_ex[i] = json_number_value(
-					json_object_get(options, buff));
-		}
-	}
-}
-
-static void save_options_ex(PICAM360CAPTURE_T *state) {
-	json_t *options = json_object();
-
-	for (int i = 0; i < state->num_of_cam; i++) {
-		char buff[256];
-		sprintf(buff, "cam%d_offset_x", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_x_ex[i]));
-		sprintf(buff, "cam%d_offset_y", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_offset_y_ex[i]));
-		sprintf(buff, "cam%d_horizon_r", i);
-		json_object_set_new(options, buff,
-				json_real(state->options.cam_horizon_r_ex[i]));
-	}
-
-	json_dump_file(options, state->options.config_ex_filepath, JSON_INDENT(4));
-
-	json_decref(options);
-}
 //------------------------------------------------------------------------------
 
 static void exit_func(void) {
@@ -863,8 +671,6 @@ static int _command_handler(int argc, char *argv[]) {
 			state->plugin_host.send_command(cmd);
 		}
 		printf("save config done\n");
-	} else if (cmd[1] == '\0' && cmd[0] >= '0' && cmd[0] <= '9') {
-		state->active_cam = cmd[0] - '0';
 	} else if (strcmp(cmd, "snap") == 0) {
 		//TODO
 	} else if (strcmp(cmd, "build_vstream") == 0) {
@@ -1021,129 +827,6 @@ static int _command_handler(int argc, char *argv[]) {
 			state->preview = (argv[1][0] == '1');
 			printf("set_preview %s\n", argv[1]);
 		}
-	} else if (strcmp(cmd, "add_camera_horizon_r") == 0) {
-		if (argv[1] != NULL) {
-			float *cam_horizon_r =
-					(state->options.config_ex_enabled) ?
-							state->options.cam_horizon_r_ex :
-							state->options.cam_horizon_r;
-
-			int cam_num = 0;
-			float value = 0;
-			if (argv[1][0] == '*') {
-				sscanf(argv[1], "*=%f", &value);
-				for (int i = 0; i < state->num_of_cam; i++) {
-					cam_horizon_r[i] += value;
-				}
-			} else {
-				sscanf(argv[1], "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < state->num_of_cam) {
-					cam_horizon_r[cam_num] += value;
-				}
-			}
-
-			if (state->options.config_ex_enabled) { //try loading configuration
-				save_options_ex(state);
-			} else { //send upstream
-				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_horizon_r %s", argv[1]);
-				state->plugin_host.send_command(cmd);
-			}
-
-			printf("add_camera_horizon_r : completed\n");
-		}
-	} else if (strcmp(cmd, "add_camera_offset_x") == 0) {
-		if (argv[1] != NULL) {
-			float *cam_offset_x =
-					(state->options.config_ex_enabled) ?
-							state->options.cam_offset_x_ex :
-							state->options.cam_offset_x;
-
-			int cam_num = 0;
-			float value = 0;
-			if (argv[1][0] == '*') {
-				sscanf(argv[1], "*=%f", &value);
-				for (int i = 0; i < state->num_of_cam; i++) {
-					cam_offset_x[i] += value;
-				}
-			} else {
-				sscanf(argv[1], "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < state->num_of_cam) {
-					cam_offset_x[cam_num] += value;
-				}
-			}
-
-			if (state->options.config_ex_enabled) { //try loading configuration
-				save_options_ex(state);
-			} else { //send upstream
-				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_offset_x %s", argv[1]);
-				state->plugin_host.send_command(cmd);
-			}
-
-			printf("add_camera_offset_x : completed\n");
-		}
-	} else if (strcmp(cmd, "add_camera_offset_y") == 0) {
-		if (argv[1] != NULL) {
-			float *cam_offset_y =
-					(state->options.config_ex_enabled) ?
-							state->options.cam_offset_y_ex :
-							state->options.cam_offset_y;
-
-			int cam_num = 0;
-			float value = 0;
-			if (argv[1][0] == '*') {
-				sscanf(argv[1], "*=%f", &value);
-				for (int i = 0; i < state->num_of_cam; i++) {
-					cam_offset_y[i] += value;
-				}
-			} else {
-				sscanf(argv[1], "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < state->num_of_cam) {
-					cam_offset_y[cam_num] += value;
-				}
-			}
-
-			if (state->options.config_ex_enabled) { //try loading configuration
-				save_options_ex(state);
-			} else { //send upstream
-				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_offset_y %s", argv[1]);
-				state->plugin_host.send_command(cmd);
-			}
-
-			printf("add_camera_offset_y : completed\n");
-		}
-	} else if (strcmp(cmd, "add_camera_offset_yaw") == 0) {
-		if (argv[1] != NULL) {
-			int cam_num = 0;
-			float value = 0;
-			if (argv[1][0] == '*') {
-				sscanf(argv[1], "*=%f", &value);
-				for (int i = 0; i < state->num_of_cam; i++) {
-					state->options.cam_offset_yaw[i] += value;
-				}
-			} else {
-				sscanf(argv[1], "%d=%f", &cam_num, &value);
-				if (cam_num >= 0 && cam_num < state->num_of_cam) {
-					state->options.cam_offset_yaw[cam_num] += value;
-				}
-			}
-			{ //send upstream
-				char cmd[256];
-				sprintf(cmd, "upstream.add_camera_offset_yaw %s", argv[1]);
-				state->plugin_host.send_command(cmd);
-			}
-
-			printf("add_camera_offset_yaw : completed\n");
-		}
-	} else if (strcmp(cmd, "set_camera_horizon_r_bias") == 0) {
-		if (argv[1] != NULL) {
-			float value = 0;
-			sscanf(argv[1], "%f", &value);
-			state->camera_horizon_r_bias = value;
-			printf("set_camera_horizon_r_bias : completed\n");
-		}
 	} else if (strcmp(cmd, "set_play_speed") == 0) {
 		if (argv[1] != NULL) {
 			float value = 0;
@@ -1177,32 +860,6 @@ static int _command_handler(int argc, char *argv[]) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_NEXT);
 	} else if (strcmp(cmd, "back2previouse_menu") == 0) {
 		menu_operate(state->menu, MENU_OPERATE_ACTIVE_BACK);
-//	} else if (state->frame != NULL && strcasecmp(state->frame->renderer->name, "CALIBRATION") == 0) {
-//		static double calib_step = 0.01;
-//		if (strcmp(cmd, "step") == 0) {
-//			char *param = strtok(NULL, " \n");
-//			if (param != NULL) {
-//				sscanf(param, "%lf", &calib_step);
-//			}
-//		}
-//		if (strcmp(cmd, "u") == 0 || strcmp(cmd, "t") == 0) {
-//			state->options.cam_offset_y[state->active_cam] += calib_step;
-//		}
-//		if (strcmp(cmd, "d") == 0 || strcmp(cmd, "b") == 0) {
-//			state->options.cam_offset_y[state->active_cam] -= calib_step;
-//		}
-//		if (strcmp(cmd, "l") == 0) {
-//			state->options.cam_offset_x[state->active_cam] += calib_step;
-//		}
-//		if (strcmp(cmd, "r") == 0) {
-//			state->options.cam_offset_x[state->active_cam] -= calib_step;
-//		}
-//		if (strcmp(cmd, "s") == 0) {
-//			state->options.sharpness_gain += calib_step;
-//		}
-//		if (strcmp(cmd, "w") == 0) {
-//			state->options.sharpness_gain -= calib_step;
-//		}
 	} else {
 		printf("unknown command : %s\n", cmd);
 	}
@@ -1331,36 +988,6 @@ static float get_view_north() {
 
 static int get_number_of_cameras() {
 	return state->num_of_cam;
-}
-static VECTOR4D_T get_camera_offset(int cam_num) {
-	VECTOR4D_T ret = { };
-	pthread_mutex_lock(&state->mutex);
-
-	if (cam_num >= 0 && cam_num < state->num_of_cam) {
-		ret.x = state->options.cam_offset_x[cam_num];
-		ret.y = state->options.cam_offset_y[cam_num];
-		ret.z = state->options.cam_offset_yaw[cam_num];
-		ret.w = state->options.cam_horizon_r[cam_num];
-	}
-
-	pthread_mutex_unlock(&state->mutex);
-	return ret;
-}
-static void set_camera_offset(int cam_num, VECTOR4D_T value) {
-	if (!state->conf_sync) {
-		return;
-	}
-
-	pthread_mutex_lock(&state->mutex);
-
-	if (cam_num >= 0 && cam_num < state->num_of_cam) {
-		state->options.cam_offset_x[cam_num] = value.x;
-		state->options.cam_offset_y[cam_num] = value.y;
-		state->options.cam_offset_yaw[cam_num] = value.z;
-		state->options.cam_horizon_r[cam_num] = value.w;
-	}
-
-	pthread_mutex_unlock(&state->mutex);
 }
 
 static VECTOR4D_T get_camera_quaternion(int cam_num) {
@@ -1494,7 +1121,6 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 		quat = state->quaternion_queue[cur];
 	}
 	VECTOR4D_T compass = state->mpu->get_compass(state->mpu);
-	VECTOR4D_T camera_offset = state->plugin_host.get_camera_offset(cam_num);
 
 	xmp_len = 0;
 	buff[xmp_len++] = 0xFF;
@@ -1522,9 +1148,6 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 			compass.x, compass.y, compass.z);
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />",
 			state->mpu->get_temperature(state->mpu));
-	xmp_len += sprintf(buff + xmp_len,
-			"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
-			camera_offset.x, camera_offset.y, camera_offset.z, camera_offset.w);
 	xmp_len += sprintf(buff + xmp_len, "<timestamp sec=\"%lu\" usec=\"%lu\" />",
 			(uint64_t) timestamp.tv_sec, (uint64_t) timestamp.tv_usec);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
@@ -1734,8 +1357,6 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.get_view_north = get_view_north;
 
 		state->plugin_host.get_number_of_cameras = get_number_of_cameras;
-		state->plugin_host.get_camera_offset = get_camera_offset;
-		state->plugin_host.set_camera_offset = set_camera_offset;
 		state->plugin_host.get_camera_quaternion = get_camera_quaternion;
 		state->plugin_host.set_camera_quaternion = set_camera_quaternion;
 		state->plugin_host.get_camera_compass = get_camera_compass;
@@ -1754,7 +1375,6 @@ static void init_plugin_host(PICAM360CAPTURE_T *state) {
 		state->plugin_host.set_texture_size = set_texture_size;
 		state->plugin_host.load_texture = load_texture;
 		state->plugin_host.get_logo_image = get_logo_image;
-		state->plugin_host.get_rendering_params = get_rendering_params;
 		state->plugin_host.cal_transform_matrix = cal_transform_matrix;
 
 		state->plugin_host.get_menu = get_menu;
@@ -2040,8 +1660,6 @@ int main(int argc, char *argv[]) {
 	state->input_mode = INPUT_MODE_CAM;
 	state->output_raw = false;
 	state->conf_sync = true;
-	state->camera_horizon_r_bias = 1.0;
-	state->refraction = 1.0;
 	state->rtp_play_speed = 1.0;
 	strncpy(state->default_view_coordinate_mode, "manual",
 			sizeof(state->default_view_coordinate_mode));

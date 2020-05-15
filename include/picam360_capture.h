@@ -43,19 +43,6 @@ typedef struct _OPTIONS_T {
 	float sharpness_gain;
 	float color_offset;
 	float overlap;
-	float cam_offset_pitch[MAX_CAM_NUM]; // x axis
-	float cam_offset_yaw[MAX_CAM_NUM]; // y axis
-	float cam_offset_roll[MAX_CAM_NUM]; // z axis
-	float cam_offset_x[MAX_CAM_NUM];
-	float cam_offset_y[MAX_CAM_NUM];
-	float cam_horizon_r[MAX_CAM_NUM];
-	float cam_aov[MAX_CAM_NUM];
-
-	char config_ex_filepath[256];
-	bool config_ex_enabled;
-	float cam_offset_x_ex[MAX_CAM_NUM];
-	float cam_offset_y_ex[MAX_CAM_NUM];
-	float cam_horizon_r_ex[MAX_CAM_NUM];
 
 	float view_offset_pitch; // x axis
 	float view_offset_yaw; // y axis
@@ -149,7 +136,6 @@ typedef struct _PICAM360CAPTURE_T {
 
 	EGL_HANDLER_T egl_handler;
 
-	int active_cam;
 	int num_of_cam;
 	pthread_t thread[MAX_CAM_NUM];
 	GLuint cam_texture[MAX_CAM_NUM][TEXTURE_BUFFER_NUM]; //double buffer
@@ -182,13 +168,11 @@ typedef struct _PICAM360CAPTURE_T {
 
 	//for unif matrix
 	//euler angles
-	float refraction;
 	float camera_pitch; // x axis
 	float camera_yaw; // y axis
 	float camera_roll; // z axis
 	VECTOR4D_T camera_quaternion[MAX_CAM_NUM + 1];
 	VECTOR4D_T camera_compass;
-	float camera_horizon_r_bias;
 	float camera_temperature;
 	float camera_north;
 	bool camera_coordinate_from_device;

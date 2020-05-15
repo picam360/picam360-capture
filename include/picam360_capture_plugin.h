@@ -93,20 +93,6 @@ typedef struct _VSTREAMER_FACTORY_T {
 	void *user_data;
 } VSTREAMER_FACTORY_T;
 
-typedef struct _RENDERING_PARAMS_T {
-	bool stereo;
-	float fov;
-	int active_cam;
-	int num_of_cam;
-	float cam_offset_matrix[MAX_CAM_NUM][16];
-	float cam_attitude[MAX_CAM_NUM][16];
-	float cam_offset_yaw[MAX_CAM_NUM];
-	float cam_offset_x[MAX_CAM_NUM];
-	float cam_offset_y[MAX_CAM_NUM];
-	float cam_horizon_r[MAX_CAM_NUM];
-	float cam_aov[MAX_CAM_NUM];
-} RENDERING_PARAMS_T;
-
 typedef struct _STATUS_T {
 	char name[64];
 	void (*get_value)(void *user_data, char *buff, int buff_len);
@@ -157,8 +143,6 @@ typedef struct _PLUGIN_HOST_T {
 	void (*set_texture_size)(uint32_t width, uint32_t height);
 	int (*load_texture)(const char *filename, uint32_t *tex_out);
 	void (*get_logo_image)(PICAM360_IMAGE_T *img);
-	void (*get_rendering_params)(VECTOR4D_T view_quat,
-			RENDERING_PARAMS_T *params);
 	void (*cal_transform_matrix)(VECTOR4D_T view_quat, VECTOR4D_T cam_quat,
 			VECTOR4D_T cam_offset, float *unif_matrix);
 
